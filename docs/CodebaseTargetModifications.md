@@ -1,5 +1,7 @@
 # Codebase Target Modifications Plan
 
+> Document status (2026-07-05): archival implementation reference. The file-level targets in this document guided the coordinate/window migration, but snippets should not be treated as exact current source. Use `SparkleRecorderArchitecture.md`, `DOCUMENTATION_STATUS.md`, and `automation-engine/` for current direction.
+
 This document details the exact file changes, target functions, and implementation code snippets required to construct the upgraded coordinate and window tracker systems.
 
 ---
@@ -25,19 +27,19 @@ This document details the exact file changes, target functions, and implementati
 
   public struct RecordedEvent: Codable, Equatable {
       // ... existing properties ...
-      
+
       // Phase 1: Flat fields implementation
       public var windowLocalX: CGFloat?
       public var windowLocalY: CGFloat?
       public var windowNormalizedX: CGFloat?
       public var windowNormalizedY: CGFloat?
-      
+
       public var coordinateBinding: CoordinateBinding?
       public var coordinateStrategy: CoordinateStrategy?
-      
+
       // Multi-App workflow window surface mapping
       public var surfaceId: String?
-      
+
       // Swift will auto-derive if no custom CodingKeys are used. If custom CodingKeys are present,
       // add coding keys and use decodeIfPresent.
   }
@@ -53,13 +55,13 @@ This document details the exact file changes, target functions, and implementati
   @MainActor
   final class Recorder: ObservableObject {
       // ... existing properties ...
-      
+
       // Maps surfaceId to captured window metadata
       @Published var activeSurfaces: [String: PlaybackSurface] = [:]
-      
+
       // Tracks the currently focused surface ID during recording
       private var activeSurfaceId: String? = nil
-      
+
       // Locks the surface ID during mouse drag gestures
       private var activeGestureSurfaceId: String? = nil
   ```
@@ -69,10 +71,10 @@ This document details the exact file changes, target functions, and implementati
   final class RecordingSurfaceTracker {
       private var timer: Timer?
       private let capture = WindowSurfaceCapture()
-      
+
       // Thread-safe cached active surface
       private(set) var cachedActiveSurface: PlaybackSurface?
-      
+
       func startTracking() {
           timer = Timer.scheduledTimer(withTimeInterval: 0.15, repeats: true) { [weak self] _ in
               DispatchQueue.global(qos: .userInteractive).async {
@@ -83,7 +85,7 @@ This document details the exact file changes, target functions, and implementati
               }
           }
       }
-      
+
       func stopTracking() {
           timer?.invalidate()
           timer = nil
@@ -112,12 +114,12 @@ This document details the exact file changes, target functions, and implementati
   private func handle(type: CGEventType, event: CGEvent) {
       // ...
       let loc = event.location
-      
+
       // Lock surfaceId during gestures (mouseDown -> mouseUp)
       if type == .leftMouseDown || type == .rightMouseDown || type == .otherMouseDown {
           activeGestureSurfaceId = activeSurfaceId
       }
-      
+
       // Match active window using the cached surface from RecordingSurfaceTracker
       if let currentFocusedWindow = surfaceTracker.cachedActiveSurface {
           // Use multi-factor surface matcher (Scoring-based matcher) instead of raw bundleIdentifier checks
@@ -129,27 +131,27 @@ This document details the exact file changes, target functions, and implementati
               self.activeSurfaceId = nextId
           }
       }
-      
+
       let targetId = activeGestureSurfaceId ?? activeSurfaceId
-      
+
       // Release gesture lock at mouseUp
       if type == .leftMouseUp || type == .rightMouseUp || type == .otherMouseUp {
           activeGestureSurfaceId = nil
       }
-      
+
       var localX: CGFloat? = nil
       var localY: CGFloat? = nil
       var normX: CGFloat? = nil
       var normY: CGFloat? = nil
       var binding: CoordinateBinding = .unbound
-      
+
       if let sId = targetId, let surface = activeSurfaces[sId] {
           let frame = surface.recordedFrame
-          let isInsideSurface = loc.x >= frame.x && 
-                                loc.x <= (frame.x + frame.width) && 
-                                loc.y >= frame.y && 
+          let isInsideSurface = loc.x >= frame.x &&
+                                loc.x <= (frame.x + frame.width) &&
+                                loc.y >= frame.y &&
                                 loc.y <= (frame.y + frame.height)
-          
+
           if isInsideSurface {
               let lx = loc.x - frame.x
               let ly = loc.y - frame.y
@@ -162,7 +164,7 @@ This document details the exact file changes, target functions, and implementati
               binding = .globalScreen
           }
       }
-      
+
       let recorded = RecordedEvent(
           kind: kind,
           time: elapsed,
@@ -175,7 +177,7 @@ This document details the exact file changes, target functions, and implementati
           coordinateStrategy: .windowLocalPreferred,
           surfaceId: targetId
       )
-      
+
       // UI / State updates dispatched back safely to MainActor
       DispatchQueue.main.async {
           self.pending.append(recorded)
@@ -203,56 +205,56 @@ This document details the exact file changes, target functions, and implementati
   public func resolve(_ event: RecordedEvent, context: PlaybackContext) -> Result<CGPoint, PointResolveError> {
       let original = CGPoint(x: event.x, y: event.y)
       let mapper = CoordinateMapper()
-      
+
       // Determine binding type
       let binding = event.coordinateBinding ?? .unbound
-      
+
       switch binding {
       case .globalScreen:
           // Keep screen-absolute coordinates completely unaltered
           return .success(original)
-          
+
       case .targetWindow:
           guard context.coordinateMode == .boundWindowOffset else {
               return .success(original)
           }
-          
+
           let targetSurfaceId = event.surfaceId ?? "surface-1"
           guard let currentFrame = context.currentSurfaceFrames[targetSurfaceId] else {
               return .failure(.missingWindowFrame(targetSurfaceId))
           }
-          
+
           var resolvedPoint = original
           let strategy = event.coordinateStrategy ?? .windowLocalPreferred
-          
+
           switch strategy {
           case .windowLocalPreferred:
               guard let lx = event.windowLocalX, let ly = event.windowLocalY else {
                   return .failure(.missingWindowLocalPoint)
               }
               resolvedPoint = mapper.resolveWindowLocalPoint(CGPoint(x: lx, y: ly), in: currentFrame)
-              
+
           case .normalizedPreferred:
               guard let nx = event.windowNormalizedX, let ny = event.windowNormalizedY else {
                   return .failure(.missingNormalizedPoint)
               }
               resolvedPoint = mapper.resolveNormalizedPoint(CGPoint(x: nx, y: ny), in: currentFrame)
-              
+
           case .absoluteOnly:
               resolvedPoint = original
-              
+
           case .locatorOnly:
               // locatorOnly strictly expects LocatorEngine processing, resolver fails
               return .failure(.locatorOnlyRequiresLocatorEngine)
           }
-          
+
           // Fail-Safe Out-Of-Bounds Check
           guard mapper.assertPointIsInsideWindow(resolvedPoint, in: currentFrame) else {
               return .failure(.resolvedPointOutOfBounds(resolvedPoint, currentFrame))
           }
-          
+
           return .success(resolvedPoint)
-          
+
       case .unbound:
           // Fallback legacy offset behavior for v1 macros
           if let targetSurfaceId = event.surfaceId,

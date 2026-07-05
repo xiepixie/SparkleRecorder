@@ -1,5 +1,7 @@
 # SparkleRecorder 项目架构
 
+> 文档状态（2026-07-05）：这是当前产品心智模型和架构快照。Swift 6、录制边界、播放器失败证据等底座已经继续推进；定时启动、依赖编排、资源仲裁和 FlowGraph 还没有进入产品代码，后续以 [DOCUMENTATION_STATUS.md](DOCUMENTATION_STATUS.md) 与 [automation-engine/README.md](automation-engine/README.md) 跟踪。
+
 本文记录 SparkleRecorder 当前的数据结构、动作设计、用户使用逻辑和功能边界，便于后续继续重构或扩展。
 
 ## 1. 项目定位

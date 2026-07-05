@@ -1,5 +1,7 @@
 # Vision Architecture & System Evolution Plan
 
+> 文档状态（2026-07-05）：视觉/OCR 约束仍有效。当前已采用 coordinate-first、vision-assisted 的方向，并已有 `TextAnchor` / `LocatorEngine` 等基础；复杂状态树、条件分支和 OCR outcome 路由不在本文件继续扩展，后续归入 `automation-engine/`。
+
 ## 1. 核心理念 (Core Philosophy)
 系统遵循 **Coordinate-first, Vision-assisted** 的原则：
 - **坐标是默认真相**：主执行路径应依赖坐标（速度最快、效率最高）。

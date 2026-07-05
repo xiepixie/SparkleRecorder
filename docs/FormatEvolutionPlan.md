@@ -1,5 +1,7 @@
 # SparkleRecorder Format Evolution Plan
 
+> 文档状态（2026-07-05）：格式演进参考，未全部实现。当前仍保留 `.tinyrec` 兼容；第一版编排持久化先采用 `automations.json`，复杂 `.sparkrec` / `.sparkflow` 包格式等工作流、证据和 UI 稳定后再落地。
+
 本文定义 SparkleRecorder 宏、脚本和未来视觉自动化资源的格式命名与演进方向。
 
 ## 1. 命名建议

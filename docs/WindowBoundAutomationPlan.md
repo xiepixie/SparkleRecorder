@@ -2,13 +2,15 @@
 ## Architecture Draft v0.9
 ### From Screen-Coordinate Replay to Window-Relative, Visual, and Semantic Automation
 
+> Document status (2026-07-05): partially implemented architecture reference. Completed or mostly completed: `PlaybackSurface`, `PlaybackContext`, `PointResolver`, `WindowContextClient`, OCR locator flow, and failure evidence plumbing. Remaining: multi-backend executor, AX/AppleEvent semantic actions, background-visible constraints, and AutomationEngine condition evaluation.
+
 This document defines the high-level architecture, security permissions, and coordinate mappings required to transition SparkleRecorder from simple screen clicker playback to robust, target-bound automation.
 
 ---
 
 ## 1. Security & System Permissions
 
-Due to macOS Transparency, Consent, and Control (TCC) security restrictions, the automation engine requires specific system privileges. 
+Due to macOS Transparency, Consent, and Control (TCC) security restrictions, the automation engine requires specific system privileges.
 
 > [刻] All permission checks and API calls must be availability-gated by macOS version (using `#available`). APIs like `SCScreenshotConfiguration` or ScreenCaptureKit still require explicit runtime checks to handle OS updates gracefully.
 

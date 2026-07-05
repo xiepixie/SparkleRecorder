@@ -2,6 +2,8 @@
 ## Implementation Plan v0.8
 ### From Direct Main Run-Loop Event Tap to Decoupled, Thread-Safe, and Semantic Event Recording
 
+> Document status (2026-07-05): partially implemented in the current worktree. Completed or mostly completed: dedicated `EventTapThread`, injectable `RecordingEngineClient`, `RawInputEvent`, start-failure feedback, bounded recording buffering, and the pure `RecordingEventPipeline` / `RecordingSessionProcessor` path. Remaining: full actor-owned recording engine, deeper semantic event output, and Instruments-backed latency validation.
+
 This document outlines the engineering architecture, low-level APIs, and target changes required to upgrade the event capture and recording engine in SparkleRecorder to support high-precision, low-latency, and thread-safe operations.
 
 ---
@@ -42,13 +44,13 @@ MainActor TimelineViewModel (SwiftUI UI presentation)
   final class EventTapThread: Thread {
       private(set) var runLoop: CFRunLoop?
       private let semaphore = DispatchSemaphore(value: 0)
-      
+
       override func main() {
           runLoop = CFRunLoopGetCurrent()
           semaphore.signal()
           CFRunLoopRun()
       }
-      
+
       func waitAndGetRunLoop() -> CFRunLoop {
           semaphore.wait()
           return runLoop!
@@ -73,7 +75,7 @@ MainActor TimelineViewModel (SwiftUI UI presentation)
   let sparkleRecorderMagic: Int64 = 0x535041524B4C4521 // "SPARKLE!"
   let source = CGEventSource(stateID: .combinedSessionState)
   source?.userData = sparkleRecorderMagic
-  
+
   // In Recorder.swift (event tap callback)
   let userData = event.getIntegerValueField(.eventSourceUserData)
   guard userData != 0x535041524B4C4521 else {
@@ -105,11 +107,11 @@ MainActor TimelineViewModel (SwiftUI UI presentation)
   ```swift
   func simplifyPath(_ points: [CGPoint], epsilon: CGFloat) -> [CGPoint] {
       guard points.count > 2 else { return points }
-      
+
       var maxDistance: CGFloat = 0
       var index = 0
       let end = points.count - 1
-      
+
       for i in 1..<end {
           let distance = perpendicularDistance(from: points[i], lineStart: points[0], lineEnd: points[end])
           if distance > maxDistance {
@@ -117,7 +119,7 @@ MainActor TimelineViewModel (SwiftUI UI presentation)
               maxDistance = distance
           }
       }
-      
+
       if maxDistance > epsilon {
           let left = simplifyPath(Array(points[0...index]), epsilon: epsilon)
           let right = simplifyPath(Array(points[index...end]), epsilon: epsilon)
@@ -178,11 +180,11 @@ MainActor TimelineViewModel (SwiftUI UI presentation)
       if let tap = tap {
           CFMachPortInvalidate(tap)
       }
-      
+
       self.tap = nil
       self.source = nil
       self.isRecording = false
-      
+
       // Stop surface tracker & timers...
   }
   ```

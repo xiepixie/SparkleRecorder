@@ -1,5 +1,7 @@
 # SparkleRecorder Repository Submission Plan
 
+> 文档状态（2026-07-05）：仓库发布清单归档/参考。它不代表当前功能迁移进度；正式推送前需要重新检查工作树、远端历史和签名/发布材料。
+
 本文件记录当前工作区提交到 `https://github.com/xiepixie/SparkleRecorder.git` 前的整理结论。
 
 ## 1. 当前远程状态
