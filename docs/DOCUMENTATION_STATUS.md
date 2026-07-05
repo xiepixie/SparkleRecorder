@@ -15,12 +15,16 @@ This index records which docs are active plans, which are implementation referen
 | Recording high-frequency buffering | Done in current worktree | `RecordingEventBuffer` and bounded `AsyncStream` policy |
 | Playback ordinary step executor | Mostly done | `PlaybackStepExecutor` and tests |
 | Playback failure evidence value model | Mostly done | `PlaybackFailureEvidence`, `PlaybackFailureEvidenceBuilder`, `PlaybackEvidenceClient` |
+| Playback run lifecycle state machine | First pass done | `PlaybackRunStateMachine` and tests |
+| Playback live run engine | First pass done | `PlaybackRunEngine` and `PlaybackRunEngineTests` |
+| Playback live locator/OCR step client | First pass done | `LivePlaybackRunStepClient`, `PlaybackLocatorCache`, `PlaybackLocatorCacheTests` |
+| Playback synchronous run engine | First pass done | `PlaybackSynchronousRunEngine`, `LivePlaybackSynchronousRunStepClient`, `PlaybackSynchronousRunEngineTests` |
 | SwiftUI selection recalculation control | Done in current worktree | `ActionGroupSelectionSnapshot`, `ActionGroupProjectionTests` |
-| AutomationEngine core contract | Not started in code | `docs/automation-engine/01-core-contract-first.md` |
-| Workflow reducer and state machine | Not started in code | `docs/automation-engine/03-reducer-state-machine.md` |
-| ResourceArbiter panic release | Not started in code | `docs/automation-engine/04-resource-arbiter.md` |
-| SchedulerClient and timed starts | Not started in code | `docs/automation-engine/06-scheduler-client.md` |
-| FlowGraph and Resource Timeline UI | Not started in code | `docs/automation-engine/08-ui-flowgraph-timeline.md` |
+| AutomationEngine core contract | Done in current worktree | `AutomationContract.swift`, `AutomationContractTests` |
+| Workflow reducer and state machine | Done in current worktree | `AutomationReducer.swift`, `AutomationReducerTests`, `AutomationViewProjection` |
+| ResourceArbiter and panic release | Done in current worktree | `AutomationResourceArbiter.swift`, `AutomationOwnerBClientTests` |
+| SchedulerClient and timed starts | Done in current worktree | `AutomationSchedulerClient.swift`, `AutomationRuntimeSession.swift`, `AutomationOwnerBClientTests` |
+| FlowGraph and Resource Timeline UI | First pass done | `AutomationMainView`, FlowGraph projection views, Resource Timeline views, `AutomationViewProjectionTests` |
 
 ## Document Roles
 
@@ -35,13 +39,10 @@ This index records which docs are active plans, which are implementation referen
 | `CodebaseTargetModifications.md` | File-level target-change notes | Archive. Do not treat snippets as exact current source. |
 | `MacroEditorUserGuide.zh-Hans.md` | User-facing editor guide | Active user doc. Does not cover future FlowGraph UI yet. |
 | `RepositorySubmissionPlan.md` | Repository publication checklist | Archive/reference. Re-check before push. |
-| `automation-engine/` | Automation scheduling, dependency, reducer, resource, UI and testing plan | Active workstream. Phase 0 core contract is the next required code step. |
+| `automation-engine/` | Automation scheduling, dependency, reducer, resource, UI and testing plan | Active workstream. Phase 0 core contract is done; three-owner planning lives in `automation-engine/workstreams/`. |
 
 ## Next Required Sequence
 
-1. Freeze the Automation Core contract.
-2. Implement reducer state transitions with Swift Testing.
-3. Add `ResourceArbiter` with idempotent release and panic release.
-4. Wrap Player and Scheduler behind mockable clients.
-5. Add workflow persistence and run history without polluting `SavedMacro`.
-6. Build FlowGraph/Resource Timeline from reducer projections only.
+1. Evaluate product-level scheduler launch integration such as `NSBackgroundActivityScheduler` or login item.
+2. Polish release-facing AutomationEngine documentation after product flows stabilize.
+3. Refresh product-facing docs after AutomationEngine UI stabilizes.

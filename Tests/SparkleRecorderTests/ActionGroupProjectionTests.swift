@@ -1,3 +1,4 @@
+import Foundation
 import Testing
 @testable import SparkleRecorderCore
 
@@ -81,5 +82,98 @@ struct ActionGroupProjectionTests {
 
         let behavior = try #require(ActionGroupProjection.firstBehaviorGroup(id: behaviorId, groups: groups))
         #expect(behavior.eventIndices == [2, 3])
+    }
+
+    @Test("Selection snapshot keeps group order and sorts event indices once")
+    func selectionSnapshotKeepsGroupOrderAndSortsEventIndices() {
+        let firstID = UUID()
+        let secondID = UUID()
+        let behaviorID = BehaviorGroupID()
+        var events = [
+            RecordedEvent.make(.leftMouseDown, time: 0.0, x: 10, y: 10),
+            RecordedEvent.make(.leftMouseUp, time: 0.1, x: 10, y: 10),
+            RecordedEvent.make(.keyDown, time: 0.2, keyCode: 1),
+            RecordedEvent.make(.keyUp, time: 0.3, keyCode: 1),
+            RecordedEvent.make(.scrollWheel, time: 0.4, x: 20, y: 30)
+        ]
+        events[4].behaviorGroupID = behaviorID
+        let groups = [
+            ActionGroup(
+                id: firstID,
+                kind: .click,
+                eventIndices: [3, 1],
+                startTime: 0,
+                endTime: 0.3,
+                summary: "Click"
+            ),
+            ActionGroup(
+                id: secondID,
+                kind: .scroll,
+                eventIndices: [4],
+                startTime: 0.4,
+                endTime: 0.4,
+                summary: "Scroll"
+            )
+        ]
+
+        let snapshot = ActionGroupProjection.selectionSnapshot(
+            groups: groups,
+            selectedGroupIDs: [secondID, firstID],
+            events: events
+        )
+
+        #expect(snapshot.groupIDs == [firstID, secondID])
+        #expect(snapshot.eventIndices == [1, 3, 4])
+        #expect(snapshot.containsBehavior)
+        #expect(snapshot.canBindBehavior)
+    }
+
+    @Test("Selection snapshot detects behavior stored on grouped row")
+    func selectionSnapshotDetectsGroupBehavior() {
+        let groupID = UUID()
+        let behaviorID = BehaviorGroupID()
+        let group = ActionGroup(
+            id: groupID,
+            kind: .sequence,
+            eventIndices: [],
+            startTime: 0,
+            endTime: 1,
+            summary: "Behavior",
+            behaviorGroupID: behaviorID,
+            behaviorGroupName: "Behavior 1"
+        )
+
+        let snapshot = ActionGroupProjection.selectionSnapshot(
+            groups: [group],
+            selectedGroupIDs: [groupID],
+            events: []
+        )
+
+        #expect(snapshot.groupIDs == [groupID])
+        #expect(snapshot.eventIndices.isEmpty)
+        #expect(snapshot.containsBehavior)
+        #expect(!snapshot.canBindBehavior)
+    }
+
+    @Test("Selection snapshot is empty when nothing is selected")
+    func selectionSnapshotIsEmptyWithoutSelection() {
+        let group = ActionGroup(
+            kind: .click,
+            eventIndices: [0, 1],
+            startTime: 0,
+            endTime: 0.1,
+            summary: "Click"
+        )
+
+        let snapshot = ActionGroupProjection.selectionSnapshot(
+            groups: [group],
+            selectedGroupIDs: [],
+            events: TestFixtures.clickPair()
+        )
+
+        #expect(snapshot.isEmpty)
+        #expect(snapshot.groupIDs.isEmpty)
+        #expect(snapshot.eventIndices.isEmpty)
+        #expect(!snapshot.containsBehavior)
     }
 }

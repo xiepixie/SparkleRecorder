@@ -51,9 +51,8 @@ public enum PreviewPathProjector {
             }
         }()
 
-        let rawEndPoint = dragPath.last ?? selectedPoint
         let projectedEnd: CGPoint? = {
-            guard let rawEndPoint else { return selectedPoint }
+            guard let rawEndPoint = dragPath.last else { return selectedPoint }
             switch edit {
             case .end(let translation), .body(let translation):
                 return translated(rawEndPoint, by: translation)

@@ -15,6 +15,11 @@ public final class EventTapThread: Thread, @unchecked Sendable {
     private var tap: CFMachPort?
     private var runLoopSource: CFRunLoopSource?
     private var runLoop: CFRunLoop?
+
+    private let startupLock = NSLock()
+    private let startupSemaphore = DispatchSemaphore(value: 0)
+    private var startupResult: Bool?
+    private var hasRequestedStart = false
     
     /// A custom magic number we inject into CGEvent.setIntegerValueField(.eventSourceUserData, value: loopbackMagic)
     /// during playback, so we can ignore them here.
@@ -26,6 +31,35 @@ public final class EventTapThread: Thread, @unchecked Sendable {
         self.tapOptions = options
         super.init()
         self.name = "com.sparklerecorder.EventTapThread"
+    }
+
+    @discardableResult
+    public func startAndWait(timeout: TimeInterval = 2.0) -> Bool {
+        let shouldStart: Bool
+        startupLock.lock()
+        if let startupResult {
+            startupLock.unlock()
+            return startupResult
+        }
+        shouldStart = !hasRequestedStart
+        if shouldStart {
+            hasRequestedStart = true
+        }
+        startupLock.unlock()
+
+        if shouldStart {
+            start()
+        }
+
+        let deadline = DispatchTime.now() + .milliseconds(Int(timeout * 1_000))
+        guard startupSemaphore.wait(timeout: deadline) == .success else {
+            return false
+        }
+
+        startupLock.lock()
+        let result = startupResult ?? false
+        startupLock.unlock()
+        return result
     }
     
     public override func main() {
@@ -76,6 +110,7 @@ public final class EventTapThread: Thread, @unchecked Sendable {
             userInfo: refcon
         ) else {
             NSLog("SparkleRecorder: failed to create event tap in EventTapThread.")
+            signalStartup(false)
             return
         }
         
@@ -84,6 +119,7 @@ public final class EventTapThread: Thread, @unchecked Sendable {
         self.runLoopSource = source
         CFRunLoopAddSource(runLoop, source, .commonModes)
         CGEvent.tapEnable(tap: newTap, enable: true)
+        signalStartup(true)
         
         // Start run loop
         CFRunLoopRun()
@@ -110,6 +146,20 @@ public final class EventTapThread: Thread, @unchecked Sendable {
         if let source = runLoopSource, let runLoop = runLoop {
             CFRunLoopRemoveSource(runLoop, source, .commonModes)
             self.runLoopSource = nil
+        }
+    }
+
+    private func signalStartup(_ result: Bool) {
+        let shouldSignal: Bool
+        startupLock.lock()
+        shouldSignal = startupResult == nil
+        if shouldSignal {
+            startupResult = result
+        }
+        startupLock.unlock()
+
+        if shouldSignal {
+            startupSemaphore.signal()
         }
     }
 }

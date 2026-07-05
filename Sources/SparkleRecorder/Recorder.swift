@@ -2,46 +2,6 @@ import Cocoa
 import CoreGraphics
 import Combine
 import SparkleRecorderCore
-import os
-
-private struct RecorderBufferState: Sendable {
-    var pending: [RecordedEvent] = []
-    var registry = RecordingSurfaceRegistry()
-}
-
-private final class RecorderEventBuffer: @unchecked Sendable {
-    private let lock = OSAllocatedUnfairLock(initialState: RecorderBufferState())
-
-    func reset() {
-        lock.withLock {
-            $0 = RecorderBufferState()
-        }
-    }
-
-    func drainPending() -> (events: [RecordedEvent], surfaces: [String: PlaybackSurface]) {
-        lock.withLock {
-            let events = $0.pending
-            $0.pending.removeAll()
-            return (events, $0.registry.activeSurfaces)
-        }
-    }
-
-    func trackingState() -> RecordingSurfaceRegistry {
-        lock.withLock {
-            $0.registry
-        }
-    }
-
-    func store(
-        registry: RecordingSurfaceRegistry,
-        event: RecordedEvent
-    ) {
-        lock.withLock {
-            $0.registry = registry
-            $0.pending.append(event)
-        }
-    }
-}
 
 private final class RecorderDisplayTimerTarget: NSObject {
     weak var recorder: Recorder?
@@ -66,19 +26,15 @@ final class Recorder: ObservableObject, @unchecked Sendable {
 
     private var engineClient: RecordingEngineClient?
     private var recordingTask: Task<Void, Never>?
+    private let makeRecordingEngine: @Sendable (CGEventMask) -> RecordingEngineClient
     private var baseMachTicks: UInt64 = 0
-    private var baseEventTimestamp: UInt64? = nil
     private var isResumedSession = false
     private var resumeOffsetDuration: Double = 0
     private let surfaceTracker = RecordingSurfaceTracker()
-    private let surfaceMatcher = SurfaceMatcher()
     private var contentFrameCache: [String: CGRect] = [:]
-    private let eventBuffer = RecorderEventBuffer()
+    private let sessionProcessor = RecordingSessionProcessor()
     private var recordMouseMovesEnabled = false
     private lazy var displayTimerTarget = RecorderDisplayTimerTarget(recorder: self)
-    
-    // Drag downsampling state
-    private let sampler = TrajectorySampler()
     
     private static let timebaseInfo: mach_timebase_info_data_t = {
         var info = mach_timebase_info_data_t()
@@ -100,6 +56,14 @@ final class Recorder: ObservableObject, @unchecked Sendable {
     var ignoredKeyCodes: Set<UInt16> = []
 
     var eventCount: Int { events.count }
+
+    init(
+        makeRecordingEngine: @escaping @Sendable (CGEventMask) -> RecordingEngineClient = { mask in
+            RecordingEngineClient.live(mask: mask)
+        }
+    ) {
+        self.makeRecordingEngine = makeRecordingEngine
+    }
 
     deinit {
         engineClient?.stop()
@@ -124,14 +88,17 @@ final class Recorder: ObservableObject, @unchecked Sendable {
         guard !isRecording else { return true }
         events.removeAll()
         liveWaveformEvents.removeAll()
-        eventBuffer.reset()
         liveDuration = 0
         recalculateStats()
         baseMachTicks = mach_absolute_time()
-        baseEventTimestamp = nil
         isResumedSession = false
         resumeOffsetDuration = 0
         recordMouseMovesEnabled = UserDefaults.standard.bool(forKey: "recordMouseMoves")
+        sessionProcessor.reset(
+            recordMouseMoves: recordMouseMovesEnabled,
+            ignoredKeyCodes: ignoredKeyCodes,
+            resumeOffsetDuration: resumeOffsetDuration
+        )
         
         contentFrameCache.removeAll()
         activeSurfaces.removeAll()
@@ -153,17 +120,26 @@ final class Recorder: ObservableObject, @unchecked Sendable {
             (1 << CGEventType.otherMouseUp.rawValue)      |
             (1 << CGEventType.otherMouseDragged.rawValue)
 
-        let client = RecordingEngineClient.live(mask: mask)
-        self.engineClient = client
-        
-        recordingTask = Task { [weak self] in
-            for await raw in client.events() {
-                self?.processRawEvent(type: raw.type, event: raw.event)
-            }
+        let client = makeRecordingEngine(mask)
+        let stream = client.events()
+        guard client.start() else {
+            client.stop()
+            surfaceTracker.stopTracking()
+            sessionProcessor.reset(
+                recordMouseMoves: recordMouseMovesEnabled,
+                ignoredKeyCodes: ignoredKeyCodes,
+                resumeOffsetDuration: resumeOffsetDuration
+            )
+            return false
         }
         
-        client.start()
+        recordingTask = Task { [weak self] in
+            for await input in stream {
+                self?.processRawInput(input)
+            }
+        }
 
+        self.engineClient = client
         isRecording = true
         startDisplayTimer()
         return true
@@ -183,7 +159,7 @@ final class Recorder: ObservableObject, @unchecked Sendable {
     }
 
     private func flushPending() {
-        let snapshot = eventBuffer.drainPending()
+        let snapshot = sessionProcessor.drainPending()
         
         if activeSurfaces != snapshot.surfaces {
             activeSurfaces = snapshot.surfaces
@@ -252,120 +228,12 @@ final class Recorder: ObservableObject, @unchecked Sendable {
         displayTimer = nil
     }
 
-    private func processRawEvent(type: CGEventType, event: CGEvent) {
-        guard let kind = RecordedEvent.Kind(rawValue: Int(type.rawValue)) else { return }
-
-        if kind == .mouseMoved && !recordMouseMovesEnabled {
-            return
-        }
-        
-        let loc = event.location
-        let eventTimestamp = UInt64(event.timestamp)
-        let eventTime = RecordingTimeline.eventTime(
-            timestamp: eventTimestamp,
-            baseTimestamp: baseEventTimestamp,
-            resumeOffsetDuration: resumeOffsetDuration
-        )
-        baseEventTimestamp = eventTime.baseTimestamp
-        let elapsed = eventTime.elapsed
-        
-        // Drag downsampling via TrajectorySampler
-        if type == .leftMouseDragged || type == .rightMouseDragged || type == .otherMouseDragged {
-            if !sampler.shouldSampleDrag(event: event, type: type, location: loc, time: elapsed) {
-                return // Drop this drag event
-            }
-        } else if type == .leftMouseDown || type == .rightMouseDown || type == .otherMouseDown {
-            sampler.processMouseDown(location: loc, time: elapsed)
-        } else if type == .leftMouseUp || type == .rightMouseUp || type == .otherMouseUp {
-            if let ignored = sampler.processMouseUp() {
-                // Process the last dragged event before the mouse up using its original elapsed time
-                processEvent(ignored.event, type: ignored.type, elapsed: ignored.elapsed)
-            }
-        }
-
-        let keyCode = UInt16(event.getIntegerValueField(.keyboardEventKeycode))
-        if kind.isKey, ignoredKeyCodes.contains(keyCode) { return }
-        
-        processEvent(event, type: type, elapsed: elapsed)
-    }
-    
-    private func processEvent(_ event: CGEvent, type: CGEventType, elapsed: Double) {
-        guard let kind = RecordedEvent.Kind(rawValue: Int(type.rawValue)) else { return }
-        let loc = event.location
-        let keyCode = UInt16(event.getIntegerValueField(.keyboardEventKeycode))
-        
-        var registry = eventBuffer.trackingState()
-        
-        let targetId = registry.update(
-            eventKind: kind,
-            trackedActiveSurface: surfaceTracker.cachedActiveSurface,
-            surfaceMatcher: surfaceMatcher
-        )
-
-        let coordinateBinding = RecordingCoordinateBinder.bind(
-            location: loc,
-            targetSurfaceId: targetId,
-            surfaces: registry.activeSurfaces
-        )
-        if let updatedSurface = coordinateBinding.updatedSurface, let targetId {
-            registry.activeSurfaces[targetId] = updatedSurface
-        }
-        let coordinateFields = coordinateBinding.fields
-
-        var unicodeStr: String? = nil
-        if kind.isKey {
-            var chars = [UniChar](repeating: 0, count: 4)
-            var actualStringLength = 0
-            event.keyboardGetUnicodeString(maxStringLength: 4, actualStringLength: &actualStringLength, unicodeString: &chars)
-            if actualStringLength > 0 {
-                unicodeStr = String(utf16CodeUnits: chars, count: actualStringLength)
-            }
-        }
-        
-        let scrollResult = makeScrollResult(for: kind, event: event)
-
-        let recorded = RecordedEvent(
-            kind: kind,
-            time: elapsed,
-            x: loc.x,
-            y: loc.y,
-            keyCode: keyCode,
-            flags: event.flags.rawValue,
-            mouseButton: event.getIntegerValueField(.mouseEventButtonNumber),
-            clickCount: event.getIntegerValueField(.mouseEventClickState),
-            scrollDeltaY: scrollResult?.playbackDeltaY ?? 0,
-            scrollDeltaX: scrollResult?.playbackDeltaX ?? 0,
-            windowLocalX: coordinateFields.windowLocalX, windowLocalY: coordinateFields.windowLocalY,
-            windowNormalizedX: coordinateFields.windowNormalizedX, windowNormalizedY: coordinateFields.windowNormalizedY,
-            contentLocalX: coordinateFields.contentLocalX, contentLocalY: coordinateFields.contentLocalY,
-            contentNormalizedX: coordinateFields.contentNormalizedX, contentNormalizedY: coordinateFields.contentNormalizedY,
-            coordinateBinding: coordinateFields.coordinateBinding, coordinateStrategy: nil,
-            surfaceId: targetId,
-            scrollPayload: scrollResult?.payload,
-            unicodeString: unicodeStr
-        )
-
-        // Display timer will flush from pending into events
-        eventBuffer.store(
-            registry: registry,
-            event: recorded
-        )
-    }
-
-    private func makeScrollResult(for kind: RecordedEvent.Kind, event: CGEvent) -> RecordingScrollResult? {
-        guard kind == .scrollWheel else { return nil }
-        return RecordingScrollPayloadBuilder.build(
-            from: RecordingScrollSample(
-                pointDeltaX: Int32(event.getIntegerValueField(.scrollWheelEventPointDeltaAxis2)),
-                pointDeltaY: Int32(event.getIntegerValueField(.scrollWheelEventPointDeltaAxis1)),
-                lineDeltaX: Int32(event.getIntegerValueField(.scrollWheelEventDeltaAxis2)),
-                lineDeltaY: Int32(event.getIntegerValueField(.scrollWheelEventDeltaAxis1)),
-                phase: Int(event.getIntegerValueField(.scrollWheelEventScrollPhase)),
-                momentumPhase: Int(event.getIntegerValueField(.scrollWheelEventMomentumPhase)),
-                fixedRawX: event.getIntegerValueField(.scrollWheelEventFixedPtDeltaAxis2),
-                fixedRawY: event.getIntegerValueField(.scrollWheelEventFixedPtDeltaAxis1),
-                isContinuous: event.getIntegerValueField(.scrollWheelEventIsContinuous) != 0
-            )
+    private func processRawInput(_ input: RawInputEvent) {
+        sessionProcessor.record(
+            input,
+            recordMouseMoves: recordMouseMovesEnabled,
+            ignoredKeyCodes: ignoredKeyCodes,
+            trackedActiveSurface: surfaceTracker.cachedActiveSurface
         )
     }
 }

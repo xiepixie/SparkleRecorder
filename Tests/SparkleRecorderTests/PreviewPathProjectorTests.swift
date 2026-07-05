@@ -111,7 +111,7 @@ struct PreviewPathProjectorTests {
         )
 
         #expect(geometry.startPoint == CGPoint(x: 45, y: 28))
-        #expect(geometry.endPoint == CGPoint(x: 45, y: 28))
+        #expect(geometry.endPoint == point)
         #expect(geometry.path.isEmpty)
     }
 }

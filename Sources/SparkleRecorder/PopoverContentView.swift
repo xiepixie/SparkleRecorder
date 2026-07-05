@@ -24,6 +24,7 @@ struct PopoverContentView: View {
     @State private var newTagText: String = ""
     @State private var notesDraft: String = ""
     @State private var isDroppingFiles = false
+    @State private var workspace: WorkspaceMode = .library
     /// Deterministic anchor for shift-click range selection.
     @State private var lastAnchorID: UUID?
 
@@ -48,11 +49,36 @@ struct PopoverContentView: View {
                     .background(VisualEffectBackground(material: .titlebar, blendingMode: .withinWindow))
                     .overlay(Divider().opacity(0.5), alignment: .bottom)
 
-                    HStack(spacing: 0) {
-                        LibrarySidebar(filter: $filter)
-                            .frame(width: 200)
-                        Divider().opacity(0.5)
-                        libraryColumn
+                    HStack {
+                        Picker("", selection: $workspace) {
+                            ForEach(WorkspaceMode.allCases) { mode in
+                                Label(mode.title, systemImage: mode.systemImage)
+                                    .tag(mode)
+                            }
+                        }
+                        .labelsHidden()
+                        .pickerStyle(.segmented)
+                        .frame(width: 280)
+
+                        Spacer(minLength: 0)
+                    }
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 8)
+                    .background(VisualEffectBackground(material: .sidebar, blendingMode: .withinWindow))
+                    .overlay(Divider().opacity(0.5), alignment: .bottom)
+
+                    switch workspace {
+                    case .library:
+                        HStack(spacing: 0) {
+                            LibrarySidebar(filter: $filter)
+                                .frame(width: 200)
+                            Divider().opacity(0.5)
+                            libraryColumn
+                        }
+
+                    case .automation:
+                        AutomationMainView(runtimeHost: controller.automationHost())
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
                     }
                 }
             } else {
@@ -100,6 +126,7 @@ struct PopoverContentView: View {
         .animation(.spring(response: 0.35, dampingFraction: 0.85), value: state.inputMonitoringGranted)
         .animation(.spring(response: 0.3, dampingFraction: 0.85), value: filteredMacros.count)
         .animation(.spring(response: 0.3, dampingFraction: 0.85), value: filter)
+        .animation(.spring(response: 0.3, dampingFraction: 0.85), value: workspace)
         .onChange(of: filter) { selection.removeAll() }
         .sheet(item: $showAssignHotkey) { macro in
             HotkeyAssignmentSheet(
@@ -210,6 +237,31 @@ struct PopoverContentView: View {
             selection.removeAll()
             lastAnchorID = macro.id
             controller.selectMacro(macro.id)
+        }
+    }
+}
+
+private enum WorkspaceMode: String, CaseIterable, Identifiable {
+    case library
+    case automation
+
+    var id: Self { self }
+
+    var title: String {
+        switch self {
+        case .library:
+            NSLocalizedString("Library", comment: "")
+        case .automation:
+            NSLocalizedString("Automation", comment: "")
+        }
+    }
+
+    var systemImage: String {
+        switch self {
+        case .library:
+            "rectangle.stack"
+        case .automation:
+            "point.topleft.down.curvedto.point.bottomright.up"
         }
     }
 }

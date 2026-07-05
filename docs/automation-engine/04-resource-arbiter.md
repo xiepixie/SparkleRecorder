@@ -1,5 +1,7 @@
 # Resource Arbiter Workstream
 
+状态（2026-07-05）：Owner B 已落地 `AutomationResourceArbiterClient`、`AutomationResourceLeaseStore`、`AutomationResourceRequest` 和 `AutomationResourceLeaseResult`。A/B 已增加 `resourceLeasesAcquired` 批量 handoff，多资源 task 不再因为第一张 lease 提前启动。
+
 ## 目标
 
 中心化管理 SparkleRecorder 的独占资源：前台键盘鼠标控制权。
@@ -10,27 +12,31 @@
 
 ## 资源模型
 
-第一版只建一个资源：
+第一版资源集合：
 
 ```swift
 public enum AutomationResource: Codable, Equatable, Sendable {
     case foregroundInput
+    case screenCapture
+    case accessibility
+    case network
 }
 ```
+
+`AutomationResourceRequirement` 是资源集合。单资源仍可用 `resourceLeaseAcquired`，多资源必须用 `resourceLeasesAcquired(runID:leases:at:)` 一次性交给 reducer；reducer 只有收到整组 leases 后才启动 task。任一资源被拒绝时，Owner B effect runner 会释放已拿到的 lease，再发 `resourceLeaseDenied`。
 
 任务声明资源需求：
 
 ```swift
-public enum AutomationResourceRequirement: Codable, Equatable, Sendable {
-    case none
-    case foregroundInput
+public struct AutomationResourceRequirement: Codable, Equatable, Sendable {
+    public var resources: Set<AutomationResource>
 }
 ```
 
 lease：
 
 ```swift
-public struct ResourceLease: Codable, Equatable, Sendable, Identifiable {
+public struct AutomationResourceLease: Codable, Equatable, Sendable, Identifiable {
     public var id: UUID
     public var runID: UUID
     public var resource: AutomationResource
@@ -62,12 +68,12 @@ terminal outcome received
 
 ## Live 实现建议
 
-`ResourceArbiterClient` 应是可注入 client：
+`AutomationResourceArbiterClient` 是可注入 client：
 
 ```swift
-struct ResourceArbiterClient: Sendable {
-    var acquire: @Sendable (UUID, AutomationResource) async -> ResourceLease?
-    var release: @Sendable (ResourceLease.ID) async -> Void
+struct AutomationResourceArbiterClient: Sendable {
+    var acquire: @Sendable (AutomationResourceRequest) async -> AutomationResourceLeaseResult
+    var release: @Sendable (UUID) async -> Void
     var panicRelease: @Sendable (UUID) async -> Void
 }
 ```
@@ -83,8 +89,10 @@ actor ForegroundInputLeaseStore {
 ## 验收条件
 
 - 同时两个 foreground task 只能有一个拿到 lease。
+- 多资源 task 必须等整组 lease 都拿到后才启动。
+- 多资源获取中途失败时必须释放已经拿到的 lease。
 - resource busy 时 task 进入 queue/waitingForResource。
-- cancel running task 会触发 panic release。
-- timeout running task 会触发 panic release。
+- cancel running task 会通过 reducer 终态路径 release lease。
+- timeout running task 会通过 reducer 终态路径 release lease。
 - Player 没回调时可以由 watchdog 触发 panic release。
 - Swift Testing 用 fake arbiter 验证状态，不触发真实输入。

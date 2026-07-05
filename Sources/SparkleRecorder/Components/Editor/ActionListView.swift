@@ -290,6 +290,8 @@ struct ActionListView: View {
     
     @ViewBuilder
     func rowContextMenu(for row: ActionRow) -> some View {
+        let snapshot = contextSnapshot(anchor: row)
+
         Button {
             selection = [row.id]
             lastAnchor = row.id
@@ -304,14 +306,14 @@ struct ActionListView: View {
         } label: {
             Label(NSLocalizedString("Duplicate Action", comment: ""), systemImage: "plus.square.on.square")
         }
-        .disabled(contextEventIndices(anchor: row).isEmpty)
+        .disabled(snapshot.eventIndices.isEmpty)
         
         Button(role: .destructive) {
             deleteRows(anchor: row)
         } label: {
             Label(NSLocalizedString("Delete Actions", comment: ""), systemImage: "trash")
         }
-        .disabled(contextEventIndices(anchor: row).isEmpty)
+        .disabled(snapshot.eventIndices.isEmpty)
         
         Divider()
         
@@ -320,44 +322,43 @@ struct ActionListView: View {
         } label: {
             Label(NSLocalizedString("Bind Behavior", comment: ""), systemImage: "square.stack.3d.down.right")
         }
-        .disabled(contextEventIndices(anchor: row).count < 2)
+        .disabled(!snapshot.canBindBehavior)
         
         Button {
             unbindRows(anchor: row)
         } label: {
             Label(NSLocalizedString("Unbind Behavior", comment: ""), systemImage: "square.stack.3d.down.forward")
         }
-        .disabled(!contextContainsBehavior(anchor: row))
+        .disabled(!snapshot.containsBehavior)
+    }
+
+    func contextSnapshot(anchor row: ActionRow) -> ActionGroupSelectionSnapshot {
+        let selectedGroupIDs = selection.contains(row.id) ? selection : [row.id]
+        return ActionGroupProjection.selectionSnapshot(
+            groups: rows.map(\.group),
+            selectedGroupIDs: selectedGroupIDs,
+            events: recorder.events
+        )
     }
     
     func contextRows(anchor row: ActionRow) -> [ActionRow] {
-        if selection.contains(row.id) {
-            return rows.filter { selection.contains($0.id) }
-        }
-        return [row]
+        let selectedIDs = Set(contextSnapshot(anchor: row).groupIDs)
+        return rows.filter { selectedIDs.contains($0.id) }
     }
     
     func contextEventIndices(anchor row: ActionRow) -> [Int] {
-        contextRows(anchor: row)
-            .flatMap(\.group.eventIndices)
-            .sorted()
+        contextSnapshot(anchor: row).eventIndices
     }
 
     func contextContainsBehavior(anchor row: ActionRow) -> Bool {
-        contextRows(anchor: row).contains { item in
-            item.group.behaviorGroupID != nil ||
-            item.group.eventIndices.contains { index in
-                recorder.events.indices.contains(index) && recorder.events[index].behaviorGroupID != nil
-            }
-        }
+        contextSnapshot(anchor: row).containsBehavior
     }
     
     func duplicateRows(anchor row: ActionRow) {
-        let indices = contextEventIndices(anchor: row)
+        let indices = contextSnapshot(anchor: row).eventIndices
         guard !indices.isEmpty else { return }
-        let sorted = indices.sorted()
-        let afterIdx = sorted.last! + 1
-        let copiesRange = afterIdx..<(afterIdx + sorted.count)
+        let afterIdx = indices.last! + 1
+        let copiesRange = afterIdx..<(afterIdx + indices.count)
         
         withUndo(NSLocalizedString("Duplicate Action", comment: "")) {
             recorder.events.duplicateEvents(at: indices)
@@ -374,16 +375,17 @@ struct ActionListView: View {
     }
     
     func deleteRows(anchor row: ActionRow) {
-        let indices = contextEventIndices(anchor: row)
+        let snapshot = contextSnapshot(anchor: row)
+        let indices = snapshot.eventIndices
         guard !indices.isEmpty else { return }
-        selection.subtract(contextRows(anchor: row).map(\.id))
+        selection.subtract(snapshot.groupIDs)
         withUndo(NSLocalizedString("Delete Actions", comment: "")) {
             recorder.events.deleteEvents(at: IndexSet(indices))
         }
     }
     
     func bindRows(anchor row: ActionRow) {
-        let indices = contextEventIndices(anchor: row)
+        let indices = contextSnapshot(anchor: row).eventIndices
         guard indices.count >= 2 else { return }
         let existing = recorder.events.compactMap(\.behaviorGroupID).reduce(into: Set<BehaviorGroupID>()) { partial, item in
             partial.insert(item)
@@ -397,8 +399,9 @@ struct ActionListView: View {
     }
     
     func unbindRows(anchor row: ActionRow) {
-        let indices = contextEventIndices(anchor: row)
-        guard !indices.isEmpty, contextContainsBehavior(anchor: row) else { return }
+        let snapshot = contextSnapshot(anchor: row)
+        let indices = snapshot.eventIndices
+        guard !indices.isEmpty, snapshot.containsBehavior else { return }
         withUndo(NSLocalizedString("Unbind Behavior", comment: "")) {
             recorder.events.unbindBehavior(at: indices)
         }

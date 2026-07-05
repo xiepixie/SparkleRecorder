@@ -19,6 +19,8 @@ final class MenuBarController: NSObject, NSPopoverDelegate {
     let player = Player()
     let state = AppState()
     let library = MacroLibrary()
+    private let automationSignalStore = AutomationSignalStore.shared
+    private var automationRuntimeHost: LiveAutomationRuntimeHost?
 
     private var globalHotkeyIDs: [UInt32] = []
     private var perMacroHotkeyIDs: [UInt32: UUID] = [:]   // hotkey-id → macro id
@@ -37,6 +39,12 @@ final class MenuBarController: NSObject, NSPopoverDelegate {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         super.init()
 
+        automationRuntimeHost = LiveAutomationRuntimeHost(
+            player: player,
+            externalSignal: .appSignals(automationSignalStore),
+            manualApproval: AutomationManualApprovalPresenter.client(),
+            ocrSearchRegionContext: Self.automationOCRSearchRegionContext
+        )
         configureStatusItem()
         configurePopover()
         configureHUD()
@@ -47,10 +55,12 @@ final class MenuBarController: NSObject, NSPopoverDelegate {
         observeAccessibilityRevocation()
         registerAllHotkeys()
         loadInitialMacroIntoRecorder()
+        automationRuntimeHost?.start()
     }
 
     deinit {
         MainActor.assumeIsolated {
+            automationRuntimeHost?.stop()
             if let m = globalClickMonitor { NSEvent.removeMonitor(m) }
             HotkeyManager.shared.unregisterAll()
             dockBadgeTimer?.invalidate()
@@ -183,6 +193,92 @@ final class MenuBarController: NSObject, NSPopoverDelegate {
             NSEvent.removeMonitor(m)
             globalClickMonitor = nil
         }
+    }
+
+    func automationHost() -> LiveAutomationRuntimeHost {
+        if let automationRuntimeHost {
+            return automationRuntimeHost
+        }
+
+        let host = LiveAutomationRuntimeHost(
+            player: player,
+            externalSignal: .appSignals(automationSignalStore),
+            manualApproval: AutomationManualApprovalPresenter.client(),
+            ocrSearchRegionContext: Self.automationOCRSearchRegionContext
+        )
+        automationRuntimeHost = host
+        host.start()
+        return host
+    }
+
+    private static func automationOCRSearchRegionContext(
+        _: AutomationConditionEvaluationRequest,
+        _ displayBounds: RectValue
+    ) async -> AutomationOCRSearchRegionContext {
+        await MainActor.run {
+            guard let screen = NSScreen.main ?? NSScreen.screens.first,
+                  let surface = try? WindowSurfaceCapture().captureFrontmostWindow() else {
+                return AutomationOCRSearchRegionContext(displayBounds: displayBounds)
+            }
+
+            let screenFrame = topLeftFrame(for: screen)
+            return AutomationOCRSearchRegionContext(
+                displayBounds: displayBounds,
+                windowFrame: displayRect(
+                    from: surface.recordedFrame,
+                    screenFrame: screenFrame,
+                    displayBounds: displayBounds
+                ),
+                contentFrame: surface.recordedContentFrame.flatMap {
+                    displayRect(
+                        from: $0,
+                        screenFrame: screenFrame,
+                        displayBounds: displayBounds
+                    )
+                }
+            )
+        }
+    }
+
+    private static func topLeftFrame(for screen: NSScreen) -> CGRect {
+        guard let primaryScreen = NSScreen.screens.first else {
+            return screen.frame
+        }
+        let primaryHeight = primaryScreen.frame.height
+        return CGRect(
+            x: screen.frame.minX,
+            y: primaryHeight - (screen.frame.minY + screen.frame.height),
+            width: screen.frame.width,
+            height: screen.frame.height
+        )
+    }
+
+    private static func displayRect(
+        from rect: RectValue,
+        screenFrame: CGRect,
+        displayBounds: RectValue
+    ) -> RectValue? {
+        let globalRect = CGRect(
+            x: rect.x,
+            y: rect.y,
+            width: rect.width,
+            height: rect.height
+        )
+        let clipped = globalRect.intersection(screenFrame)
+        guard !clipped.isNull,
+              clipped.width > 1,
+              clipped.height > 1 else {
+            return nil
+        }
+
+        let scaleX = displayBounds.width / max(1, screenFrame.width)
+        let scaleY = displayBounds.height / max(1, screenFrame.height)
+        return RectValue(
+            x: displayBounds.x + (clipped.minX - screenFrame.minX) * scaleX,
+            y: displayBounds.y + (clipped.minY - screenFrame.minY) * scaleY,
+            width: clipped.width * scaleX,
+            height: clipped.height * scaleY
+        )
     }
 
     // MARK: - HUD
@@ -1011,6 +1107,7 @@ final class MenuBarController: NSObject, NSPopoverDelegate {
     /// Called from applicationWillTerminate so Cmd-Q never loses work:
     /// a live recording is stopped and saved, pending editor edits persist.
     func prepareForTermination() {
+        automationRuntimeHost?.stop()
         countdown?.cancel()
         if player.isPlaying { player.stop() }
         if recorder.isRecording {

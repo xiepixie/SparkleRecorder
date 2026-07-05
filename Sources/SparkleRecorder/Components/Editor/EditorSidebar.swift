@@ -804,28 +804,30 @@ struct EditorSidebar: View {
         }
     }
     
-    var selectedRows: [ActionRow] {
-        rows.filter { selection.contains($0.id) }
+    var selectionSnapshot: ActionGroupSelectionSnapshot {
+        ActionGroupProjection.selectionSnapshot(
+            groups: rows.map(\.group),
+            selectedGroupIDs: selection,
+            events: recorder.events
+        )
+    }
+
+    func selectedGroups() -> [ActionGroup] {
+        rows.compactMap { row in
+            selection.contains(row.id) ? row.group : nil
+        }
     }
 
     var canBindSelection: Bool {
-        selectedEventIndices().count >= 2
+        selectionSnapshot.canBindBehavior
     }
 
     var canUnbindSelection: Bool {
-        selectedRows.contains { row in
-            row.group.behaviorGroupID != nil ||
-            row.group.eventIndices.contains { index in
-                recorder.events.indices.contains(index) && recorder.events[index].behaviorGroupID != nil
-            }
-        }
+        selectionSnapshot.containsBehavior
     }
     
     func selectedEventIndices() -> [Int] {
-        rows
-            .filter { selection.contains($0.id) }
-            .flatMap(\.group.eventIndices)
-            .sorted()
+        selectionSnapshot.eventIndices
     }
     
     func nextBehaviorName() -> String {
@@ -1214,7 +1216,7 @@ struct EditorSidebar: View {
     enum Axis { case x, y }
     
     func alignSelectedCoordinates(axis: Axis) {
-        let selectedGroups = rows.filter { selection.contains($0.id) }.map { $0.group }
+        let selectedGroups = selectedGroups()
         guard let firstGrp = selectedGroups.first, let sp = firstGrp.startPoint else { return }
         
         let targetVal = axis == .x ? sp.x : sp.y
@@ -1243,7 +1245,7 @@ struct EditorSidebar: View {
     }
     
     func applyBatchTimeout() {
-        let selectedGroups = rows.filter { selection.contains($0.id) }.map { $0.group }
+        let selectedGroups = selectedGroups()
         withUndo(NSLocalizedString("Batch Set Timeout", comment: "")) {
             for grp in selectedGroups {
                 if grp.kind.editsSemanticTextTarget || (grp.kind.canUseLocatorStrategy && inspStrategy == .locatorOnly) {

@@ -90,11 +90,18 @@ private final class PlayerRunState: @unchecked Sendable {
     weak var player: Player?
     let generation: UInt64
     let completion: ((Bool) -> Void)?
+    let automationCompletion: ((AutomationPlayerCompletion) -> Void)?
 
-    init(player: Player, generation: UInt64, completion: ((Bool) -> Void)?) {
+    init(
+        player: Player,
+        generation: UInt64,
+        completion: ((Bool) -> Void)?,
+        automationCompletion: ((AutomationPlayerCompletion) -> Void)?
+    ) {
         self.player = player
         self.generation = generation
         self.completion = completion
+        self.automationCompletion = automationCompletion
     }
 
     @MainActor
@@ -108,48 +115,19 @@ private final class PlayerRunState: @unchecked Sendable {
     }
 
     @MainActor
-    func finish(monitor: PlaybackConflictMonitor, didAbort: Bool, wasCancelled: Bool) {
+    func finish(
+        monitor: PlaybackConflictMonitor,
+        failureEvidence: PlaybackFailureEvidence?,
+        terminalOutcome: PlaybackRunCompletion
+    ) {
         player?.finishRun(
             generation: generation,
             monitor: monitor,
-            didAbort: didAbort,
-            wasCancelled: wasCancelled,
+            failureEvidence: failureEvidence,
+            terminalOutcome: terminalOutcome,
+            automationCompletion: automationCompletion,
             completion: completion
         )
-    }
-}
-
-private final class LockedValueBox<Value: Sendable>: @unchecked Sendable {
-    private let lock = NSLock()
-    private var value: Value
-
-    init(_ value: Value) {
-        self.value = value
-    }
-
-    func set(_ newValue: Value) {
-        lock.lock()
-        value = newValue
-        lock.unlock()
-    }
-
-    func get() -> Value {
-        lock.lock()
-        defer { lock.unlock() }
-        return value
-    }
-}
-
-private struct PlaybackPointResolution: Sendable {
-    var point: CGPoint?
-    var failureReason: String?
-
-    static func success(_ point: CGPoint) -> PlaybackPointResolution {
-        PlaybackPointResolution(point: point, failureReason: nil)
-    }
-
-    static func failure(_ reason: String) -> PlaybackPointResolution {
-        PlaybackPointResolution(point: nil, failureReason: reason)
     }
 }
 
@@ -162,358 +140,143 @@ final class Player: ObservableObject {
     @Published private(set) var totalLoops: Int = 1
 
     private var task: Task<Void, Never>?
-    /// Incremented on every play()/stop(). A task only touches published state
-    /// if its generation still matches, so a stale epilogue can't clobber a
-    /// newer playback that started right after stop().
-    private var generation: UInt64 = 0
+    private var runStateMachine = PlaybackRunStateMachine()
     private let pointResolver = PointResolver()
     private var conflictMonitor: PlaybackConflictMonitor?
     private let playbackClock: PlaybackClockClient
     private let eventPoster: EventPosterClient
+    private let evidenceClient: PlaybackEvidenceClient
     nonisolated private static let waitStrategy = PlaybackWaitStrategy.precise
-
-    nonisolated private static func awaitSynchronously<Value: Sendable>(
-        _ operation: @escaping @Sendable () async -> Value
-    ) -> Value {
-        let semaphore = DispatchSemaphore(value: 0)
-        let result = LockedValueBox<Value?>(nil)
-        Task.detached(priority: .userInitiated) {
-            result.set(await operation())
-            semaphore.signal()
-        }
-        semaphore.wait()
-        guard let value = result.get() else {
-            fatalError("SparkleRecorder: synchronous async bridge completed without a result")
-        }
-        return value
-    }
-
-    @available(macOS 14.0, *)
-    nonisolated private static func recordFailureEvidence(
-        macroID: UUID?,
-        startTime: Date,
-        duration: TimeInterval,
-        failedEventIndex: Int?,
-        bundleIdentifier: String?,
-        title: String?,
-        reason: String
-    ) async {
-        guard let macroID = macroID else { return }
-        var screenshotData: Data? = nil
-        do {
-            let image = try await ScreenCaptureService.shared.captureWindow(bundleIdentifier: bundleIdentifier, title: title)
-            let bitmap = NSBitmapImageRep(cgImage: image)
-            screenshotData = bitmap.representation(using: .png, properties: [:])
-        } catch {}
-        
-        await EvidenceClient.shared.recordPlayback(
-            macroID: macroID,
-            startTime: startTime,
-            duration: duration,
-            success: false,
-            failedEventIndex: failedEventIndex,
-            errorMessage: reason,
-            screenshotData: screenshotData
-        )
-    }
-
-    nonisolated private static func recordFailureEvidenceSynchronously(
-        macroID: UUID?,
-        startTime: Date,
-        duration: TimeInterval,
-        failedEventIndex: Int?,
-        bundleIdentifier: String?,
-        title: String?,
-        reason: String
-    ) {
-        if #available(macOS 14.0, *) {
-            awaitSynchronously {
-                await recordFailureEvidence(macroID: macroID, startTime: startTime, duration: duration, failedEventIndex: failedEventIndex, bundleIdentifier: bundleIdentifier, title: title, reason: reason)
-            }
-        }
-    }
 
     init(
         playbackClock: PlaybackClockClient = .live,
-        eventPoster: EventPosterClient = .live()
+        eventPoster: EventPosterClient = .live(),
+        evidenceClient: PlaybackEvidenceClient = .live
     ) {
         self.playbackClock = playbackClock
         self.eventPoster = eventPoster
+        self.evidenceClient = evidenceClient
     }
 
     /// Play the macro `loops` times. Pass `loops <= 0` for continuous (infinite) playback,
     /// which only stops on `stop()` or the configured stop hotkey.
     /// The completion receives `true` only when playback ran to natural completion —
     /// `false` for cancellation, so callers can skip chains/stats/sounds on abort.
-    func play(macroID: UUID? = nil, events: [RecordedEvent], loops: Int = 1, speed: Double = 1.0, context: PlaybackContext = PlaybackContext(), windowTracker: WindowTracker? = nil, completion: ((Bool) -> Void)? = nil) {
+    func play(
+        macroID: UUID? = nil,
+        events: [RecordedEvent],
+        runID: UUID = UUID(),
+        loops: Int = 1,
+        speed: Double = 1.0,
+        context: PlaybackContext = PlaybackContext(),
+        windowTracker: WindowTracker? = nil,
+        completion: ((Bool) -> Void)? = nil,
+        automationCompletion: ((AutomationPlayerCompletion) -> Void)? = nil
+    ) {
         let plan = PlaybackPlanner.plan(events: events, loops: loops, speed: speed)
         guard !isPlaying, !plan.steps.isEmpty else { completion?(false); return }
-        let infinite = plan.loopMode.isContinuous
         let total = plan.loopMode.displayLoopCount
 
-        generation &+= 1
-        let gen = generation
+        let startSnapshot = runStateMachine.start(totalLoops: total)
+        let gen = startSnapshot.generation
         let monitor = PlaybackConflictMonitor()
         let playbackClock = playbackClock
-        let eventPoster = eventPoster
         let windowContext = Player.windowContextClient(for: windowTracker)
-        let pointResolver = pointResolver
-        let runState = PlayerRunState(player: self, generation: gen, completion: completion)
+        let stepClientFactory = LivePlaybackRunStepClient(
+            playbackClock: playbackClock,
+            pointResolver: pointResolver,
+            eventPoster: eventPoster
+        )
+        let runState = PlayerRunState(
+            player: self,
+            generation: gen,
+            completion: completion,
+            automationCompletion: automationCompletion
+        )
+        let runStartTime = Date.now
+        let runStartClock = playbackClock.now()
         monitor.start()
         conflictMonitor = monitor
-        isPlaying = true
-        clock.progress = 0
-        currentLoop = 0
-        totalLoops = total
+        apply(startSnapshot)
 
         task = Task.detached(priority: .userInitiated) {
-            var loopIndex = 0
-            // Throttle progress updates to ~30 Hz so the hot posting loop never
-            // waits on a busy main thread between events.
-            var lastProgressPush = 0.0
-            var runningContext = context
-            var hasCapturedFailure = false
-            var aborted = false
-            outer: while !Task.isCancelled {
-                if !infinite, loopIndex >= total { break }
-                loopIndex += 1
-                let snapshot = loopIndex
-                await runState.updateCurrentLoop(snapshot)
+            let powerAssertion = PlaybackPowerAssertion()
+            defer { powerAssertion.end() }
 
-                windowContext.activateAll(runningContext.surfaces.values)
+            let stepClient = stepClientFactory.makeClient()
 
-                // Allow app to activate
-                await playbackClock.sleep(0.2)
-
-                windowContext.refreshResolvedFrames(in: &runningContext)
-
-                var scheduledTime = playbackClock.now()
-                var recentLocatorPoint: (key: String, point: CGPoint, eventTime: TimeInterval)? = nil
-                for step in plan.steps {
-                    let event = step.event
-                    if Task.isCancelled { break outer }
-                    scheduledTime += step.deltaFromPrevious
-
-                    let target = scheduledTime
-                    await playbackClock.wait(until: target, strategy: Self.waitStrategy)
-                    if Task.isCancelled { break outer }
-                    if monitor.hasConflict {
-                        aborted = true
-                        break outer
-                    }
-
-                    let targetSurfaceId = PlaybackPlanner.targetSurfaceId(for: event, context: runningContext)
-                    if runningContext.currentSurfaceFrames[targetSurfaceId] == nil,
-                       let surface = runningContext.surfaces[targetSurfaceId] {
-                        let resolvedSurfaceIds = windowContext.refreshResolvedFrames(
-                            in: &runningContext,
-                            surfaces: [targetSurfaceId: surface],
-                            resetExisting: false
-                        )
-                        if resolvedSurfaceIds.contains(targetSurfaceId) {
-                            windowContext.activateSurface(surface)
-                        }
-                    }
-
-                    if event.kind == .waitForText, let anchor = event.textAnchor {
-                        let text = anchor.text
-                        let timeout = event.textTimeout ?? 10.0
-                        let startPoll = playbackClock.now()
-                        var found = false
-                        if #available(macOS 14.0, *) {
-                            let locator = LocatorEngine()
-                            while playbackClock.now() - startPoll < timeout {
-                                if Task.isCancelled { break outer }
-                                do {
-                                    _ = try await locator.locate(event: event, context: runningContext, strategies: [.ocr(anchor)])
-                                    found = true
-                                    break
-                                } catch {
-                                    await playbackClock.sleep(0.5)
-                                }
-                            }
-                        }
-                        if !found {
-                            aborted = true
-                            if !hasCapturedFailure {
-                                hasCapturedFailure = true
-                                let bid = runningContext.surfaces[targetSurfaceId]?.bundleIdentifier
-                                let title = runningContext.surfaces[targetSurfaceId]?.windowTitle
-                                Task {
-                                    if #available(macOS 14.0, *) {
-                                        await Player.recordFailureEvidence(macroID: macroID, startTime: Date(), duration: 0, failedEventIndex: nil, bundleIdentifier: bid, title: title, reason: "waitForText timeout: '\(text)'")
-                                    }
-                                }
-                            }
-                            break outer // Abort execution
-                        }
-                        scheduledTime = playbackClock.now()
-                        continue
-                    }
-
-                    if event.kind == .verifyText, let anchor = event.textAnchor {
-                        let text = anchor.text
-                        let mustExist = event.verifyMustExist ?? true
-                        var found = false
-                        if #available(macOS 14.0, *) {
-                            let locator = LocatorEngine()
-                            do {
-                                _ = try await locator.locate(event: event, context: runningContext, strategies: [.ocr(anchor)])
-                                found = true
-                            } catch {}
-                        }
-                        if found != mustExist {
-                            aborted = true
-                            if !hasCapturedFailure {
-                                hasCapturedFailure = true
-                                let bid = runningContext.surfaces[targetSurfaceId]?.bundleIdentifier
-                                let title = runningContext.surfaces[targetSurfaceId]?.windowTitle
-                                Task {
-                                    if #available(macOS 14.0, *) {
-                                        await Player.recordFailureEvidence(macroID: macroID, startTime: Date(), duration: 0, failedEventIndex: nil, bundleIdentifier: bid, title: title, reason: "verifyText failed: '\(text)' mustExist=\(mustExist)")
-                                    }
-                                }
-                            }
-                            break outer // Abort execution
-                        }
-                        let actual = playbackClock.now()
-                        if actual - scheduledTime > 0.04 {
-                            scheduledTime = actual
-                        }
-                        continue
-                    }
-
-	                    let point: CGPoint
-	                    if #available(macOS 14.0, *), (event.coordinateStrategy == .locatorOnly || event.textAnchor != nil) {
-                            let cacheKey = Player.locatorCacheKey(for: event, surfaceId: targetSurfaceId)
-                            if let cacheKey,
-                               let cached = recentLocatorPoint,
-                               cached.key == cacheKey,
-                               abs(event.time - cached.eventTime) <= 1.0 {
-                                point = cached.point
-                            } else {
-                                let locator = LocatorEngine()
-                                var strategies: [LocatorStrategy] = []
-                                if let anchor = event.textAnchor {
-                                    strategies.append(.ocr(anchor))
-                                }
-
-                                do {
-                                    point = try await Player.locateWithOptionalWait(locator: locator, event: event, context: runningContext, strategies: strategies, clock: playbackClock)
-                                    if let cacheKey {
-                                        recentLocatorPoint = (cacheKey, point, event.time)
-                                    }
-                                } catch {
-                                    if event.locatorFallbackPolicy == .allowCoordinateFallback {
-                                        if let fallbackPoint = Player.coordinateFallbackPoint(for: event, surfaceId: targetSurfaceId, context: runningContext) {
-                                            point = fallbackPoint
-                                        } else {
-                                            let resolvedResult = pointResolver.resolve(event, context: runningContext)
-                                            switch resolvedResult {
-                                            case .success(let pt):
-                                                point = pt
-                                            case .failure(let fallbackError):
-                                                #if DEBUG
-                                                NSLog("SparkleRecorder: locator fallback error: \(fallbackError)")
-                                                #endif
-                                                aborted = true
-                                                if !hasCapturedFailure {
-                                                    hasCapturedFailure = true
-                                                    let bid = runningContext.surfaces[targetSurfaceId]?.bundleIdentifier
-                                                    let title = runningContext.surfaces[targetSurfaceId]?.windowTitle
-                                                        if #available(macOS 14.0, *) {
-                                                            await Player.recordFailureEvidence(macroID: macroID, startTime: Date(), duration: 0, failedEventIndex: nil, bundleIdentifier: bid, title: title, reason: "\(fallbackError)")
-                                                        }
-                                                }
-                                                break outer
-                                            }
-                                        }
-                                    } else {
-                                        #if DEBUG
-                                        NSLog("SparkleRecorder: locator engine error: \(error)")
-                                        #endif
-                                        aborted = true
-                                        if !hasCapturedFailure {
-                                            hasCapturedFailure = true
-                                            let bid = runningContext.surfaces[targetSurfaceId]?.bundleIdentifier
-                                            let title = runningContext.surfaces[targetSurfaceId]?.windowTitle
-                                                if #available(macOS 14.0, *) {
-                                                    await Player.recordFailureEvidence(macroID: macroID, startTime: Date(), duration: 0, failedEventIndex: nil, bundleIdentifier: bid, title: title, reason: "\(error)")
-                                                }
-                                        }
-                                        break outer
-                                    }
-                                }
-                            }
-                    } else {
-                        let resolvedResult = pointResolver.resolve(event, context: runningContext)
-                        switch resolvedResult {
-                        case .success(let pt):
-                            point = pt
-                        case .failure(let error):
-                            #if DEBUG
-                            NSLog("SparkleRecorder: point resolve error: \(error)")
-                            #endif
-                            aborted = true
-                            if !hasCapturedFailure {
-                                hasCapturedFailure = true
-                                let bid = runningContext.surfaces[targetSurfaceId]?.bundleIdentifier
-                                let title = runningContext.surfaces[targetSurfaceId]?.windowTitle
-                                Task {
-                                    if #available(macOS 14.0, *) {
-                                        await Player.recordFailureEvidence(macroID: macroID, startTime: Date(), duration: 0, failedEventIndex: nil, bundleIdentifier: bid, title: title, reason: "\(error)")
-                                    }
-                                }
-                            }
-                            break outer
-                        }
-                    }
-
-                    eventPoster.post(event, point)
-                    let postTime = playbackClock.now()
-                    if postTime - scheduledTime > 0.04 {
-                        scheduledTime = postTime
-                    }
-                    if plan.rawDuration > 0, postTime - lastProgressPush > 0.033 {
-                        lastProgressPush = postTime
-                        let p = step.progress
-                        await runState.updateProgress(p)
-                    }
+            let engine = PlaybackRunEngine(
+                plan: plan,
+                context: context,
+                macroID: macroID,
+                runID: runID,
+                startedAt: runStartTime,
+                startedClock: runStartClock,
+                clock: playbackClock,
+                windowContext: windowContext,
+                conflict: PlaybackConflictClient(hasConflict: { monitor.hasConflict }),
+                stepClient: stepClient,
+                waitStrategy: Self.waitStrategy
+            )
+            let result = await engine.run(callbacks: PlaybackRunEngineCallbacks(
+                loopStarted: { loop in
+                    await runState.updateCurrentLoop(loop)
+                },
+                progressChanged: { progress in
+                    await runState.updateProgress(progress)
                 }
-            }
-            let didAbort = aborted
+            ))
+            let didAbort = result.didAbort
+            let failureEvidence = result.failureEvidence
             let wasCancelled = Task.isCancelled
-            await runState.finish(monitor: monitor, didAbort: didAbort, wasCancelled: wasCancelled)
+            let duration = playbackClock.now() - runStartClock
+            let terminalOutcome = PlaybackRunStateMachine.completion(
+                runID: runID,
+                startedAt: runStartTime,
+                duration: duration,
+                didAbort: didAbort,
+                wasCancelled: wasCancelled,
+                failureEvidence: failureEvidence
+            )
+            await runState.finish(
+                monitor: monitor,
+                failureEvidence: failureEvidence,
+                terminalOutcome: terminalOutcome
+            )
         }
     }
 
     func stop() {
-        generation &+= 1
+        let snapshot = runStateMachine.stop()
         task?.cancel()
         task = nil
         conflictMonitor?.stop()
         conflictMonitor = nil
-        isPlaying = false
-        clock.progress = 0
-        currentLoop = 0
-        totalLoops = 1
+        apply(snapshot)
     }
 
     fileprivate func updateCurrentLoop(_ loop: Int, generation expectedGeneration: UInt64) {
-        guard generation == expectedGeneration else { return }
-        currentLoop = loop
+        guard let snapshot = runStateMachine.updateCurrentLoop(
+            loop,
+            generation: expectedGeneration
+        ) else { return }
+        apply(snapshot)
     }
 
     fileprivate func updateProgress(_ progress: Double, generation expectedGeneration: UInt64) {
-        guard generation == expectedGeneration else { return }
-        clock.progress = progress
+        guard let snapshot = runStateMachine.updateProgress(
+            progress,
+            generation: expectedGeneration
+        ) else { return }
+        apply(snapshot)
     }
 
     fileprivate func finishRun(
         generation expectedGeneration: UInt64,
         monitor: PlaybackConflictMonitor,
-        didAbort: Bool,
-        wasCancelled: Bool,
+        failureEvidence: PlaybackFailureEvidence?,
+        terminalOutcome: PlaybackRunCompletion,
+        automationCompletion: ((AutomationPlayerCompletion) -> Void)?,
         completion: ((Bool) -> Void)?
     ) {
         monitor.stop()
@@ -521,14 +284,26 @@ final class Player: ObservableObject {
             conflictMonitor = nil
         }
 
-        let finished = !wasCancelled && !didAbort
-        if generation == expectedGeneration {
-            isPlaying = false
-            clock.progress = 0
-            currentLoop = 0
-            totalLoops = 1
+        if let snapshot = runStateMachine.finish(generation: expectedGeneration) {
+            apply(snapshot)
         }
-        completion?(finished)
+
+        if let failureEvidence {
+            let evidenceClient = evidenceClient
+            Task(priority: .utility) {
+                await evidenceClient.recordFailure(failureEvidence)
+            }
+        }
+
+        automationCompletion?(terminalOutcome.automationCompletion)
+        completion?(terminalOutcome.didFinishNaturally)
+    }
+
+    private func apply(_ snapshot: PlaybackRunSnapshot) {
+        isPlaying = snapshot.isPlaying
+        clock.progress = snapshot.progress
+        currentLoop = snapshot.currentLoop
+        totalLoops = snapshot.totalLoops
     }
 
     /// Synchronous playback for CLI mode — no MainActor hops, no published state.
@@ -542,231 +317,42 @@ final class Player: ObservableObject {
         context: PlaybackContext = PlaybackContext(),
         windowTracker: WindowTracker? = nil,
         playbackClock: PlaybackClockClient = .live,
-        eventPoster: EventPosterClient = .live()
+        eventPoster: EventPosterClient = .live(),
+        evidenceClient: PlaybackEvidenceClient = .live
     ) {
         let plan = PlaybackPlanner.plan(events: events, loops: PlaybackPlanner.finiteLoopCount(for: loops), speed: speed)
         guard !plan.steps.isEmpty else { return }
-        let total = plan.loopMode.displayLoopCount
-        let resolver = PointResolver()
         let monitor = PlaybackConflictMonitor()
         let windowContext = Player.windowContextClient(for: windowTracker)
+        let stepClientFactory = LivePlaybackSynchronousRunStepClient(
+            playbackClock: playbackClock,
+            eventPoster: eventPoster
+        )
+        let runID = UUID()
+        let runStartTime = Date.now
+        let runStartClock = playbackClock.now()
         monitor.start()
         defer { monitor.stop() }
-        for _ in 0..<total {
-            windowContext.activateAll(context.surfaces.values)
-            var runningContext = context
 
-            // Allow app to activate
-            playbackClock.sleepSynchronously(0.2)
+        let powerAssertion = PlaybackPowerAssertion()
+        defer { powerAssertion.end() }
 
-            windowContext.refreshResolvedFrames(in: &runningContext)
-
-            var scheduledTime = playbackClock.now()
-            var recentLocatorPoint: (key: String, point: CGPoint, eventTime: TimeInterval)? = nil
-            for step in plan.steps {
-                let event = step.event
-                scheduledTime += step.deltaFromPrevious
-
-                let target = scheduledTime
-                playbackClock.waitSynchronously(until: target, strategy: Self.waitStrategy)
-                if monitor.hasConflict {
-                    return
-                }
-                var hasCapturedFailure = false
-                let targetSurfaceId = PlaybackPlanner.targetSurfaceId(for: event, context: runningContext)
-
-                if runningContext.currentSurfaceFrames[targetSurfaceId] == nil,
-                   let surface = runningContext.surfaces[targetSurfaceId] {
-                    let resolvedSurfaceIds = windowContext.refreshResolvedFrames(
-                        in: &runningContext,
-                        surfaces: [targetSurfaceId: surface],
-                        resetExisting: false
-                    )
-                    if resolvedSurfaceIds.contains(targetSurfaceId) {
-                        windowContext.activateSurface(surface)
-                    }
-                }
-                if event.kind == .waitForText, let anchor = event.textAnchor {
-                    let text = anchor.text
-                    let timeout = event.textTimeout ?? 10.0
-                    let startPoll = playbackClock.now()
-                    var found = false
-                    if #available(macOS 14.0, *) {
-                        let contextSnapshot = runningContext
-                        found = awaitSynchronously {
-                            let locator = LocatorEngine()
-                            while playbackClock.now() - startPoll < timeout {
-                                do {
-                                    _ = try await locator.locate(event: event, context: contextSnapshot, strategies: [.ocr(anchor)])
-                                    return true
-                                } catch {
-                                    await playbackClock.sleep(0.5)
-                                }
-                            }
-                            return false
-                        }
-                    }
-                    if !found {
-                        if !hasCapturedFailure {
-                            hasCapturedFailure = true
-                            let bid = runningContext.surfaces[targetSurfaceId]?.bundleIdentifier
-                            let title = runningContext.surfaces[targetSurfaceId]?.windowTitle
-                            recordFailureEvidenceSynchronously(
-                                macroID: macroID,
-                                startTime: Date(),
-                                duration: 0,
-                                failedEventIndex: nil,
-                                bundleIdentifier: bid,
-                                title: title,
-                                reason: "waitForText timeout: '\(text)'"
-                            )
-                        }
-                        return // Abort synchronously
-                    }
-                    scheduledTime = playbackClock.now()
-                    continue
-                }
-                if event.kind == .verifyText, let anchor = event.textAnchor {
-                    let text = anchor.text
-                    let mustExist = event.verifyMustExist ?? true
-                    var found = false
-                    if #available(macOS 14.0, *) {
-                        let contextSnapshot = runningContext
-                        found = awaitSynchronously {
-                            let locator = LocatorEngine()
-                            do {
-                                _ = try await locator.locate(event: event, context: contextSnapshot, strategies: [.ocr(anchor)])
-                                return true
-                            } catch {
-                                return false
-                            }
-                        }
-                    }
-                    if found != mustExist {
-                        if !hasCapturedFailure {
-                            hasCapturedFailure = true
-                            let bid = runningContext.surfaces[targetSurfaceId]?.bundleIdentifier
-                            let title = runningContext.surfaces[targetSurfaceId]?.windowTitle
-                            recordFailureEvidenceSynchronously(
-                                macroID: macroID,
-                                startTime: Date(),
-                                duration: 0,
-                                failedEventIndex: nil,
-                                bundleIdentifier: bid,
-                                title: title,
-                                reason: "verifyText failed: '\(text)' mustExist=\(mustExist)"
-                            )
-                        }
-                        return // Abort synchronously
-                    }
-                    let actual = playbackClock.now()
-                    if actual - scheduledTime > 0.04 {
-                        scheduledTime = actual
-                    }
-                    continue
-                }
-
-                let point: CGPoint
-                if #available(macOS 14.0, *), (event.coordinateStrategy == .locatorOnly || event.textAnchor != nil) {
-                    let cacheKey = Player.locatorCacheKey(for: event, surfaceId: targetSurfaceId)
-                    if let cacheKey,
-                       let cached = recentLocatorPoint,
-                       cached.key == cacheKey,
-                       abs(event.time - cached.eventTime) <= 1.0 {
-                        point = cached.point
-                    } else {
-                        let contextSnapshot = runningContext
-                        let resolution = awaitSynchronously {
-                            let locator = LocatorEngine()
-                            var strategies: [LocatorStrategy] = []
-                            if let anchor = event.textAnchor {
-                                strategies.append(.ocr(anchor))
-                            }
-                            do {
-                                let resolvedPoint = try await Player.locateWithOptionalWait(
-                                    locator: locator,
-                                    event: event,
-                                    context: contextSnapshot,
-                                    strategies: strategies,
-                                    clock: playbackClock
-                                )
-                                return PlaybackPointResolution.success(resolvedPoint)
-                            } catch {
-                                if event.locatorFallbackPolicy == .allowCoordinateFallback {
-                                    if let fallbackPoint = Player.coordinateFallbackPoint(for: event, surfaceId: targetSurfaceId, context: contextSnapshot) {
-                                        return PlaybackPointResolution.success(fallbackPoint)
-                                    } else {
-                                        switch resolver.resolve(event, context: contextSnapshot) {
-                                        case .success(let pt):
-                                            return PlaybackPointResolution.success(pt)
-                                        case .failure(let fallbackError):
-                                            return PlaybackPointResolution.failure(String(describing: fallbackError))
-                                        }
-                                    }
-                                }
-
-                                return PlaybackPointResolution.failure(String(describing: error))
-                            }
-                        }
-                        guard let pt = resolution.point else {
-                            let reason = resolution.failureReason ?? "locator resolution failed"
-                            #if DEBUG
-                            NSLog("SparkleRecorder: locator resolution error: \(reason)")
-                            #endif
-                            if !hasCapturedFailure {
-                                hasCapturedFailure = true
-                                let bid = runningContext.surfaces[targetSurfaceId]?.bundleIdentifier
-                                let title = runningContext.surfaces[targetSurfaceId]?.windowTitle
-                                recordFailureEvidenceSynchronously(
-                                    macroID: macroID,
-                                    startTime: Date(),
-                                    duration: 0,
-                                    failedEventIndex: nil,
-                                    bundleIdentifier: bid,
-                                    title: title,
-                                    reason: reason
-                                )
-                            }
-                            return
-                        }
-                        point = pt
-                        if let cacheKey {
-                            recentLocatorPoint = (cacheKey, pt, event.time)
-                        }
-                    }
-                } else {
-                    let resolvedResult = resolver.resolve(event, context: runningContext)
-                    switch resolvedResult {
-                    case .success(let pt):
-                        point = pt
-                    case .failure(let error):
-                        #if DEBUG
-                        NSLog("SparkleRecorder: point resolve error: \(error)")
-                        #endif
-                        if !hasCapturedFailure {
-                            hasCapturedFailure = true
-                            let bid = runningContext.surfaces[targetSurfaceId]?.bundleIdentifier
-                            let title = runningContext.surfaces[targetSurfaceId]?.windowTitle
-                            recordFailureEvidenceSynchronously(
-                                macroID: macroID,
-                                startTime: Date(),
-                                duration: 0,
-                                failedEventIndex: nil,
-                                bundleIdentifier: bid,
-                                title: title,
-                                reason: "\(error)"
-                            )
-                        }
-                        return
-                    }
-                }
-
-                eventPoster.post(event, point)
-                let postTime = playbackClock.now()
-                if postTime - scheduledTime > 0.04 {
-                    scheduledTime = postTime
-                }
-            }
+        let engine = PlaybackSynchronousRunEngine(
+            plan: plan,
+            context: context,
+            macroID: macroID,
+            runID: runID,
+            startedAt: runStartTime,
+            startedClock: runStartClock,
+            clock: playbackClock,
+            windowContext: windowContext,
+            conflict: PlaybackConflictClient(hasConflict: { monitor.hasConflict }),
+            stepClient: stepClientFactory.makeClient(),
+            waitStrategy: Self.waitStrategy
+        )
+        let result = engine.run()
+        if let failureEvidence = result.failureEvidence {
+            evidenceClient.recordFailureSynchronously(failureEvidence)
         }
     }
 
@@ -825,68 +411,4 @@ final class Player: ObservableObject {
         return PlaybackSurfaceFrameResolution(outerFrame: outerFrame, contentFrame: contentFrame)
     }
 
-    @available(macOS 14.0, *)
-    nonisolated private static func locateWithOptionalWait(locator: LocatorEngine, event: RecordedEvent, context: PlaybackContext, strategies: [LocatorStrategy], clock: PlaybackClockClient = .live) async throws -> CGPoint {
-        guard event.kind.isMouse, event.textAnchor != nil, let timeout = event.textTimeout, timeout > 0 else {
-            return try await locator.locate(event: event, context: context, strategies: strategies)
-        }
-
-        let startedAt = clock.now()
-        var lastError: Error = VisionDetectorError.textNotMatched
-        while clock.now() - startedAt < timeout {
-            do {
-                return try await locator.locate(event: event, context: context, strategies: strategies)
-            } catch {
-                lastError = error
-                await clock.sleep(0.25)
-            }
-        }
-        throw lastError
-    }
-
-    nonisolated private static func locatorCacheKey(for event: RecordedEvent, surfaceId: String) -> String? {
-        guard let anchor = event.textAnchor else { return nil }
-        return [
-            surfaceId,
-            anchor.text,
-            anchor.matchMode.rawValue,
-            rectKey(anchor.observedContentNormalizedFrame ?? anchor.observedFrame),
-            rectKey(anchor.searchContentNormalizedRegion ?? anchor.searchRegion),
-            pointKey(anchor.coordinateFallbackContentNormalized ?? anchor.coordinateFallback)
-        ].joined(separator: "|")
-    }
-
-    nonisolated private static func rectKey(_ rect: RectValue?) -> String {
-        guard let rect else { return "-" }
-        return String(format: "%.4f,%.4f,%.4f,%.4f", rect.x, rect.y, rect.width, rect.height)
-    }
-
-    nonisolated private static func pointKey(_ point: PointValue?) -> String {
-        guard let point else { return "-" }
-        return String(format: "%.4f,%.4f", point.x, point.y)
-    }
-
-    nonisolated private static func coordinateFallbackPoint(for event: RecordedEvent, surfaceId: String, context: PlaybackContext) -> CGPoint? {
-        guard let anchor = event.textAnchor,
-              let windowFrame = context.currentSurfaceFrames[surfaceId] else { return nil }
-
-        let point: CGPoint?
-        if let normalized = anchor.coordinateFallbackContentNormalized,
-           let contentFrame = context.currentContentFrames[surfaceId] {
-            point = CGPoint(
-                x: contentFrame.x + normalized.x * contentFrame.width,
-                y: contentFrame.y + normalized.y * contentFrame.height
-            )
-        } else if let fallback = anchor.coordinateFallback {
-            point = CGPoint(x: fallback.x, y: fallback.y)
-        } else {
-            point = nil
-        }
-
-        guard let point,
-              CoordinateMapper().assertPointIsInsideWindow(point, in: windowFrame) else {
-            return nil
-        }
-        return point
-    }
 }

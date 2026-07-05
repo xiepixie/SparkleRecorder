@@ -1,5 +1,7 @@
 # Automation Core Contract First
 
+状态（2026-07-05）：Phase 0 contract 已在 `AutomationContract.swift` 和 `AutomationContractTests` 中落地。本文继续作为合同语义说明；后续 reducer、ResourceArbiter、Player/Scheduler client 不应重新定义这些核心类型。
+
 此文件定义必须先完成、不可与下游大规模并行的核心合同。目标是在不触发真实鼠标键盘、不写 UI 的情况下，先把编排状态和事件语言固定下来。
 
 ## 为什么必须先做合同
@@ -38,9 +40,11 @@ public struct AutomationWorkflow: Codable, Equatable, Sendable, Identifiable {
 ```swift
 public struct AutomationTask: Codable, Equatable, Sendable, Identifiable {
     public var id: UUID
+    public var name: String
     public var kind: AutomationTaskKind
     public var schedule: AutomationSchedule?
     public var resourceRequirement: AutomationResourceRequirement
+    public var graphPosition: AutomationGraphPoint?
 }
 ```
 
@@ -62,6 +66,7 @@ public enum AutomationTaskKind: Codable, Equatable, Sendable {
 ```swift
 public struct AutomationTaskRun: Codable, Equatable, Sendable, Identifiable {
     public var id: UUID                 // runID
+    public var executionID: UUID
     public var workflowID: UUID
     public var taskID: UUID
     public var macroID: UUID?
@@ -69,8 +74,11 @@ public struct AutomationTaskRun: Codable, Equatable, Sendable, Identifiable {
     public var earliestStartTime: Date?
     public var actualStartTime: Date?
     public var completedAt: Date?
+    public var status: AutomationTaskRunStatus
     public var outcome: AutomationOutcome?
     public var evidenceID: UUID?
+    public var leaseID: UUID?
+    public var upstreamRunIDs: [UUID]
 }
 ```
 
@@ -81,6 +89,7 @@ public struct AutomationTaskRun: Codable, Equatable, Sendable, Identifiable {
 - `actualStartTime`: 真正开始时间。
 - `completedAt`: 终态时间。
 - `outcome`: 运行结果。
+- `upstreamRunIDs`: 解锁当前 run 的上游终态 run，用于 condition context。
 
 ### `AutomationDependency`
 
@@ -114,14 +123,16 @@ public enum AutomationDependencyTrigger: Codable, Equatable, Sendable {
 
 ```swift
 public enum AutomationOutcome: Codable, Equatable, Sendable {
-    case succeeded(RunReport)
-    case failed(RunReport)
-    case cancelled
-    case timedOut
-    case resourceConflict
-    case permissionDenied(String)
+    case succeeded(report: RunReport?)
+    case failed(report: RunReport?)
+    case cancelled(reason: String?)
+    case timedOut(deadline: Date?)
+    case resourceConflict(resource: AutomationResource?)
+    case permissionDenied(permission: AutomationPermission, message: String)
     case conditionMatched
     case conditionNotMatched
+    case missingMacro(macroID: UUID)
+    case rejected(reason: String)
 }
 ```
 
@@ -132,13 +143,49 @@ public enum AutomationOutcome: Codable, Equatable, Sendable {
 ```swift
 public enum AutomationAction: Equatable, Sendable {
     case clockTick(Date)
-    case manualStart(workflowID: UUID, taskID: UUID)
+    case manualStart(workflowID: UUID, taskID: UUID, requestedAt: Date)
+    case scheduledStartDue(workflowID: UUID, taskID: UUID, scheduledAt: Date)
+    case upsertWorkflow(AutomationWorkflow, at: Date)
+    case deleteWorkflow(workflowID: UUID, at: Date)
+    case upsertTask(workflowID: UUID, task: AutomationTask, at: Date)
+    case deleteTask(workflowID: UUID, taskID: UUID, at: Date)
+    case moveTask(workflowID: UUID, taskID: UUID, position: AutomationGraphPoint, at: Date)
+    case upsertDependency(workflowID: UUID, dependency: AutomationDependency, at: Date)
+    case deleteDependency(workflowID: UUID, dependencyID: UUID, at: Date)
+    case runCreated(AutomationTaskRun)
+    case resourceLeaseAcquired(runID: UUID, lease: AutomationResourceLease, at: Date)
+    case resourceLeasesAcquired(runID: UUID, leases: [AutomationResourceLease], at: Date)
+    case resourceLeaseDenied(runID: UUID, resource: AutomationResource, at: Date)
     case playerStarted(runID: UUID, at: Date)
     case playerFinished(runID: UUID, outcome: AutomationOutcome, at: Date)
-    case resourceLeaseAcquired(runID: UUID, leaseID: UUID, at: Date)
-    case resourceLeaseDenied(runID: UUID, at: Date)
-    case cancelRun(runID: UUID, at: Date)
     case conditionEvaluated(runID: UUID, outcome: AutomationOutcome, at: Date)
+    case taskFinished(runID: UUID, outcome: AutomationOutcome, at: Date)
+    case cancelRun(runID: UUID, at: Date)
+    case panicRelease(runID: UUID, at: Date)
+}
+```
+
+### `AutomationEffect`
+
+Reducer 不调用真实系统 API，只把副作用请求交给 Owner B。
+
+```swift
+public enum AutomationEffect: Codable, Equatable, Sendable {
+    case requestResource(runID: UUID, requirement: AutomationResourceRequirement)
+    case releaseResource(runID: UUID, lease: AutomationResourceLease)
+    case startPlayer(runID: UUID, workflowID: UUID, taskID: UUID, macroID: UUID)
+    case cancelPlayer(runID: UUID)
+    case evaluateCondition(
+        runID: UUID,
+        workflowID: UUID,
+        taskID: UUID,
+        condition: AutomationConditionSpec,
+        previousOutcomes: [AutomationOutcome]
+    )
+    case wait(runID: UUID, workflowID: UUID, taskID: UUID, duration: TimeInterval)
+    case sendNotification(runID: UUID, workflowID: UUID, taskID: UUID, notification: AutomationNotificationSpec)
+    case persistWorkflows([AutomationWorkflow])
+    case persistRun(AutomationTaskRun)
 }
 ```
 
