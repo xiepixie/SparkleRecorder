@@ -1,5 +1,5 @@
 #!/usr/bin/env swift
-// Generates AppIcon.iconset for TinyRecorder.
+// Generates AppIcon.iconset for SparkleRecorder.
 // Run from project root:  swift tools/make_icon.swift
 // Then:                   iconutil -c icns AppIcon.iconset -o AppIcon.icns
 import AppKit

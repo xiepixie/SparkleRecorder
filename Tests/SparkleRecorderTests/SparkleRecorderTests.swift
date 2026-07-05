@@ -1,0 +1,492 @@
+import Testing
+import Foundation
+import CoreGraphics
+@testable import SparkleRecorderCore
+
+@Suite("SparkleRecorder Tests")
+struct SparkleRecorderTests {
+    
+    @Test("Text Macro Format Roundtrip")
+    func textMacroFormatRoundTrip() {
+        let events = [
+            RecordedEvent.make(.mouseMoved, time: 0.0, x: 100, y: 200),
+            RecordedEvent.make(.leftMouseDown, time: 0.1, x: 100, y: 200, mouseButton: 0, clickCount: 1),
+            RecordedEvent.make(.leftMouseUp, time: 0.2, x: 100, y: 200, mouseButton: 0, clickCount: 1),
+            RecordedEvent.make(.scrollWheel, time: 0.3, scrollDeltaY: -5, scrollDeltaX: 0),
+            RecordedEvent.make(.keyDown, time: 0.4, keyCode: 49, flags: 0),
+            RecordedEvent.make(.keyUp, time: 0.5, keyCode: 49, flags: 0)
+        ]
+        
+        let exportedText = TextMacroFormat.export(events)
+        #expect(exportedText.contains("SPARKLERECORDER 1"))
+        
+        do {
+            let result = try TextMacroFormat.parse(exportedText)
+            #expect(result.events.count == events.count)
+            #expect(result.events[0].kind == .mouseMoved)
+            #expect(result.events[1].kind == .leftMouseDown)
+            #expect(result.events[2].kind == .leftMouseUp)
+            #expect(result.events[3].kind == .scrollWheel)
+            #expect(result.events[4].kind == .keyDown)
+            #expect(result.events[5].kind == .keyUp)
+        } catch {
+            Issue.record("Failed to parse exported text: \(error)")
+        }
+    }
+    
+    @Test("SparkleRecorder Importer Parse Empty")
+    func legacyRecImporterParseEmpty() {
+        #expect(throws: Error.self) {
+            try LegacyRecImporter.parse(Data())
+        }
+    }
+    
+    @Test("Saved Macro Decoding Compatibility")
+    func savedMacroDecodingCompatibility() {
+        let jsonStr = """
+        {
+          "id": "A4E7F912-88B9-4DF5-91E3-E3CCF9B3C2D1",
+          "name": "Test Macro",
+          "events": [
+            {
+              "kind": 1,
+              "time": 0.54,
+              "x": 420.5,
+              "y": 310.2,
+              "keyCode": 0,
+              "flags": 0,
+              "mouseButton": 0,
+              "clickCount": 1,
+              "scrollDeltaY": 0,
+              "scrollDeltaX": 0
+            }
+          ],
+          "createdAt": 766094400,
+          "modifiedAt": 766094412,
+          "version": 3,
+          "loops": 1,
+          "speed": 1.5
+        }
+        """
+        
+        guard let data = jsonStr.data(using: .utf8) else {
+            Issue.record("Failed to encode mock string")
+            return
+        }
+        
+        do {
+            let decoder = JSONDecoder()
+            decoder.dateDecodingStrategy = .secondsSince1970
+            let macro = try decoder.decode(SavedMacro.self, from: data)
+            #expect(macro.name == "Test Macro")
+            #expect(macro.speed == 1.5)
+            #expect(macro.loops == 1)
+            #expect(macro.events.count == 1)
+            #expect(macro.events[0].kind == .leftMouseDown)
+        } catch {
+            Issue.record("SavedMacro failed to decode compatibility JSON: \(error)")
+        }
+    }
+    
+    @Test("Synthesizer Dry Run")
+    func synthesizerDryRun() {
+        class MockPoster: EventPosting {
+            var posted: [(RecordedEvent, CGPoint)] = []
+            func post(_ event: RecordedEvent, at point: CGPoint) {
+                posted.append((event, point))
+            }
+        }
+        
+        let poster = MockPoster()
+        let synth = MouseKeyboardSynthesizer(poster: poster)
+        
+        let ev = RecordedEvent.make(.leftMouseDown, time: 0.1, x: 50, y: 60)
+        synth.synthesize(ev, at: CGPoint(x: 500, y: 600))
+        
+        #expect(poster.posted.count == 1)
+        #expect(poster.posted[0].0.kind == .leftMouseDown)
+        #expect(poster.posted[0].1.x == 500)
+        #expect(poster.posted[0].1.y == 600)
+    }
+    
+    @Test("Point Resolver")
+    func pointResolver() {
+        let resolver = PointResolver()
+        let event = RecordedEvent.make(.mouseMoved, time: 0.1, x: 150, y: 250)
+        
+        // 1. screenAbsolute Mode
+        let contextAbsolute = PlaybackContext(coordinateMode: .screenAbsolute)
+        let pointAbsolute = try! resolver.resolve(event, context: contextAbsolute).get()
+        #expect(pointAbsolute.x == 150)
+        #expect(pointAbsolute.y == 250)
+        
+        // 2. boundWindowOffset Mode
+        let surface = PlaybackSurface(recordedFrame: RectValue(x: 100, y: 100, width: 800, height: 600))
+        let currentFrame = RectValue(x: 250, y: 150, width: 800, height: 600)
+        
+        let contextOffset = PlaybackContext(
+            surfaces: ["main": surface],
+            currentSurfaceFrames: ["main": currentFrame],
+            coordinateMode: .boundWindowOffset
+        )
+        
+        let pointOffset = try! resolver.resolve(event, context: contextOffset).get()
+        #expect(pointOffset.x == 300)
+        #expect(pointOffset.y == 300)
+    }
+    
+    @Test("Event Grouper Click and Drag")
+    func eventGrouperClickAndDrag() {
+        let grouper = EventGrouper()
+        
+        // 1. Click events
+        let clickEvents = [
+            RecordedEvent.make(.leftMouseDown, time: 0.1, x: 100, y: 100),
+            RecordedEvent.make(.leftMouseUp, time: 0.2, x: 100, y: 100)
+        ]
+        let clickGroups = grouper.group(clickEvents)
+        #expect(clickGroups.count == 1)
+        #expect(clickGroups[0].kind == .click)
+        #expect(clickGroups[0].eventIndices == [0, 1])
+        #expect(clickGroups[0].startPoint == CGPoint(x: 100, y: 100))
+        
+        // 2. Drag events
+        let dragEvents = [
+            RecordedEvent.make(.leftMouseDown, time: 0.1, x: 100, y: 100),
+            RecordedEvent.make(.leftMouseDragged, time: 0.2, x: 105, y: 105),
+            RecordedEvent.make(.leftMouseDragged, time: 0.3, x: 110, y: 110),
+            RecordedEvent.make(.leftMouseUp, time: 0.4, x: 110, y: 110)
+        ]
+        let dragGroups = grouper.group(dragEvents)
+        #expect(dragGroups.count == 1)
+        #expect(dragGroups[0].kind == .drag)
+        #expect(dragGroups[0].eventIndices == [0, 1, 2, 3])
+        #expect(dragGroups[0].startPoint == CGPoint(x: 100, y: 100))
+        #expect(dragGroups[0].endPoint == CGPoint(x: 110, y: 110))
+        #expect(dragGroups[0].path.count == 4)
+        
+        // 3. Wait events (with interval > 200ms)
+        let waitEvents = [
+            RecordedEvent.make(.leftMouseDown, time: 0.1, x: 100, y: 100),
+            RecordedEvent.make(.leftMouseUp, time: 0.2, x: 100, y: 100),
+            // Wait 1.0s gap
+            RecordedEvent.make(.scrollWheel, time: 1.2, scrollDeltaY: -5, scrollDeltaX: 0)
+        ]
+        let waitGroups = grouper.group(waitEvents)
+        #expect(waitGroups.count == 3) // Click, Wait, Scroll
+        #expect(waitGroups[0].kind == .click)
+        #expect(waitGroups[1].kind == .wait)
+        #expect(waitGroups[1].startTime == 0.2)
+        #expect(waitGroups[1].endTime == 1.2)
+        #expect(waitGroups[2].kind == .scroll)
+    }
+
+    @Test("Event Grouper Rapid Multi Point Click")
+    func eventGrouperRapidMultiPointClick() {
+        let events = [
+            RecordedEvent.make(.leftMouseDown, time: 0.00, x: 100, y: 100, mouseButton: 0, clickCount: 1),
+            RecordedEvent.make(.leftMouseUp, time: 0.02, x: 100, y: 100, mouseButton: 0, clickCount: 1),
+            RecordedEvent.make(.leftMouseDown, time: 0.07, x: 150, y: 120, mouseButton: 0, clickCount: 1),
+            RecordedEvent.make(.leftMouseUp, time: 0.09, x: 150, y: 120, mouseButton: 0, clickCount: 1),
+            RecordedEvent.make(.leftMouseDown, time: 0.14, x: 210, y: 140, mouseButton: 0, clickCount: 1),
+            RecordedEvent.make(.leftMouseUp, time: 0.16, x: 210, y: 140, mouseButton: 0, clickCount: 1)
+        ]
+
+        let groups = EventGrouper().group(events)
+        #expect(groups.count == 1)
+        #expect(groups[0].kind == .multiPointClick)
+        #expect(groups[0].path == [
+            CGPoint(x: 100, y: 100),
+            CGPoint(x: 150, y: 120),
+            CGPoint(x: 210, y: 140)
+        ])
+        #expect(groups[0].clickCount == 3)
+    }
+
+    @Test("Event Grouper Strict Continuity")
+    func eventGrouperStrictContinuity() {
+        let grouper = EventGrouper()
+        let events = [
+            RecordedEvent.make(.keyDown, time: 0.1, keyCode: 49, flags: 0),
+            RecordedEvent.make(.leftMouseDown, time: 0.2, x: 100, y: 100),
+            RecordedEvent.make(.leftMouseUp, time: 0.3, x: 100, y: 100),
+            RecordedEvent.make(.keyUp, time: 0.4, keyCode: 49, flags: 0)
+        ]
+        let groups = grouper.group(events)
+        #expect(groups.count == 3)
+        #expect(groups[0].kind == .keyPress)
+        #expect(groups[1].kind == .click)
+        #expect(groups[2].kind == .keyPress)
+    }
+
+    @Test("Event Grouper Long Press and Key Hold")
+    func eventGrouperLongPressAndKeyHold() {
+        let grouper = EventGrouper()
+        
+        let longPressEvents = [
+            RecordedEvent.make(.leftMouseDown, time: 0.1, x: 100, y: 100),
+            RecordedEvent.make(.leftMouseUp, time: 0.5, x: 100, y: 100)
+        ]
+        let lpGroups = grouper.group(longPressEvents)
+        #expect(lpGroups.count == 1)
+        #expect(lpGroups[0].kind == .longPress)
+        
+        let keyHoldEvents = [
+            RecordedEvent.make(.keyDown, time: 0.1, keyCode: 49, flags: 0),
+            RecordedEvent.make(.keyUp, time: 0.5, keyCode: 49, flags: 0)
+        ]
+        let khGroups = grouper.group(keyHoldEvents)
+        #expect(khGroups.count == 1)
+        #expect(khGroups[0].kind == .keyHold)
+    }
+
+    @Test("Scroll Direction Compatibility")
+    func scrollDirectionCompatibility() {
+        let grouper = EventGrouper()
+        let scrollEvents = [
+            RecordedEvent.make(.scrollWheel, time: 0.1, scrollDeltaY: -5, scrollDeltaX: 0),
+            RecordedEvent.make(.scrollWheel, time: 0.2, scrollDeltaY: -4, scrollDeltaX: 0),
+            RecordedEvent.make(.scrollWheel, time: 0.3, scrollDeltaY: 3, scrollDeltaX: 0)
+        ]
+        let scrollGroups = grouper.group(scrollEvents)
+        #expect(scrollGroups.count == 2)
+        #expect(scrollGroups[0].kind == .scroll)
+        #expect(scrollGroups[1].kind == .scroll)
+        #expect(scrollGroups[0].eventIndices.count == 2)
+        #expect(scrollGroups[1].eventIndices.count == 1)
+    }
+
+    @Test("Event Grouper Merges Scroll Segment Across Short Pause")
+    func eventGrouperMergesScrollSegmentAcrossShortPause() {
+        let scrollEvents = [
+            RecordedEvent.make(.scrollWheel, time: 3.708, x: 300, y: 240, scrollDeltaY: -12, scrollDeltaX: 0),
+            RecordedEvent.make(.scrollWheel, time: 3.724, x: 300, y: 240, scrollDeltaY: -12, scrollDeltaX: 0),
+            RecordedEvent.make(.scrollWheel, time: 3.762, x: 301, y: 241, scrollDeltaY: -12, scrollDeltaX: 0),
+            RecordedEvent.make(.scrollWheel, time: 4.144, x: 302, y: 242, scrollDeltaY: -12, scrollDeltaX: 0),
+            RecordedEvent.make(.scrollWheel, time: 4.169, x: 302, y: 242, scrollDeltaY: -12, scrollDeltaX: 0),
+            RecordedEvent.make(.scrollWheel, time: 4.235, x: 303, y: 242, scrollDeltaY: -12, scrollDeltaX: 0)
+        ]
+
+        let groups = EventGrouper().group(scrollEvents)
+        #expect(groups.count == 1)
+        #expect(groups[0].kind == .scroll)
+        #expect(groups[0].eventIndices.count == 6)
+        #expect(groups[0].scrollDeltaY == -72)
+    }
+
+    @Test("Point Resolver Fail-Safe (Out of Bounds)")
+    func pointResolverOutOfBounds() {
+        let resolver = PointResolver()
+        let event = RecordedEvent.make(.mouseMoved, time: 0.1, x: 1500, y: 1500)
+        
+        let surface = PlaybackSurface(recordedFrame: RectValue(x: 100, y: 100, width: 800, height: 600))
+        let currentFrame = RectValue(x: 250, y: 150, width: 800, height: 600)
+        
+        let contextOffset = PlaybackContext(
+            surfaces: ["main": surface],
+            currentSurfaceFrames: ["main": currentFrame],
+            coordinateMode: .boundWindowOffset
+        )
+        
+        let result = resolver.resolve(event, context: contextOffset)
+        // Since event is at (1500, 1500) and recordedFrame is 800x600 at (100, 100), 
+        // the normalized point will be out of bounds (0...1).
+        if case .failure(let error) = result {
+            if case .resolvedPointOutOfBounds = error {
+                // Success
+            } else {
+                Issue.record("Expected out of bounds error but got \(error)")
+            }
+        } else {
+            Issue.record("Expected out of bounds error but got success")
+        }
+    }
+
+    @Test("Event Grouper Scroll Payload Accumulation")
+    func eventGrouperScrollPayload() {
+        let grouper = EventGrouper()
+        var first = RecordedEvent.make(.scrollWheel, time: 0.1, scrollDeltaY: -5, scrollDeltaX: 1)
+        first.scrollPayload = ScrollPayload(deltaX: 1, deltaY: -5, lineDeltaX: 0, lineDeltaY: -1, phase: 1, isContinuous: true)
+        var second = RecordedEvent.make(.scrollWheel, time: 0.2, scrollDeltaY: -4, scrollDeltaX: 2)
+        second.scrollPayload = ScrollPayload(deltaX: 2, deltaY: -4, lineDeltaX: 0, lineDeltaY: -1, phase: 1, isContinuous: true)
+        let scrollEvents = [first, second]
+        let scrollGroups = grouper.group(scrollEvents)
+        #expect(scrollGroups.count == 1)
+        #expect(scrollGroups[0].kind == .scroll)
+        #expect(scrollGroups[0].scrollPayload?.deltaY == -9)
+        #expect(scrollGroups[0].scrollPayload?.deltaX == 3)
+    }
+
+    @Test("Event Grouper Unicode Payload")
+    func eventGrouperUnicodePayload() {
+        let grouper = EventGrouper()
+        var eventA = RecordedEvent.make(.keyDown, time: 0.1, keyCode: 0, flags: 0)
+        eventA.unicodeString = "a"
+        let eventUp = RecordedEvent.make(.keyUp, time: 0.2, keyCode: 0, flags: 0)
+        
+        let events = [eventA, eventUp]
+        let groups = grouper.group(events)
+        #expect(groups.count == 1)
+        #expect(groups[0].kind == .keyPress)
+        #expect(groups[0].unicodeString == "a")
+    }
+
+    @Test("RecordedEvent OCR Strategy Encoding and Decoding")
+    func recordedEventOCREncodingDecoding() {
+        let event = RecordedEvent(
+            kind: .leftMouseDown,
+            time: 1.0,
+            x: 100,
+            y: 200,
+            keyCode: 0,
+            flags: 0,
+            mouseButton: 0,
+            clickCount: 1,
+            scrollDeltaY: 0,
+            scrollDeltaX: 0,
+            coordinateBinding: .targetWindow,
+            coordinateStrategy: .locatorOnly,
+            surfaceId: "cookie-run",
+            textAnchor: TextAnchor(text: "一次填滿", observedFrame: RectValue(x: 10, y: 10, width: 50, height: 20))
+        )
+        
+        do {
+            let data = try JSONEncoder().encode(event)
+            let decoded = try JSONDecoder().decode(RecordedEvent.self, from: data)
+            #expect(decoded.coordinateBinding == .targetWindow)
+            #expect(decoded.coordinateStrategy == .locatorOnly)
+            #expect(decoded.surfaceId == "cookie-run")
+            #expect(decoded.textAnchor?.text == "一次填滿")
+        } catch {
+            Issue.record("Failed to round-trip RecordedEvent with OCR values: \(error)")
+        }
+    }
+    
+    @Test("Point Resolver Prefers Content Coordinates")
+    func pointResolverPrefersContentCoordinates() throws {
+        let resolver = PointResolver()
+        let surface = PlaybackSurface(
+            recordedFrame: RectValue(x: 100, y: 100, width: 800, height: 600),
+            recordedContentFrame: RectValue(x: 100, y: 128, width: 800, height: 572)
+        )
+        let context = PlaybackContext(
+            surfaces: ["main": surface],
+            currentSurfaceFrames: ["main": RectValue(x: 300, y: 200, width: 900, height: 700)],
+            currentContentFrames: ["main": RectValue(x: 300, y: 235, width: 900, height: 665)]
+        )
+        
+        var event = RecordedEvent.make(.leftMouseDown, time: 0, x: 500, y: 400, mouseButton: 0)
+        event.coordinateBinding = .targetWindow
+        event.surfaceId = "main"
+        event.contentNormalizedX = 0.25
+        event.contentNormalizedY = 0.5
+        event.contentLocalX = 10
+        event.contentLocalY = 10
+        
+        let point = try resolver.resolve(event, context: context).get()
+        #expect(abs(point.x - 525) < 0.001)
+        #expect(abs(point.y - 567.5) < 0.001)
+        
+        event.contentNormalizedX = 1.2
+        if case .failure(.resolvedPointOutOfBounds(_, let bounds)) = resolver.resolve(event, context: context) {
+            #expect(abs(bounds.x - 300) < 0.001)
+            #expect(abs(bounds.y - 235) < 0.001)
+        } else {
+            Issue.record("Expected content bounds failure")
+        }
+    }
+    
+    @Test("Event Grouper Semantic Actions")
+    func eventGrouperSemanticActions() {
+        var clickEvents: [RecordedEvent] = []
+        for i in 0..<5 {
+            let t = Double(i) * 0.12
+            clickEvents.append(.make(.leftMouseDown, time: t, x: 100, y: 100, mouseButton: 0, clickCount: 1))
+            clickEvents.append(.make(.leftMouseUp, time: t + 0.04, x: 100, y: 100, mouseButton: 0, clickCount: 1))
+        }
+        let clickGroups = EventGrouper().group(clickEvents)
+        #expect(clickGroups.count == 1)
+        #expect(clickGroups[0].kind == .repeatedClick)
+        #expect(clickGroups[0].clickCount == 5)
+        
+        let shortcutEvents = [
+            RecordedEvent.make(.flagsChanged, time: 0.00, keyCode: 55, flags: ModFlag.command),
+            RecordedEvent.make(.keyDown, time: 0.02, keyCode: 1, flags: ModFlag.command),
+            RecordedEvent.make(.keyUp, time: 0.04, keyCode: 1, flags: ModFlag.command),
+            RecordedEvent.make(.flagsChanged, time: 0.06, keyCode: 55, flags: 0)
+        ]
+        let shortcutGroups = EventGrouper().group(shortcutEvents)
+        #expect(shortcutGroups.count == 1)
+        #expect(shortcutGroups[0].kind == .shortcut)
+        #expect(shortcutGroups[0].summary.contains("Cmd+S"))
+        
+        var h = RecordedEvent.make(.keyDown, time: 0.10, keyCode: 4)
+        h.unicodeString = "h"
+        let hUp = RecordedEvent.make(.keyUp, time: 0.12, keyCode: 4)
+        var i = RecordedEvent.make(.keyDown, time: 0.20, keyCode: 34)
+        i.unicodeString = "i"
+        let iUp = RecordedEvent.make(.keyUp, time: 0.22, keyCode: 34)
+        let textGroups = EventGrouper().group([h, hUp, i, iUp])
+        #expect(textGroups.count == 1)
+        #expect(textGroups[0].kind == .textInput)
+        #expect(textGroups[0].unicodeString == "hi")
+    }
+    
+    @Test("Event Grouper Aggregates Full Scroll Payload")
+    func eventGrouperAggregatesFullScrollPayload() {
+        var first = RecordedEvent.make(.scrollWheel, time: 0.1, x: 200, y: 200, scrollDeltaY: -5, scrollDeltaX: 1)
+        first.scrollPayload = ScrollPayload(deltaX: 1, deltaY: -5, lineDeltaX: 0, lineDeltaY: -1, phase: 1, momentumPhase: 0, fixedDeltaX: 0.5, fixedDeltaY: -1.5, isContinuous: true)
+        var second = RecordedEvent.make(.scrollWheel, time: 0.2, x: 202, y: 202, scrollDeltaY: -4, scrollDeltaX: 2)
+        second.scrollPayload = ScrollPayload(deltaX: 2, deltaY: -4, lineDeltaX: 1, lineDeltaY: -1, phase: 2, momentumPhase: 3, fixedDeltaX: 1.0, fixedDeltaY: -2.0, isContinuous: false)
+        
+        let groups = EventGrouper().group([first, second])
+        #expect(groups.count == 1)
+        #expect(groups[0].kind == .scroll)
+        #expect(groups[0].scrollPayload?.deltaX == 3)
+        #expect(groups[0].scrollPayload?.deltaY == -9)
+        #expect(groups[0].scrollPayload?.lineDeltaX == 1)
+        #expect(groups[0].scrollPayload?.lineDeltaY == -2)
+        #expect(groups[0].scrollPayload?.momentumPhase == 3)
+        #expect(groups[0].scrollPayload?.fixedDeltaX == 1.5)
+        #expect(groups[0].scrollPayload?.fixedDeltaY == -3.5)
+        #expect(groups[0].scrollPayload?.isContinuous == true)
+    }
+
+    @Test("Scroll Playback Delta Keeps Recorded Wheel Amount")
+    func scrollPlaybackDeltaKeepsRecordedWheelAmount() {
+        #expect(RecordedEvent.Kind.scrollWheel.isMouse)
+        #expect(CGEventPoster.effectiveScrollPointDelta(recorded: -12, payload: 0) == -12)
+        #expect(CGEventPoster.effectiveScrollPointDelta(recorded: 18, payload: 0.2) == 18)
+        #expect(CGEventPoster.effectiveScrollPointDelta(recorded: -12, payload: -4.6) == -5)
+        #expect(CGEventPoster.effectiveScrollPointDelta(recorded: 0, payload: 7.0) == 7)
+        #expect(CGEventPoster.effectiveScrollLineDelta(recorded: -12, payload: nil) == -1)
+        #expect(CGEventPoster.shouldUseLineScroll(
+            payload: ScrollPayload(deltaX: 0, deltaY: 0, lineDeltaX: 0, lineDeltaY: -1, phase: 0, isContinuous: false),
+            lineY: -1,
+            lineX: 0
+        ))
+        #expect(CGEventPoster.shouldUseLineScroll(
+            payload: ScrollPayload(deltaX: 0, deltaY: -12, lineDeltaX: 0, lineDeltaY: -1, phase: 0, isContinuous: false),
+            lineY: -1,
+            lineX: 0
+        ))
+        #expect(!CGEventPoster.shouldUseLineScroll(
+            payload: ScrollPayload(deltaX: 0, deltaY: -8, lineDeltaX: 0, lineDeltaY: -1, phase: 0, isContinuous: true),
+            lineY: -1,
+            lineX: 0
+        ))
+
+        var wheel = RecordedEvent.make(.scrollWheel, time: 0.1, x: 100, y: 100, scrollDeltaY: -12, scrollDeltaX: 0)
+        wheel.scrollPayload = ScrollPayload(deltaX: 0, deltaY: 0, lineDeltaX: 0, lineDeltaY: -1, phase: 0, isContinuous: false)
+        let wheelSpec = CGEventPoster.scrollPlaybackSpec(for: wheel)
+        #expect(wheelSpec.units == .line)
+        #expect(wheelSpec.wheelY == -1)
+
+        var trackpad = RecordedEvent.make(.scrollWheel, time: 0.1, x: 100, y: 100, scrollDeltaY: -8, scrollDeltaX: 0)
+        trackpad.scrollPayload = ScrollPayload(deltaX: 0, deltaY: -8, lineDeltaX: 0, lineDeltaY: -1, phase: 1, isContinuous: true)
+        let trackpadSpec = CGEventPoster.scrollPlaybackSpec(for: trackpad)
+        #expect(trackpadSpec.units == .pixel)
+        #expect(trackpadSpec.wheelY == -8)
+        #expect(trackpadSpec.isContinuous)
+    }
+}

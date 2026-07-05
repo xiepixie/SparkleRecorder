@@ -1,0 +1,92 @@
+import Foundation
+import CoreGraphics
+import ApplicationServices
+import AppKit
+
+public enum PermissionStatus {
+    case authorized
+    case denied
+    case notDetermined
+}
+
+public class PermissionCenter {
+    public static let shared = PermissionCenter()
+    
+    private init() {}
+    
+    // MARK: - 1. Listen Event Access (For Recording)
+    
+    public func checkListenEventAccess() -> PermissionStatus {
+        if #available(macOS 14.4, *) {
+            return CGPreflightListenEventAccess() ? .authorized : .denied
+        } else {
+            return AXIsProcessTrusted() ? .authorized : .denied
+        }
+    }
+    
+    public func requestListenEventAccess() -> Bool {
+        if #available(macOS 14.4, *) {
+            return CGRequestListenEventAccess()
+        } else {
+            let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true] as CFDictionary
+            return AXIsProcessTrustedWithOptions(options)
+        }
+    }
+    
+    // MARK: - 2. Post Event Access (For Playback)
+    
+    public func checkPostEventAccess() -> PermissionStatus {
+        if #available(macOS 14.4, *) {
+            return CGPreflightPostEventAccess() ? .authorized : .denied
+        } else {
+            return AXIsProcessTrusted() ? .authorized : .denied
+        }
+    }
+    
+    public func requestPostEventAccess() -> Bool {
+        if #available(macOS 14.4, *) {
+            return CGRequestPostEventAccess()
+        } else {
+            let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true] as CFDictionary
+            return AXIsProcessTrustedWithOptions(options)
+        }
+    }
+    
+    // MARK: - 3. Screen Capture Access (For Pixel Matching/OCR)
+    
+    public func checkScreenCaptureAccess() -> PermissionStatus {
+        if #available(macOS 10.15, *) {
+            return CGPreflightScreenCaptureAccess() ? .authorized : .denied
+        } else {
+            return .authorized
+        }
+    }
+    
+    public func requestScreenCaptureAccess() -> Bool {
+        if #available(macOS 10.15, *) {
+            return CGRequestScreenCaptureAccess()
+        } else {
+            return true
+        }
+    }
+    
+    // MARK: - 4. Accessibility Access (For UIElement / Window Introspection)
+    
+    public func checkAccessibilityAccess() -> PermissionStatus {
+        return AXIsProcessTrusted() ? .authorized : .denied
+    }
+    
+    public func requestAccessibilityAccess() -> Bool {
+        let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true] as CFDictionary
+        return AXIsProcessTrustedWithOptions(options)
+    }
+    
+    // MARK: - Convenience methods
+    
+    public func checkAllRequiredPermissions() -> Bool {
+        return checkListenEventAccess() == .authorized &&
+               checkPostEventAccess() == .authorized &&
+               checkAccessibilityAccess() == .authorized &&
+               checkScreenCaptureAccess() == .authorized
+    }
+}

@@ -6,20 +6,38 @@ This document details the exact file changes, target functions, and implementati
 
 ## 1. Data Model Upgrades
 
-### [RecordedEvent.swift](file:///Applications/TinyTask-macOS-1.2.6/Sources/TinyRecorder/RecordedEvent.swift)
-- **Target Changes**: Add optional window-relative coordinates.
+### [RecordedEvent.swift](../Sources/SparkleRecorder/RecordedEvent.swift)
+- **Target Changes**: Add optional flat window-relative coordinate variables, coordinate strategy, and `surfaceId` mapping to support multi-app workflows.
 - **Implementation Snippet**:
   ```swift
+  public enum CoordinateBinding: String, Codable {
+      case targetWindow
+      case globalScreen
+      case unbound
+  }
+
+  public enum CoordinateStrategy: String, Codable {
+      case windowLocalPreferred
+      case normalizedPreferred
+      case absoluteOnly
+      case locatorOnly
+  }
+
   public struct RecordedEvent: Codable, Equatable {
       // ... existing properties ...
       
-      // New optional properties for window-bound coordinate space mapping
+      // Phase 1: Flat fields implementation
       public var windowLocalX: CGFloat?
       public var windowLocalY: CGFloat?
       public var windowNormalizedX: CGFloat?
       public var windowNormalizedY: CGFloat?
       
-      // Ensure custom Codable decoding maps values correctly, defaulting to nil for legacy files
+      public var coordinateBinding: CoordinateBinding?
+      public var coordinateStrategy: CoordinateStrategy?
+      
+      // Multi-App workflow window surface mapping
+      public var surfaceId: String?
+      
       // Swift will auto-derive if no custom CodingKeys are used. If custom CodingKeys are present,
       // add coding keys and use decodeIfPresent.
   }
@@ -29,178 +47,254 @@ This document details the exact file changes, target functions, and implementati
 
 ## 2. Event Capture & Coordinate Updates (Recording Phase)
 
-### [Recorder.swift](file:///Applications/TinyTask-macOS-1.2.6/Sources/TinyRecorder/Recorder.swift)
-- **Target Property**: Add reference to the recording surface.
+### [Recorder.swift](../Sources/SparkleRecorder/Recorder.swift)
+- **Target Properties**: Manage multiple active surfaces and tracks focus switches during recording. Ensure thread safety by marking `Recorder` as `@MainActor`.
   ```swift
+  @MainActor
   final class Recorder: ObservableObject {
       // ... existing properties ...
-      @Published private(set) var currentSurface: PlaybackSurface?
+      
+      // Maps surfaceId to captured window metadata
+      @Published var activeSurfaces: [String: PlaybackSurface] = [:]
+      
+      // Tracks the currently focused surface ID during recording
+      private var activeSurfaceId: String? = nil
+      
+      // Locks the surface ID during mouse drag gestures
+      private var activeGestureSurfaceId: String? = nil
   ```
-- **Target Function**: `startRecording(surface:)` and `loadEvents(_:surface:)`.
+- **Throttled Surface Tracker**:
+  To prevent heavy cross-process AX IPC calls from blocking the high-frequency `CGEventTap` callback thread, we introduce a `RecordingSurfaceTracker` that queries window details asynchronously on a background queue every `150ms` and caches the active window details.
+  ```swift
+  final class RecordingSurfaceTracker {
+      private var timer: Timer?
+      private let capture = WindowSurfaceCapture()
+      
+      // Thread-safe cached active surface
+      private(set) var cachedActiveSurface: PlaybackSurface?
+      
+      func startTracking() {
+          timer = Timer.scheduledTimer(withTimeInterval: 0.15, repeats: true) { [weak self] _ in
+              DispatchQueue.global(qos: .userInteractive).async {
+                  let surface = try? self?.capture.captureFrontmostWindow()
+                  DispatchQueue.main.async {
+                      self?.cachedActiveSurface = surface
+                  }
+              }
+          }
+      }
+      
+      func stopTracking() {
+          timer?.invalidate()
+          timer = nil
+      }
+  }
+  ```
+- **Target Function**: `startRecording(surface:)` and `loadEvents(_:surfaces:)`.
   ```swift
   @discardableResult
   func startRecording(surface: PlaybackSurface? = nil) -> Bool {
       // ... existing initialization ...
-      self.currentSurface = surface
+      self.activeSurfaces.removeAll()
+      if let initialSurface = surface {
+          let sId = "surface-1"
+          self.activeSurfaces[sId] = initialSurface
+          self.activeSurfaceId = sId
+      } else {
+          self.activeSurfaceId = nil
+      }
+      self.activeGestureSurfaceId = nil
       // ...
   }
-  
-  func loadEvents(_ new: [RecordedEvent], surface: PlaybackSurface? = nil) {
-      events = new
-      liveDuration = new.last?.time ?? 0
-      self.currentSurface = surface
-  }
   ```
-- **Target Function**: `handle(type:event:)`. Calculate and store window-relative parameters dynamically.
+- **Target Function**: `handle(type:event:)`. Calculate relative coordinates and map `surfaceId` safely.
   ```swift
   private func handle(type: CGEventType, event: CGEvent) {
       // ...
       let loc = event.location
       
+      // Lock surfaceId during gestures (mouseDown -> mouseUp)
+      if type == .leftMouseDown || type == .rightMouseDown || type == .otherMouseDown {
+          activeGestureSurfaceId = activeSurfaceId
+      }
+      
+      // Match active window using the cached surface from RecordingSurfaceTracker
+      if let currentFocusedWindow = surfaceTracker.cachedActiveSurface {
+          // Use multi-factor surface matcher (Scoring-based matcher) instead of raw bundleIdentifier checks
+          if let existingId = surfaceMatcher.match(currentFocusedWindow, against: activeSurfaces) {
+              self.activeSurfaceId = existingId
+          } else {
+              let nextId = "surface-\(activeSurfaces.count + 1)"
+              activeSurfaces[nextId] = currentFocusedWindow
+              self.activeSurfaceId = nextId
+          }
+      }
+      
+      let targetId = activeGestureSurfaceId ?? activeSurfaceId
+      
+      // Release gesture lock at mouseUp
+      if type == .leftMouseUp || type == .rightMouseUp || type == .otherMouseUp {
+          activeGestureSurfaceId = nil
+      }
+      
       var localX: CGFloat? = nil
       var localY: CGFloat? = nil
       var normX: CGFloat? = nil
       var normY: CGFloat? = nil
+      var binding: CoordinateBinding = .unbound
       
-      if let surface = currentSurface {
-          let lx = loc.x - surface.recordedFrame.x
-          let ly = loc.y - surface.recordedFrame.y
-          localX = lx
-          localY = ly
-          normX = surface.recordedFrame.width > 0 ? lx / surface.recordedFrame.width : 0
-          normY = surface.recordedFrame.height > 0 ? ly / surface.recordedFrame.height : 0
+      if let sId = targetId, let surface = activeSurfaces[sId] {
+          let frame = surface.recordedFrame
+          let isInsideSurface = loc.x >= frame.x && 
+                                loc.x <= (frame.x + frame.width) && 
+                                loc.y >= frame.y && 
+                                loc.y <= (frame.y + frame.height)
+          
+          if isInsideSurface {
+              let lx = loc.x - frame.x
+              let ly = loc.y - frame.y
+              localX = lx
+              localY = ly
+              normX = frame.width > 0 ? lx / frame.width : 0
+              normY = frame.height > 0 ? ly / frame.height : 0
+              binding = .targetWindow
+          } else {
+              binding = .globalScreen
+          }
       }
       
       let recorded = RecordedEvent(
           kind: kind,
           time: elapsed,
-          x: loc.x,
-          y: loc.y,
-          keyCode: keyCode,
-          flags: event.flags.rawValue,
-          mouseButton: event.getIntegerValueField(.mouseEventButtonNumber),
-          clickCount: event.getIntegerValueField(.mouseEventClickState),
-          scrollDeltaY: /*...*/,
-          scrollDeltaX: /*...*/,
+          // ...
           windowLocalX: localX,
           windowLocalY: localY,
           windowNormalizedX: normX,
-          windowNormalizedY: normY
+          windowNormalizedY: normY,
+          coordinateBinding: binding,
+          coordinateStrategy: .windowLocalPreferred,
+          surfaceId: targetId
       )
-      // ...
-  }
-  ```
-- **Target Helper Function**: `updateRelativeCoordinates(for:)` to recalculate coordinates when a click/drag event is translated or inserted in the editor.
-  ```swift
-  private func updateRelativeCoordinates(for index: Int) {
-      guard events.indices.contains(index) else { return }
-      if let surface = currentSurface {
-          let lx = events[index].x - surface.recordedFrame.x
-          let ly = events[index].y - surface.recordedFrame.y
-          events[index].windowLocalX = lx
-          events[index].windowLocalY = ly
-          events[index].windowNormalizedX = surface.recordedFrame.width > 0 ? lx / surface.recordedFrame.width : 0
-          events[index].windowNormalizedY = surface.recordedFrame.height > 0 ? ly / surface.recordedFrame.height : 0
+      
+      // UI / State updates dispatched back safely to MainActor
+      DispatchQueue.main.async {
+          self.pending.append(recorded)
       }
   }
   ```
-  *This helper will be called in `translateEventsLinear`, `conformPath`, `insertClick`, `insertDrag`, and `insertKeystroke`.*
 
 ---
 
 ## 3. Playback Coordinate Resolution (Replay Phase)
 
-### [PointResolver.swift](file:///Applications/TinyTask-macOS-1.2.6/Sources/TinyRecorder/PointResolver.swift)
-- **Target Function**: `resolve(_:context:)`. Integrate high-fidelity window-relative matching and multi-monitor boundaries clamping.
+### [PointResolver.swift](../Sources/SparkleRecorder/PointResolver.swift)
+- **Target Function**: `resolve(_:context:)`. Support multi-surface matching based on contextual bounds and fail safely.
 - **Code implementation**:
   ```swift
-  public func resolve(_ event: RecordedEvent, context: PlaybackContext) -> CGPoint {
+  public enum PointResolveError: Error {
+      case missingSurface(String)
+      case missingWindowFrame(String)
+      case missingWindowLocalPoint
+      case missingNormalizedPoint
+      case resolvedPointOutOfBounds(CGPoint, RectValue)
+      case locatorOnlyRequiresLocatorEngine
+  }
+
+  public func resolve(_ event: RecordedEvent, context: PlaybackContext) -> Result<CGPoint, PointResolveError> {
       let original = CGPoint(x: event.x, y: event.y)
+      let mapper = CoordinateMapper()
       
-      var resolvedPoint = original
+      // Determine binding type
+      let binding = event.coordinateBinding ?? .unbound
       
-      if context.coordinateMode == .boundWindowOffset,
-         let currentFrame = context.currentSurfaceFrame {
+      switch binding {
+      case .globalScreen:
+          // Keep screen-absolute coordinates completely unaltered
+          return .success(original)
           
-          if let localX = event.windowLocalX, let localY = event.windowLocalY {
-              // 1. Resolve relative window local points
-              resolvedPoint = CGPoint(x: currentFrame.x + localX, y: currentFrame.y + localY)
-              
-              // 2. Responsive scale check if window width/height changed significantly
-              if let recordedFrame = context.surface?.recordedFrame,
-                 (abs(recordedFrame.width - currentFrame.width) > 5.0 || 
-                  abs(recordedFrame.height - currentFrame.height) > 5.0) {
-                  
-                  if let normX = event.windowNormalizedX, let normY = event.windowNormalizedY {
-                      resolvedPoint = CGPoint(
-                          x: currentFrame.x + (normX * currentFrame.width),
-                          y: currentFrame.y + (normY * currentFrame.height)
-                      )
-                  }
+      case .targetWindow:
+          guard context.coordinateMode == .boundWindowOffset else {
+              return .success(original)
+          }
+          
+          let targetSurfaceId = event.surfaceId ?? "surface-1"
+          guard let currentFrame = context.currentSurfaceFrames[targetSurfaceId] else {
+              return .failure(.missingWindowFrame(targetSurfaceId))
+          }
+          
+          var resolvedPoint = original
+          let strategy = event.coordinateStrategy ?? .windowLocalPreferred
+          
+          switch strategy {
+          case .windowLocalPreferred:
+              guard let lx = event.windowLocalX, let ly = event.windowLocalY else {
+                  return .failure(.missingWindowLocalPoint)
               }
-          } else if let recordedFrame = context.surface?.recordedFrame {
-              // Fallback for legacy absolute coordinate macros
+              resolvedPoint = mapper.resolveWindowLocalPoint(CGPoint(x: lx, y: ly), in: currentFrame)
+              
+          case .normalizedPreferred:
+              guard let nx = event.windowNormalizedX, let ny = event.windowNormalizedY else {
+                  return .failure(.missingNormalizedPoint)
+              }
+              resolvedPoint = mapper.resolveNormalizedPoint(CGPoint(x: nx, y: ny), in: currentFrame)
+              
+          case .absoluteOnly:
+              resolvedPoint = original
+              
+          case .locatorOnly:
+              // locatorOnly strictly expects LocatorEngine processing, resolver fails
+              return .failure(.locatorOnlyRequiresLocatorEngine)
+          }
+          
+          // Fail-Safe Out-Of-Bounds Check
+          guard mapper.assertPointIsInsideWindow(resolvedPoint, in: currentFrame) else {
+              return .failure(.resolvedPointOutOfBounds(resolvedPoint, currentFrame))
+          }
+          
+          return .success(resolvedPoint)
+          
+      case .unbound:
+          // Fallback legacy offset behavior for v1 macros
+          if let targetSurfaceId = event.surfaceId,
+             let recordedFrame = context.surfaces[targetSurfaceId]?.recordedFrame,
+             let currentFrame = context.currentSurfaceFrames[targetSurfaceId] {
               let dx = currentFrame.x - recordedFrame.x
               let dy = currentFrame.y - recordedFrame.y
-              resolvedPoint = CGPoint(x: event.x + dx, y: event.y + dy)
+              return .success(CGPoint(x: event.x + dx, y: event.y + dy))
           }
+          return .success(original)
       }
-      
-      // Bounding Box Clamping across MacBook display + Sidecar + secondary monitors
-      #if canImport(AppKit)
-      if let screens = NSScreen.screens.first {
-          let unionFrame = NSScreen.screens.dropFirst().reduce(screens.frame) { $0.union($1.frame) }
-          let primaryHeight = screens.frame.height
-          
-          let minX = unionFrame.minX
-          let maxX = unionFrame.maxX
-          let minY_CG = primaryHeight - unionFrame.maxY
-          let maxY_CG = primaryHeight - unionFrame.minY
-          
-          resolvedPoint.x = max(minX, min(resolvedPoint.x, maxX))
-          resolvedPoint.y = max(minY_CG, min(resolvedPoint.y, maxY_CG))
-      }
-      #endif
-      
-      return resolvedPoint
   }
   ```
 
 ---
 
-## 4. UI View & Controller Modifications
+## 4. Playback Context & Activation (Runner Phase)
 
-### [MenuBarController.swift](file:///Applications/TinyTask-macOS-1.2.6/Sources/TinyRecorder/MenuBarController.swift)
-- **Target Function**: `actuallyStartRecording()`.
-  - Pass the resolved initial surface to `recorder.startRecording(surface:)`:
-    ```swift
-    let capture = WindowSurfaceCapture()
-    self.recordedSurface = try? capture.captureFrontmostWindow()
-    let ok = recorder.startRecording(surface: self.recordedSurface)
-    ```
-- **Target Function**: `selectMacro(_:)` & `persistCurrentMacroIfNeeded()`.
-  - Pass surface details when loading events:
-    ```swift
-    recorder.loadEvents(m.events, surface: m.surface)
-    ```
-- **Target Function**: `preparePlaybackContext(for:completion:)`.
-  - Replace frontmost application query with scoring loop.
-  - Implement scoring check:
-    ```swift
-    // Loop through windows, calculate scoring weights:
-    // bundleIdentifier matching: +100
-    // windowTitlePattern regex match: +80
-    // recordedDisplayId matching: +20
-    // Select the highest scoring window as the PlaybackContext target.
-    ```
+### [MenuBarController.swift](../Sources/SparkleRecorder/MenuBarController.swift)
+- **Lazy Window Resolution**:
+  - `PlaybackContext` holds a reference to `WindowTracker` and the targets' metadata dictionary.
+  - As the `Runner` schedules each action step, it calls `windowTracker.resolve(surfaceId:)` to lazy resolve/activate the target window *only* when the action is fired, supporting dynamic window movements.
 
 ---
 
-## 5. Verification & Test Suite Requirements
+## 5. SwiftUI Performance Audit & Optimization
+
+### [MacroEditor.swift](../Sources/SparkleRecorder/MacroEditor.swift)
+- **Identify Bottleneck**: Inside `TargetCrosshairView`, the `getDisplayPath(for:)` function maps and calculates complex path conformal projections (`conformPathPoint`) for every single point in the path inside the SwiftUI `body` rendering loop. During dragging, this triggers at 60Hz/120Hz, leading to CPU thrashing and frame drops.
+- **Remedy**:
+  - Store projected path coordinates inside a `ProjectionCacheKey` mapped dictionary in the Editor View Model.
+  - When actions/zoom/window frames change, invalidate and re-project paths on-demand, allowing SwiftUI `body` to read statically.
+
+---
+
+## 6. Verification & Test Suite Requirements
 
 To prevent regression bugs, the following validation test cases will be executed:
 
-1. **Window Re-location and Replay**: Record mouse paths inside Slack window. Move the Slack window to a Sidecar iPad display or secondary monitor. Replay and verify cursor paths remain perfectly positioned relative to the window.
-2. **Window Resizing Scale Mapping**: Record a button-clicking flow in a browser window. Change the browser window scaling (e.g. dragging bounds to change width/height). Replay and verify click locations map correctly using the `windowNormalized` ratio.
+1. **Window Re-location and Replay**: Record mouse paths inside Slack window. Move the Slack window to a Sidecar iPad display or secondary monitor. Replay and verify cursor paths remain within a configurable tolerance (e.g. ±3 logical points).
+2. **Window Resizing Scale Mapping**: Record a button-clicking flow in a browser window. Change the browser window scaling. Replay and verify normalized mapping works for proportional layouts; for reflowing layouts, verify LocatorEngine chooses OCR/AX before normalized fallback.
 3. **Legacy Macro Persistence**: Load a v1 macro file (only absolute screen coordinate points). Verify that the `PointResolver` fallback matches screen-absolute mapping and replays properly.
-4. **Targeted Disconnect Safety**: Record on an external display. Unplug the external display. Verify that resolved points clamp correctly within the MacBook built-in monitor limits.
+4. **Targeted Disconnect Safety**: Record on an external display. Unplug the external display. Verify that the Runner pauses safely and asks the user to rebind the missing surface (does not clamp to random edges).
+5. **Multiple Windows Matching**: Open two windows of Safari. Verify WindowTracker matches the correct window using the title matching regex pattern score.
+6. **Multi-App Context Switching Replay**: Record a macro copying from Safari and pasting to Slack. Move both windows. Verify that the Runner successfully activates and targets the correct window for each action step during replay.

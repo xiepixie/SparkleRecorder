@@ -2,17 +2,17 @@
 import PackageDescription
 
 let package = Package(
-    name: "TinyRecorder",
+    name: "SparkleRecorder",
     defaultLocalization: "en",
     platforms: [.macOS(.v14)],
     products: [
-        .executable(name: "TinyRecorder", targets: ["TinyRecorder"]),
-        .library(name: "TinyRecorderCore", targets: ["TinyRecorderCore"])
+        .executable(name: "SparkleRecorder", targets: ["SparkleRecorder"]),
+        .library(name: "SparkleRecorderCore", targets: ["SparkleRecorderCore"])
     ],
     targets: [
         .target(
-            name: "TinyRecorderCore",
-            path: "Sources/TinyRecorder",
+            name: "SparkleRecorderCore",
+            path: "Sources/SparkleRecorder",
             exclude: [
                 "AppDelegate.swift",
                 "AppState.swift",
@@ -29,8 +29,18 @@ let package = Package(
                 "SoundController.swift",
                 "VisualEffects.swift",
                 "WelcomeWindow.swift",
+                "MacroTransformer.swift",
                 "main.swift",
-                "WindowSurfaceCapture.swift"
+                "WindowSurfaceCapture.swift",
+                "WindowTracker.swift",
+                "EventTapThread.swift",
+                "PermissionCenter.swift",
+                "RecordingSurfaceTracker.swift",
+                "Components",
+                "ScreenCaptureService.swift",
+                "VisionDetector.swift",
+                "LocatorEngine.swift",
+                "TrajectorySampler.swift"
             ],
             sources: [
                 "RecordedEvent.swift",
@@ -39,13 +49,14 @@ let package = Package(
                 "SavedMacro.swift",
                 "MouseKeyboardSynthesizer.swift",
                 "PointResolver.swift",
-                "EventGrouper.swift"
+                "EventGrouper.swift",
+                "CoordinateMapper.swift"
             ]
         ),
         .executableTarget(
-            name: "TinyRecorder",
-            dependencies: ["TinyRecorderCore"],
-            path: "Sources/TinyRecorder",
+            name: "SparkleRecorder",
+            dependencies: ["SparkleRecorderCore"],
+            path: "Sources/SparkleRecorder",
             exclude: [
                 "RecordedEvent.swift",
                 "TextMacroFormat.swift",
@@ -53,14 +64,16 @@ let package = Package(
                 "SavedMacro.swift",
                 "MouseKeyboardSynthesizer.swift",
                 "PointResolver.swift",
-                "EventGrouper.swift"
+                "EventGrouper.swift",
+                "CoordinateMapper.swift"
             ]
         ),
         .testTarget(
-            name: "TinyRecorderTests",
-            dependencies: ["TinyRecorderCore"],
-            path: "Tests/TinyRecorderTests",
+            name: "SparkleRecorderTests",
+            dependencies: ["SparkleRecorderCore"],
+            path: "Tests/SparkleRecorderTests",
             swiftSettings: [
+                .swiftLanguageMode(.v6),
                 .unsafeFlags(["-F", "/Library/Developer/CommandLineTools/Library/Developer/Frameworks"])
             ],
             linkerSettings: [

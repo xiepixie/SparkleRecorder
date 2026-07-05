@@ -8,7 +8,7 @@
 		<string>zh-Hans</string>
 	</array>
 	<key>CFBundleDisplayName</key>
-	<string>TinyRecorder</string>
+	<string>SparkleRecorder</string>
 	<key>CFBundleDocumentTypes</key>
 	<array>
 		<dict>
@@ -17,14 +17,14 @@
 				<string>tinyrec</string>
 			</array>
 			<key>CFBundleTypeName</key>
-			<string>TinyRecorder Macro</string>
+			<string>SparkleRecorder Macro</string>
 			<key>CFBundleTypeRole</key>
 			<string>Editor</string>
 			<key>LSHandlerRank</key>
 			<string>Owner</string>
 			<key>LSItemContentTypes</key>
 			<array>
-				<string>com.tinyrecorder.macro</string>
+				<string>com.sparklerecorder.macro</string>
 			</array>
 		</dict>
 		<dict>
@@ -33,7 +33,7 @@
 				<string>rec</string>
 			</array>
 			<key>CFBundleTypeName</key>
-			<string>TinyTask Macro</string>
+			<string>SparkleRecorder Macro</string>
 			<key>CFBundleTypeRole</key>
 			<string>Viewer</string>
 			<key>LSHandlerRank</key>
@@ -45,7 +45,7 @@
 				<string>trm</string>
 			</array>
 			<key>CFBundleTypeName</key>
-			<string>TinyRecorder Text Macro</string>
+			<string>SparkleRecorder Text Macro</string>
 			<key>CFBundleTypeRole</key>
 			<string>Editor</string>
 			<key>LSHandlerRank</key>
@@ -53,15 +53,15 @@
 		</dict>
 	</array>
 	<key>CFBundleExecutable</key>
-	<string>TinyRecorder</string>
+	<string>SparkleRecorder</string>
 	<key>CFBundleIconFile</key>
 	<string>AppIcon</string>
 	<key>CFBundleIconName</key>
 	<string>AppIcon</string>
 	<key>CFBundleIdentifier</key>
-	<string>com.tinyrecorder.app</string>
+	<string>com.sparklerecorder.app</string>
 	<key>CFBundleName</key>
-	<string>TinyRecorder</string>
+	<string>SparkleRecorder</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
@@ -75,11 +75,11 @@
 	<key>LSMultipleInstancesProhibited</key>
 	<true/>
 	<key>NSAppleEventsUsageDescription</key>
-	<string>TinyRecorder uses system events to record and replay your input.</string>
+	<string>SparkleRecorder uses system events to record and replay your input.</string>
 	<key>NSHighResolutionCapable</key>
 	<true/>
 	<key>NSHumanReadableCopyright</key>
-	<string>TinyRecorder — a free TinyTask clone for macOS.</string>
+	<string>SparkleRecorder — a free macro recorder for macOS.</string>
 	<key>NSPrincipalClass</key>
 	<string>NSApplication</string>
 	<key>UTExportedTypeDeclarations</key>
@@ -90,9 +90,9 @@
 				<string>public.json</string>
 			</array>
 			<key>UTTypeDescription</key>
-			<string>TinyRecorder Macro</string>
+			<string>SparkleRecorder Macro</string>
 			<key>UTTypeIdentifier</key>
-			<string>com.tinyrecorder.macro</string>
+			<string>com.sparklerecorder.macro</string>
 			<key>UTTypeTagSpecification</key>
 			<dict>
 				<key>public.filename-extension</key>

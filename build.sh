@@ -1,5 +1,5 @@
 #!/bin/bash
-# Build TinyRecorder.app and install it to /Applications.
+# Build SparkleRecorder.app and install it to /Applications.
 #
 # Why /Applications: macOS ties Accessibility / Input Monitoring (TCC) grants to a
 # bundle's path *and* code signature. A single bundle at the standard, immutable
@@ -14,13 +14,13 @@
 # re-prompt for permissions after each rebuild.
 set -euo pipefail
 
-APP_NAME="TinyRecorder"
+APP_NAME="SparkleRecorder"
 ROOT="$(cd "$(dirname "$0")" && pwd)"
 BUILD_DIR="${ROOT}/.build/release"
 STAGE="${ROOT}/.build/${APP_NAME}.app"        # assembled here first (gitignored)
 # Install location can be overridden (e.g. to build a one-off copy on the Desktop
 # without disturbing the /Applications install).
-INSTALL_DIR="${TINYRECORDER_INSTALL_DIR:-/Applications}"
+INSTALL_DIR="${SPARKLERECORDER_INSTALL_DIR:-/Applications}"
 APP_BUNDLE="${INSTALL_DIR}/${APP_NAME}.app"   # final location
 CONTENTS="${STAGE}/Contents"
 
@@ -34,9 +34,9 @@ if [ ! -f "AppIcon.icns" ] || [ "tools/make_icon.swift" -nt "AppIcon.icns" ]; th
 fi
 
 echo "→ Compiling (release)..."
-# Extra swiftc flags can be injected, e.g. TINYRECORDER_SWIFT_FLAGS="-Xswiftc -DHIDE_PERMISSION_BANNER".
+# Extra swiftc flags can be injected, e.g. SPARKLERECORDER_SWIFT_FLAGS="-Xswiftc -DHIDE_PERMISSION_BANNER".
 # Unquoted on purpose so multiple flags word-split into separate arguments.
-swift build -c release ${TINYRECORDER_SWIFT_FLAGS:-}
+swift build -c release ${SPARKLERECORDER_SWIFT_FLAGS:-}
 
 echo "→ Bundling ${APP_NAME}.app..."
 rm -rf "$STAGE"
@@ -49,11 +49,11 @@ cp "${ROOT}/AppIcon.icns" "${CONTENTS}/Resources/AppIcon.icns"
 chmod +x "${CONTENTS}/MacOS/${APP_NAME}"
 
 # Copy localization strings
-if [ -d "${ROOT}/Sources/TinyRecorder/en.lproj" ]; then
-    cp -R "${ROOT}/Sources/TinyRecorder/en.lproj" "${CONTENTS}/Resources/"
+if [ -d "${ROOT}/Sources/SparkleRecorder/en.lproj" ]; then
+    cp -R "${ROOT}/Sources/SparkleRecorder/en.lproj" "${CONTENTS}/Resources/"
 fi
-if [ -d "${ROOT}/Sources/TinyRecorder/zh-Hans.lproj" ]; then
-    cp -R "${ROOT}/Sources/TinyRecorder/zh-Hans.lproj" "${CONTENTS}/Resources/"
+if [ -d "${ROOT}/Sources/SparkleRecorder/zh-Hans.lproj" ]; then
+    cp -R "${ROOT}/Sources/SparkleRecorder/zh-Hans.lproj" "${CONTENTS}/Resources/"
 fi
 
 
@@ -83,13 +83,13 @@ sign_app() {
 # Prefer a Developer ID Application identity when one is installed: a stable
 # signature means TCC (Accessibility / Input Monitoring) grants persist across
 # rebuilds, and it's a prerequisite for notarization. Override by exporting
-# TINYRECORDER_SIGN_ID="Developer ID Application: Name (TEAMID)". Falls back to
+# SPARKLERECORDER_SIGN_ID="Developer ID Application: Name (TEAMID)". Falls back to
 # ad-hoc signing until a Developer ID cert exists (then grants re-prompt per build).
 # List identities once. The trailing `|| true` on each pipeline matters: under
 # `set -euo pipefail` a grep with no match exits non-zero and would abort the
 # build, so we swallow that and just end up with an empty SIGN_ID.
 SIGN_IDS=$(security find-identity -v -p codesigning 2>/dev/null || true)
-SIGN_ID="${TINYRECORDER_SIGN_ID:-}"
+SIGN_ID="${SPARKLERECORDER_SIGN_ID:-}"
 # 1) Prefer a Developer ID Application cert — distribution-ready & notarizable.
 if [ -z "$SIGN_ID" ]; then
     SIGN_ID=$(printf '%s\n' "$SIGN_IDS" | grep "Developer ID Application" | head -1 | sed -E 's/.*"(.*)"$/\1/' || true)
@@ -99,36 +99,37 @@ fi
 if [ -z "$SIGN_ID" ]; then
     SIGN_ID=$(printf '%s\n' "$SIGN_IDS" | grep -E "Apple Development|Apple Distribution" | head -1 | sed -E 's/.*"(.*)"$/\1/' || true)
 fi
-# 3) Fallback: use or create a stable self-signed local certificate "TinyRecorder-SelfSigned"
+# 3) Fallback: use or create a stable self-signed local certificate "SparkleRecorder-SelfSigned"
 #    so that TCC (Accessibility) permissions persist across rebuilds on this Mac.
 if [ -z "$SIGN_ID" ]; then
-    if printf '%s\n' "$SIGN_IDS" | grep -q "TinyRecorder-SelfSigned"; then
-        SIGN_ID="TinyRecorder-SelfSigned"
+    if printf '%s\n' "$SIGN_IDS" | grep -q "SparkleRecorder-SelfSigned"; then
+        SIGN_ID="SparkleRecorder-SelfSigned"
     else
-        echo "→ Generating stable self-signed codesigning certificate 'TinyRecorder-SelfSigned'..."
-        CERT_CONF_TMP=$(mktemp)
+        echo "→ Generating stable self-signed codesigning certificate 'SparkleRecorder-SelfSigned'..."
+        CERT_TMP_DIR=$(mktemp -d)
+        CERT_CONF_TMP="${CERT_TMP_DIR}/openssl.cnf"
+        KEY_PEM="${CERT_TMP_DIR}/key.pem"
+        CERT_PEM="${CERT_TMP_DIR}/cert.pem"
+        CERT_P12="${CERT_TMP_DIR}/cert.p12"
         cat <<EOF > "$CERT_CONF_TMP"
 [req]
 distinguished_name = req_distinguished_name
 prompt = no
 [req_distinguished_name]
-CN = TinyRecorder-SelfSigned
+CN = SparkleRecorder-SelfSigned
 [ext]
 keyUsage = critical, digitalSignature
 extendedKeyUsage = critical, codeSigning
 basicConstraints = critical, CA:false
 EOF
-        KEY_PEM=$(mktemp)
-        CERT_PEM=$(mktemp)
-        CERT_P12=$(mktemp)
         
         openssl req -x509 -newkey rsa:2048 -keyout "$KEY_PEM" -out "$CERT_PEM" -sha256 -days 3650 -nodes -config "$CERT_CONF_TMP" -extensions ext
         openssl pkcs12 -export -legacy -inkey "$KEY_PEM" -in "$CERT_PEM" -out "$CERT_P12" -passout pass:123456
-        security import "$CERT_P12" -P 123456
+        security import "$CERT_P12" -f pkcs12 -P 123456 -A -T /usr/bin/codesign
         security add-trusted-cert -p codeSign -r trustRoot "$CERT_PEM"
         
-        rm -f "$CERT_CONF_TMP" "$KEY_PEM" "$CERT_PEM" "$CERT_P12"
-        SIGN_ID="TinyRecorder-SelfSigned"
+        rm -rf "$CERT_TMP_DIR"
+        SIGN_ID="SparkleRecorder-SelfSigned"
     fi
 fi
 

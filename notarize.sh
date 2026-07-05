@@ -1,12 +1,12 @@
 #!/bin/bash
-# Notarize and staple the installed TinyRecorder.app so other people can run it
+# Notarize and staple the installed SparkleRecorder.app so other people can run it
 # without Gatekeeper warnings. Requires:
 #   1. A Developer ID-signed build (run ./build.sh with a Developer ID cert).
 #   2. Notary credentials stored ONCE in the keychain (no secrets live in this
 #      file). Create an app-specific password at https://appleid.apple.com →
 #      Sign-In & Security → App-Specific Passwords, then run:
 #
-#        xcrun notarytool store-credentials tinyrecorder-notary \
+#        xcrun notarytool store-credentials sparklerecorder-notary \
 #          --apple-id "you@example.com" \
 #          --team-id  "YOURTEAMID" \
 #          --password "xxxx-xxxx-xxxx-xxxx"
@@ -14,9 +14,9 @@
 # After that, just run: ./notarize.sh
 set -euo pipefail
 
-APP="/Applications/TinyRecorder.app"
-PROFILE="tinyrecorder-notary"
-ZIP="$(mktemp -d)/TinyRecorder.zip"
+APP="/Applications/SparkleRecorder.app"
+PROFILE="sparklerecorder-notary"
+ZIP="$(mktemp -d)/SparkleRecorder.zip"
 
 if [ ! -d "$APP" ]; then
     echo "✗ $APP not found. Run ./build.sh first." >&2

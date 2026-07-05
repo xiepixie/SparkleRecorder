@@ -1,10 +1,10 @@
 #!/bin/bash
 set -e
 
-CERT_NAME="Apple Development: TinyRecorder Local"
-CER_PATH="/tmp/tiny_local.cer"
-KEY_PATH="/tmp/tiny_local.key"
-P12_PATH="/tmp/tiny_local.p12"
+CERT_NAME="Apple Development: SparkleRecorder Local"
+CER_PATH="/tmp/sparklerecorder_local.cer"
+KEY_PATH="/tmp/sparklerecorder_local.key"
+P12_PATH="/tmp/sparklerecorder_local.p12"
 PASSWORD="local_dev_pass"
 
 echo "============================================="
