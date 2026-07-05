@@ -8,13 +8,11 @@ struct LibraryHeader: View {
     @Binding var showSearch: Bool
     let isWindow: Bool
     let macroCount: Int
-    @EnvironmentObject var recorder: Recorder
-    @EnvironmentObject var player: Player
     @EnvironmentObject var state: AppState
 
     private var statusText: String {
-        if recorder.isRecording { return NSLocalizedString("Recording…", comment: "") }
-        if player.isPlaying     { return NSLocalizedString("Playing…", comment: "") }
+        if state.isRecording { return NSLocalizedString("Recording…", comment: "") }
+        if state.isPlaying     { return NSLocalizedString("Playing…", comment: "") }
         let format = NSLocalizedString("Idle · %d macros", comment: "")
         return String(format: format, macroCount)
     }
@@ -25,7 +23,7 @@ struct LibraryHeader: View {
             if !isWindow {
                 LibraryBrandStrip(
                     statusText: statusText,
-                    isRecording: recorder.isRecording,
+                    isRecording: state.isRecording,
                     onSettings: { controller.showSettingsWindow() }
                 )
             }
@@ -36,15 +34,15 @@ struct LibraryHeader: View {
                     controller.toggleRecording()
                 } label: {
                     HStack(spacing: 10) {
-                        if recorder.isRecording {
+                        if state.isRecording {
                             Image(systemName: "stop.fill").font(.system(size: 11, weight: .black))
                                 .foregroundStyle(.white)
                         } else {
                             RecDot(size: 8, glassWhite: false)
                         }
-                        Text(recorder.isRecording ? NSLocalizedString("Stop recording", comment: "") : NSLocalizedString("Start recording", comment: ""))
+                        Text(state.isRecording ? NSLocalizedString("Stop recording", comment: "") : NSLocalizedString("Start recording", comment: ""))
                             .font(.system(size: 13, weight: .semibold))
-                            .foregroundStyle(recorder.isRecording ? .white : .primary)
+                            .foregroundStyle(state.isRecording ? .white : .primary)
                         Spacer(minLength: 0)
                         HStack(spacing: 3) {
                             KeyCapView(text: state.recordHotkey.name, size: .sm, variant: .glass)
@@ -55,16 +53,16 @@ struct LibraryHeader: View {
                     .frame(maxWidth: .infinity)
                     .background(
                         Capsule(style: .continuous)
-                            .fill(recorder.isRecording ? Brand.red500.opacity(0.8) : Color.primary.opacity(0.04))
+                            .fill(state.isRecording ? Brand.red500.opacity(0.8) : Color.primary.opacity(0.04))
                     )
                     .overlay(
                         Capsule(style: .continuous)
-                            .strokeBorder(recorder.isRecording ? Brand.red500 : Color.primary.opacity(0.1), lineWidth: 0.5)
+                            .strokeBorder(state.isRecording ? Brand.red500 : Color.primary.opacity(0.1), lineWidth: 0.5)
                     )
-                    .shadow(color: recorder.isRecording ? Brand.red500.opacity(0.3) : .clear, radius: 8, x: 0, y: 4)
+                    .shadow(color: state.isRecording ? Brand.red500.opacity(0.3) : .clear, radius: 8, x: 0, y: 4)
                 }
                 .buttonStyle(HoverPressButtonStyle(hoverScale: 1.012))
-                .accessibilityLabel(recorder.isRecording ? NSLocalizedString("Stop recording", comment: "") : NSLocalizedString("Start recording", comment: ""))
+                .accessibilityLabel(state.isRecording ? NSLocalizedString("Stop recording", comment: "") : NSLocalizedString("Start recording", comment: ""))
                 
                 // Search Button
                 Button {

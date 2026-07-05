@@ -162,10 +162,10 @@ private struct WelcomeView: View {
     private func startRefresh() {
         refreshTimer?.invalidate()
         refreshTimer = Timer.scheduledTimer(withTimeInterval: 1.5, repeats: true) { _ in
-            let ax = AXIsProcessTrusted()
-            let im = inputMonitoringGranted()
-            let sc = PermissionCenter.shared.checkScreenCaptureAccess() == .authorized
-            DispatchQueue.main.async {
+            Task { @MainActor in
+                let ax = AXIsProcessTrusted()
+                let im = inputMonitoringGranted()
+                let sc = PermissionCenter.shared.checkScreenCaptureAccess() == .authorized
                 accessibility = ax
                 inputMonitoring = im
                 screenCapture = sc

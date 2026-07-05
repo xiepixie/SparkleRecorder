@@ -24,6 +24,8 @@ final class AppState: ObservableObject {
         didSet { persist(playHotkey, key: "hk_play") }
     }
     @Published var statusMessage: String = ""
+    @Published var isRecording: Bool = false
+    @Published var isPlaying: Bool = false
     @Published var accessibilityGranted: Bool = AXIsProcessTrusted()
     /// Input Monitoring is a separate TCC permission from Accessibility; both are
     /// required to record. Polled live alongside Accessibility so the UI reflects
@@ -98,7 +100,9 @@ final class AppState: ObservableObject {
     }
 
     deinit {
-        refreshTimer?.invalidate()
+        MainActor.assumeIsolated {
+            refreshTimer?.invalidate()
+        }
     }
 
     func refreshPermissions() {

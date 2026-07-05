@@ -26,6 +26,7 @@ struct EditorSidebar: View {
     let onPickCoordinate: (Bool) -> Void
     let onAddClickPoint: () -> Void
     let onPickText: () -> Void
+    let onRefreshRows: () -> [ActionRow]
 
     @State private var insertWaitMs: Double = 1000
     @State private var confirmClearAll = false
@@ -107,15 +108,16 @@ struct EditorSidebar: View {
 		                                    if isRecordingKey {
 		                                        Button(action: stopRecordingKey) {
 		                                            HStack(spacing: 4) {
-		                                                Image(systemName: "record.circle.fill").foregroundColor(.red)
+		                                                Image(systemName: "record.circle.fill").foregroundStyle(.red)
 		                                                let mods = modifierString(flags: recordedFlags)
 		                                                Text(mods.isEmpty ? NSLocalizedString("Press any key…", comment: "") : "\(mods) " + NSLocalizedString("Press any key…", comment: ""))
-		                                                    .foregroundColor(.white)
+		                                                    .foregroundStyle(.white)
 		                                            }
 		                                            .font(.system(size: 11, weight: .bold))
 		                                            .padding(.horizontal, 8)
 		                                            .padding(.vertical, 4)
-		                                            .background(RoundedRectangle(cornerRadius: 6).fill(Color.red.opacity(0.8)))
+		                                            .background(Color.red.opacity(0.8))
+                                                    .clipShape(.rect(cornerRadius: 6))
 		                                        }
 		                                        .buttonStyle(.plain)
 		                                    } else {
@@ -128,7 +130,8 @@ struct EditorSidebar: View {
 		                                            .font(.system(size: 11, weight: .semibold))
 		                                            .padding(.horizontal, 8)
 		                                            .padding(.vertical, 4)
-		                                            .background(RoundedRectangle(cornerRadius: 6).fill(Color.primary.opacity(0.08)))
+		                                            .background(Color.primary.opacity(0.08))
+                                                    .clipShape(.rect(cornerRadius: 6))
 		                                        }
 		                                        .buttonStyle(.plain)
 		                                    }
@@ -781,10 +784,8 @@ struct EditorSidebar: View {
     
     func selectInsertedEvents(in range: Range<Int>) {
         DispatchQueue.main.async {
-            let groups = EventGrouper().group(self.recorder.events, liveDuration: self.recorder.liveDuration)
-            if let inserted = groups.first(where: { group in
-                group.eventIndices.contains(where: { range.contains($0) })
-            }) {
+            let groups = self.onRefreshRows().map(\.group)
+            if let inserted = ActionGroupProjection.firstGroup(containingEventIn: range, groups: groups) {
                 self.selection = [inserted.id]
                 self.onLoadInspector()
                 self.onUpdatePreview()
@@ -794,13 +795,8 @@ struct EditorSidebar: View {
     
     func selectInsertedWait(start: TimeInterval, end: TimeInterval) {
         DispatchQueue.main.async {
-            let groups = EventGrouper().group(self.recorder.events, liveDuration: self.recorder.liveDuration)
-            let tolerance: TimeInterval = 0.02
-            if let wait = groups.first(where: { group in
-                group.kind.isPassiveWait &&
-                abs(group.startTime - start) <= tolerance &&
-                abs(group.endTime - end) <= tolerance
-            }) ?? groups.last(where: { $0.kind.isPassiveWait && abs($0.endTime - end) <= tolerance }) {
+            let groups = self.onRefreshRows().map(\.group)
+            if let wait = ActionGroupProjection.firstWaitGroup(start: start, end: end, groups: groups) {
                 self.selection = [wait.id]
                 self.onLoadInspector()
                 self.onUpdatePreview()
@@ -869,8 +865,8 @@ struct EditorSidebar: View {
     
     func selectBehavior(_ id: BehaviorGroupID) {
         DispatchQueue.main.async {
-            let groups = EventGrouper().group(self.recorder.events, liveDuration: self.recorder.liveDuration)
-            if let bound = groups.first(where: { $0.behaviorGroupID == id }) {
+            let groups = self.onRefreshRows().map(\.group)
+            if let bound = ActionGroupProjection.firstBehaviorGroup(id: id, groups: groups) {
                 self.selection = [bound.id]
                 self.onLoadInspector()
                 self.onUpdatePreview()
@@ -1317,6 +1313,19 @@ struct AnchorPositionCard: View {
                     .font(.system(size: 9.5, weight: .medium))
                     .foregroundStyle(.secondary)
             }
+            
+            Divider()
+            
+            VStack(alignment: .leading, spacing: 4) {
+                Text(NSLocalizedString("Detected Text", comment: ""))
+                    .font(.system(size: 9.8, weight: .medium))
+                    .foregroundStyle(.secondary)
+                Text(anchor.text)
+                    .font(.system(size: 10.5, weight: .semibold))
+                    .foregroundStyle(.primary)
+                    .textSelection(.enabled)
+            }
+            .padding(.vertical, 2)
             
             Divider()
             

@@ -5,34 +5,14 @@ import SparkleRecorderCore
 struct EditorTimeline: View {
     @EnvironmentObject var library: MacroLibrary
     @EnvironmentObject var player: Player
-    let events: [RecordedEvent]
+    let samples: [TimelineSampledEvent]
+    let totalDuration: TimeInterval
     let groups: [ActionGroup]
     @Binding var selection: Set<UUID>
 
     @State private var hoverFraction: Double?
     @State private var dragRange: (start: Double, end: Double)?
     @GestureState private var isDragging = false
-
-    private var totalDuration: TimeInterval { events.last?.time ?? 0 }
-
-    struct SampledEvent: Identifiable {
-        let id: Int
-        let event: RecordedEvent
-    }
-
-    private var sampledEvents: [SampledEvent] {
-        guard !events.isEmpty else { return [] }
-        let maxBars = 800
-        let n = min(events.count, maxBars)
-        let stride = max(1, events.count / n)
-        var result: [SampledEvent] = []
-        var i = 0
-        while i < events.count {
-            result.append(SampledEvent(id: i, event: events[i]))
-            i += stride
-        }
-        return result
-    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -65,7 +45,7 @@ struct EditorTimeline: View {
                         guard totalDuration > 0 else { return }
                         let h = size.height
                         let w = size.width
-                        for sampled in sampledEvents {
+                        for sampled in samples {
                             let ev = sampled.event
                             let x = CGFloat(ev.time / totalDuration) * w
                             let isImpact = Brand.isImpact(ev.kind)
@@ -115,21 +95,13 @@ struct EditorTimeline: View {
                         }
                         .onEnded { _ in
                             if let dr = dragRange {
-                                let lo = min(dr.start, dr.end) * totalDuration
-                                let hi = max(dr.start, dr.end) * totalDuration
-                                var newSel: Set<UUID> = []
-                                for grp in groups {
-                                    if grp.startTime >= lo && grp.endTime <= hi {
-                                        newSel.insert(grp.id)
-                                    }
-                                }
-                                if newSel.isEmpty {
-                                    // Select nearest group
-                                    let target = (dr.start + dr.end) / 2 * totalDuration
-                                    if let grp = nearestGroup(to: target) {
-                                        selection = [grp.id]
-                                    }
-                                } else {
+                                let newSel = TimelineProjection.selection(
+                                    dragStartFraction: dr.start,
+                                    dragEndFraction: dr.end,
+                                    totalDuration: totalDuration,
+                                    groups: groups
+                                )
+                                if !newSel.isEmpty {
                                     selection = newSel
                                 }
                             }
@@ -175,31 +147,10 @@ struct EditorTimeline: View {
 
     func selectionRange(in width: CGFloat) -> (start: CGFloat, end: CGFloat)? {
         guard !selection.isEmpty, totalDuration > 0 else { return nil }
-        var times: [TimeInterval] = []
-        for grp in groups {
-            if selection.contains(grp.id) {
-                times.append(grp.startTime)
-                times.append(grp.endTime)
-            }
-        }
-        guard let lo = times.min(), let hi = times.max() else { return nil }
-        let s = CGFloat(lo / totalDuration) * width
-        let e = CGFloat(hi / totalDuration) * width
+        guard let range = TimelineProjection.selectedTimeRange(selection: selection, groups: groups) else { return nil }
+        let s = CGFloat(range.start / totalDuration) * width
+        let e = CGFloat(range.end / totalDuration) * width
         return (s, e)
-    }
-
-    func nearestGroup(to t: TimeInterval) -> ActionGroup? {
-        guard !groups.isEmpty else { return nil }
-        var bestGrp = groups[0]
-        var bestDelta = TimeInterval.greatestFiniteMagnitude
-        for grp in groups {
-            let d = min(abs(grp.startTime - t), abs(grp.endTime - t))
-            if d < bestDelta {
-                bestDelta = d
-                bestGrp = grp
-            }
-        }
-        return bestGrp
     }
 
     func formatTime(_ d: TimeInterval) -> String {

@@ -3,14 +3,16 @@ import CoreGraphics
 import ApplicationServices
 import AppKit
 
-public enum PermissionStatus {
+public enum PermissionStatus: Sendable {
     case authorized
     case denied
     case notDetermined
 }
 
-public class PermissionCenter {
+@MainActor
+public final class PermissionCenter {
     public static let shared = PermissionCenter()
+    private static let axPromptOptionKey = "AXTrustedCheckOptionPrompt"
     
     private init() {}
     
@@ -28,7 +30,7 @@ public class PermissionCenter {
         if #available(macOS 14.4, *) {
             return CGRequestListenEventAccess()
         } else {
-            let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true] as CFDictionary
+            let options = [Self.axPromptOptionKey: true] as CFDictionary
             return AXIsProcessTrustedWithOptions(options)
         }
     }
@@ -47,7 +49,7 @@ public class PermissionCenter {
         if #available(macOS 14.4, *) {
             return CGRequestPostEventAccess()
         } else {
-            let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true] as CFDictionary
+            let options = [Self.axPromptOptionKey: true] as CFDictionary
             return AXIsProcessTrustedWithOptions(options)
         }
     }
@@ -77,7 +79,7 @@ public class PermissionCenter {
     }
     
     public func requestAccessibilityAccess() -> Bool {
-        let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true] as CFDictionary
+        let options = [Self.axPromptOptionKey: true] as CFDictionary
         return AXIsProcessTrustedWithOptions(options)
     }
     

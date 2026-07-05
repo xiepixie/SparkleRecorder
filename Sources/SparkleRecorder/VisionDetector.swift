@@ -4,7 +4,7 @@ import Vision
 import CoreImage
 import AppKit
 
-public enum VisionDetectorError: Error {
+public enum VisionDetectorError: Error, Sendable {
     case noTextFound
     case textNotMatched
     case imageProcessingFailed
@@ -12,13 +12,13 @@ public enum VisionDetectorError: Error {
     case templateMatchingFailed
 }
 
-public struct TextDetection: Equatable {
+public struct TextDetection: Equatable, Sendable {
     public var text: String
     public var boundingBox: CGRect // Normalized top-left coordinates [0,1]
     public var confidence: Float
 }
 
-public class VisionDetector {
+public final class VisionDetector: Sendable {
     
     public init() {}
     

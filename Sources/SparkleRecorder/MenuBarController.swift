@@ -23,12 +23,15 @@ final class MenuBarController: NSObject, NSPopoverDelegate {
     private var globalHotkeyIDs: [UInt32] = []
     private var perMacroHotkeyIDs: [UInt32: UUID] = [:]   // hotkey-id → macro id
     private var dockBadgeTimer: Timer?
+    private var dockBadgeVisible = true
     private var playStartTime: CFAbsoluteTime = 0
     private var playingMacroID: UUID?
     /// Macros already visited in the current chain run — breaks A→B→A cycles.
     private var chainVisited: Set<UUID> = []
     private var settingsWC: SettingsWindowController?
     private var recordedSurface: PlaybackSurface?
+    private var recorderLoadedMacroID: UUID?
+    private var recorderLoadingMacroID: UUID?
 
     override init() {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
@@ -40,17 +43,18 @@ final class MenuBarController: NSObject, NSPopoverDelegate {
         countdown = CountdownOverlayController()
         observeStateForIcon()
         observeLibraryForHotkeys()
+        observeLibrarySelectionForInitialEventLoad()
         observeAccessibilityRevocation()
         registerAllHotkeys()
         loadInitialMacroIntoRecorder()
     }
 
     deinit {
-        if let m = globalClickMonitor { NSEvent.removeMonitor(m) }
-        Task { @MainActor in
+        MainActor.assumeIsolated {
+            if let m = globalClickMonitor { NSEvent.removeMonitor(m) }
             HotkeyManager.shared.unregisterAll()
+            dockBadgeTimer?.invalidate()
         }
-        dockBadgeTimer?.invalidate()
     }
 
     // MARK: - Status item
@@ -69,11 +73,19 @@ final class MenuBarController: NSObject, NSPopoverDelegate {
     private func observeStateForIcon() {
         recorder.$isRecording
             .receive(on: RunLoop.main)
-            .sink { [weak self] _ in self?.refreshIcon(); self?.updateDockBadge() }
+            .sink { [weak self] recording in
+                self?.state.isRecording = recording
+                self?.refreshIcon()
+                self?.updateDockBadge()
+            }
             .store(in: &cancellables)
         player.$isPlaying
             .receive(on: RunLoop.main)
-            .sink { [weak self] _ in self?.refreshIcon(); self?.updateDockBadge() }
+            .sink { [weak self] playing in
+                self?.state.isPlaying = playing
+                self?.refreshIcon()
+                self?.updateDockBadge()
+            }
             .store(in: &cancellables)
     }
 
@@ -110,16 +122,20 @@ final class MenuBarController: NSObject, NSPopoverDelegate {
 
     private func startBadgePulse() {
         guard dockBadgeTimer == nil else { return }
-        var visible = true
+        dockBadgeVisible = true
         dockBadgeTimer = Timer.scheduledTimer(withTimeInterval: 0.7, repeats: true) { _ in
-            visible.toggle()
-            NSApp.dockTile.badgeLabel = visible ? "●" : " "
+            Task { @MainActor [weak self] in
+                guard let self else { return }
+                self.dockBadgeVisible.toggle()
+                NSApp.dockTile.badgeLabel = self.dockBadgeVisible ? "●" : " "
+            }
         }
     }
 
     private func stopBadgePulse() {
         dockBadgeTimer?.invalidate()
         dockBadgeTimer = nil
+        dockBadgeVisible = true
     }
 
     // MARK: - Popover
@@ -131,8 +147,6 @@ final class MenuBarController: NSObject, NSPopoverDelegate {
         popover.delegate = self
 
         let view = PopoverContentView(controller: self, isWindow: false)
-            .environmentObject(recorder)
-            .environmentObject(player)
             .environmentObject(state)
             .environmentObject(library)
 
@@ -187,10 +201,11 @@ final class MenuBarController: NSObject, NSPopoverDelegate {
         guard recorder.isRecording else { return }
         recorder.stopRecording()
         recorder.clearAll()
+        recorderLoadedMacroID = nil
         // Restore the previously-active macro (if any) into the recorder buffer
         // so we don't leave the editor pointing at nothing.
         if let m = library.currentMacro {
-            recorder.loadEvents(m.events)
+            loadMacroEventsIntoRecorder(m.id)
         }
         hud?.hide()
         state.statusMessage = "Recording discarded."
@@ -214,6 +229,17 @@ final class MenuBarController: NSObject, NSPopoverDelegate {
             .store(in: &cancellables)
         // Global-hotkey changes go through reapplyHotkeys() explicitly from the
         // settings UI — no state-wide sink needed.
+    }
+
+    private func observeLibrarySelectionForInitialEventLoad() {
+        library.$currentMacroID
+            .compactMap { $0 }
+            .removeDuplicates()
+            .sink { [weak self] id in
+                guard let self, !self.recorder.isRecording else { return }
+                self.loadMacroEventsIntoRecorder(id)
+            }
+            .store(in: &cancellables)
     }
 
     /// If macOS Accessibility is revoked while a recording is live, the event tap
@@ -309,7 +335,7 @@ final class MenuBarController: NSObject, NSPopoverDelegate {
 
     private func loadInitialMacroIntoRecorder() {
         if let m = library.currentMacro {
-            recorder.loadEvents(m.events)
+            loadMacroEventsIntoRecorder(m.id)
         }
     }
 
@@ -317,8 +343,37 @@ final class MenuBarController: NSObject, NSPopoverDelegate {
         persistCurrentMacroIfNeeded()
         library.select(id: id)
         if let m = library.currentMacro {
-            recorder.loadEvents(m.events)
-            state.statusMessage = "Loaded \(m.name)."
+            state.statusMessage = "Loading \(m.name)..."
+            loadMacroEventsIntoRecorder(m.id, statusName: m.name)
+        }
+    }
+
+    private func loadMacroEventsIntoRecorder(_ id: UUID, statusName: String? = nil) {
+        guard !recorder.isRecording else { return }
+        guard recorderLoadedMacroID != id, recorderLoadingMacroID != id else { return }
+
+        recorderLoadingMacroID = id
+        Task { [weak self] in
+            guard let self else { return }
+            defer {
+                if self.recorderLoadingMacroID == id {
+                    self.recorderLoadingMacroID = nil
+                }
+            }
+
+            do {
+                let events = try await self.library.loadEvents(for: id)
+                guard self.library.currentMacroID == id else { return }
+                self.recorder.loadEvents(events)
+                self.recorderLoadedMacroID = id
+                if let statusName {
+                    self.state.statusMessage = "Loaded \(statusName)."
+                }
+            } catch {
+                if let statusName {
+                    self.state.statusMessage = "Failed to load \(statusName)."
+                }
+            }
         }
     }
 
@@ -337,7 +392,11 @@ final class MenuBarController: NSObject, NSPopoverDelegate {
         library.delete(id: id)
         if wasCurrent {
             if let m = library.currentMacro {
-                recorder.loadEvents(m.events)
+                Task {
+                    if let evs = try? await library.loadEvents(for: m.id) {
+                        recorder.loadEvents(evs)
+                    }
+                }
             } else {
                 recorder.clearAll()
             }
@@ -349,7 +408,11 @@ final class MenuBarController: NSObject, NSPopoverDelegate {
         library.deleteMany(ids: ids)
         if wasCurrent {
             if let m = library.currentMacro {
-                recorder.loadEvents(m.events)
+                Task {
+                    if let evs = try? await library.loadEvents(for: m.id) {
+                        recorder.loadEvents(evs)
+                    }
+                }
             } else {
                 recorder.clearAll()
             }
@@ -451,7 +514,11 @@ final class MenuBarController: NSObject, NSPopoverDelegate {
                 // Don't leave an empty buffer that a later persist would write
                 // over the selected macro — restore it.
                 if let m = library.currentMacro {
-                    recorder.loadEvents(m.events)
+                    Task {
+                        if let evs = try? await library.loadEvents(for: m.id) {
+                            recorder.loadEvents(evs)
+                        }
+                    }
                 }
             }
             hud?.hide()
@@ -535,7 +602,7 @@ final class MenuBarController: NSObject, NSPopoverDelegate {
             // Completion arrives on the main actor. `finished` is false when the run
             // was cancelled (stop hotkey, new playback, recording started) — in that
             // case we skip stats, sounds, status, and most importantly the chain.
-            self.player.play(events: self.recorder.events, loops: loops, speed: speed, context: context, windowTracker: WindowTracker()) { [weak self] finished in
+            self.player.play(macroID: macro?.id, events: self.recorder.events, loops: loops, speed: speed, context: context, windowTracker: WindowTracker()) { [weak self] finished in
                 guard let self else { return }
                 // Look the chain up LIVE (not from the stale pre-playback copy) so
                 // clearing it mid-run is respected.
@@ -558,9 +625,13 @@ final class MenuBarController: NSObject, NSPopoverDelegate {
                     }
                     self.state.statusMessage = "Chaining to \(next.name)…"
                     self.library.select(id: next.id)
-                    self.recorder.loadEvents(next.events)
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-                        self.play(isChained: true)
+                    Task {
+                        if let evs = try? await self.library.loadEvents(for: next.id) {
+                            self.recorder.loadEvents(evs)
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                                self.play(isChained: true)
+                            }
+                        }
                     }
                 } else {
                     self.state.statusMessage = "Playback finished."
@@ -589,16 +660,19 @@ final class MenuBarController: NSObject, NSPopoverDelegate {
 
     /// Play a specific saved macro by id (used by per-macro hotkeys + library card buttons).
     func playMacroByID(_ id: UUID) {
-        guard let macro = library.macros.first(where: { $0.id == id }) else { return }
+        guard library.macros.contains(where: { $0.id == id }) else { return }
         if recorder.isRecording { toggleRecording() }
         if player.isPlaying { player.stop() }
         persistCurrentMacroIfNeeded()
         chainVisited.removeAll()
         library.select(id: id)
-        recorder.loadEvents(macro.events)
-        // Short delay to let state settle, then play.
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { [weak self] in
-            self?.play()
+        Task {
+            if let evs = try? await library.loadEvents(for: id) {
+                recorder.loadEvents(evs)
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { [weak self] in
+                    self?.play()
+                }
+            }
         }
     }
 

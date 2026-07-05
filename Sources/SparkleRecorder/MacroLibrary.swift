@@ -40,14 +40,10 @@ enum LibraryFilter: Hashable {
     }
 }
 
-/// On-disk representation of the whole library.
-private struct LibraryData: Codable {
-    var macros: [SavedMacro]
-    var currentMacroID: UUID?
-    var version: Int = 3
-}
+
 
 /// The user's saved macros. Auto-persists to Application Support.
+@MainActor
 final class MacroLibrary: ObservableObject {
     @Published private(set) var macros: [SavedMacro] = []
     @Published var currentMacroID: UUID?
@@ -74,90 +70,45 @@ final class MacroLibrary: ObservableObject {
         }
     }
 
-    private static let supportDirectoryName = "SparkleRecorder"
-    private static let legacySupportDirectoryName = String(decoding: [84, 105, 110, 121, 82, 101, 99, 111, 114, 100, 101, 114], as: UTF8.self)
+    private let client: MacroRepositoryClient
 
-    private static var fileURL: URL {
-        let appSupport = FileManager.default
-            .urls(for: .applicationSupportDirectory, in: .userDomainMask)
-            .first!
-        let base = appSupport.appendingPathComponent(supportDirectoryName, isDirectory: true)
-        try? FileManager.default.createDirectory(at: base, withIntermediateDirectories: true)
-        migrateLegacyLibraryIfNeeded(to: base, appSupport: appSupport)
-        return base.appendingPathComponent("library.json")
-    }
-
-    private static func migrateLegacyLibraryIfNeeded(to base: URL, appSupport: URL) {
-        let newFile = base.appendingPathComponent("library.json")
-        guard !FileManager.default.fileExists(atPath: newFile.path) else { return }
-
-        let legacyFile = appSupport
-            .appendingPathComponent(legacySupportDirectoryName, isDirectory: true)
-            .appendingPathComponent("library.json")
-        guard FileManager.default.fileExists(atPath: legacyFile.path) else { return }
-
-        do {
-            try FileManager.default.copyItem(at: legacyFile, to: newFile)
-            NSLog("SparkleRecorder: migrated existing macro library into the renamed app support folder.")
-        } catch {
-            NSLog("SparkleRecorder: failed to migrate existing macro library: \(error.localizedDescription)")
+    init(client: MacroRepositoryClient = .live) {
+        self.client = client
+        Task {
+            await load()
         }
     }
-
-    init() { load() }
 
     // MARK: - Persistence
 
-    func load() {
-        guard let data = try? Data(contentsOf: Self.fileURL) else { return }
-        guard var decoded = try? JSONDecoder().decode(LibraryData.self, from: data) else {
-            // The file exists but won't parse. Preserve it before any future
-            // save() overwrites the user's entire library with an empty one.
-            let stamp = Int(Date().timeIntervalSince1970)
-            let backup = Self.fileURL.deletingLastPathComponent()
-                .appendingPathComponent("library.corrupt-\(stamp).json")
-            try? FileManager.default.copyItem(at: Self.fileURL, to: backup)
-            NSLog("SparkleRecorder: library.json failed to decode — backed up to \(backup.lastPathComponent)")
-            return
-        }
-        
-        // Auto-migration: Adjust coordinates for the new titlebar-aware coordinate system
-        if decoded.version < 3 {
-            for mIdx in decoded.macros.indices {
-                var macro = decoded.macros[mIdx]
-                for eIdx in macro.events.indices {
-                    var ev = macro.events[eIdx]
-                    if let oldLocalY = ev.windowLocalY, let sId = ev.surfaceId, let surface = macro.surfaces[sId] {
-                        let bid = surface.bundleIdentifier
-                        let pid = bid.flatMap { b in NSWorkspace.shared.runningApplications.first(where: { $0.bundleIdentifier == b })?.processIdentifier }
-                        let tbHeight = CoordinateMapper.windowTitleBarHeight(for: pid, frame: surface.recordedFrame)
-                        ev.windowLocalY = oldLocalY - tbHeight
-                        
-                        let clientHeight = max(1.0, surface.recordedFrame.height - tbHeight)
-                        ev.windowNormalizedY = oldLocalY >= tbHeight ? (oldLocalY - tbHeight) / clientHeight : 0
-                        macro.events[eIdx] = ev
-                    }
-                }
-                decoded.macros[mIdx] = macro
-            }
-            decoded.version = 3
+    func load() async {
+        do {
+            let loaded = try await client.loadAllManifests()
+            self.macros = loaded
             
-            // Re-save immediately so we don't migrate again
-            self.macros = decoded.macros
-            self.currentMacroID = decoded.currentMacroID
-            save()
-        } else {
-            self.macros = decoded.macros
-            self.currentMacroID = decoded.currentMacroID
+            if let idString = UserDefaults.standard.string(forKey: "currentMacroID"),
+               let id = UUID(uuidString: idString) {
+                self.currentMacroID = id
+            } else {
+                self.currentMacroID = self.macros.first?.id
+            }
+        } catch {
+            NSLog("SparkleRecorder: Failed to load from MacroRepository: \(error)")
         }
     }
 
     func save() {
-        let data = LibraryData(macros: macros, currentMacroID: currentMacroID)
-        let enc = JSONEncoder()
-        enc.outputFormatting = [.prettyPrinted]
-        guard let encoded = try? enc.encode(data) else { return }
-        try? encoded.write(to: Self.fileURL, options: .atomic)
+        // currentMacroID is saved to UserDefaults
+        if let id = currentMacroID {
+            UserDefaults.standard.set(id.uuidString, forKey: "currentMacroID")
+        } else {
+            UserDefaults.standard.removeObject(forKey: "currentMacroID")
+        }
+        
+        // For array re-ordering (if drag-and-drop was used), we save all metadata
+        for macro in macros {
+            Task { try? await client.saveMetadata(macro) }
+        }
     }
 
     // MARK: - Mutations
@@ -166,6 +117,8 @@ final class MacroLibrary: ObservableObject {
     func insert(_ macro: SavedMacro) {
         macros.insert(macro, at: 0)
         currentMacroID = macro.id
+        Task { try? await client.saveEvents(macro.events, macro.id) }
+        Task { try? await client.saveMetadata(macro) }
         save()
     }
 
@@ -175,6 +128,8 @@ final class MacroLibrary: ObservableObject {
         let m = SavedMacro(name: n, events: events, loops: loops)
         macros.insert(m, at: insertionIndex())
         currentMacroID = m.id
+        Task { try? await client.saveEvents(m.events, m.id) }
+        Task { try? await client.saveMetadata(m) }
         save()
         return m
     }
@@ -273,7 +228,14 @@ final class MacroLibrary: ObservableObject {
     func updateEvents(id: UUID, events: [RecordedEvent]) {
         mutate(id) {
             $0.events = events
+            $0.cachedDuration = events.last?.time ?? 0
+            $0.cachedEventCount = events.count
         }
+        Task { try? await client.saveEvents(events, id) }
+    }
+    
+    func loadEvents(for id: UUID) async throws -> [RecordedEvent] {
+        return try await client.loadEvents(id)
     }
 
     func rename(id: UUID, to name: String) {
@@ -286,11 +248,14 @@ final class MacroLibrary: ObservableObject {
         for i in macros.indices where macros[i].chainTo == id {
             macros[i].chainTo = nil
             macros[i].modifiedAt = Date()
+            let m = macros[i]
+            Task { try? await client.saveMetadata(m) }
         }
         macros.removeAll { $0.id == id }
         if currentMacroID == id {
             currentMacroID = macros.first?.id
         }
+        Task { try? await client.deleteMacro(id) }
         save()
     }
 
@@ -298,11 +263,16 @@ final class MacroLibrary: ObservableObject {
         for id in ids {
             for i in macros.indices where macros[i].chainTo == id {
                 macros[i].chainTo = nil
+                let m = macros[i]
+                Task { try? await client.saveMetadata(m) }
             }
         }
         macros.removeAll { ids.contains($0.id) }
         if let cur = currentMacroID, ids.contains(cur) {
             currentMacroID = macros.first?.id
+        }
+        for id in ids {
+            Task { try? await client.deleteMacro(id) }
         }
         save()
     }
@@ -319,12 +289,27 @@ final class MacroLibrary: ObservableObject {
         copy.lastPlayedAt = nil
         copy.totalRunTime = 0
         copy.favorite = false
-        if let idx = macros.firstIndex(where: { $0.id == id }) {
-            macros.insert(copy, at: idx + 1)
-        } else {
-            macros.insert(copy, at: 0)
+        
+        // Fetch full events before duplicating!
+        Task {
+            if let events = try? await client.loadEvents(id) {
+                var newCopy = copy
+                newCopy.events = events
+                newCopy.cachedDuration = src.duration
+                newCopy.cachedEventCount = src.eventCount
+                let finalCopy = newCopy
+                
+                if let idx = self.macros.firstIndex(where: { $0.id == id }) {
+                    self.macros.insert(finalCopy, at: idx + 1)
+                } else {
+                    self.macros.insert(finalCopy, at: 0)
+                }
+                self.save()
+                
+                try? await client.saveEvents(events, finalCopy.id)
+                try? await client.saveMetadata(finalCopy)
+            }
         }
-        save()
     }
 
     func move(from offsets: IndexSet, to destination: Int) {
@@ -394,7 +379,8 @@ final class MacroLibrary: ObservableObject {
         guard let idx = macros.firstIndex(where: { $0.id == id }) else { return }
         body(&macros[idx])
         macros[idx].modifiedAt = Date()
-        save()
+        let m = macros[idx]
+        Task { try? await client.saveMetadata(m) }
     }
 
     private func autoName() -> String {

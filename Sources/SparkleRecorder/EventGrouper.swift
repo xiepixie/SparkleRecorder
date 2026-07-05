@@ -1,7 +1,7 @@
 import Foundation
 import CoreGraphics
 
-public enum ActionGroupKind: String, Codable {
+public enum ActionGroupKind: String, Codable, Sendable {
     case click
     case doubleClick
     case longPress
@@ -22,7 +22,7 @@ public enum ActionGroupKind: String, Codable {
     case sequence
 }
 
-public struct EventGroupingOptions: Codable, Equatable {
+public struct EventGroupingOptions: Codable, Equatable, Sendable {
     public var clickMoveTolerance: CGFloat = 5
     public var dragDistanceThreshold: CGFloat = 8
     public var longPressThreshold: TimeInterval = 0.35
@@ -45,7 +45,7 @@ public struct EventGroupingOptions: Codable, Equatable {
     public init() {}
 }
 
-public struct ActionGroup: Identifiable, Equatable {
+public struct ActionGroup: Identifiable, Equatable, Sendable {
     public var id: UUID
     public var kind: ActionGroupKind
     public var eventIndices: [Int]
@@ -127,7 +127,7 @@ public struct ActionGroup: Identifiable, Equatable {
     }
 }
 
-public struct EventGrouper {
+public struct EventGrouper: Sendable {
     public let options: EventGroupingOptions
 
     public init(options: EventGroupingOptions = EventGroupingOptions()) {

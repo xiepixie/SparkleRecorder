@@ -18,7 +18,7 @@ final class CountdownOverlayController {
     private(set) var isActive = false
 
     /// `seconds` ticks before completion. `onComplete` runs on the main queue.
-    func start(seconds: Int = 3, onComplete: @escaping () -> Void) {
+    func start(seconds: Int = 3, onComplete: @escaping @MainActor @Sendable () -> Void) {
         cancel()
         session &+= 1
         let mySession = session
@@ -67,7 +67,7 @@ final class CountdownOverlayController {
         window?.orderOut(nil)
     }
 
-    private func dismiss(session expected: UInt64, _ then: @escaping () -> Void) {
+    private func dismiss(session expected: UInt64, _ then: @escaping @MainActor @Sendable () -> Void) {
         guard let win = window else { then(); return }
         NSAnimationContext.runAnimationGroup({ ctx in
             ctx.duration = 0.2

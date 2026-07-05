@@ -196,11 +196,13 @@ if args.count >= 3, args[1] == "--play" {
         let speed: Double
         let loops: Int
         var context = PlaybackContext()
+        var targetID: UUID? = nil
         if let saved = try? dec.decode(SavedMacro.self, from: data), !saved.events.isEmpty {
             events = saved.events
             speed = saved.speed
             // Continuous (0) would run forever with no in-app stop hotkey — clamp.
             loops = max(1, saved.loops)
+            targetID = saved.id
             
             if !saved.surfaces.isEmpty {
                 // Activate target apps immediately so they can be ready.
@@ -235,8 +237,20 @@ if args.count >= 3, args[1] == "--play" {
         // Post events from a background thread with plain sleeps — no run-loop
         // pumping, no MainActor hops, so timing stays faithful to the recording.
         let semaphore = DispatchSemaphore(value: 0)
+        let playbackEvents = events
+        let playbackLoops = loops
+        let playbackSpeed = speed
+        let playbackContext = context
+        let playbackTargetID = targetID
         Thread.detachNewThread {
-            Player.playSynchronously(events: events, loops: loops, speed: speed, context: context, windowTracker: WindowTracker())
+            Player.playSynchronously(
+                macroID: playbackTargetID,
+                events: playbackEvents,
+                loops: playbackLoops,
+                speed: playbackSpeed,
+                context: playbackContext,
+                windowTracker: WindowTracker()
+            )
             semaphore.signal()
         }
         semaphore.wait()

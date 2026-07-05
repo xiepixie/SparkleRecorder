@@ -1,6 +1,7 @@
 import Cocoa
 import SwiftUI
 
+@MainActor
 private final class CaptureWindow: NSWindow {
     override var canBecomeKey: Bool { true }
 }
@@ -9,6 +10,7 @@ private final class CaptureWindow: NSWindow {
 /// This replaces NSEvent.addGlobalMonitorForEvents which requires the separate
 /// "Input Monitoring" permission (distinct from Accessibility on macOS 10.15+).
 /// By using a real window that accepts events, we avoid the permission issue entirely.
+@MainActor
 private final class PickerCaptureView: NSView {
     var onDoubleClick: ((CGPoint) -> Void)?
     var onCancel: (() -> Void)?
@@ -37,6 +39,7 @@ private final class PickerCaptureView: NSView {
     }
 }
 
+@MainActor
 final class CoordinatePickerOverlay {
     static let shared = CoordinatePickerOverlay()
     

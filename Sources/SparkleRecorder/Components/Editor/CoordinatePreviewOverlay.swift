@@ -5,6 +5,7 @@ import SwiftUI
 /// EXCEPT when the mouse is over an interactive crosshair / drag-handle.
 /// Uses a polling timer on NSEvent.mouseLocation to toggle ignoresMouseEvents,
 /// which is the standard macOS pattern for click-through overlays.
+@MainActor
 class ClickThroughPanel: NSPanel {
     /// Returns true if the given CG-screen point is over an interactive element.
     var isPointInteractive: ((_ cgScreenPoint: CGPoint) -> Bool)?
@@ -23,14 +24,16 @@ class ClickThroughPanel: NSPanel {
         self.ignoresMouseEvents = true // Default: everything passes through
         
         trackingTimer = Timer.scheduledTimer(withTimeInterval: 0.04, repeats: true) { [weak self] _ in
-            guard let self = self, !self.isDragging else { return }
-            let cocoaPt = NSEvent.mouseLocation
-            let screenH = NSScreen.screens.first?.frame.height ?? 0
-            let cgPt = CGPoint(x: cocoaPt.x, y: screenH - cocoaPt.y)
-            let interactive = self.isPointInteractive?(cgPt) ?? false
-            // Only update when the value actually changes to avoid flickering
-            if self.ignoresMouseEvents == interactive {
-                self.ignoresMouseEvents = !interactive
+            Task { @MainActor in
+                guard let self = self, !self.isDragging else { return }
+                let cocoaPt = NSEvent.mouseLocation
+                let screenH = NSScreen.screens.first?.frame.height ?? 0
+                let cgPt = CGPoint(x: cocoaPt.x, y: screenH - cocoaPt.y)
+                let interactive = self.isPointInteractive?(cgPt) ?? false
+                // Only update when the value actually changes to avoid flickering
+                if self.ignoresMouseEvents == interactive {
+                    self.ignoresMouseEvents = !interactive
+                }
             }
         }
         
@@ -71,10 +74,13 @@ class ClickThroughPanel: NSPanel {
     }
     
     deinit {
-        stopTracking()
+        MainActor.assumeIsolated {
+            stopTracking()
+        }
     }
 }
 
+@MainActor
 class ClickThroughHostingView<Content: View>: NSHostingView<Content> {
     required init(rootView: Content) {
         super.init(rootView: rootView)
@@ -118,6 +124,7 @@ class ClickThroughHostingView<Content: View>: NSHostingView<Content> {
     }
 }
 
+@MainActor
 func screenToSwiftUI(_ pt: CGPoint, window: NSWindow, primaryScreenHeight: CGFloat) -> CGPoint {
     let cocoaScreenPt = NSPoint(x: pt.x, y: primaryScreenHeight - pt.y)
     let localPt = window.convertPoint(fromScreen: cocoaScreenPt)
@@ -127,6 +134,7 @@ func screenToSwiftUI(_ pt: CGPoint, window: NSWindow, primaryScreenHeight: CGFlo
     )
 }
 
+@MainActor
 func screenToSwiftUI(_ rect: CGRect, window: NSWindow, primaryScreenHeight: CGFloat) -> CGRect {
     let topLeft = screenToSwiftUI(CGPoint(x: rect.minX, y: rect.minY), window: window, primaryScreenHeight: primaryScreenHeight)
     let bottomRight = screenToSwiftUI(CGPoint(x: rect.maxX, y: rect.maxY), window: window, primaryScreenHeight: primaryScreenHeight)
@@ -138,6 +146,7 @@ func screenToSwiftUI(_ rect: CGRect, window: NSWindow, primaryScreenHeight: CGFl
     )
 }
 
+@MainActor
 func swiftuiToScreen(_ pt: CGPoint, window: NSWindow, primaryScreenHeight: CGFloat) -> CGPoint {
     let localPt = NSPoint(
         x: pt.x,

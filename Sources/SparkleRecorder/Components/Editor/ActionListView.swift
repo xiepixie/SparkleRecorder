@@ -8,8 +8,7 @@ struct ActionListView: View {
     @Environment(\.undoManager) private var undoManager
     let rows: [ActionRow]
     @Binding var selection: Set<UUID>
-    let hideMouseMoves: Bool
-    let smartMergeGestures: Bool
+    let onRefreshRows: () -> [ActionRow]
     @State private var lastAnchor: UUID?
     @State private var dropInsertion: ActionRowInsertion? = nil
     @State private var draggedID: UUID? = nil
@@ -264,26 +263,13 @@ struct ActionListView: View {
     }
 
     func selectMovedRows(in eventIndexRange: Range<Int>) {
-        let movedRows = currentRowsFromRecorder().filter { row in
+        let movedRows = onRefreshRows().filter { row in
             row.group.eventIndices.contains { eventIndexRange.contains($0) }
         }
         if !movedRows.isEmpty {
             selection = Set(movedRows.map(\.id))
             lastAnchor = movedRows.first?.id
         }
-    }
-
-    func currentRowsFromRecorder() -> [ActionRow] {
-        var options = EventGroupingOptions()
-        options.disableGrouping = !smartMergeGestures
-        return EventGrouper(options: options)
-            .group(recorder.events, liveDuration: recorder.liveDuration)
-            .compactMap { group in
-                if hideMouseMoves && group.kind == .mouseMove {
-                    return nil
-                }
-                return ActionRow(group: group)
-            }
     }
 
 	    func handleTap(_ id: UUID, mods: NSEvent.ModifierFlags) {

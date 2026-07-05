@@ -5,17 +5,18 @@ import SparkleRecorderCore
 
 // MARK: - Window controller
 
+@MainActor
 final class RecordingHUDController {
     private var window: NSPanel?
     private let recorder: Recorder
-    private let onDiscard: () -> Void
-    private let onStop:    () -> Void
+    private let onDiscard: @MainActor @Sendable () -> Void
+    private let onStop: @MainActor @Sendable () -> Void
     private weak var state: AppState?
 
     init(recorder: Recorder,
          state: AppState?,
-         onDiscard: @escaping () -> Void,
-         onStop: @escaping () -> Void) {
+         onDiscard: @escaping @MainActor @Sendable () -> Void,
+         onStop: @escaping @MainActor @Sendable () -> Void) {
         self.recorder = recorder
         self.state = state
         self.onDiscard = onDiscard
@@ -39,7 +40,9 @@ final class RecordingHUDController {
             ctx.duration = 0.18
             win.animator().alphaValue = 0
         }, completionHandler: { [weak self] in
-            self?.window?.orderOut(nil)
+            Task { @MainActor in
+                self?.window?.orderOut(nil)
+            }
         })
     }
 
@@ -115,8 +118,8 @@ final class RecordingHUDController {
 struct RecordingHUDView: View {
     @ObservedObject var recorder: Recorder
     weak var state: AppState?
-    let onDiscard: () -> Void
-    let onStop:  () -> Void
+    let onDiscard: @MainActor @Sendable () -> Void
+    let onStop: @MainActor @Sendable () -> Void
 
     @State private var pulse = false
 
@@ -135,7 +138,7 @@ struct RecordingHUDView: View {
         String(format: "%02d", Int((recorder.liveDuration - floor(recorder.liveDuration)) * 100))
     }
 
-    private var stats: (clicks: Int, keys: Int, scrolls: Int, drags: Int) {
+    private var stats: RecordingStats {
         recorder.liveStats
     }
 
@@ -180,7 +183,8 @@ struct RecordingHUDView: View {
 
                 // Event-track panel
                 VStack(spacing: 2) {
-                    LiveWaveform(events: recorder.events)
+                    LiveWaveform(events: recorder.liveWaveformEvents)
+                        .equatable()
                         .frame(height: 28)
                     HStack {
                         Text("0s")
@@ -231,33 +235,33 @@ struct RecordingHUDView: View {
 
 // MARK: - HUD pieces
 
-private struct LiveWaveform: View {
+private struct LiveWaveform: View, Equatable {
     let events: [RecordedEvent]
 
     var body: some View {
         GeometryReader { geo in
-            let w = geo.size.width
-            let h = geo.size.height
-            // Show last ~150 events as vertical bars sliding across.
-            let recent = Array(events.suffix(150))
-            let count = max(1, recent.count)
+            let bars = WaveformProjection.indexedBars(from: events)
 
-            ZStack(alignment: .leading) {
-                Capsule(style: .continuous)
-                    .fill(Color.primary.opacity(0.06))
-                    .frame(height: h)
+            Canvas { context, size in
+                context.fill(
+                    Capsule(style: .continuous).path(in: CGRect(origin: .zero, size: size)),
+                    with: .color(Color.primary.opacity(0.06))
+                )
 
-                ForEach(0..<recent.count, id: \.self) { i in
-                    let ev = recent[i]
-                    let x = (CGFloat(i) / CGFloat(count)) * w
-                    let isImpact = Brand.isImpact(ev.kind)
-                    RoundedRectangle(cornerRadius: 1, style: .continuous)
-                        .fill(Brand.eventColor(ev.kind).opacity(isImpact ? 1.0 : 0.6))
-                        .frame(
-                            width: isImpact ? 2 : 1.2,
-                            height: isImpact ? h : h * 0.45
-                        )
-                        .offset(x: x)
+                for bar in bars {
+                    let barWidth: CGFloat = bar.isImpact ? 2 : 1.2
+                    let barHeight = bar.isImpact ? size.height : size.height * 0.45
+                    let x = min(max(0, CGFloat(bar.positionFraction) * size.width), max(0, size.width - barWidth))
+                    let rect = CGRect(
+                        x: x,
+                        y: (size.height - barHeight) / 2,
+                        width: barWidth,
+                        height: barHeight
+                    )
+                    context.fill(
+                        RoundedRectangle(cornerRadius: 1, style: .continuous).path(in: rect),
+                        with: .color(Brand.eventColor(bar.kind).opacity(bar.isImpact ? 1.0 : 0.6))
+                    )
                 }
             }
         }

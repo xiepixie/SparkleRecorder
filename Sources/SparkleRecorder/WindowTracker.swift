@@ -2,7 +2,7 @@ import Cocoa
 import ApplicationServices
 import SparkleRecorderCore
 
-public final class WindowTracker {
+public final class WindowTracker: Sendable {
     public init() {}
     
     public func resolveCurrentFrames(for surfaces: [String: PlaybackSurface]) -> [String: RectValue] {

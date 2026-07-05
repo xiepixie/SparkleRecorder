@@ -5,7 +5,7 @@ public protocol EventTapThreadDelegate: AnyObject {
     func eventTapThread(_ thread: EventTapThread, didReceive type: CGEventType, event: CGEvent)
 }
 
-public final class EventTapThread: Thread {
+public final class EventTapThread: Thread, @unchecked Sendable {
     public weak var delegate: EventTapThreadDelegate?
     
     private let mask: CGEventMask

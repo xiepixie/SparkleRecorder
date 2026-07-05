@@ -3,14 +3,14 @@ import CoreGraphics
 import SparkleRecorderCore
 import OSLog
 
-public enum LocatorStrategy {
+public enum LocatorStrategy: @unchecked Sendable {
     case coordinates
     case ocr(TextAnchor)
     case template(CGImage)
 }
 
 @available(macOS 14.0, *)
-public class LocatorEngine {
+public final class LocatorEngine: @unchecked Sendable {
     private let logger = Logger(subsystem: "com.sparklerecorder.mac", category: "LocatorEngine")
     private let pointResolver = PointResolver()
     private let visionDetector = VisionDetector()

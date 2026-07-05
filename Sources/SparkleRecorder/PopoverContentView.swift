@@ -10,8 +10,6 @@ struct PopoverContentView: View {
     /// `true` when hosted in the resizable Dock window, `false` for the menu-bar popover.
     var isWindow: Bool = false
 
-    @EnvironmentObject var recorder: Recorder
-    @EnvironmentObject var player: Player
     @EnvironmentObject var state: AppState
     @EnvironmentObject var library: MacroLibrary
 
@@ -152,10 +150,11 @@ struct PopoverContentView: View {
     /// Returns `true` if any provider was a macro file URL we accepted.
     func handleFileDrop(providers: [NSItemProvider]) -> Bool {
         var accepted = false
+        let importableExts = Self.importableExts
         for provider in providers where provider.hasItemConformingToTypeIdentifier(UTType.fileURL.identifier) {
             accepted = true
             _ = provider.loadObject(ofClass: URL.self) { url, _ in
-                guard let url, Self.importableExts.contains(url.pathExtension.lowercased()) else { return }
+                guard let url, importableExts.contains(url.pathExtension.lowercased()) else { return }
                 DispatchQueue.main.async {
                     controller.importMacro(at: url)
                 }

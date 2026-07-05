@@ -1,6 +1,6 @@
 import Foundation
 
-public struct HotkeyBinding: Codable, Equatable, Hashable {
+public struct HotkeyBinding: Codable, Equatable, Hashable, Sendable {
     public var keyCode: UInt32
     public var name: String
     public var modifiers: UInt32
@@ -20,7 +20,7 @@ public struct HotkeyBinding: Codable, Equatable, Hashable {
 }
 
 /// A saved macro entry in the library.
-public struct SavedMacro: Codable, Identifiable, Equatable {
+public struct SavedMacro: Codable, Identifiable, Equatable, Sendable {
     public var id: UUID
     public var name: String
     public var events: [RecordedEvent]
@@ -56,9 +56,13 @@ public struct SavedMacro: Codable, Identifiable, Equatable {
     public var playCount: Int = 0
     public var lastPlayedAt: Date?
     public var totalRunTime: TimeInterval = 0
+    
+    // Cached values for fast loading without parsing the heavy events array
+    public var cachedDuration: TimeInterval?
+    public var cachedEventCount: Int?
 
-    public var duration: TimeInterval { events.last?.time ?? 0 }
-    public var eventCount: Int { events.count }
+    public var duration: TimeInterval { cachedDuration ?? (events.last?.time ?? 0) }
+    public var eventCount: Int { cachedEventCount ?? events.count }
     public var clickCount: Int {
         events.filter { $0.kind == .leftMouseDown || $0.kind == .rightMouseDown || $0.kind == .otherMouseDown }.count
     }
@@ -70,6 +74,7 @@ public struct SavedMacro: Codable, Identifiable, Equatable {
         case loops, speed, surface, surfaces, followWindowOffset
         case icon, accent, tags, favorite, hotkey, notes, chainTo
         case playCount, lastPlayedAt, totalRunTime
+        case cachedDuration, cachedEventCount
     }
 
     public init(id: UUID = UUID(),
@@ -140,6 +145,8 @@ public struct SavedMacro: Codable, Identifiable, Equatable {
         self.playCount = try c.decodeIfPresent(Int.self, forKey: .playCount) ?? 0
         self.lastPlayedAt = try c.decodeIfPresent(Date.self, forKey: .lastPlayedAt)
         self.totalRunTime = try c.decodeIfPresent(TimeInterval.self, forKey: .totalRunTime) ?? 0
+        self.cachedDuration = try c.decodeIfPresent(TimeInterval.self, forKey: .cachedDuration)
+        self.cachedEventCount = try c.decodeIfPresent(Int.self, forKey: .cachedEventCount)
     }
 
     public func encode(to encoder: Encoder) throws {
@@ -164,5 +171,7 @@ public struct SavedMacro: Codable, Identifiable, Equatable {
         try c.encode(playCount, forKey: .playCount)
         try c.encodeIfPresent(lastPlayedAt, forKey: .lastPlayedAt)
         try c.encode(totalRunTime, forKey: .totalRunTime)
+        try c.encodeIfPresent(cachedDuration, forKey: .cachedDuration)
+        try c.encodeIfPresent(cachedEventCount, forKey: .cachedEventCount)
     }
 }

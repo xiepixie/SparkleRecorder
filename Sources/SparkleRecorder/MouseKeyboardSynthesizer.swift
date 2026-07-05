@@ -1,7 +1,9 @@
-import Foundation
 import CoreGraphics
+import Foundation
+import os
+import SparkleRecorderCore
 
-public protocol EventPosting {
+public protocol EventPosting: AnyObject {
     func post(_ event: RecordedEvent, at point: CGPoint)
 }
 
@@ -33,40 +35,40 @@ public final class CGEventPoster: EventPosting {
 
     public func post(_ ev: RecordedEvent, at point: CGPoint) {
         guard let cgType = cgEventType(for: ev.kind) else { return }
+        guard let plan = PlaybackInputPlanner.plan(for: ev) else { return }
 
         // Removed CGWarpMouseCursorPosition because it stalls WindowServer at 60Hz.
         // CGEvent(mouseEventSource:...) natively updates the cursor location on macOS.
 
         let source = CGEventSource(stateID: .combinedSessionState)
 
-        switch ev.kind {
-        case .keyDown, .keyUp:
+        switch plan {
+        case .keyboard(let spec):
             if let cgEvent = CGEvent(
                 keyboardEventSource: source,
-                virtualKey: CGKeyCode(ev.keyCode),
-                keyDown: ev.kind == .keyDown
+                virtualKey: CGKeyCode(spec.keyCode),
+                keyDown: spec.keyDown
             ) {
-                cgEvent.flags = CGEventFlags(rawValue: ev.flags)
+                cgEvent.flags = CGEventFlags(rawValue: spec.flags)
                 cgEvent.setIntegerValueField(.eventSourceUserData, value: loopbackMagic)
                 cgEvent.post(tap: .cghidEventTap)
             }
 
-        case .flagsChanged:
+        case .flagsChanged(let spec):
             if let cgEvent = CGEvent(
                 keyboardEventSource: source,
-                virtualKey: CGKeyCode(ev.keyCode),
+                virtualKey: CGKeyCode(spec.keyCode),
                 keyDown: false
             ) {
                 cgEvent.type = .flagsChanged
-                cgEvent.flags = CGEventFlags(rawValue: ev.flags)
+                cgEvent.flags = CGEventFlags(rawValue: spec.flags)
                 cgEvent.setIntegerValueField(.eventSourceUserData, value: loopbackMagic)
                 cgEvent.post(tap: .cghidEventTap)
             }
 
-        case .scrollWheel:
+        case .scroll(let spec):
             let scrollSource = Self.makeScrollEventSource(loopbackMagic: loopbackMagic)
             placeCursorForScroll(at: point, source: scrollSource, flags: ev.flags)
-            let spec = Self.scrollPlaybackSpec(for: ev)
             if let cgEvent = CGEvent(
                 scrollWheelEvent2Source: scrollSource,
                 units: spec.units,
@@ -90,39 +92,20 @@ public final class CGEventPoster: EventPosting {
                 cgEvent.post(tap: .cghidEventTap)
             }
 
-        default:
-            // Mouse events
-            let button: CGMouseButton
-            switch ev.kind {
-            case .leftMouseDown, .leftMouseUp, .leftMouseDragged:
-                button = .left
-            case .rightMouseDown, .rightMouseUp, .rightMouseDragged:
-                button = .right
-            case .otherMouseDown, .otherMouseUp, .otherMouseDragged:
-                button = CGMouseButton(rawValue: UInt32(ev.mouseButton)) ?? .center
-            case .mouseMoved:
-                button = .left
-            default:
-                button = .left
-            }
-
+        case .mouse(let spec):
             if let cgEvent = CGEvent(
                 mouseEventSource: source,
                 mouseType: cgType,
                 mouseCursorPosition: point,
-                mouseButton: button
+                mouseButton: spec.button.cgMouseButton
             ) {
-                cgEvent.setIntegerValueField(.mouseEventButtonNumber, value: ev.mouseButton)
-                
-                let isClickOrDrag = ev.kind == .leftMouseDown || ev.kind == .leftMouseUp || ev.kind == .leftMouseDragged ||
-                                    ev.kind == .rightMouseDown || ev.kind == .rightMouseUp || ev.kind == .rightMouseDragged ||
-                                    ev.kind == .otherMouseDown || ev.kind == .otherMouseUp || ev.kind == .otherMouseDragged
-                let clickState = ev.clickCount > 0 ? ev.clickCount : (isClickOrDrag ? 1 : 0)
-                if clickState > 0 {
+                cgEvent.setIntegerValueField(.mouseEventButtonNumber, value: spec.buttonNumber)
+
+                if let clickState = spec.clickState {
                     cgEvent.setIntegerValueField(.mouseEventClickState, value: clickState)
                 }
                 
-                cgEvent.flags = CGEventFlags(rawValue: ev.flags)
+                cgEvent.flags = CGEventFlags(rawValue: spec.flags)
                 cgEvent.setIntegerValueField(.eventSourceUserData, value: loopbackMagic)
                 cgEvent.post(tap: .cghidEventTap)
             }
@@ -130,61 +113,19 @@ public final class CGEventPoster: EventPosting {
     }
 
     static func effectiveScrollPointDelta(recorded: Int32, payload: CGFloat?) -> Int32 {
-        guard let payload else { return recorded }
-        let rounded = Int32(payload.rounded())
-        return rounded == 0 ? recorded : rounded
+        PlaybackScrollPlanner.effectivePointDelta(recorded: recorded, payload: payload)
     }
 
     static func effectiveScrollLineDelta(recorded: Int32, payload: Int32?) -> Int32 {
-        if let payload, payload != 0 { return payload }
-        guard recorded != 0 else { return 0 }
-        let scaled = Double(recorded) / 12.0
-        if abs(scaled) >= 1 {
-            return Int32(scaled.rounded())
-        }
-        return recorded > 0 ? 1 : -1
+        PlaybackScrollPlanner.effectiveLineDelta(recorded: recorded, payload: payload)
     }
 
     static func shouldUseLineScroll(payload: ScrollPayload?, lineY: Int32, lineX: Int32) -> Bool {
-        guard let payload else { return false }
-        guard !payload.isContinuous else { return false }
-        return (lineY != 0 || lineX != 0)
+        PlaybackScrollPlanner.shouldUseLineScroll(payload: payload, lineY: lineY, lineX: lineX)
     }
 
-    struct ScrollPlaybackSpec: Equatable {
-        var units: CGScrollEventUnit
-        var wheelY: Int32
-        var wheelX: Int32
-        var isContinuous: Bool
-        var phase: Int?
-        var momentumPhase: Int?
-    }
-
-    static func scrollPlaybackSpec(for event: RecordedEvent) -> ScrollPlaybackSpec {
-        let lineY = effectiveScrollLineDelta(recorded: event.scrollDeltaY, payload: event.scrollPayload?.lineDeltaY)
-        let lineX = effectiveScrollLineDelta(recorded: event.scrollDeltaX, payload: event.scrollPayload?.lineDeltaX)
-        let useLineUnits = shouldUseLineScroll(payload: event.scrollPayload, lineY: lineY, lineX: lineX)
-        if useLineUnits {
-            return ScrollPlaybackSpec(
-                units: .line,
-                wheelY: lineY,
-                wheelX: lineX,
-                isContinuous: false,
-                phase: nil,
-                momentumPhase: nil
-            )
-        }
-
-        let pointY = effectiveScrollPointDelta(recorded: event.scrollDeltaY, payload: event.scrollPayload?.deltaY)
-        let pointX = effectiveScrollPointDelta(recorded: event.scrollDeltaX, payload: event.scrollPayload?.deltaX)
-        return ScrollPlaybackSpec(
-            units: .pixel,
-            wheelY: pointY,
-            wheelX: pointX,
-            isContinuous: event.scrollPayload?.isContinuous ?? false,
-            phase: event.scrollPayload?.phase,
-            momentumPhase: event.scrollPayload?.momentumPhase
-        )
+    static func scrollPlaybackSpec(for event: RecordedEvent) -> PlaybackScrollSpec {
+        PlaybackScrollPlanner.spec(for: event)
     }
 
     private static func makeScrollEventSource(loopbackMagic: Int64) -> CGEventSource? {
@@ -231,6 +172,19 @@ public final class CGEventPoster: EventPosting {
     }
 }
 
+private extension PlaybackMouseButton {
+    var cgMouseButton: CGMouseButton {
+        switch self {
+        case .left:
+            return .left
+        case .right:
+            return .right
+        case .other(let buttonNumber):
+            return CGMouseButton(rawValue: UInt32(buttonNumber)) ?? .center
+        }
+    }
+}
+
 public final class MouseKeyboardSynthesizer {
     private let poster: EventPosting
 
@@ -240,5 +194,28 @@ public final class MouseKeyboardSynthesizer {
 
     public func synthesize(_ event: RecordedEvent, at point: CGPoint) {
         poster.post(event, at: point)
+    }
+}
+
+public final class LockedEventPoster: @unchecked Sendable {
+    private let lock = OSAllocatedUnfairLock()
+    private let synthesizer: MouseKeyboardSynthesizer
+
+    public init(synthesizer: MouseKeyboardSynthesizer = MouseKeyboardSynthesizer()) {
+        self.synthesizer = synthesizer
+    }
+
+    public func post(_ event: RecordedEvent, at point: CGPoint) {
+        lock.withLock {
+            synthesizer.synthesize(event, at: point)
+        }
+    }
+}
+
+public extension EventPosterClient {
+    static func live(poster: LockedEventPoster = LockedEventPoster()) -> EventPosterClient {
+        EventPosterClient { event, point in
+            poster.post(event, at: point)
+        }
     }
 }

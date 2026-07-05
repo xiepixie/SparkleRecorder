@@ -7,10 +7,9 @@ struct MiniWaveform: View {
 
     var body: some View {
         GeometryReader { geo in
-            let w = geo.size.width
             let total = events.last?.time ?? 0
             let dur = total > 0 ? total : 1
-            let bars = sampleEvents(maxBars: 60, width: w, dur: dur)
+            let bars = WaveformProjection.timedBars(from: events, maxBars: 60, duration: dur)
 
             Canvas { context, size in
                 let trackHeight = size.height * 0.5
@@ -29,7 +28,7 @@ struct MiniWaveform: View {
                     let barWidth: CGFloat = bar.isImpact ? 2 : 1.2
                     let barHeight = bar.isImpact ? size.height * 0.82 : size.height * 0.42
                     let rect = CGRect(
-                        x: min(max(0, bar.x), max(0, size.width - barWidth)),
+                        x: min(max(0, CGFloat(bar.positionFraction) * size.width), max(0, size.width - barWidth)),
                         y: (size.height - barHeight) / 2,
                         width: barWidth,
                         height: barHeight
@@ -41,23 +40,6 @@ struct MiniWaveform: View {
                 }
             }
         }
-    }
-
-    struct Bar { let x: CGFloat; let kind: RecordedEvent.Kind; let isImpact: Bool }
-
-    func sampleEvents(maxBars: Int, width: CGFloat, dur: TimeInterval) -> [Bar] {
-        guard !events.isEmpty else { return [] }
-        let n = min(events.count, maxBars)
-        let stride = max(1, events.count / n)
-        var result: [Bar] = []
-        var i = 0
-        while i < events.count {
-            let ev = events[i]
-            let x = CGFloat(ev.time / dur) * width
-            result.append(Bar(x: x, kind: ev.kind, isImpact: Brand.isImpact(ev.kind)))
-            i += stride
-        }
-        return result
     }
 
     func color(for kind: RecordedEvent.Kind) -> Color {

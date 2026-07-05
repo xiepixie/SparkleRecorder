@@ -72,12 +72,7 @@ enum Brand {
 
     /// Whether an event kind is an "impact" (taller tick) vs a move.
     static func isImpact(_ kind: RecordedEvent.Kind) -> Bool {
-        switch kind {
-        case .mouseMoved, .leftMouseDragged, .rightMouseDragged, .otherMouseDragged:
-            return false
-        default:
-            return true
-        }
+        WaveformProjection.isImpact(kind)
     }
 
     /// The one spring used for state changes app-wide — consistent motion.

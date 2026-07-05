@@ -4,92 +4,48 @@ import SparkleRecorderCore
 
 struct TargetCrosshairView: View {
     @ObservedObject var state: OverlayState
-    
+
     @State private var pulseScale: CGFloat = 0.8
     @State private var pulseOpacity: Double = 0.8
     @State private var lineDashPhase: CGFloat = 0
-    
+
     @State private var activeDrag: ActiveDragEdit?
     @State private var confirmFlashActionID: UUID?
     @State private var confirmFlash: Bool = false
     @State private var flashPoint: CGPoint? = nil
     @State private var hoveredActionID: UUID?
     @State private var hoveredHandle: DragHandle?
-    
+
     private var actions: [RelativePreviewAction] { state.actions }
-    
-    func getDisplayStartPoint(for action: RelativePreviewAction) -> CGPoint? {
-        if action.kind.previewsPointSequence {
-            return getDisplayPath(for: action).first
+
+    private func previewEdit(for action: RelativePreviewAction) -> PreviewPathEdit? {
+        guard let drag = activeDrag, drag.actionID == action.id else { return nil }
+        switch drag.handle {
+        case .start:
+            return .start(drag.clampedTranslation)
+        case .end:
+            return .end(drag.clampedTranslation)
+        case .body:
+            return .body(drag.clampedTranslation)
+        case .point(let pointIndex):
+            return .point(index: pointIndex, translation: drag.clampedTranslation)
         }
-        guard let pt = action.selectedPoint else { return nil }
-        if let drag = activeDrag, drag.actionID == action.id {
-            switch drag.handle {
-            case .start, .body:
-                return pt + drag.clampedTranslation
-            case .end, .point(_):
-                return pt
-            }
-        }
-        return pt
     }
-    
-    func getDisplayEndPoint(for action: RelativePreviewAction) -> CGPoint? {
-        if action.kind.previewsPointSequence {
-            return getDisplayPath(for: action).last
-        }
-        guard let endPt = action.dragPath.last else { return action.selectedPoint }
-        if let drag = activeDrag, drag.actionID == action.id {
-            switch drag.handle {
-            case .end, .body:
-                return endPt + drag.clampedTranslation
-            case .start, .point(_):
-                return endPt
-            }
-        }
-        return endPt
+
+    private func displayGeometry(for action: RelativePreviewAction) -> PreviewPathGeometry {
+        let edit = previewEdit(for: action)
+        return PreviewPathProjector.geometry(
+            dragPath: action.dragPath,
+            selectedPoint: action.selectedPoint,
+            previewsPointSequence: action.kind.previewsPointSequence,
+            edit: edit
+        )
     }
-    
-    func getDisplayPath(for action: RelativePreviewAction) -> [CGPoint] {
-        guard action.dragPath.count > 1 else { return [] }
-        if let drag = activeDrag, drag.actionID == action.id {
-            switch drag.handle {
-            case .start:
-                if action.kind.previewsPointSequence {
-                    return action.dragPath
-                }
-                if let start = action.selectedPoint ?? action.dragPath.first, let end = action.dragPath.last {
-                    let newStart = start + drag.clampedTranslation
-                    return action.dragPath.map {
-                        conformPathPoint(pt: $0, oldStart: start, oldEnd: end, newStart: newStart, newEnd: end)
-                    }
-                }
-            case .end:
-                if action.kind.previewsPointSequence {
-                    return action.dragPath
-                }
-                if let start = action.selectedPoint ?? action.dragPath.first, let end = action.dragPath.last {
-                    let newEnd = end + drag.clampedTranslation
-                    return action.dragPath.map {
-                        conformPathPoint(pt: $0, oldStart: start, oldEnd: end, newStart: start, newEnd: newEnd)
-                    }
-                }
-            case .body:
-                return action.dragPath.map { $0 + drag.clampedTranslation }
-            case .point(let pointIndex):
-                guard action.dragPath.indices.contains(pointIndex) else { return action.dragPath }
-                return action.dragPath.enumerated().map { index, point in
-                    index == pointIndex ? point + drag.clampedTranslation : point
-                }
-            }
-        }
-        return action.dragPath
-    }
-    
+
     private func coordinateString(_ pt: CGPoint) -> String {
         return "(\(Int(pt.x.rounded())), \(Int(pt.y.rounded())))"
     }
-    
+
     @ViewBuilder
     private func tooltipView(for displayPt: CGPoint) -> some View {
         let screenPt = {
@@ -98,7 +54,7 @@ struct TargetCrosshairView: View {
             }
             return displayPt
         }()
-        
+
         Text(coordinateString(screenPt))
             .font(.system(size: 10, weight: .bold, design: .monospaced))
             .foregroundStyle(.white)
@@ -109,52 +65,28 @@ struct TargetCrosshairView: View {
             .offset(y: -36)
             .fixedSize()
     }
-    
-    func conformPathPoint(pt: CGPoint, oldStart: CGPoint, oldEnd: CGPoint, newStart: CGPoint, newEnd: CGPoint) -> CGPoint {
-        let mainVector = CGPoint(x: oldEnd.x - oldStart.x, y: oldEnd.y - oldStart.y)
-        let newVector = CGPoint(x: newEnd.x - newStart.x, y: newEnd.y - newStart.y)
-        
-        let oldLen2 = mainVector.x * mainVector.x + mainVector.y * mainVector.y
-        guard oldLen2 > 0.001 else {
-            let dx = newStart.x - oldStart.x
-            let dy = newStart.y - oldStart.y
-            return CGPoint(x: pt.x + dx, y: pt.y + dy)
-        }
-        
-        let mainVectorPerp = CGPoint(x: -mainVector.y, y: mainVector.x)
-        let newVectorPerp = CGPoint(x: -newVector.y, y: newVector.x)
-        
-        let dx = pt.x - oldStart.x
-        let dy = pt.y - oldStart.y
-        
-        let u = (dx * mainVector.x + dy * mainVector.y) / oldLen2
-        let v = (dx * mainVectorPerp.x + dy * mainVectorPerp.y) / oldLen2
-        
-        return CGPoint(
-            x: newStart.x + u * newVector.x + v * newVectorPerp.x,
-            y: newStart.y + u * newVector.y + v * newVectorPerp.y
-        )
-    }
-    
+
     var body: some View {
+        let actionGeometries = Dictionary(uniqueKeysWithValues: actions.map { ($0.id, displayGeometry(for: $0)) })
+
         GeometryReader { geometry in
             ZStack(alignment: .topLeading) {
                 // 1. Connection dashed path in sequential order
                 Path { path in
                 var lastPt: CGPoint? = nil
                 for action in actions {
-                    let startPt = getDisplayStartPoint(for: action)
+                    let startPt = actionGeometries[action.id]?.startPoint
                     if let start = startPt {
                         if let last = lastPt {
                             path.move(to: last)
                             path.addLine(to: start)
                         }
-                        lastPt = getDisplayEndPoint(for: action)
+                        lastPt = actionGeometries[action.id]?.endPoint
                     }
                 }
             }
             .stroke(Color.primary.opacity(0.35), style: StrokeStyle(lineWidth: 1.5, lineCap: .round, lineJoin: .round, dash: [4, 4]))
-            
+
             // 2. Ripple animation overlay
             if let fPt = flashPoint {
                 Circle()
@@ -162,7 +94,7 @@ struct TargetCrosshairView: View {
                     .frame(width: confirmFlash ? 16 : 48, height: confirmFlash ? 16 : 48)
                     .position(fPt)
             }
-            
+
 	            // 3. Render each action's markers
 	            ForEach(actions) { action in
 	                if let region = action.searchRegion {
@@ -176,7 +108,7 @@ struct TargetCrosshairView: View {
 	                        .position(x: region.midX, y: region.midY)
 	                        .allowsHitTesting(false)
 	                }
-	                
+
 	                if let observed = action.observedFrame {
 	                    RoundedRectangle(cornerRadius: 4)
 	                        .stroke(action.themeColor.opacity(0.95), lineWidth: 1.5)
@@ -188,7 +120,7 @@ struct TargetCrosshairView: View {
 	                        .position(x: observed.midX, y: observed.midY)
 	                        .allowsHitTesting(false)
 	                }
-	                
+
 	                if let fallback = action.fallbackPoint {
 	                    Image(systemName: "smallcircle.filled.circle")
 	                        .font(.system(size: 13, weight: .bold))
@@ -196,16 +128,16 @@ struct TargetCrosshairView: View {
 	                        .shadow(color: .black.opacity(0.3), radius: 2)
 	                        .position(fallback)
 	                        .allowsHitTesting(false)
-	                }
-	                
-	                // Drag path
-	                let displayPath = getDisplayPath(for: action)
-                if action.kind.canPreviewPath, displayPath.count > 1 {
+		                }
+
+		                // Drag path
+		                let displayPath = actionGeometries[action.id]?.path ?? []
+	                if action.kind.canPreviewPath, displayPath.count > 1 {
                     Path { path in
                         path.addLines(displayPath)
                     }
                     .stroke(Color.black.opacity(0.3), lineWidth: 3.5)
-                    
+
                     Path { path in
                         path.addLines(displayPath)
                     }
@@ -213,7 +145,7 @@ struct TargetCrosshairView: View {
                         action.themeColor,
                         style: StrokeStyle(lineWidth: 2.2, lineCap: .round, lineJoin: .round, miterLimit: 10, dash: [6, 4], dashPhase: lineDashPhase)
                     )
-                    
+
                     Path { path in
                         path.addLines(displayPath)
                     }
@@ -237,14 +169,14 @@ struct TargetCrosshairView: View {
                             .onEnded { value in
                                 let finalTranslation = value.translation.clamped(to: 800)
                                 activeDrag = nil
-                                
+
                                 let distance = hypot(finalTranslation.width, finalTranslation.height)
                                 guard distance >= 0.5 else { return }
-                                
+
                                 CoordinatePreviewOverlay.shared.onDragPathEnded?(action.id, finalTranslation.width, finalTranslation.height)
                             }
                     )
-                    
+
                     if action.kind.editsPathTarget {
                         if let startPt = displayPath.first {
                             Circle()
@@ -253,20 +185,20 @@ struct TargetCrosshairView: View {
                                 .shadow(color: .black.opacity(0.3), radius: 2)
                                 .position(startPt)
                         }
-                        
-                        if let endPt = displayPath.last {
-                            let showArrow: Bool = {
-                                if let startPt = getDisplayStartPoint(for: action) {
-                                    let dx = endPt.x - startPt.x
-                                    let dy = endPt.y - startPt.y
-                                    return (dx * dx + dy * dy) > 225
+
+	                        if let endPt = displayPath.last {
+	                            let showArrow: Bool = {
+	                                if let startPt = actionGeometries[action.id]?.startPoint {
+	                                    let dx = endPt.x - startPt.x
+	                                    let dy = endPt.y - startPt.y
+	                                    return (dx * dx + dy * dy) > 225
                                 }
                                 return true
-                            }()
-                            
-                            if showArrow, let displayEndPt = getDisplayEndPoint(for: action) {
-                                let isCurrentDrag = (activeDrag?.actionID == action.id && activeDrag?.handle == .end)
-                                
+	                            }()
+
+	                            if showArrow, let displayEndPt = actionGeometries[action.id]?.endPoint {
+	                                let isCurrentDrag = (activeDrag?.actionID == action.id && activeDrag?.handle == .end)
+
                                 Image(systemName: "arrowtriangle.down.fill")
                                     .resizable()
                                     .aspectRatio(contentMode: .fit)
@@ -299,12 +231,12 @@ struct TargetCrosshairView: View {
                                             .onEnded { value in
                                                 let finalTranslation = value.translation.clamped(to: 800)
                                                 activeDrag = nil
-                                                
+
                                                 let distance = hypot(finalTranslation.width, finalTranslation.height)
                                                 guard distance >= 0.5 else { return }
-                                                
+
                                                 CoordinatePreviewOverlay.shared.onDragEndPointEnded?(action.id, finalTranslation.width, finalTranslation.height)
-                                                
+
                                                 // Trigger ripple
                                                 flashPoint = endPt + finalTranslation
                                                 confirmFlashActionID = action.id
@@ -375,31 +307,31 @@ struct TargetCrosshairView: View {
                         }
                     }
                 }
-                
-                // Targets
-                if !action.kind.previewsPointSequence, let pt = action.selectedPoint, let displayPt = getDisplayStartPoint(for: action) {
+
+	                // Targets
+	                if !action.kind.previewsPointSequence, let pt = action.selectedPoint, let displayPt = actionGeometries[action.id]?.startPoint {
                     let isCurrentDrag = (activeDrag?.actionID == action.id && activeDrag?.handle == .start)
-                    
+
                     ZStack {
                         // Current Drag Tooltip
                         if isCurrentDrag, activeDrag != nil {
                             tooltipView(for: displayPt)
                         }
-                        
+
                         Circle()
                             .stroke(action.themeColor.opacity(0.8), lineWidth: 1.5)
                             .frame(width: 24, height: 24)
                             .scaleEffect(isCurrentDrag ? 1.25 : pulseScale)
                             .opacity(isCurrentDrag ? 0.3 : pulseOpacity)
-                        
+
                         Circle()
                             .stroke(action.themeColor, lineWidth: 1.5)
                             .frame(width: 12, height: 12)
-                        
+
                         Circle()
                             .fill(action.themeColor)
                             .frame(width: 3.5, height: 3.5)
-                        
+
                         Rectangle()
                             .fill(action.themeColor.opacity(0.6))
                             .frame(width: 16, height: 1)
@@ -439,12 +371,12 @@ struct TargetCrosshairView: View {
                             .onEnded { value in
                                 let finalTranslation = value.translation.clamped(to: 800)
                                 activeDrag = nil
-                                
+
                                 let distance = hypot(finalTranslation.width, finalTranslation.height)
                                 guard distance >= 0.5 else { return }
-                                
+
                                 CoordinatePreviewOverlay.shared.onDragStartPointEnded?(action.id, finalTranslation.width, finalTranslation.height)
-                                
+
                                 // Trigger ripple
                                 flashPoint = pt + finalTranslation
                                 confirmFlashActionID = action.id
@@ -482,7 +414,7 @@ struct TargetCrosshairView: View {
             }
         }
     }
-    
+
     func arrowRotation(for path: [CGPoint]) -> Angle {
         guard path.count >= 2 else { return .zero }
         let p1 = path[path.count - 2]

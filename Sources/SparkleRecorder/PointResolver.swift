@@ -4,7 +4,7 @@ import CoreGraphics
 import AppKit
 #endif
 
-public enum CoordinateMode: String, Codable {
+public enum CoordinateMode: String, Codable, Sendable {
     /// Plays macro strictly with absolute screen coordinates.
     case screenAbsolute
     
@@ -14,7 +14,7 @@ public enum CoordinateMode: String, Codable {
     case boundWindowOffset
 }
 
-public struct RectValue: Codable, Equatable {
+public struct RectValue: Codable, Equatable, Sendable {
     public var x: CGFloat
     public var y: CGFloat
     public var width: CGFloat
@@ -28,7 +28,7 @@ public struct RectValue: Codable, Equatable {
     }
 }
 
-public struct PlaybackSurface: Codable, Equatable {
+public struct PlaybackSurface: Codable, Equatable, Sendable {
     public var appName: String?
     public var bundleIdentifier: String?
     public var windowTitle: String?
@@ -59,7 +59,7 @@ public struct PlaybackSurface: Codable, Equatable {
     }
 }
 
-public struct PlaybackContext {
+public struct PlaybackContext: Sendable {
     public var surfaces: [String: PlaybackSurface]
     public var currentSurfaceFrames: [String: RectValue]
     public var currentContentFrames: [String: RectValue]
@@ -84,7 +84,7 @@ public struct PlaybackContext {
     }
 }
 
-public enum PointResolveError: Error {
+public enum PointResolveError: Error, Sendable {
     case missingSurface(String)
     case missingWindowFrame(String)
     case missingWindowLocalPoint
@@ -93,7 +93,7 @@ public enum PointResolveError: Error {
     case locatorOnlyRequiresLocatorEngine
 }
 
-public struct PointResolver {
+public struct PointResolver: Sendable {
     public init() {}
     
     public func resolve(_ event: RecordedEvent, context: PlaybackContext) -> Result<CGPoint, PointResolveError> {

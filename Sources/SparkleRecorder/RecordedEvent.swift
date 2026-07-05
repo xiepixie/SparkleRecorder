@@ -1,25 +1,25 @@
 import Foundation
 import CoreGraphics
 
-public enum CoordinateBinding: String, Codable {
+public enum CoordinateBinding: String, Codable, Sendable {
     case targetWindow
     case globalScreen
     case unbound
 }
 
-public enum CoordinateStrategy: String, Codable {
+public enum CoordinateStrategy: String, Codable, Sendable {
     case windowLocalPreferred
     case normalizedPreferred
     case absoluteOnly
     case locatorOnly
 }
 
-public enum LocatorFallbackPolicy: String, Codable {
+public enum LocatorFallbackPolicy: String, Codable, Sendable {
     case fail
     case allowCoordinateFallback
 }
 
-public struct BehaviorGroupID: Codable, Equatable, Hashable {
+public struct BehaviorGroupID: Codable, Equatable, Hashable, Sendable {
     public var rawValue: UUID
     
     public init(_ rawValue: UUID = UUID()) {
@@ -27,7 +27,7 @@ public struct BehaviorGroupID: Codable, Equatable, Hashable {
     }
 }
 
-public struct PointValue: Codable, Equatable {
+public struct PointValue: Codable, Equatable, Sendable {
     public var x: CGFloat
     public var y: CGFloat
     
@@ -37,12 +37,12 @@ public struct PointValue: Codable, Equatable {
     }
 }
 
-public enum TextMatchMode: String, Codable, Equatable {
+public enum TextMatchMode: String, Codable, Equatable, Sendable {
     case contains
     case exact
 }
 
-public struct TextAnchor: Codable, Equatable {
+public struct TextAnchor: Codable, Equatable, Sendable {
     public var text: String
     public var matchMode: TextMatchMode
     public var observedFrame: RectValue
@@ -76,7 +76,7 @@ public struct TextAnchor: Codable, Equatable {
     }
 }
 
-public struct ScrollPayload: Codable, Equatable {
+public struct ScrollPayload: Codable, Equatable, Sendable {
     public var deltaX: CGFloat
     public var deltaY: CGFloat
     public var lineDeltaX: Int32?
@@ -110,8 +110,8 @@ public struct ScrollPayload: Codable, Equatable {
     }
 }
 
-public struct RecordedEvent: Codable, Equatable {
-    public enum Kind: Int, Codable {
+public struct RecordedEvent: Codable, Equatable, Sendable {
+    public enum Kind: Int, Codable, Sendable {
         case leftMouseDown      = 1
         case leftMouseUp        = 2
         case rightMouseDown     = 3
@@ -146,6 +146,10 @@ public struct RecordedEvent: Codable, Equatable {
             case .keyDown, .keyUp, .flagsChanged: return true
             default: return false
             }
+        }
+
+        public var postsInputEvent: Bool {
+            isMouse || isKey
         }
     }
 
@@ -251,7 +255,7 @@ public struct RecordedEvent: Codable, Equatable {
     }
 }
 
-public struct Macro: Codable {
+public struct Macro: Codable, Sendable {
     public var events: [RecordedEvent]
     public var createdAt: Date
     public var version: Int = 1

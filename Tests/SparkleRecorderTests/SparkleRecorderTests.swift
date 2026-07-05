@@ -1,6 +1,7 @@
 import Testing
 import Foundation
 import CoreGraphics
+import os
 @testable import SparkleRecorderCore
 
 @Suite("SparkleRecorder Tests")
@@ -90,23 +91,19 @@ struct SparkleRecorderTests {
     
     @Test("Synthesizer Dry Run")
     func synthesizerDryRun() {
-        class MockPoster: EventPosting {
-            var posted: [(RecordedEvent, CGPoint)] = []
-            func post(_ event: RecordedEvent, at point: CGPoint) {
-                posted.append((event, point))
-            }
+        let recorder = PostedInputRecorder()
+        let client = EventPosterClient { event, point in
+            recorder.append(event: event, point: point)
         }
-        
-        let poster = MockPoster()
-        let synth = MouseKeyboardSynthesizer(poster: poster)
-        
+
         let ev = RecordedEvent.make(.leftMouseDown, time: 0.1, x: 50, y: 60)
-        synth.synthesize(ev, at: CGPoint(x: 500, y: 600))
-        
-        #expect(poster.posted.count == 1)
-        #expect(poster.posted[0].0.kind == .leftMouseDown)
-        #expect(poster.posted[0].1.x == 500)
-        #expect(poster.posted[0].1.y == 600)
+        client.post(ev, CGPoint(x: 500, y: 600))
+
+        let posted = recorder.snapshot()
+        #expect(posted.count == 1)
+        #expect(posted[0].event.kind == .leftMouseDown)
+        #expect(posted[0].point.x == 500)
+        #expect(posted[0].point.y == 600)
     }
     
     @Test("Point Resolver")
@@ -455,22 +452,22 @@ struct SparkleRecorderTests {
     @Test("Scroll Playback Delta Keeps Recorded Wheel Amount")
     func scrollPlaybackDeltaKeepsRecordedWheelAmount() {
         #expect(RecordedEvent.Kind.scrollWheel.isMouse)
-        #expect(CGEventPoster.effectiveScrollPointDelta(recorded: -12, payload: 0) == -12)
-        #expect(CGEventPoster.effectiveScrollPointDelta(recorded: 18, payload: 0.2) == 18)
-        #expect(CGEventPoster.effectiveScrollPointDelta(recorded: -12, payload: -4.6) == -5)
-        #expect(CGEventPoster.effectiveScrollPointDelta(recorded: 0, payload: 7.0) == 7)
-        #expect(CGEventPoster.effectiveScrollLineDelta(recorded: -12, payload: nil) == -1)
-        #expect(CGEventPoster.shouldUseLineScroll(
+        #expect(PlaybackScrollPlanner.effectivePointDelta(recorded: -12, payload: 0) == -12)
+        #expect(PlaybackScrollPlanner.effectivePointDelta(recorded: 18, payload: 0.2) == 18)
+        #expect(PlaybackScrollPlanner.effectivePointDelta(recorded: -12, payload: -4.6) == -5)
+        #expect(PlaybackScrollPlanner.effectivePointDelta(recorded: 0, payload: 7.0) == 7)
+        #expect(PlaybackScrollPlanner.effectiveLineDelta(recorded: -12, payload: nil) == -1)
+        #expect(PlaybackScrollPlanner.shouldUseLineScroll(
             payload: ScrollPayload(deltaX: 0, deltaY: 0, lineDeltaX: 0, lineDeltaY: -1, phase: 0, isContinuous: false),
             lineY: -1,
             lineX: 0
         ))
-        #expect(CGEventPoster.shouldUseLineScroll(
+        #expect(PlaybackScrollPlanner.shouldUseLineScroll(
             payload: ScrollPayload(deltaX: 0, deltaY: -12, lineDeltaX: 0, lineDeltaY: -1, phase: 0, isContinuous: false),
             lineY: -1,
             lineX: 0
         ))
-        #expect(!CGEventPoster.shouldUseLineScroll(
+        #expect(!PlaybackScrollPlanner.shouldUseLineScroll(
             payload: ScrollPayload(deltaX: 0, deltaY: -8, lineDeltaX: 0, lineDeltaY: -1, phase: 0, isContinuous: true),
             lineY: -1,
             lineX: 0
@@ -478,15 +475,34 @@ struct SparkleRecorderTests {
 
         var wheel = RecordedEvent.make(.scrollWheel, time: 0.1, x: 100, y: 100, scrollDeltaY: -12, scrollDeltaX: 0)
         wheel.scrollPayload = ScrollPayload(deltaX: 0, deltaY: 0, lineDeltaX: 0, lineDeltaY: -1, phase: 0, isContinuous: false)
-        let wheelSpec = CGEventPoster.scrollPlaybackSpec(for: wheel)
+        let wheelSpec = PlaybackScrollPlanner.spec(for: wheel)
         #expect(wheelSpec.units == .line)
         #expect(wheelSpec.wheelY == -1)
 
         var trackpad = RecordedEvent.make(.scrollWheel, time: 0.1, x: 100, y: 100, scrollDeltaY: -8, scrollDeltaX: 0)
         trackpad.scrollPayload = ScrollPayload(deltaX: 0, deltaY: -8, lineDeltaX: 0, lineDeltaY: -1, phase: 1, isContinuous: true)
-        let trackpadSpec = CGEventPoster.scrollPlaybackSpec(for: trackpad)
+        let trackpadSpec = PlaybackScrollPlanner.spec(for: trackpad)
         #expect(trackpadSpec.units == .pixel)
         #expect(trackpadSpec.wheelY == -8)
         #expect(trackpadSpec.isContinuous)
+    }
+}
+
+private struct PostedInput: Equatable, Sendable {
+    var event: RecordedEvent
+    var point: CGPoint
+}
+
+private final class PostedInputRecorder: @unchecked Sendable {
+    private let lock = OSAllocatedUnfairLock<[PostedInput]>(initialState: [])
+
+    func append(event: RecordedEvent, point: CGPoint) {
+        lock.withLock {
+            $0.append(PostedInput(event: event, point: point))
+        }
+    }
+
+    func snapshot() -> [PostedInput] {
+        lock.withLock { $0 }
     }
 }

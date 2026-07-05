@@ -80,20 +80,24 @@ struct EditorView: View {
     @AppStorage("showOverlayPreview") var showOverlayPreview = true
 
     @State private var cachedRows: [ActionRow] = []
+    @State private var cachedTimelineSamples: [TimelineSampledEvent] = []
 
     var rows: [ActionRow] { cachedRows }
 
-    func updateCachedRows() {
-        var options = EventGroupingOptions()
-        options.disableGrouping = !smartMergeGestures
-        let list = EventGrouper(options: options).group(recorder.events, liveDuration: recorder.liveDuration)
-        cachedRows = list.enumerated().compactMap { idx, grp in
-            if hideMouseMoves && grp.kind == .mouseMove {
-                return nil
-            }
-            return ActionRow(group: grp)
+    @discardableResult
+    func updateCachedRows() -> [ActionRow] {
+        let list = ActionGroupProjection.groups(
+            from: recorder.events,
+            liveDuration: recorder.liveDuration,
+            hidesMouseMoves: hideMouseMoves,
+            smartMergeGestures: smartMergeGestures
+        ).map { group in
+            ActionRow(group: group)
         }
+        cachedRows = list
+        cachedTimelineSamples = TimelineProjection.sampleEvents(from: recorder.events)
         updatePreview()
+        return list
     }
 
     var body: some View {
@@ -145,13 +149,15 @@ struct EditorView: View {
                         },
                         onPickText: {
                             self.startPickingText()
-                        }
+                        },
+                        onRefreshRows: updateCachedRows
                     )
                     .frame(minWidth: 280, idealWidth: 310, maxWidth: 360)
 
                     VStack(spacing: 0) {
                         EditorTimeline(
-                            events: recorder.events,
+                            samples: cachedTimelineSamples,
+                            totalDuration: recorder.events.last?.time ?? 0,
                             groups: rows.map(\.group),
                             selection: $selection
                         )
@@ -160,8 +166,7 @@ struct EditorView: View {
                         ActionListView(
                             rows: rows,
                             selection: $selection,
-                            hideMouseMoves: hideMouseMoves,
-                            smartMergeGestures: smartMergeGestures
+                            onRefreshRows: updateCachedRows
                         )
                     }
                     .frame(minWidth: 420)
