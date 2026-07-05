@@ -187,12 +187,6 @@ struct LibraryMainView: View {
                     .padding(.bottom, 6)
                 }
             }
-
-            Divider().opacity(0.5)
-
-            LibraryFooter(controller: controller, state: state)
-                .padding(.horizontal, 8)
-                .padding(.vertical, 6)
         }
         .overlay(alignment: .bottom) {
             if !state.statusMessage.isEmpty {

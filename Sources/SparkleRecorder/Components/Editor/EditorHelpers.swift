@@ -25,8 +25,8 @@ func humanKindName(_ k: RecordedEvent.Kind) -> String {
     case .keyUp:             return NSLocalizedString("Key Up", comment: "")
     case .flagsChanged:      return NSLocalizedString("Modifier", comment: "")
     case .scrollWheel:       return NSLocalizedString("Scroll", comment: "")
-    case .waitForText:       return NSLocalizedString("Wait for text", comment: "")
-    case .verifyText:        return NSLocalizedString("Verify text", comment: "")
+    case .waitForText:       return NSLocalizedString("Wait Text", comment: "")
+    case .verifyText:        return NSLocalizedString("Verify Text", comment: "")
     }
 }
 
@@ -52,7 +52,7 @@ func actionKindColor(_ k: ActionGroupKind) -> Color {
     case .drag: return Brand.sigViolet
     case .scroll: return Brand.sigTeal
     case .keyPress, .keyHold, .keyRepeat, .shortcut, .modifierHold, .textInput: return Brand.sigBlue
-    case .waitForText: return Brand.sigAmber
+    case .waitForText, .waitForTextGone: return Brand.sigAmber
     case .verifyText: return Brand.sigViolet
     case .sequence: return Brand.sigAmber
     case .wait: return .secondary
@@ -71,6 +71,7 @@ func actionKindIcon(_ k: ActionGroupKind) -> String {
     case .scroll: return "arrow.up.and.down"
     case .keyPress, .keyHold, .keyRepeat, .shortcut, .modifierHold, .textInput: return "keyboard"
     case .waitForText: return "text.magnifyingglass"
+    case .waitForTextGone: return "text.badge.minus"
     case .verifyText: return "checkmark.seal"
     case .sequence: return "square.stack.3d.down.right"
     case .wait: return "clock"
@@ -93,7 +94,8 @@ func humanActionKindName(_ k: ActionGroupKind) -> String {
     case .shortcut: return NSLocalizedString("Shortcut", comment: "")
     case .modifierHold: return NSLocalizedString("Modifier Hold", comment: "")
     case .textInput: return NSLocalizedString("Text Input", comment: "")
-    case .waitForText: return NSLocalizedString("Wait For Text", comment: "")
+    case .waitForText: return NSLocalizedString("Wait Text", comment: "")
+    case .waitForTextGone: return NSLocalizedString("Wait Text Gone", comment: "")
     case .verifyText: return NSLocalizedString("Verify Text", comment: "")
     case .sequence: return NSLocalizedString("Behavior", comment: "")
     case .wait: return NSLocalizedString("Wait", comment: "")
@@ -150,7 +152,7 @@ extension ActionGroupKind {
     }
 
     var editsSemanticTextTarget: Bool {
-        self == .waitForText || self == .verifyText
+        self == .waitForText || self == .waitForTextGone || self == .verifyText
     }
 
     var canUseLocatorStrategy: Bool {
@@ -189,7 +191,7 @@ extension ActionGroupKind {
             return 6
         case .drag:
             return 3
-        case .waitForText, .verifyText, .scroll:
+        case .waitForText, .waitForTextGone, .verifyText, .scroll:
             return 1
         default:
             return 0
@@ -201,6 +203,9 @@ func actionWorkflowMessage(for group: ActionGroup, event: RecordedEvent?) -> Str
     if group.kind == .waitForText {
         return NSLocalizedString("Waits until the target text appears, then continues. It does not click.", comment: "")
     }
+    if group.kind == .waitForTextGone {
+        return NSLocalizedString("Waits until the target text disappears, then continues. It does not click.", comment: "")
+    }
     if group.kind == .verifyText {
         return NSLocalizedString("Checks the text condition once. Playback stops if the condition is not met.", comment: "")
     }
@@ -209,9 +214,9 @@ func actionWorkflowMessage(for group: ActionGroup, event: RecordedEvent?) -> Str
     }
     if group.kind.canUseLocatorStrategy && ((event?.coordinateStrategy == .locatorOnly) || group.textAnchor != nil) {
         if group.kind == .click {
-            return NSLocalizedString("Finds the target text, then clicks the center of the matched text box.", comment: "")
+            return NSLocalizedString("Waits for the target text up to the timeout, then clicks the matched text box.", comment: "")
         }
-        return NSLocalizedString("Finds the target text, then plays this action at the matched text box.", comment: "")
+        return NSLocalizedString("Waits for the target text up to the timeout, then plays this action at the matched text box.", comment: "")
     }
     if group.kind.editsPathTarget {
         return NSLocalizedString("Keeps the drag as one down-drag-up gesture; moving handles preserves the path shape.", comment: "")

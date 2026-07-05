@@ -200,6 +200,91 @@ struct SparkleRecorderTests {
         #expect(groups[0].clickCount == 3)
     }
 
+    @Test("Event Grouper Keeps Wait Between Repeated Clicks")
+    func eventGrouperKeepsWaitBetweenRepeatedClicks() {
+        let events = [
+            RecordedEvent.make(.leftMouseDown, time: 0.00, x: 100, y: 100, mouseButton: 0, clickCount: 1),
+            RecordedEvent.make(.leftMouseUp, time: 0.02, x: 100, y: 100, mouseButton: 0, clickCount: 1),
+            RecordedEvent.make(.leftMouseDown, time: 0.32, x: 100, y: 100, mouseButton: 0, clickCount: 1),
+            RecordedEvent.make(.leftMouseUp, time: 0.34, x: 100, y: 100, mouseButton: 0, clickCount: 1)
+        ]
+
+        let groups = EventGrouper().group(events)
+
+        #expect(groups.count == 3)
+        #expect(groups[0].kind == .click)
+        #expect(groups[1].kind == .wait)
+        #expect(abs(groups[1].duration - 0.30) < 0.0001)
+        #expect(groups[2].kind == .click)
+    }
+
+    @Test("Event Grouper Keeps Wait Between Point Clicks")
+    func eventGrouperKeepsWaitBetweenPointClicks() {
+        let events = [
+            RecordedEvent.make(.leftMouseDown, time: 0.00, x: 100, y: 100, mouseButton: 0, clickCount: 1),
+            RecordedEvent.make(.leftMouseUp, time: 0.02, x: 100, y: 100, mouseButton: 0, clickCount: 1),
+            RecordedEvent.make(.leftMouseDown, time: 0.25, x: 180, y: 120, mouseButton: 0, clickCount: 1),
+            RecordedEvent.make(.leftMouseUp, time: 0.27, x: 180, y: 120, mouseButton: 0, clickCount: 1)
+        ]
+
+        let groups = EventGrouper().group(events)
+
+        #expect(groups.count == 3)
+        #expect(groups[0].kind == .click)
+        #expect(groups[1].kind == .wait)
+        #expect(groups[2].kind == .click)
+    }
+
+    @Test("Event Grouper Does Not Merge Text Click With Coordinate Clicks")
+    func eventGrouperDoesNotMergeTextClickWithCoordinateClicks() throws {
+        let anchor = TextAnchor(
+            text: "Confirm",
+            observedFrame: RectValue(x: 90, y: 90, width: 80, height: 24),
+            searchRegion: RectValue(x: 70, y: 70, width: 140, height: 80),
+            coordinateFallback: PointValue(x: 130, y: 102)
+        )
+        var textDown = RecordedEvent.make(.leftMouseDown, time: 0.00, x: 130, y: 102, mouseButton: 0, clickCount: 1)
+        textDown.coordinateStrategy = .locatorOnly
+        textDown.locatorFallbackPolicy = .fail
+        textDown.textAnchor = anchor
+        var textUp = RecordedEvent.make(.leftMouseUp, time: 0.02, x: 130, y: 102, mouseButton: 0, clickCount: 1)
+        textUp.coordinateStrategy = .locatorOnly
+        textUp.locatorFallbackPolicy = .fail
+        textUp.textAnchor = anchor
+
+        let events = [
+            textDown,
+            textUp,
+            RecordedEvent.make(.leftMouseDown, time: 0.07, x: 180, y: 120, mouseButton: 0, clickCount: 1),
+            RecordedEvent.make(.leftMouseUp, time: 0.09, x: 180, y: 120, mouseButton: 0, clickCount: 1)
+        ]
+
+        let groups = EventGrouper().group(events)
+
+        #expect(groups.count == 2)
+        #expect(groups[0].kind == .click)
+        #expect(groups[0].textAnchor?.text == "Confirm")
+        #expect(groups[1].kind == .click)
+        #expect(groups[1].textAnchor == nil)
+    }
+
+    @Test("Event Grouper Labels Wait Text Gone")
+    func eventGrouperLabelsWaitTextGone() throws {
+        var event = RecordedEvent.make(.waitForText, time: 1)
+        event.textAnchor = TextAnchor(
+            text: "Loading",
+            observedFrame: RectValue(x: 0, y: 0, width: 120, height: 24)
+        )
+        event.textTimeout = 5
+        event.verifyMustExist = false
+
+        let group = try #require(EventGrouper().group([event]).first)
+
+        #expect(group.kind == .waitForTextGone)
+        #expect(group.summary == "Wait Text Gone: Loading")
+        #expect(group.verifyMustExist == false)
+    }
+
     @Test("Event Grouper Strict Continuity")
     func eventGrouperStrictContinuity() {
         let grouper = EventGrouper()

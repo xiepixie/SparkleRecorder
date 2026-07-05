@@ -40,9 +40,13 @@ This index records which docs are active plans, which are implementation referen
 | `MacroEditorUserGuide.zh-Hans.md` | User-facing editor guide | Active user doc. Does not cover future FlowGraph UI yet. |
 | `RepositorySubmissionPlan.md` | Repository publication checklist | Archive/reference. Re-check before push. |
 | `automation-engine/` | Automation scheduling, dependency, reducer, resource, UI and testing plan | Active workstream. Phase 0 core contract is done; three-owner planning lives in `automation-engine/workstreams/`. |
+| `workflow-page-productization/` | Next-stage Workflow page, CLI-first AI interface, and two-owner productization plan | Active plan. Use this for the next phase where Engine/Runtime contracts feed a redesigned usable Workflow page. |
 
 ## Next Required Sequence
 
-1. Evaluate product-level scheduler launch integration such as `NSBackgroundActivityScheduler` or login item.
-2. Polish release-facing AutomationEngine documentation after product flows stabilize.
-3. Refresh product-facing docs after AutomationEngine UI stabilizes.
+1. Freeze the Workflow page product contract in `workflow-page-productization/`.
+2. Implement backend ready-for-ui notices for scheduler occurrences, resource waiting, timeout/retry, join policy, visual conditions, and CLI-first AI draft validation.
+3. Rebuild the Workflow UI from fixtures before live wiring.
+4. Evaluate product-level scheduler launch integration such as `NSBackgroundActivityScheduler` or login item.
+5. Polish release-facing AutomationEngine documentation after product flows stabilize.
+6. Refresh product-facing docs after AutomationEngine UI stabilizes.

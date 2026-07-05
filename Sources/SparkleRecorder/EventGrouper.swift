@@ -16,6 +16,7 @@ public enum ActionGroupKind: String, Codable, Sendable {
     case wait
     case mouseMove
     case waitForText
+    case waitForTextGone
     case verifyText
     case repeatedClick
     case multiPointClick
@@ -33,7 +34,8 @@ public struct EventGroupingOptions: Codable, Equatable, Sendable {
     public var scrollSegmentPositionTolerance: CGFloat = 180
     public var waitThreshold: TimeInterval = 0.200
     public var maxGestureDuration: TimeInterval = 30.0
-    /// Maximum gap between consecutive clicks to merge them into a multi-click (double/triple)
+    /// Maximum direct gap between clicks to merge them into a multi-click (double/triple).
+    /// A derived wait row always breaks click merging, even when the gap is shorter than this value.
     public var clickMergeGap: TimeInterval = 0.45
     /// Maximum distance between click positions to allow merging
     public var clickMergeDistance: CGFloat = 20
@@ -170,7 +172,7 @@ public struct EventGrouper: Sendable {
                 case .flagsChanged:
                     kind = .keyPress
                 case .waitForText:
-                    kind = .waitForText
+                    kind = ev.verifyMustExist == false ? .waitForTextGone : .waitForText
                 case .verifyText:
                     kind = .verifyText
                 }
@@ -514,18 +516,23 @@ public struct EventGrouper: Sendable {
                 name = String(format: NSLocalizedString("Move to (%d, %d)", comment: ""), Int(ev.x), Int(ev.y))
                 kind = .mouseMove
             } else if ev.kind == .waitForText {
+                let mustExist = ev.verifyMustExist ?? true
                 if let text = ev.textAnchor?.text, !text.isEmpty {
-                    name = String(format: NSLocalizedString("Wait for text: %@", comment: ""), text)
+                    name = mustExist
+                        ? String(format: NSLocalizedString("Wait Text: %@", comment: ""), text)
+                        : String(format: NSLocalizedString("Wait Text Gone: %@", comment: ""), text)
                 } else {
-                    name = NSLocalizedString("Wait for text", comment: "")
+                    name = mustExist
+                        ? NSLocalizedString("Wait Text", comment: "")
+                        : NSLocalizedString("Wait Text Gone", comment: "")
                 }
-                kind = .waitForText
+                kind = mustExist ? .waitForText : .waitForTextGone
             } else if ev.kind == .verifyText {
                 let mustExist = ev.verifyMustExist ?? true
                 if let text = ev.textAnchor?.text, !text.isEmpty {
-                    name = String(format: NSLocalizedString("Verify text: %@ (%@)", comment: ""), text, mustExist ? NSLocalizedString("Exists", comment: "") : NSLocalizedString("Not Exists", comment: ""))
+                    name = String(format: NSLocalizedString("Verify Text: %@ (%@)", comment: ""), text, mustExist ? NSLocalizedString("Exists", comment: "") : NSLocalizedString("Not Exists", comment: ""))
                 } else {
-                    name = NSLocalizedString("Verify text", comment: "")
+                    name = NSLocalizedString("Verify Text", comment: "")
                 }
                 kind = .verifyText
             } else {
@@ -784,23 +791,16 @@ public struct EventGrouper: Sendable {
         var i = 0
         while i < groups.count {
             let g = groups[i]
-            if g.kind == .click {
+            if isMergeableCoordinateClick(g) {
                 var merged = g
                 var count = max(1, g.clickCount)
                 var j = i + 1
-                // Look ahead: skip wait groups and merge subsequent clicks
+                // Look ahead and merge directly adjacent clicks. A visible wait
+                // row is a user-meaningful pause and must not be consumed into
+                // a double/triple click.
                 while j < groups.count {
                     let next = groups[j]
-                    if next.kind == .wait {
-                        // Check if the wait is short enough to still merge
-                        if next.duration <= options.clickMergeGap {
-                            j += 1
-                            continue
-                        } else {
-                            break
-                        }
-                    }
-                    if next.kind == .click, let sp1 = merged.startPoint, let sp2 = next.startPoint {
+                    if isMergeableCoordinateClick(next), let sp1 = merged.startPoint, let sp2 = next.startPoint {
                         guard merged.mouseButton == next.mouseButton else { break }
                         let dist = hypot(sp2.x - sp1.x, sp2.y - sp1.y)
                         let gap = next.startTime - merged.endTime
@@ -894,7 +894,7 @@ public struct EventGrouper: Sendable {
         var i = 0
         while i < groups.count {
             let first = groups[i]
-            guard first.kind == .click, first.startPoint != nil else {
+            guard isMergeableCoordinateClick(first), first.startPoint != nil else {
                 result.append(first)
                 i += 1
                 continue
@@ -904,7 +904,7 @@ public struct EventGrouper: Sendable {
             var j = i + 1
             while j < groups.count {
                 let next = groups[j]
-                guard next.kind == .click,
+                guard isMergeableCoordinateClick(next),
                       next.startPoint != nil,
                       next.startTime - mergedGroups.last!.endTime <= options.multiPointClickGap else {
                     break
@@ -939,6 +939,10 @@ public struct EventGrouper: Sendable {
             i = j
         }
         return result
+    }
+
+    private func isMergeableCoordinateClick(_ group: ActionGroup) -> Bool {
+        group.kind == .click && group.textAnchor == nil
     }
     
     private func aggregateScrollPayload(_ events: [RecordedEvent]) -> ScrollPayload? {
@@ -1142,8 +1146,8 @@ public struct EventGrouper: Sendable {
         case .keyUp:             return NSLocalizedString("Key Up", comment: "")
         case .flagsChanged:      return NSLocalizedString("Modifier", comment: "")
         case .scrollWheel:       return NSLocalizedString("Scroll", comment: "")
-        case .waitForText:       return NSLocalizedString("Wait for text", comment: "")
-        case .verifyText:        return NSLocalizedString("Verify text", comment: "")
+        case .waitForText:       return NSLocalizedString("Wait Text", comment: "")
+        case .verifyText:        return NSLocalizedString("Verify Text", comment: "")
         }
     }
 }

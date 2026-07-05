@@ -228,8 +228,7 @@ final class MacroLibrary: ObservableObject {
     func updateEvents(id: UUID, events: [RecordedEvent]) {
         mutate(id) {
             $0.events = events
-            $0.cachedDuration = events.last?.time ?? 0
-            $0.cachedEventCount = events.count
+            $0.refreshCachesFromEvents()
         }
         Task { try? await client.saveEvents(events, id) }
     }
@@ -295,8 +294,7 @@ final class MacroLibrary: ObservableObject {
             if let events = try? await client.loadEvents(id) {
                 var newCopy = copy
                 newCopy.events = events
-                newCopy.cachedDuration = src.duration
-                newCopy.cachedEventCount = src.eventCount
+                newCopy.refreshCachesFromEvents()
                 let finalCopy = newCopy
                 
                 if let idx = self.macros.firstIndex(where: { $0.id == id }) {

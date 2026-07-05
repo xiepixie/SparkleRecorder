@@ -114,17 +114,7 @@ struct MacroCard: View {
             } message: {
                 Text(NSLocalizedString("Multiplier between 0.1× and 10×.", comment: ""))
             }
-            .onDrag {
-                NSItemProvider(object: macro.id.uuidString as NSString)
-            }
-            .onDrop(of: [UTType.text], isTargeted: $dragOver) { providers in
-                providers.first?.loadObject(ofClass: NSString.self) { (item, _) in
-                    if let s = item as? String, let id = UUID(uuidString: s), id != macro.id {
-                        DispatchQueue.main.async { onDragMove(id, macro.id) }
-                    }
-                }
-                return true
-            }
+
     }
 
     private var cardHeight: CGFloat {
@@ -305,7 +295,7 @@ struct MacroCard: View {
             }
 
             // Tiny waveform
-            MiniWaveform(events: macro.events)
+            MiniWaveform(events: macro.events, bars: macro.waveformBars, duration: macro.duration)
                 .frame(height: 18)
 
             // Tags row (if any)

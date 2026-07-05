@@ -230,7 +230,7 @@ final class CoordinatePreviewOverlay {
                         if dx * dx + dy * dy <= 784 { return true } // 28^2
                     }
                     if action.kind.canPreviewPath,
-                       action.dragPath.count > 1 {
+                       !action.dragPath.isEmpty {
                         if action.kind.previewsPointSequence {
                             for point in action.dragPath {
                                 let dx = sx - point.x, dy = sy - point.y
@@ -240,7 +240,8 @@ final class CoordinatePreviewOverlay {
                             let dx = sx - endPt.x, dy = sy - endPt.y
                             if dx * dx + dy * dy <= 784 { return true }
                         }
-                        if distanceFromPoint(CGPoint(x: sx, y: sy), toPolyline: action.dragPath) <= 10 {
+                        if action.dragPath.count > 1,
+                           distanceFromPoint(CGPoint(x: sx, y: sy), toPolyline: action.dragPath) <= 10 {
                             return true
                         }
                     }

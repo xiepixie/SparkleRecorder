@@ -148,6 +148,10 @@ let package = Package(
                 "RecordingSurfaceRegistry.swift",
                 "RunEvidence.swift"
             ],
+            resources: [
+                .process("Localizable.xcstrings"),
+                .process("InfoPlist.xcstrings")
+            ],
             swiftSettings: [
                 .swiftLanguageMode(.v6)
             ]
@@ -216,6 +220,10 @@ let package = Package(
                 "SurfaceMatcher.swift",
                 "RecordingSurfaceRegistry.swift",
                 "RunEvidence.swift"
+            ],
+            resources: [
+                .process("Localizable.xcstrings"),
+                .process("InfoPlist.xcstrings")
             ]
         ),
         .testTarget(

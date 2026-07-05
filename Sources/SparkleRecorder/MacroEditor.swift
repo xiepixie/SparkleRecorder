@@ -43,6 +43,7 @@ final class EditorWindowController: NSWindowController, NSWindowDelegate {
 
 struct DragEditSession {
     let groupID: UUID
+    let group: ActionGroup
     let eventIndices: [Int]
     let snapshot: [RecordedEvent]
 }
@@ -86,6 +87,10 @@ struct EditorView: View {
 
     @discardableResult
     func updateCachedRows() -> [ActionRow] {
+        let selectedGroups = cachedRows.filter { selection.contains($0.id) }.map { $0.group }
+        let selectedIndices = selectedGroups.compactMap { $0.eventIndices.first }
+        let selectedWaits = selectedGroups.filter { $0.kind.isPassiveWait }.map { $0.endTime }
+
         let list = ActionGroupProjection.groups(
             from: recorder.events,
             liveDuration: recorder.liveDuration,
@@ -96,6 +101,24 @@ struct EditorView: View {
         }
         cachedRows = list
         cachedTimelineSamples = TimelineProjection.sampleEvents(from: recorder.events)
+
+        var newSelection = Set<UUID>()
+        for row in list {
+            if row.group.kind.isPassiveWait {
+                if selectedWaits.contains(where: { abs($0 - row.group.endTime) < 0.01 }) {
+                    newSelection.insert(row.id)
+                }
+            } else if let firstIdx = row.group.eventIndices.first, selectedIndices.contains(firstIdx) {
+                newSelection.insert(row.id)
+            }
+        }
+        
+        if newSelection != selection {
+            DispatchQueue.main.async {
+                self.selection = newSelection
+            }
+        }
+
         updatePreview()
         return list
     }
@@ -188,7 +211,6 @@ struct EditorView: View {
         .onChange(of: recorder.events) {
             guard !recorder.isRecording else { return }
             updateCachedRows()
-            updatePreview()
             controller.persistEdits()
         }
         .onChange(of: hideMouseMoves) {
@@ -258,6 +280,25 @@ struct EditorView: View {
                 inspTimeout = 10.0
                 inspVerifyMustExist = true
             }
+        } else if selection.count > 1 {
+            let textRows = textTargetRowsForCurrentSelection()
+            var firstTextEvent: RecordedEvent?
+            for row in textRows where firstTextEvent == nil {
+                for index in row.group.eventIndices where recorder.events.indices.contains(index) {
+                    let event = recorder.events[index]
+                    if event.textAnchor != nil || event.coordinateStrategy == .locatorOnly {
+                        firstTextEvent = event
+                        break
+                    }
+                }
+            }
+
+            inspTime = ""; inspX = ""; inspY = ""; inspEndX = ""; inspEndY = ""; inspKey = ""; inspFlags = 0
+            inspStrategy = .locatorOnly
+            inspOCRText = firstTextEvent?.textAnchor?.text ?? ""
+            inspFallbackPolicy = firstTextEvent?.locatorFallbackPolicy ?? .fail
+            inspTimeout = firstTextEvent?.textTimeout ?? 10.0
+            inspVerifyMustExist = firstTextEvent?.verifyMustExist ?? true
         } else {
             inspTime = ""; inspX = ""; inspY = ""; inspEndX = ""; inspEndY = ""; inspKey = ""; inspFlags = 0
             inspStrategy = .windowLocalPreferred
@@ -344,6 +385,13 @@ struct EditorView: View {
                     }
                 }
             }
+
+            if grp.kind.editsSemanticTextTarget {
+                searchRegion = searchRegion ?? observedFrame
+                observedFrame = nil
+                fallbackPoint = nil
+                startPt = nil
+            }
             
             if grp.kind.isPassiveWait || (grp.kind == .mouseMove && hideMouseMoves) {
                 continue
@@ -368,19 +416,19 @@ struct EditorView: View {
                 if let grp = self.rows.first(where: { $0.id == groupID })?.group {
                     self.activeDragSession = DragEditSession(
                         groupID: groupID,
+                        group: grp,
                         eventIndices: grp.eventIndices,
                         snapshot: rec.events
                     )
                 }
             }
             CoordinatePreviewOverlay.shared.onDragStartPointEnded = { [weak recorder] groupID, dx, dy in
-                guard let session = self.activeDragSession, let rec = recorder else { return }
+                guard let session = self.activeDragSession, session.groupID == groupID, let rec = recorder else { return }
                 rec.loadEvents(session.snapshot)
                 self.activeDragSession = nil
                 self.withUndo(NSLocalizedString("Adjust Drag Start", comment: "")) {
-                    if let grp = self.rows.first(where: { $0.id == session.groupID })?.group,
-                       let start = grp.startPoint,
-                       let end = grp.endPoint {
+                    if let start = session.group.startPoint,
+                       let end = session.group.endPoint {
                         let newStart = CGPoint(x: start.x + dx, y: start.y + dy)
                         rec.events.conformPath(
                             at: session.eventIndices,
@@ -392,39 +440,38 @@ struct EditorView: View {
                         )
                     }
                 }
+                self.updateCachedRows()
                 self.loadInspector()
-                self.updatePreview()
             }
             CoordinatePreviewOverlay.shared.onDragEndPointEnded = { [weak recorder] groupID, dx, dy in
-                guard let session = self.activeDragSession, let rec = recorder else { return }
+                guard let session = self.activeDragSession, session.groupID == groupID, let rec = recorder else { return }
                 rec.loadEvents(session.snapshot)
                 self.activeDragSession = nil
                 self.withUndo(NSLocalizedString("Adjust Swipe Destination", comment: "")) {
-                    if let grp = self.rows.first(where: { $0.id == session.groupID })?.group {
-                        if let start = grp.startPoint, let end = grp.endPoint {
-                            let newEnd = CGPoint(x: end.x + dx, y: end.y + dy)
-                            rec.events.conformPath(at: session.eventIndices, startPoint: start, oldEndPoint: end, newEndPoint: newEnd, surfaces: currentMacro?.surfaces ?? [:])
-                        }
+                    if let start = session.group.startPoint,
+                       let end = session.group.endPoint {
+                        let newEnd = CGPoint(x: end.x + dx, y: end.y + dy)
+                        rec.events.conformPath(at: session.eventIndices, startPoint: start, oldEndPoint: end, newEndPoint: newEnd, surfaces: currentMacro?.surfaces ?? [:])
                     }
                 }
+                self.updateCachedRows()
                 self.loadInspector()
-                self.updatePreview()
             }
             CoordinatePreviewOverlay.shared.onDragPathEnded = { [weak recorder] groupID, dx, dy in
-                guard let session = self.activeDragSession, let rec = recorder else { return }
+                guard let session = self.activeDragSession, session.groupID == groupID, let rec = recorder else { return }
                 rec.loadEvents(session.snapshot)
                 self.activeDragSession = nil
-                let undoName = self.rows.first(where: { $0.id == groupID })?.group.kind.previewsPointSequence == true
+                let undoName = session.group.kind.previewsPointSequence
                     ? NSLocalizedString("Move Click Points", comment: "")
                     : NSLocalizedString("Move Drag Path", comment: "")
                 self.withUndo(undoName) {
                     rec.events.translateEvents(at: session.eventIndices, dx: dx, dy: dy, surfaces: currentMacro?.surfaces ?? [:])
                 }
+                self.updateCachedRows()
                 self.loadInspector()
-                self.updatePreview()
             }
             CoordinatePreviewOverlay.shared.onDragPathPointEnded = { [weak recorder] groupID, pointIndex, dx, dy in
-                guard let session = self.activeDragSession, let rec = recorder else { return }
+                guard let session = self.activeDragSession, session.groupID == groupID, let rec = recorder else { return }
                 rec.loadEvents(session.snapshot)
                 self.activeDragSession = nil
                 self.withUndo(NSLocalizedString("Move Click Point", comment: "")) {
@@ -436,8 +483,8 @@ struct EditorView: View {
                         surfaces: currentMacro?.surfaces ?? [:]
                     )
                 }
+                self.updateCachedRows()
                 self.loadInspector()
-                self.updatePreview()
             }
             CoordinatePreviewOverlay.shared.show(actions: actionsToPreview, selectedActionID: selection.count == 1 ? selection.first : nil)
         } else {
@@ -552,8 +599,8 @@ struct EditorView: View {
                 }
             }
             
+            self.updateCachedRows()
             self.loadInspector()
-            self.updatePreview() // This restores the preview overlay
         }
         
         CoordinatePickerOverlay.shared.onCancelled = {
@@ -593,8 +640,8 @@ struct EditorView: View {
             self.withUndo(NSLocalizedString("Add Click Point", comment: "")) {
                 rec.events.appendMultiPointClick(at: row.group.eventIndices, point: finalPt)
             }
+            self.updateCachedRows()
             self.loadInspector()
-            self.updatePreview()
         }
 
         CoordinatePickerOverlay.shared.onCancelled = {
@@ -609,12 +656,18 @@ struct EditorView: View {
     func startPickingText() {
         CoordinatePreviewOverlay.shared.hide()
         
-        guard self.selection.count == 1, let selectId = self.selection.first,
-              let row = self.rows.first(where: { $0.id == selectId }) else {
+        let targetRows = textTargetRowsForCurrentSelection()
+        guard !targetRows.isEmpty else {
             return
         }
         
-        let surfaceId = row.group.eventIndices.compactMap { recorder.events[$0].surfaceId }.first
+        let surfaceId = targetRows
+            .flatMap { row in
+                row.group.eventIndices.compactMap { index in
+                    recorder.events.indices.contains(index) ? recorder.events[index].surfaceId : nil
+                }
+            }
+            .first
         let resolvedSurface = (surfaceId.flatMap { library.currentMacro?.surfaces[$0] }) ?? library.currentMacro?.surfaces.values.first
         let finalSurfaceId = surfaceId ?? library.currentMacro?.surfaces.first(where: { $0.value == resolvedSurface })?.key
         
@@ -622,18 +675,32 @@ struct EditorView: View {
             guard let rec = recorder else { return }
             
             self.withUndo(NSLocalizedString("Pick Target Text", comment: "")) {
-                if let sId = finalSurfaceId {
-                    rec.events.updateSurfaceId(at: row.group.eventIndices, surfaceId: sId)
+                for row in targetRows {
+                    if let sId = finalSurfaceId {
+                        rec.events.updateSurfaceId(at: row.group.eventIndices, surfaceId: sId)
+                    }
+                    if row.group.kind.editsSemanticTextTarget {
+                        rec.events.updateSemanticAction(
+                            at: row.group.eventIndices,
+                            textAnchor: anchor,
+                            timeout: row.group.textTimeout ?? self.inspTimeout,
+                            verifyMustExist: row.group.verifyMustExist ?? true,
+                            fallbackPolicy: self.inspFallbackPolicy
+                        )
+                    } else {
+                        rec.events.updateCoordinateStrategy(
+                            at: row.group.eventIndices,
+                            strategy: .locatorOnly,
+                            textAnchor: anchor,
+                            fallbackPolicy: self.inspFallbackPolicy,
+                            textTimeout: self.inspTimeout
+                        )
+                    }
                 }
-	                if row.group.kind.editsSemanticTextTarget {
-	                    rec.events.updateSemanticAction(at: row.group.eventIndices, textAnchor: anchor, timeout: row.group.textTimeout, verifyMustExist: row.group.verifyMustExist, fallbackPolicy: inspFallbackPolicy)
-	                } else {
-	                    rec.events.updateCoordinateStrategy(at: row.group.eventIndices, strategy: .locatorOnly, textAnchor: anchor, fallbackPolicy: inspFallbackPolicy, textTimeout: inspTimeout)
-	                }
             }
             
+            self.updateCachedRows()
             self.loadInspector()
-            self.updatePreview()
         }
         
         TextPickerOverlay.shared.onCancelled = {
@@ -641,6 +708,19 @@ struct EditorView: View {
         }
         
         TextPickerOverlay.shared.start(targetSurface: resolvedSurface)
+    }
+
+    func textTargetRowsForCurrentSelection() -> [ActionRow] {
+        rows.filter { row in
+            guard selection.contains(row.id) else { return false }
+            if row.group.kind.editsSemanticTextTarget { return true }
+            guard row.group.kind.canUseLocatorStrategy else { return false }
+            return row.group.textAnchor != nil || row.group.eventIndices.contains { index in
+                guard recorder.events.indices.contains(index) else { return false }
+                let event = recorder.events[index]
+                return event.coordinateStrategy == .locatorOnly || event.textAnchor != nil
+            }
+        }
     }
 
 }
@@ -674,8 +754,8 @@ struct EditorView: View {
 /// Fixed column widths shared by the events header + rows.
 enum EventCol {
     static let num: CGFloat = 46
-    static let time: CGFloat = 96
-    static let pos: CGFloat = 132
+    static let time: CGFloat = 100
+    static let pos: CGFloat = 160
     static let key: CGFloat = 80
 }
 

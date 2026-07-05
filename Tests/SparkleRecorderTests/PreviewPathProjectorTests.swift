@@ -99,8 +99,8 @@ struct PreviewPathProjectorTests {
         #expect(geometry.path == projected)
     }
 
-    @Test("Geometry preserves point target endpoints when no path can be displayed")
-    func geometryPreservesPointTargetEndpoints() {
+    @Test("Geometry preserves point target when source path is empty")
+    func geometryPreservesPointTargetWhenSourcePathIsEmpty() {
         let point = CGPoint(x: 42, y: 24)
 
         let geometry = PreviewPathProjector.geometry(
@@ -111,7 +111,48 @@ struct PreviewPathProjectorTests {
         )
 
         #expect(geometry.startPoint == CGPoint(x: 45, y: 28))
-        #expect(geometry.endPoint == point)
-        #expect(geometry.path.isEmpty)
+        #expect(geometry.endPoint == CGPoint(x: 45, y: 28))
+        #expect(geometry.path == [CGPoint(x: 45, y: 28)])
+    }
+
+    @Test("Single point path remains visible while dragged repeatedly")
+    func singlePointPathRemainsVisibleWhileDraggedRepeatedly() {
+        let point = CGPoint(x: 20, y: 30)
+
+        let firstProjection = PreviewPathProjector.geometry(
+            dragPath: [point],
+            selectedPoint: point,
+            previewsPointSequence: false,
+            edit: .body(CGSize(width: 10, height: -5))
+        )
+        let secondProjection = PreviewPathProjector.geometry(
+            dragPath: firstProjection.path,
+            selectedPoint: firstProjection.startPoint,
+            previewsPointSequence: false,
+            edit: .body(CGSize(width: -3, height: 7))
+        )
+
+        #expect(firstProjection.path == [CGPoint(x: 30, y: 25)])
+        #expect(firstProjection.startPoint == CGPoint(x: 30, y: 25))
+        #expect(firstProjection.endPoint == CGPoint(x: 30, y: 25))
+        #expect(secondProjection.path == [CGPoint(x: 27, y: 32)])
+        #expect(secondProjection.startPoint == CGPoint(x: 27, y: 32))
+        #expect(secondProjection.endPoint == CGPoint(x: 27, y: 32))
+    }
+
+    @Test("Single click sequence exposes its point handle")
+    func singleClickSequenceExposesItsPointHandle() {
+        let point = CGPoint(x: 12, y: 9)
+
+        let geometry = PreviewPathProjector.geometry(
+            dragPath: [point],
+            selectedPoint: nil,
+            previewsPointSequence: true,
+            edit: .point(index: 0, translation: CGSize(width: 4, height: 6))
+        )
+
+        #expect(geometry.startPoint == CGPoint(x: 16, y: 15))
+        #expect(geometry.endPoint == CGPoint(x: 16, y: 15))
+        #expect(geometry.path == [CGPoint(x: 16, y: 15)])
     }
 }

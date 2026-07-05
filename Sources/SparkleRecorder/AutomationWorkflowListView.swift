@@ -25,7 +25,6 @@ struct AutomationWorkflowListView: View {
                     .labelStyle(.iconOnly)
                     .buttonStyle(.borderless)
                     .frame(width: 26, height: 26)
-                    .controlSurface(cornerRadius: 8, tint: Brand.libraryBlue, isActive: false)
                     .help(NSLocalizedString("New Workflow", comment: ""))
                     .accessibilityLabel(NSLocalizedString("New Workflow", comment: ""))
 
@@ -33,7 +32,6 @@ struct AutomationWorkflowListView: View {
                     .labelStyle(.iconOnly)
                     .buttonStyle(.borderless)
                     .frame(width: 26, height: 26)
-                    .controlSurface(cornerRadius: 8, tint: Brand.sigTeal, isActive: false)
                     .help(NSLocalizedString("Import Workflow Package", comment: ""))
                     .accessibilityLabel(NSLocalizedString("Import Workflow Package", comment: ""))
 
@@ -41,7 +39,6 @@ struct AutomationWorkflowListView: View {
                     .labelStyle(.iconOnly)
                     .buttonStyle(.borderless)
                     .frame(width: 26, height: 26)
-                    .controlSurface(cornerRadius: 8, tint: Brand.libraryGreen, isActive: false)
                     .disabled(projection.workflows.isEmpty)
                     .help(NSLocalizedString("Export All Workflows", comment: ""))
                     .accessibilityLabel(NSLocalizedString("Export All Workflows", comment: ""))
@@ -50,7 +47,6 @@ struct AutomationWorkflowListView: View {
                     .labelStyle(.iconOnly)
                     .buttonStyle(.borderless)
                     .frame(width: 26, height: 26)
-                    .controlSurface(cornerRadius: 8, tint: Brand.sigAmber, isActive: false)
                     .disabled(projection.workflows.isEmpty)
                     .help(NSLocalizedString("Share All Workflows", comment: ""))
                     .accessibilityLabel(NSLocalizedString("Share All Workflows", comment: ""))
@@ -69,15 +65,14 @@ struct AutomationWorkflowListView: View {
                 } else {
                     LazyVStack(spacing: 8) {
                         ForEach(projection.workflows) { workflow in
-                            Button {
+                            AutomationWorkflowRow(
+                                workflow: workflow,
+                                isSelected: (selectedWorkflowID ?? projection.workflows.first?.id) == workflow.id
+                            )
+                            .contentShape(Rectangle())
+                            .onTapGesture {
                                 onSelectWorkflow(workflow.id)
-                            } label: {
-                                AutomationWorkflowRow(
-                                    workflow: workflow,
-                                    isSelected: (selectedWorkflowID ?? projection.workflows.first?.id) == workflow.id
-                                )
                             }
-                            .buttonStyle(.plain)
                         }
                     }
                 }

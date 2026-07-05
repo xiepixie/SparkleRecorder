@@ -25,6 +25,27 @@ struct ActionListView: View {
                     .foregroundStyle(.tertiary)
                 Spacer()
                 if !selection.isEmpty {
+                    ControlGroup {
+                        Button {
+                            moveSelection(.up)
+                        } label: {
+                            Image(systemName: "arrow.up")
+                        }
+                        .help(NSLocalizedString("Move selected actions up", comment: ""))
+                        .disabled(!canMoveSelection(.up))
+
+                        Button {
+                            moveSelection(.down)
+                        } label: {
+                            Image(systemName: "arrow.down")
+                        }
+                        .help(NSLocalizedString("Move selected actions down", comment: ""))
+                        .disabled(!canMoveSelection(.down))
+                    }
+                    .controlGroupStyle(.navigation)
+                    .font(.system(size: 10.5, weight: .semibold))
+                    .foregroundStyle(Brand.accent(library.currentMacro?.accent))
+
                     Text(String(format: NSLocalizedString("%d selected", comment: ""), selection.count))
                         .font(.system(size: 10.5, weight: .medium))
                         .foregroundStyle(Brand.accent(library.currentMacro?.accent))
@@ -32,8 +53,6 @@ struct ActionListView: View {
             }
 
             VStack(spacing: 0) {
-	                headerRow
-	                Divider().opacity(0.5)
 	                ScrollView {
 	                    if rows.isEmpty {
 	                        VStack(spacing: 8) {
@@ -49,49 +68,54 @@ struct ActionListView: View {
 	                        .frame(maxWidth: .infinity, minHeight: 170)
 	                    }
 	                    
-	                    LazyVStack(spacing: 0) {
-	                        ForEach(Array(rows.enumerated()), id: \.element.id) { index, row in
-                            ActionRowView(
-                                row: row,
-                                order: index + 1,
-                                selected: selection.contains(row.id),
-                                isMoving: isMoving(row),
-                                onTap: { mods in handleTap(row.id, mods: mods) },
-                                onDragStarted: { beginDrag(row.id) },
-                                draggedID: $draggedID
-                            )
-                            .overlay(alignment: .top) {
-                                insertionIndicator(isActive: dropInsertion == .before(row.id))
-                            }
-                            .overlay(alignment: .bottom) {
-                                insertionIndicator(isActive: dropInsertion == .after(row.id))
-                            }
-                            .onDrop(of: [.text], delegate: ActionRowDropDelegate(
-                                rowID: row.id,
-                                dropInsertion: $dropInsertion,
-                                draggedID: $draggedID,
-                                canDrop: canDrop,
-                                onDrop: moveRows
-                            ))
-                            .contextMenu {
-                                rowContextMenu(for: row)
-                            }
-	                        }
-                        
-                        Color.clear
-                            .frame(height: 32)
-                            .contentShape(Rectangle())
-                            .onDrop(of: [.text], delegate: ActionListEndDropDelegate(
-                                dropInsertion: $dropInsertion,
-                                draggedID: $draggedID,
-                                canDrop: canDrop,
-                                onDrop: moveRows
-                            ))
-                            .overlay(alignment: .top) {
-                                insertionIndicator(isActive: dropInsertion == .end)
+	                    LazyVStack(spacing: 0, pinnedViews: .sectionHeaders) {
+                            Section {
+                                ForEach(Array(rows.enumerated()), id: \.element.id) { index, row in
+                                    ActionRowView(
+                                        row: row,
+                                        order: index + 1,
+                                        selected: selection.contains(row.id),
+                                        isMoving: isMoving(row),
+                                        onTap: { mods in handleTap(row.id, mods: mods) },
+                                        onDragStarted: { beginDrag(row.id) },
+                                        draggedID: $draggedID
+                                    )
+                                    .overlay(alignment: .top) {
+                                        insertionIndicator(isActive: dropInsertion == .before(row.id))
+                                    }
+                                    .overlay(alignment: .bottom) {
+                                        insertionIndicator(isActive: dropInsertion == .after(row.id))
+                                    }
+                                    .onDrop(of: [.text], delegate: ActionRowDropDelegate(
+                                        rowID: row.id,
+                                        dropInsertion: $dropInsertion,
+                                        draggedID: $draggedID,
+                                        canDrop: canDrop,
+                                        onDrop: moveRows
+                                    ))
+                                    .contextMenu {
+                                        rowContextMenu(for: row)
+                                    }
+                                }
+                            } header: {
+                                VStack(spacing: 0) {
+                                    headerRow
+                                    Divider().opacity(0.5)
+                                }
+                                .background(VisualEffectBackground(material: .sidebar, blendingMode: .withinWindow))
                             }
 	                    }
 	                }
+                    .contentMargins(.bottom, 32, for: .scrollContent)
+                    .onDrop(of: [.text], delegate: ActionListEndDropDelegate(
+                        dropInsertion: $dropInsertion,
+                        draggedID: $draggedID,
+                        canDrop: canDrop,
+                        onDrop: moveRows
+                    ))
+                    .overlay(alignment: .bottom) {
+                        insertionIndicator(isActive: dropInsertion == .end)
+                    }
 	            }
 	            .sectionSurface(cornerRadius: 12)
 	            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
@@ -154,6 +178,127 @@ struct ActionListView: View {
         rows.filter { $0.group.kind.isReorderableAction }
     }
 
+    enum MoveDirection {
+        case up
+        case down
+    }
+
+    private var selectedReorderableIDs: Set<UUID> {
+        let reorderableIDs = Set(reorderableRows.map(\.id))
+        return selection.intersection(reorderableIDs)
+    }
+
+    func canMoveSelection(_ direction: MoveDirection) -> Bool {
+        let movingIDs = selectedReorderableIDs
+        guard !movingIDs.isEmpty else { return false }
+        guard let sourceID = reorderableRows.first(where: { movingIDs.contains($0.id) })?.id,
+              let step = visibleStepInsertion(direction, movingGroupIDs: movingIDs) else { return false }
+
+        if canDrop(sourceID: sourceID, insertion: step.insertion) {
+            return true
+        }
+        return step.target.group.kind.isPassiveWait && canNudgeSelectionAcrossWaitGap(
+            direction,
+            waitRow: step.target,
+            movingGroupIDs: movingIDs
+        )
+    }
+
+    func moveSelection(_ direction: MoveDirection) {
+        let movingIDs = selectedReorderableIDs
+        guard let sourceID = reorderableRows.first(where: { movingIDs.contains($0.id) })?.id else { return }
+        guard let step = visibleStepInsertion(direction, movingGroupIDs: movingIDs) else { return }
+
+        if canDrop(sourceID: sourceID, insertion: step.insertion) {
+            moveRows(sourceID: sourceID, insertion: step.insertion)
+        } else if step.target.group.kind.isPassiveWait {
+            nudgeSelectionAcrossWaitGap(direction, waitRow: step.target, movingGroupIDs: movingIDs)
+        }
+    }
+
+    private func visibleStepInsertion(
+        _ direction: MoveDirection,
+        movingGroupIDs: Set<UUID>
+    ) -> (target: ActionRow, insertion: ActionRowInsertion)? {
+        let movingVisibleIndices = rows.indices.filter { movingGroupIDs.contains(rows[$0].id) }
+        guard let firstMovingIndex = movingVisibleIndices.first,
+              let lastMovingIndex = movingVisibleIndices.last else { return nil }
+
+        switch direction {
+        case .up:
+            guard let target = rows[..<firstMovingIndex].last(where: { !movingGroupIDs.contains($0.id) }) else {
+                return nil
+            }
+            return (target, .before(target.id))
+        case .down:
+            guard let target = rows.dropFirst(lastMovingIndex + 1).first(where: { !movingGroupIDs.contains($0.id) }) else {
+                return nil
+            }
+            return (target, .after(target.id))
+        }
+    }
+
+    private func canNudgeSelectionAcrossWaitGap(
+        _ direction: MoveDirection,
+        waitRow: ActionRow,
+        movingGroupIDs: Set<UUID>
+    ) -> Bool {
+        guard let plan = waitGapNudgePlan(direction, waitRow: waitRow, movingGroupIDs: movingGroupIDs) else {
+            return false
+        }
+        return abs(plan.delta) > 0.000_001
+    }
+
+    private func waitGapNudgePlan(
+        _ direction: MoveDirection,
+        waitRow: ActionRow,
+        movingGroupIDs: Set<UUID>
+    ) -> (sourceEventIndices: [Int], delta: TimeInterval)? {
+        let movingRows = rows.filter { movingGroupIDs.contains($0.id) && $0.group.kind.isReorderableAction }
+        let sourceEventIndices = Array(Set(movingRows.flatMap(\.group.eventIndices))).sorted()
+        guard !sourceEventIndices.isEmpty else { return nil }
+
+        let movingGroups = movingRows.map(\.group)
+        guard let movingStart = movingGroups.map(\.startTime).min(),
+              let movingEnd = movingGroups.map(\.endTime).max() else { return nil }
+
+        let epsilon: TimeInterval = 0.000_001
+        let duration = max(0, movingEnd - movingStart)
+        let wait = waitRow.group
+        let destinationStart: TimeInterval
+
+        switch direction {
+        case .up:
+            destinationStart = wait.startTime + epsilon
+        case .down:
+            destinationStart = max(wait.startTime + epsilon, wait.endTime - duration - epsilon)
+        }
+
+        return (sourceEventIndices, destinationStart - movingStart)
+    }
+
+    private func nudgeSelectionAcrossWaitGap(
+        _ direction: MoveDirection,
+        waitRow: ActionRow,
+        movingGroupIDs: Set<UUID>
+    ) {
+        guard let plan = waitGapNudgePlan(direction, waitRow: waitRow, movingGroupIDs: movingGroupIDs),
+              abs(plan.delta) > 0.000_001 else { return }
+
+        var movedEvents: [RecordedEvent] = []
+        withUndo(NSLocalizedString("Move Action", comment: "")) {
+            for idx in plan.sourceEventIndices where recorder.events.indices.contains(idx) {
+                recorder.events[idx].time = max(0, recorder.events[idx].time + plan.delta)
+            }
+            movedEvents = plan.sourceEventIndices.compactMap { idx in
+                recorder.events.indices.contains(idx) ? recorder.events[idx] : nil
+            }
+            recorder.events.sortByTimePreservingOrder()
+        }
+
+        selectMovedEvents(matching: movedEvents)
+    }
+
     func beginDrag(_ id: UUID) {
         guard reorderableRows.contains(where: { $0.id == id }) else { return }
         if !selection.contains(id) {
@@ -178,20 +323,48 @@ struct ActionListView: View {
         let movingGroupIDs = movingGroupIDs(for: sourceID)
         guard !movingGroupIDs.isEmpty else { return false }
 
-        switch insertion {
-        case .before(let targetID), .after(let targetID):
-            guard !movingGroupIDs.contains(targetID),
-                  reorderableRows.contains(where: { $0.id == targetID }) else {
-                return false
-            }
-        case .end:
-            break
-        }
+        guard let normalizedInsertion = normalizedInsertion(insertion, movingGroupIDs: movingGroupIDs) else { return false }
 
-        guard let proposedOrder = visibleOrderAfterMove(movingGroupIDs: movingGroupIDs, to: insertion) else {
+        guard let proposedOrder = visibleOrderAfterMove(movingGroupIDs: movingGroupIDs, to: normalizedInsertion) else {
             return false
         }
         return proposedOrder != reorderableRows.map(\.id)
+    }
+
+    func normalizedInsertion(_ insertion: ActionRowInsertion, movingGroupIDs: Set<UUID>) -> ActionRowInsertion? {
+        switch insertion {
+        case .before(let targetID):
+            guard !movingGroupIDs.contains(targetID),
+                  let targetRowIndex = rows.firstIndex(where: { $0.id == targetID }) else {
+                return nil
+            }
+            if reorderableRows.contains(where: { $0.id == targetID }) {
+                return .before(targetID)
+            }
+            if let previous = rows[..<targetRowIndex].last(where: { $0.group.kind.isReorderableAction && !movingGroupIDs.contains($0.id) }) {
+                return .after(previous.id)
+            }
+            if let next = rows.dropFirst(targetRowIndex + 1).first(where: { $0.group.kind.isReorderableAction && !movingGroupIDs.contains($0.id) }) {
+                return .before(next.id)
+            }
+            return .end
+
+        case .after(let targetID):
+            guard !movingGroupIDs.contains(targetID),
+                  let targetRowIndex = rows.firstIndex(where: { $0.id == targetID }) else {
+                return nil
+            }
+            if reorderableRows.contains(where: { $0.id == targetID }) {
+                return .after(targetID)
+            }
+            if let next = rows.dropFirst(targetRowIndex + 1).first(where: { $0.group.kind.isReorderableAction && !movingGroupIDs.contains($0.id) }) {
+                return .before(next.id)
+            }
+            return .end
+
+        case .end:
+            return .end
+        }
     }
 
     func visibleOrderAfterMove(movingGroupIDs: Set<UUID>, to insertion: ActionRowInsertion) -> [UUID]? {
@@ -218,7 +391,8 @@ struct ActionListView: View {
     }
 
     func targetEventIndex(for insertion: ActionRowInsertion, movingGroupIDs: Set<UUID>) -> Int? {
-        switch insertion {
+        guard let normalizedInsertion = normalizedInsertion(insertion, movingGroupIDs: movingGroupIDs) else { return nil }
+        switch normalizedInsertion {
         case .before(let targetID):
             return rows.first { $0.id == targetID && $0.group.kind.isReorderableAction }?.group.eventIndices.first
         case .after(let targetID):
@@ -265,6 +439,27 @@ struct ActionListView: View {
     func selectMovedRows(in eventIndexRange: Range<Int>) {
         let movedRows = onRefreshRows().filter { row in
             row.group.eventIndices.contains { eventIndexRange.contains($0) }
+        }
+        if !movedRows.isEmpty {
+            selection = Set(movedRows.map(\.id))
+            lastAnchor = movedRows.first?.id
+        }
+    }
+
+    func selectMovedEvents(matching movedEvents: [RecordedEvent]) {
+        guard !movedEvents.isEmpty else { return }
+
+        var remaining = movedEvents
+        var matchedEventIndices = Set<Int>()
+        for (idx, event) in recorder.events.enumerated() {
+            guard let matchIndex = remaining.firstIndex(of: event) else { continue }
+            matchedEventIndices.insert(idx)
+            remaining.remove(at: matchIndex)
+            if remaining.isEmpty { break }
+        }
+
+        let movedRows = onRefreshRows().filter { row in
+            row.group.eventIndices.contains { matchedEventIndices.contains($0) }
         }
         if !movedRows.isEmpty {
             selection = Set(movedRows.map(\.id))

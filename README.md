@@ -139,6 +139,16 @@ Run tests:
 swift test
 ```
 
+Localization source of truth:
+
+```text
+Sources/SparkleRecorder/Localizable.xcstrings
+Sources/SparkleRecorder/InfoPlist.xcstrings
+```
+
+`build.sh` exports those catalogs into generated `.lproj/*.strings` files inside the app bundle for `NSLocalizedString` runtime lookup. Do not edit generated `.strings` files by hand.
+The export uses Xcode's `xcstringstool`, so local app packaging requires a full Xcode 15+ install selected with `xcode-select`.
+
 Notarization uses `notarize.sh` after a Developer ID signed build.
 
 ## Architecture

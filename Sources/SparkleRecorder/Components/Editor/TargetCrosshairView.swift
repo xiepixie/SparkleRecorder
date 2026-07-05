@@ -42,6 +42,62 @@ struct TargetCrosshairView: View {
         )
     }
 
+    private func beginOrUpdateDrag(actionID: UUID, handle: DragHandle, translation: CGSize) {
+        let shouldStartSession = activeDrag == nil || activeDrag?.actionID != actionID || activeDrag?.handle != handle
+        activeDrag = ActiveDragEdit(actionID: actionID, handle: handle, translation: translation)
+        if shouldStartSession {
+            CoordinatePreviewOverlay.shared.onDragStarted?(actionID)
+        }
+    }
+
+    private func confirmationPoint(for action: RelativePreviewAction, handle: DragHandle, translation: CGSize) -> CGPoint? {
+        let edit: PreviewPathEdit
+        switch handle {
+        case .start:
+            edit = .start(translation)
+        case .end:
+            edit = .end(translation)
+        case .body:
+            edit = .body(translation)
+        case .point(let pointIndex):
+            edit = .point(index: pointIndex, translation: translation)
+        }
+
+        let geometry = PreviewPathProjector.geometry(
+            dragPath: action.dragPath,
+            selectedPoint: action.selectedPoint,
+            previewsPointSequence: action.kind.previewsPointSequence,
+            edit: edit
+        )
+
+        switch handle {
+        case .start:
+            return geometry.startPoint
+        case .end:
+            return geometry.endPoint
+        case .body:
+            return geometry.endPoint ?? geometry.startPoint ?? geometry.path.last
+        case .point(let pointIndex):
+            guard geometry.path.indices.contains(pointIndex) else { return nil }
+            return geometry.path[pointIndex]
+        }
+    }
+
+    @ViewBuilder
+    private func orderBadge(for action: RelativePreviewAction) -> some View {
+        Text("\(action.order)")
+            .font(.system(size: 8.5, weight: .bold, design: .rounded))
+            .foregroundStyle(.white)
+            .padding(.horizontal, 5)
+            .padding(.vertical, 1)
+            .background(
+                Capsule()
+                    .fill(action.themeColor)
+                    .shadow(color: .black.opacity(0.2), radius: 1)
+            )
+            .fixedSize()
+    }
+
     private func coordinateString(_ pt: CGPoint) -> String {
         return "(\(Int(pt.x.rounded())), \(Int(pt.y.rounded())))"
     }
@@ -104,6 +160,12 @@ struct TargetCrosshairView: View {
 	                            RoundedRectangle(cornerRadius: 6)
 	                                .stroke(action.themeColor.opacity(0.9), style: StrokeStyle(lineWidth: 2, dash: [7, 5], dashPhase: lineDashPhase))
 	                        )
+	                        .overlay(alignment: .topLeading) {
+	                            if action.kind.editsSemanticTextTarget {
+	                                orderBadge(for: action)
+	                                    .offset(x: 6, y: 6)
+	                            }
+	                        }
 	                        .frame(width: region.width, height: region.height)
 	                        .position(x: region.midX, y: region.midY)
 	                        .allowsHitTesting(false)
@@ -116,12 +178,18 @@ struct TargetCrosshairView: View {
 	                            RoundedRectangle(cornerRadius: 4)
 	                                .fill(action.themeColor.opacity(0.12))
 	                        )
+	                        .overlay(alignment: .topLeading) {
+	                            if action.kind.editsSemanticTextTarget {
+	                                orderBadge(for: action)
+	                                    .offset(x: 6, y: 6)
+	                            }
+	                        }
 	                        .frame(width: observed.width, height: observed.height)
 	                        .position(x: observed.midX, y: observed.midY)
 	                        .allowsHitTesting(false)
 	                }
 
-	                if let fallback = action.fallbackPoint {
+	                if !action.kind.editsSemanticTextTarget, let fallback = action.fallbackPoint {
 	                    Image(systemName: "smallcircle.filled.circle")
 	                        .font(.system(size: 13, weight: .bold))
 	                        .foregroundStyle(action.themeColor)
@@ -156,16 +224,11 @@ struct TargetCrosshairView: View {
                     .help(action.kind.previewsPointSequence
                           ? NSLocalizedString("Drag line to move all click points", comment: "")
                           : NSLocalizedString("Drag path to move the whole drag", comment: ""))
-                    .gesture(
-                        DragGesture(minimumDistance: 0)
-                            .onChanged { value in
-                                if activeDrag == nil {
-                                    activeDrag = ActiveDragEdit(actionID: action.id, handle: .body, translation: value.translation)
-                                    CoordinatePreviewOverlay.shared.onDragStarted?(action.id)
-                                } else {
-                                    activeDrag?.translation = value.translation
-                                }
-                            }
+	                    .gesture(
+	                        DragGesture(minimumDistance: 0)
+	                            .onChanged { value in
+	                                beginOrUpdateDrag(actionID: action.id, handle: .body, translation: value.translation)
+	                            }
                             .onEnded { value in
                                 let finalTranslation = value.translation.clamped(to: 800)
                                 activeDrag = nil
@@ -174,6 +237,12 @@ struct TargetCrosshairView: View {
                                 guard distance >= 0.5 else { return }
 
                                 CoordinatePreviewOverlay.shared.onDragPathEnded?(action.id, finalTranslation.width, finalTranslation.height)
+                                flashPoint = confirmationPoint(for: action, handle: .body, translation: finalTranslation)
+                                confirmFlashActionID = action.id
+                                confirmFlash = true
+                                withAnimation(.easeOut(duration: 0.6)) {
+                                    confirmFlash = false
+                                }
                             }
                     )
 
@@ -186,26 +255,27 @@ struct TargetCrosshairView: View {
                                 .position(startPt)
                         }
 
-	                        if let endPt = displayPath.last {
+	                        if let actionGeometry = actionGeometries[action.id],
+	                           let displayEndPt = actionGeometry.endPoint {
 	                            let showArrow: Bool = {
-	                                if let startPt = actionGeometries[action.id]?.startPoint {
-	                                    let dx = endPt.x - startPt.x
-	                                    let dy = endPt.y - startPt.y
+	                                if let startPt = actionGeometry.startPoint {
+	                                    let dx = displayEndPt.x - startPt.x
+	                                    let dy = displayEndPt.y - startPt.y
 	                                    return (dx * dx + dy * dy) > 225
                                 }
                                 return true
 	                            }()
 
-	                            if showArrow, let displayEndPt = actionGeometries[action.id]?.endPoint {
+	                            if showArrow {
 	                                let isCurrentDrag = (activeDrag?.actionID == action.id && activeDrag?.handle == .end)
 
                                 Image(systemName: "arrowtriangle.down.fill")
                                     .resizable()
                                     .aspectRatio(contentMode: .fit)
-                                    .frame(width: 14, height: 14)
-                                    .foregroundStyle(action.themeColor)
-                                    .shadow(color: .black.opacity(0.3), radius: 2)
-                                    .rotationEffect(arrowRotation(for: displayPath))
+	                                    .frame(width: 14, height: 14)
+	                                    .foregroundStyle(action.themeColor)
+	                                    .shadow(color: .black.opacity(0.3), radius: 2)
+	                                    .rotationEffect(arrowRotation(for: actionGeometry))
                                     .scaleEffect(isCurrentDrag ? 1.25 : 1.0)
                                     .overlay(
                                         Group {
@@ -218,16 +288,11 @@ struct TargetCrosshairView: View {
                                     .frame(width: 100, height: 100) // Large frame to prevent visual clipping of badge/arrow/shadows
                                     .contentShape(Rectangle())
                                     .offset(x: displayEndPt.x - 50, y: displayEndPt.y - 50)
-                                    .gesture(
-                                        DragGesture(minimumDistance: 0)
-                                            .onChanged { value in
-                                                if activeDrag == nil {
-                                                    activeDrag = ActiveDragEdit(actionID: action.id, handle: .end, translation: value.translation)
-                                                    CoordinatePreviewOverlay.shared.onDragStarted?(action.id)
-                                                } else {
-                                                    activeDrag?.translation = value.translation
-                                                }
-                                            }
+	                                    .gesture(
+	                                        DragGesture(minimumDistance: 0)
+	                                            .onChanged { value in
+	                                                beginOrUpdateDrag(actionID: action.id, handle: .end, translation: value.translation)
+	                                            }
                                             .onEnded { value in
                                                 let finalTranslation = value.translation.clamped(to: 800)
                                                 activeDrag = nil
@@ -238,7 +303,7 @@ struct TargetCrosshairView: View {
                                                 CoordinatePreviewOverlay.shared.onDragEndPointEnded?(action.id, finalTranslation.width, finalTranslation.height)
 
                                                 // Trigger ripple
-                                                flashPoint = endPt + finalTranslation
+	                                                flashPoint = confirmationPoint(for: action, handle: .end, translation: finalTranslation)
                                                 confirmFlashActionID = action.id
                                                 confirmFlash = true
                                                 withAnimation(.easeOut(duration: 0.6)) {
@@ -249,6 +314,8 @@ struct TargetCrosshairView: View {
                             }
                         }
                     }
+
+	                }
 
                     if action.kind.previewsPointSequence {
                         ForEach(Array(displayPath.enumerated()), id: \.offset) { pointIndex, point in
@@ -280,12 +347,7 @@ struct TargetCrosshairView: View {
                             .gesture(
                                 DragGesture(minimumDistance: 0)
                                     .onChanged { value in
-                                        if activeDrag == nil {
-                                            activeDrag = ActiveDragEdit(actionID: action.id, handle: .point(pointIndex), translation: value.translation)
-                                            CoordinatePreviewOverlay.shared.onDragStarted?(action.id)
-                                        } else {
-                                            activeDrag?.translation = value.translation
-                                        }
+                                        beginOrUpdateDrag(actionID: action.id, handle: .point(pointIndex), translation: value.translation)
                                     }
                                     .onEnded { value in
                                         let finalTranslation = value.translation.clamped(to: 800)
@@ -296,7 +358,7 @@ struct TargetCrosshairView: View {
 
                                         CoordinatePreviewOverlay.shared.onDragPathPointEnded?(action.id, pointIndex, finalTranslation.width, finalTranslation.height)
 
-                                        flashPoint = point + finalTranslation
+                                        flashPoint = confirmationPoint(for: action, handle: .point(pointIndex), translation: finalTranslation)
                                         confirmFlashActionID = action.id
                                         confirmFlash = true
                                         withAnimation(.easeOut(duration: 0.6)) {
@@ -306,10 +368,12 @@ struct TargetCrosshairView: View {
                             )
                         }
                     }
-                }
 
 	                // Targets
-	                if !action.kind.previewsPointSequence, let pt = action.selectedPoint, let displayPt = actionGeometries[action.id]?.startPoint {
+	                if !action.kind.previewsPointSequence,
+	                   !action.kind.editsSemanticTextTarget,
+	                   action.selectedPoint != nil,
+	                   let displayPt = actionGeometries[action.id]?.startPoint {
                     let isCurrentDrag = (activeDrag?.actionID == action.id && activeDrag?.handle == .start)
 
                     ZStack {
@@ -358,16 +422,11 @@ struct TargetCrosshairView: View {
                     .frame(width: 100, height: 100) // Large frame to prevent visual clipping of badge/arrow/shadows
                     .contentShape(Rectangle())
                     .offset(x: displayPt.x - 50, y: displayPt.y - 50)
-                    .gesture(
-                        DragGesture(minimumDistance: 0)
-                            .onChanged { value in
-                                if activeDrag == nil {
-                                    activeDrag = ActiveDragEdit(actionID: action.id, handle: .start, translation: value.translation)
-                                    CoordinatePreviewOverlay.shared.onDragStarted?(action.id)
-                                } else {
-                                    activeDrag?.translation = value.translation
-                                }
-                             }
+	                    .gesture(
+	                        DragGesture(minimumDistance: 0)
+	                            .onChanged { value in
+	                                beginOrUpdateDrag(actionID: action.id, handle: .start, translation: value.translation)
+	                             }
                             .onEnded { value in
                                 let finalTranslation = value.translation.clamped(to: 800)
                                 activeDrag = nil
@@ -378,7 +437,7 @@ struct TargetCrosshairView: View {
                                 CoordinatePreviewOverlay.shared.onDragStartPointEnded?(action.id, finalTranslation.width, finalTranslation.height)
 
                                 // Trigger ripple
-                                flashPoint = pt + finalTranslation
+                                flashPoint = confirmationPoint(for: action, handle: .start, translation: finalTranslation)
                                 confirmFlashActionID = action.id
                                 confirmFlash = true
                                 withAnimation(.easeOut(duration: 0.6)) {
@@ -415,12 +474,21 @@ struct TargetCrosshairView: View {
         }
     }
 
-    func arrowRotation(for path: [CGPoint]) -> Angle {
+    func arrowRotation(for geometry: PreviewPathGeometry) -> Angle {
+        if let start = geometry.startPoint,
+           let end = geometry.endPoint,
+           hypot(end.x - start.x, end.y - start.y) > 0.001 {
+            return arrowRotation(from: start, to: end)
+        }
+
+        let path = geometry.path
         guard path.count >= 2 else { return .zero }
-        let p1 = path[path.count - 2]
-        let p2 = path[path.count - 1]
-        let dx = p2.x - p1.x
-        let dy = p2.y - p1.y
+        return arrowRotation(from: path[path.count - 2], to: path[path.count - 1])
+    }
+
+    func arrowRotation(from start: CGPoint, to end: CGPoint) -> Angle {
+        let dx = end.x - start.x
+        let dy = end.y - start.y
         let angle = atan2(dy, dx)
         return Angle(radians: Double(angle) - .pi / 2)
     }

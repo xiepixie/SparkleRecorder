@@ -43,28 +43,12 @@ struct PopoverContentView: View {
                     // live in the leading inset.
                     ZStack {
                         BrandTitleStrip()
+                        
+
                     }
                     .frame(height: 38)
                     .frame(maxWidth: .infinity)
                     .background(VisualEffectBackground(material: .titlebar, blendingMode: .withinWindow))
-                    .overlay(Divider().opacity(0.5), alignment: .bottom)
-
-                    HStack {
-                        Picker("", selection: $workspace) {
-                            ForEach(WorkspaceMode.allCases) { mode in
-                                Label(mode.title, systemImage: mode.systemImage)
-                                    .tag(mode)
-                            }
-                        }
-                        .labelsHidden()
-                        .pickerStyle(.segmented)
-                        .frame(width: 280)
-
-                        Spacer(minLength: 0)
-                    }
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 8)
-                    .background(VisualEffectBackground(material: .sidebar, blendingMode: .withinWindow))
                     .overlay(Divider().opacity(0.5), alignment: .bottom)
 
                     switch workspace {
@@ -80,9 +64,20 @@ struct PopoverContentView: View {
                         AutomationMainView(runtimeHost: controller.automationHost())
                             .frame(maxWidth: .infinity, maxHeight: .infinity)
                     }
+
+                    Divider().opacity(0.5)
+                    LibraryFooter(controller: controller, state: state, workspace: $workspace)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 6)
                 }
             } else {
-                libraryColumn
+                VStack(spacing: 0) {
+                    libraryColumn
+                    Divider().opacity(0.5)
+                    LibraryFooter(controller: controller, state: state, workspace: $workspace)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 6)
+                }
             }
 
             // File-drop overlay (shown only while user is dragging .tinyrec files in)
@@ -241,7 +236,7 @@ struct PopoverContentView: View {
     }
 }
 
-private enum WorkspaceMode: String, CaseIterable, Identifiable {
+enum WorkspaceMode: String, CaseIterable, Identifiable {
     case library
     case automation
 

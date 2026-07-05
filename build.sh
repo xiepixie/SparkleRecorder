@@ -18,6 +18,7 @@ APP_NAME="SparkleRecorder"
 ROOT="$(cd "$(dirname "$0")" && pwd)"
 BUILD_DIR="${ROOT}/.build/release"
 STAGE="${ROOT}/.build/${APP_NAME}.app"        # assembled here first (gitignored)
+GENERATED_L10N="${ROOT}/.build/generated-localizations"
 # Install location can be overridden (e.g. to build a one-off copy on the Desktop
 # without disturbing the /Applications install).
 INSTALL_DIR="${SPARKLERECORDER_INSTALL_DIR:-/Applications}"
@@ -48,14 +49,19 @@ cp "${ROOT}/Info.plist" "${CONTENTS}/Info.plist"
 cp "${ROOT}/AppIcon.icns" "${CONTENTS}/Resources/AppIcon.icns"
 chmod +x "${CONTENTS}/MacOS/${APP_NAME}"
 
-# Copy localization strings
-if [ -d "${ROOT}/Sources/SparkleRecorder/en.lproj" ]; then
-    cp -R "${ROOT}/Sources/SparkleRecorder/en.lproj" "${CONTENTS}/Resources/"
+echo "→ Compiling string catalogs..."
+if ! XCSTRINGSTOOL=$(xcrun --find xcstringstool 2>/dev/null); then
+    echo "error: xcstringstool was not found. Install full Xcode 15+ and select it with xcode-select." >&2
+    exit 1
 fi
-if [ -d "${ROOT}/Sources/SparkleRecorder/zh-Hans.lproj" ]; then
-    cp -R "${ROOT}/Sources/SparkleRecorder/zh-Hans.lproj" "${CONTENTS}/Resources/"
-fi
+rm -rf "$GENERATED_L10N"
+mkdir -p "$GENERATED_L10N"
+"$XCSTRINGSTOOL" compile "${ROOT}/Sources/SparkleRecorder/Localizable.xcstrings" --output-directory "$GENERATED_L10N"
+"$XCSTRINGSTOOL" compile "${ROOT}/Sources/SparkleRecorder/InfoPlist.xcstrings" --output-directory "$GENERATED_L10N"
 
+# Copy generated runtime localization resources.
+lproj_dirs=("${GENERATED_L10N}/"*.lproj)
+cp -R "${lproj_dirs[@]}" "${CONTENTS}/Resources/"
 
 # Stamp a monotonically-increasing build number (before signing — editing the
 # plist afterwards would invalidate the signature).

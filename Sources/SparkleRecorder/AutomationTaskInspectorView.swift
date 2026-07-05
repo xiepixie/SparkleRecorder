@@ -274,34 +274,37 @@ struct AutomationTaskInspectorView: View {
         VStack(alignment: .leading, spacing: 8) {
             Button(action: saveTask) {
                 Label(NSLocalizedString("Save Task", comment: ""), systemImage: "checkmark")
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .frame(maxWidth: .infinity)
             }
-            .buttonStyle(.borderless)
-            .controlSurface(cornerRadius: 8, tint: Brand.libraryBlue, isActive: false)
+            .buttonStyle(.bordered)
+            .controlSize(.large)
             .disabled(trimmedName.isEmpty)
 
             if activeRunID != nil {
                 Button(action: cancelActiveRun) {
                     Label(NSLocalizedString("Cancel Run", comment: ""), systemImage: "xmark")
-                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .frame(maxWidth: .infinity)
                 }
-                .buttonStyle(.borderless)
-                .controlSurface(cornerRadius: 8, tint: Brand.red500, isActive: false)
+                .buttonStyle(.bordered)
+                .controlSize(.large)
+                .tint(Brand.red500)
             } else {
                 Button(action: runTask) {
                     Label(NSLocalizedString("Run Task", comment: ""), systemImage: "play.fill")
-                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .frame(maxWidth: .infinity)
                 }
-                .buttonStyle(.borderless)
-                .controlSurface(cornerRadius: 8, tint: Brand.libraryGreen, isActive: false)
+                .buttonStyle(.borderedProminent)
+                .controlSize(.large)
+                .tint(Brand.libraryGreen)
             }
 
             Button(role: .destructive, action: deleteTask) {
                 Label(NSLocalizedString("Delete Task", comment: ""), systemImage: "trash")
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .frame(maxWidth: .infinity)
             }
-            .buttonStyle(.borderless)
-            .controlSurface(cornerRadius: 8, tint: Brand.red500, isActive: false)
+            .buttonStyle(.bordered)
+            .controlSize(.large)
+            .tint(Brand.red500)
         }
     }
 

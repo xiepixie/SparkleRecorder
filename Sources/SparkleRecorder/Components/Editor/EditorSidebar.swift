@@ -30,10 +30,12 @@ struct EditorSidebar: View {
 
     @State private var insertWaitMs: Double = 1000
     @State private var confirmClearAll = false
-    @State private var isRecordingKey = false
-    @State private var recordedFlags: UInt64 = 0
-    @State private var keyMonitor: Any? = nil
     @Environment(\.undoManager) private var undoManager
+
+    struct ActionInsertionPlacement {
+        var eventIndex: Int
+        var explicitStartTime: TimeInterval?
+    }
 
     var body: some View {
         ScrollView {
@@ -105,45 +107,21 @@ struct EditorSidebar: View {
 		                        
 			                            if grp.kind.editsKeyboardInput {
 		                                gridField(NSLocalizedString("Key code", comment: "")) {
-		                                    if isRecordingKey {
-		                                        Button(action: stopRecordingKey) {
-		                                            HStack(spacing: 4) {
-		                                                Image(systemName: "record.circle.fill").foregroundStyle(.red)
-		                                                let mods = modifierString(flags: recordedFlags)
-		                                                Text(mods.isEmpty ? NSLocalizedString("Press any key…", comment: "") : "\(mods) " + NSLocalizedString("Press any key…", comment: ""))
-		                                                    .foregroundStyle(.white)
-		                                            }
-		                                            .font(.system(size: 11, weight: .bold))
-		                                            .padding(.horizontal, 8)
-		                                            .padding(.vertical, 4)
-		                                            .background(Color.red.opacity(0.8))
-                                                    .clipShape(.rect(cornerRadius: 6))
-		                                        }
-		                                        .buttonStyle(.plain)
-		                                    } else {
-		                                        Button(action: startRecordingKey) {
-		                                            HStack(spacing: 4) {
-		                                                Image(systemName: "keyboard")
-		                                                let currentCode = UInt16(inspKey) ?? grp.keyCode ?? 0
-		                                                Text(shortcutName(keyCode: currentCode, flags: inspFlags))
-		                                            }
-		                                            .font(.system(size: 11, weight: .semibold))
-		                                            .padding(.horizontal, 8)
-		                                            .padding(.vertical, 4)
-		                                            .background(Color.primary.opacity(0.08))
-                                                    .clipShape(.rect(cornerRadius: 6))
-		                                        }
-		                                        .buttonStyle(.plain)
-		                                    }
+		                                    ShortcutRecorderField(
+		                                        currentBinding: keyboardShortcutBinding(for: grp),
+		                                        allHotkeys: [],
+		                                        allowsClear: false,
+		                                        recordingPrompt: NSLocalizedString("Press any key…", comment: ""),
+		                                        emptyPrompt: NSLocalizedString("Click to record shortcut", comment: ""),
+		                                        onRecord: applyRecordedShortcut
+		                                    )
 		                                }
-		                                if !isRecordingKey {
-		                                    labeledField(NSLocalizedString("Raw Code", comment: ""), text: $inspKey)
-		                                }
+		                                labeledField(NSLocalizedString("Raw Code", comment: ""), text: $inspKey)
 			                            } else if grp.kind.editsSemanticTextTarget {
 			                                gridField(NSLocalizedString("Target Text", comment: "")) {
 			                                    TargetTextEditorInnerView(text: Binding(get: { inspOCRText }, set: { inspOCRText = $0; applyInspector() }), onPick: onPickText)
 			                                }
-			                                if grp.kind == .verifyText {
+                                if grp.kind == .waitForText || grp.kind == .waitForTextGone || grp.kind == .verifyText {
 			                                    gridField(NSLocalizedString("Must Exist", comment: "")) {
 			                                    Toggle("", isOn: Binding(
 			                                        get: { inspVerifyMustExist },
@@ -201,6 +179,27 @@ struct EditorSidebar: View {
                             Text(String(format: NSLocalizedString("Batch edit %d actions", comment: ""), selection.count))
                                 .font(.system(size: 11, weight: .semibold))
                                 .foregroundStyle(Brand.sigBlue)
+
+                            if !selectedTextTargetGroups().isEmpty {
+                                VStack(alignment: .leading, spacing: 6) {
+                                    Text(NSLocalizedString("Shared Text Target", comment: ""))
+                                        .font(.system(size: 9.5, weight: .semibold))
+                                        .foregroundStyle(.secondary)
+                                    TargetTextEditorInnerView(
+                                        text: Binding(
+                                            get: { inspOCRText },
+                                            set: { inspOCRText = $0 }
+                                        ),
+                                        onPick: onPickText
+                                    )
+                                    HStack(spacing: 6) {
+                                        labeledInlineDoubleField(NSLocalizedString("Timeout", comment: ""), value: $inspTimeout)
+                                        Button(NSLocalizedString("Apply to Selected", comment: "")) { applyBatchTextTarget() }
+                                            .buttonStyle(.borderedProminent)
+                                            .controlSize(.small)
+                                    }
+                                }
+                            }
                             
                             VStack(alignment: .leading, spacing: 6) {
                                 Text(NSLocalizedString("Align Coordinates", comment: ""))
@@ -246,23 +245,22 @@ struct EditorSidebar: View {
 
                 // Section 2: Selection / Edit Actions
                 section(NSLocalizedString("Selection", comment: ""), icon: "checklist") {
-                    Button(action: deleteSelected) {
-                        Label(NSLocalizedString("Delete selected", comment: ""), systemImage: "trash")
-                            .frame(maxWidth: .infinity)
-                    }
-                    .buttonStyle(.bordered)
-                    .controlSize(.small)
-                    .disabled(selection.isEmpty)
-                    .keyboardShortcut(.delete, modifiers: [])
+                    HStack(spacing: 6) {
+                        Button(action: deleteSelected) {
+                            Label(NSLocalizedString("Delete", comment: ""), systemImage: "trash")
+                                .frame(maxWidth: .infinity)
+                        }
+                        .keyboardShortcut(.delete, modifiers: [])
 
-                    Button(action: duplicateSelected) {
-                        Label(NSLocalizedString("Duplicate selected", comment: ""), systemImage: "plus.square.on.square")
-                            .frame(maxWidth: .infinity)
+                        Button(action: duplicateSelected) {
+                            Label(NSLocalizedString("Duplicate", comment: ""), systemImage: "plus.square.on.square")
+                                .frame(maxWidth: .infinity)
+                        }
+                        .keyboardShortcut("d", modifiers: .command)
                     }
                     .buttonStyle(.bordered)
                     .controlSize(.small)
                     .disabled(selection.isEmpty)
-                    .keyboardShortcut("d", modifiers: .command)
                     
                     HStack(spacing: 6) {
                         Button(action: bindSelectedBehavior) {
@@ -375,14 +373,22 @@ struct EditorSidebar: View {
                             tint: .secondary
                         ) { insertAction(.wait) }
 
-                        // Row 4: OCR / Vision Wait
+                        // Row 4: Vision & OCR Clicks
                         insertActionButton(
                             title: NSLocalizedString("Click Text", comment: ""),
-                            subtitle: NSLocalizedString("Find then click", comment: ""),
+                            subtitle: NSLocalizedString("Wait then click", comment: ""),
                             icon: "text.cursor",
                             tint: Brand.sigTeal
                         ) { insertTextClick() }
 
+                        insertActionButton(
+                            title: NSLocalizedString("Reveal & Click", comment: ""),
+                            subtitle: NSLocalizedString("Vision flow", comment: ""),
+                            icon: "sparkles.rectangle.stack",
+                            tint: Brand.sigTeal
+                        ) { insertRevealAndClickTextFlow() }
+
+                        // Row 5: Vision Waits
                         insertActionButton(
                             title: NSLocalizedString("Wait Text", comment: ""),
                             subtitle: NSLocalizedString("Wait to appear", comment: ""),
@@ -390,7 +396,14 @@ struct EditorSidebar: View {
                             tint: Brand.sigViolet
                         ) { insertAction(.waitForText) }
 
-                        // Row 5: Verification & Misc
+                        insertActionButton(
+                            title: NSLocalizedString("Wait Text Gone", comment: ""),
+                            subtitle: NSLocalizedString("Wait to disappear", comment: ""),
+                            icon: "text.badge.minus",
+                            tint: Brand.sigAmber
+                        ) { insertAction(.waitForTextGone) }
+
+                        // Row 6: Verification & Misc
                         insertActionButton(
                             title: NSLocalizedString("Verify Text", comment: ""),
                             subtitle: NSLocalizedString("Checkpoint", comment: ""),
@@ -420,21 +433,21 @@ struct EditorSidebar: View {
                             }
                             .controlSize(.small)
                             Spacer()
-                            Button(action: { shiftSelection(by: -shiftMs / 1000.0) }) {
-                                Image(systemName: "gobackward")
-                                    .font(.system(size: 10, weight: .bold))
+                            ControlGroup {
+                                Button(action: { shiftSelection(by: -shiftMs / 1000.0) }) {
+                                    Image(systemName: "gobackward")
+                                        .font(.system(size: 10, weight: .bold))
+                                }
+                                .disabled(selection.isEmpty)
+
+                                Button(action: { shiftSelection(by: shiftMs / 1000.0) }) {
+                                    Image(systemName: "goforward")
+                                        .font(.system(size: 10, weight: .bold))
+                                }
+                                .disabled(selection.isEmpty)
                             }
-                            .buttonStyle(.bordered)
+                            .controlGroupStyle(.navigation)
                             .controlSize(.small)
-                            .disabled(selection.isEmpty)
-                            
-                            Button(action: { shiftSelection(by: shiftMs / 1000.0) }) {
-                                Image(systemName: "goforward")
-                                    .font(.system(size: 10, weight: .bold))
-                            }
-                            .buttonStyle(.bordered)
-                            .controlSize(.small)
-                            .disabled(selection.isEmpty)
                         }
                     }
                     
@@ -467,50 +480,26 @@ struct EditorSidebar: View {
             .padding(14)
         }
         .background(VisualEffectBackground(material: .sidebar, blendingMode: .behindWindow))
-        .onDisappear {
-            stopRecordingKey()
-        }
-        .onChange(of: selection) {
-            stopRecordingKey()
-        }
     }
 
-    func startRecordingKey() {
-        if keyMonitor != nil {
-            stopRecordingKey()
-            return
-        }
-        isRecordingKey = true
-        recordedFlags = 0
-        
-        keyMonitor = NSEvent.addLocalMonitorForEvents(matching: [.keyDown, .flagsChanged]) { event in
-            if event.type == .flagsChanged {
-                let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
-                DispatchQueue.main.async {
-                    self.recordedFlags = UInt64(flags.rawValue)
-                }
-                return nil
-            } else if event.type == .keyDown {
-                let code = event.keyCode
-                let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
-                DispatchQueue.main.async {
-                    self.inspKey = "\(code)"
-                    self.inspFlags = UInt64(flags.rawValue)
-                    self.applyInspector()
-                    self.stopRecordingKey()
-                }
-                return nil
-            }
-            return event
-        }
+    func keyboardShortcutBinding(for group: ActionGroup) -> Binding<HotkeyBinding?> {
+        Binding(
+            get: {
+                guard let keyCode = UInt16(inspKey) ?? group.keyCode else { return nil }
+                let flags = inspFlags
+                return HotkeyBinding(
+                    keyCode: UInt32(keyCode),
+                    name: shortcutName(keyCode: keyCode, flags: flags)
+                )
+            },
+            set: { _ in }
+        )
     }
-    
-    func stopRecordingKey() {
-        if let monitor = keyMonitor {
-            NSEvent.removeMonitor(monitor)
-            keyMonitor = nil
-        }
-        isRecordingKey = false
+
+    func applyRecordedShortcut(_ recording: ShortcutRecording) {
+        inspKey = String(recording.keyCode)
+        inspFlags = recording.eventFlags
+        applyInspector()
     }
 
     @ViewBuilder
@@ -591,11 +580,14 @@ struct EditorSidebar: View {
                 }
                 Spacer(minLength: 0)
             }
-            .frame(maxWidth: .infinity, minHeight: 34, alignment: .leading)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.vertical, 4)
+            .padding(.horizontal, 6)
         }
         .buttonStyle(.bordered)
-        .controlSize(.small)
+        .controlSize(.regular)
     }
+
 
     @ViewBuilder
     func inspectorGrid(@ViewBuilder content: () -> some View) -> some View {
@@ -637,6 +629,27 @@ struct EditorSidebar: View {
                 }
             }
         ))
+    }
+
+    @ViewBuilder
+    func labeledInlineDoubleField(_ title: String, value: Binding<Double>) -> some View {
+        HStack(spacing: 5) {
+            Text(title)
+                .font(.system(size: 9.5, weight: .medium))
+                .foregroundStyle(.secondary)
+            TextField(title, text: Binding(
+                get: { String(format: "%.2f", value.wrappedValue) },
+                set: { newValue in
+                    if let parsed = Double(newValue) {
+                        value.wrappedValue = parsed
+                    }
+                }
+            ))
+            .textFieldStyle(.roundedBorder)
+            .font(.system(.callout, design: .monospaced))
+            .controlSize(.small)
+            .frame(width: 64)
+        }
     }
     
     func firstEvent(for group: ActionGroup) -> RecordedEvent? {
@@ -767,19 +780,25 @@ struct EditorSidebar: View {
         return anchor
     }
     
-    func insertionIndexAfterSelection() -> Int {
+    func insertionPlacementAfterSelection() -> ActionInsertionPlacement {
         guard let anchor = insertionAnchor()?.row else {
-            return recorder.events.count
+            return ActionInsertionPlacement(eventIndex: recorder.events.count, explicitStartTime: nil)
         }
         
         let group = anchor.group
         if let lastEventIndex = group.eventIndices.last {
-            return min(lastEventIndex + 1, recorder.events.count)
+            return ActionInsertionPlacement(eventIndex: min(lastEventIndex + 1, recorder.events.count), explicitStartTime: nil)
         }
         
-        return recorder.events.firstIndex { event in
+        let index = recorder.events.firstIndex { event in
             event.time >= group.endTime
         } ?? recorder.events.count
+        let explicitStartTime = group.kind.isPassiveWait ? group.endTime : nil
+        return ActionInsertionPlacement(eventIndex: index, explicitStartTime: explicitStartTime)
+    }
+
+    func insertionIndexAfterSelection() -> Int {
+        insertionPlacementAfterSelection().eventIndex
     }
     
     func selectInsertedEvents(in range: Range<Int>) {
@@ -787,8 +806,32 @@ struct EditorSidebar: View {
             let groups = self.onRefreshRows().map(\.group)
             if let inserted = ActionGroupProjection.firstGroup(containingEventIn: range, groups: groups) {
                 self.selection = [inserted.id]
-                self.onLoadInspector()
-                self.onUpdatePreview()
+                DispatchQueue.main.async {
+                    self.onLoadInspector()
+                    self.onUpdatePreview()
+                }
+            }
+        }
+    }
+
+    func selectInsertedTextTargets(in range: Range<Int>) {
+        DispatchQueue.main.async {
+            let groups = self.onRefreshRows().map(\.group)
+            let textGroups = groups.filter { group in
+                group.eventIndices.contains { range.contains($0) } && self.isTextTargetGroup(group)
+            }
+            if !textGroups.isEmpty {
+                self.selection = Set(textGroups.map(\.id))
+                DispatchQueue.main.async {
+                    self.onLoadInspector()
+                    self.onUpdatePreview()
+                }
+            } else if let inserted = ActionGroupProjection.firstGroup(containingEventIn: range, groups: groups) {
+                self.selection = [inserted.id]
+                DispatchQueue.main.async {
+                    self.onLoadInspector()
+                    self.onUpdatePreview()
+                }
             }
         }
     }
@@ -798,8 +841,10 @@ struct EditorSidebar: View {
             let groups = self.onRefreshRows().map(\.group)
             if let wait = ActionGroupProjection.firstWaitGroup(start: start, end: end, groups: groups) {
                 self.selection = [wait.id]
-                self.onLoadInspector()
-                self.onUpdatePreview()
+                DispatchQueue.main.async {
+                    self.onLoadInspector()
+                    self.onUpdatePreview()
+                }
             }
         }
     }
@@ -816,6 +861,20 @@ struct EditorSidebar: View {
         rows.compactMap { row in
             selection.contains(row.id) ? row.group : nil
         }
+    }
+
+    func isTextTargetGroup(_ group: ActionGroup) -> Bool {
+        if group.kind.editsSemanticTextTarget { return true }
+        guard group.kind.canUseLocatorStrategy else { return false }
+        return group.textAnchor != nil || group.eventIndices.contains { index in
+            guard recorder.events.indices.contains(index) else { return false }
+            let event = recorder.events[index]
+            return event.coordinateStrategy == .locatorOnly || event.textAnchor != nil
+        }
+    }
+
+    func selectedTextTargetGroups() -> [ActionGroup] {
+        selectedGroups().filter(isTextTargetGroup)
     }
 
     var canBindSelection: Bool {
@@ -1023,7 +1082,8 @@ struct EditorSidebar: View {
     }
 
 	    func insertAction(_ kind: ActionGroupKind) {
-	        let idx = insertionIndexAfterSelection()
+	        let placement = insertionPlacementAfterSelection()
+	        let idx = placement.eventIndex
 	        let clampedIndex = max(0, min(idx, recorder.events.count))
         let insertedCount = kind.insertedEventCount
         let waitDelta = max(0, insertWaitMs / 1000.0)
@@ -1049,8 +1109,12 @@ struct EditorSidebar: View {
             case .scroll: recorder.events.insertScroll(at: clampedIndex)
             case .keyPress: recorder.events.insertKeystroke(at: clampedIndex)
             case .waitForText: recorder.events.insertWaitForText(at: clampedIndex)
+            case .waitForTextGone: recorder.events.insertWaitForTextGone(at: clampedIndex)
             case .verifyText: recorder.events.insertVerifyText(at: clampedIndex)
             default: break
+            }
+            if !kind.isPassiveWait, insertedCount > 0, let explicitStartTime = placement.explicitStartTime {
+                retimeInsertedEvents(in: clampedIndex..<(clampedIndex + insertedCount), toStartTime: explicitStartTime)
             }
         }
         
@@ -1062,14 +1126,54 @@ struct EditorSidebar: View {
 	    }
     
     func insertTextClick() {
-        let idx = insertionIndexAfterSelection()
+        let placement = insertionPlacementAfterSelection()
+        let idx = placement.eventIndex
         let clampedIndex = max(0, min(idx, recorder.events.count))
         
         withUndo(NSLocalizedString("Insert Click Text", comment: "")) {
             recorder.events.insertTextClick(at: clampedIndex)
+            if let explicitStartTime = placement.explicitStartTime {
+                retimeInsertedEvents(in: clampedIndex..<(clampedIndex + 2), toStartTime: explicitStartTime)
+            }
         }
         
         selectInsertedEvents(in: clampedIndex..<(clampedIndex + 2))
+    }
+
+    func insertRevealAndClickTextFlow() {
+        let placement = insertionPlacementAfterSelection()
+        let clampedIndex = max(0, min(placement.eventIndex, recorder.events.count))
+        let delay = placement.explicitStartTime == nil ? max(0, insertWaitMs / 1000.0) : 0
+        var insertedRange = clampedIndex..<clampedIndex
+
+        withUndo(NSLocalizedString("Insert Reveal and Click Text", comment: "")) {
+            insertedRange = recorder.events.insertRevealAndClickTextFlow(at: clampedIndex, preDelay: delay)
+            if let explicitStartTime = placement.explicitStartTime {
+                retimeInsertedEvents(in: insertedRange, toStartTime: explicitStartTime)
+            }
+        }
+
+        selectInsertedTextTargets(in: insertedRange)
+    }
+
+    func retimeInsertedEvents(in range: Range<Int>, toStartTime startTime: TimeInterval) {
+        guard startTime.isFinite,
+              range.lowerBound >= 0,
+              range.upperBound <= recorder.events.count,
+              range.lowerBound < range.upperBound else {
+            return
+        }
+        let baseTime = recorder.events[range.lowerBound].time
+        let delta = startTime - baseTime
+        guard delta != 0 else { return }
+
+        for index in range {
+            recorder.events[index].time += delta
+        }
+        recorder.events.sortByTimePreservingOrder()
+        if let lastTime = recorder.events.last?.time {
+            recorder.liveDuration = max(recorder.liveDuration, lastTime)
+        }
     }
 
 	    func applyStretch() {
@@ -1256,6 +1360,36 @@ struct EditorSidebar: View {
                         timeout: inspTimeout,
                         verifyMustExist: firstEvent(for: grp)?.verifyMustExist,
                         fallbackPolicy: firstEvent(for: grp)?.locatorFallbackPolicy
+                    )
+                }
+            }
+        }
+        onLoadInspector()
+        onUpdatePreview()
+    }
+
+    func applyBatchTextTarget() {
+        let targetGroups = selectedTextTargetGroups()
+        guard !targetGroups.isEmpty else { return }
+
+        withUndo(NSLocalizedString("Batch Set Text Target", comment: "")) {
+            for group in targetGroups {
+                let anchor = updatedAnchor(for: group, text: inspOCRText)
+                if group.kind.editsSemanticTextTarget {
+                    recorder.events.updateSemanticAction(
+                        at: group.eventIndices,
+                        textAnchor: anchor,
+                        timeout: inspTimeout,
+                        verifyMustExist: group.verifyMustExist ?? true,
+                        fallbackPolicy: firstEvent(for: group)?.locatorFallbackPolicy
+                    )
+                } else {
+                    recorder.events.updateCoordinateStrategy(
+                        at: group.eventIndices,
+                        strategy: .locatorOnly,
+                        textAnchor: anchor,
+                        fallbackPolicy: firstEvent(for: group)?.locatorFallbackPolicy ?? inspFallbackPolicy,
+                        textTimeout: inspTimeout
                     )
                 }
             }

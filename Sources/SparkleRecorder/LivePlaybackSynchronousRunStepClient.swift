@@ -86,29 +86,35 @@ struct LivePlaybackSynchronousRunStepClient: Sendable {
         if event.kind == .waitForText, let anchor = event.textAnchor {
             let text = anchor.text
             let timeout = event.textTimeout ?? 10.0
+            let mustExist = event.verifyMustExist ?? true
             let startPoll = playbackClock.now()
-            var found = false
+            var matched = false
             if #available(macOS 14.0, *) {
                 let contextSnapshot = runningContext
-                found = awaitSynchronously {
+                matched = awaitSynchronously {
                     let locator = LocatorEngine()
                     while playbackClock.now() - startPoll < timeout {
+                        let found: Bool
                         do {
                             _ = try await locator.locate(
                                 event: event,
                                 context: contextSnapshot,
                                 strategies: [.ocr(anchor)]
                             )
-                            return true
+                            found = true
                         } catch {
-                            await playbackClock.sleep(0.5)
+                            found = false
                         }
+                        if found == mustExist {
+                            return true
+                        }
+                        await playbackClock.sleep(0.5)
                     }
                     return false
                 }
             }
-            guard found else {
-                return .failed(reason: "waitForText timeout: '\(text)'")
+            guard matched else {
+                return .failed(reason: "waitForText timeout: '\(text)' mustExist=\(mustExist)")
             }
             return .succeeded(.semanticWaitCompleted)
         }

@@ -4,6 +4,17 @@ import CoreGraphics
 import SparkleRecorderCore
 
 extension Array where Element == RecordedEvent {
+    public mutating func sortByTimePreservingOrder() {
+        self = enumerated()
+            .sorted { left, right in
+                if left.element.time == right.element.time {
+                    return left.offset < right.offset
+                }
+                return left.element.time < right.element.time
+            }
+            .map(\.element)
+    }
+
     public mutating func deleteEvents(at indices: IndexSet) {
         let sorted = indices.sorted(by: >)
         for i in sorted where self.indices.contains(i) {
@@ -18,7 +29,7 @@ extension Array where Element == RecordedEvent {
     public mutating func updateEvent(at index: Int, with new: RecordedEvent) -> Int? {
         guard self.indices.contains(index) else { return nil }
         self[index] = new
-        self.sort { $0.time < $1.time }
+        self.sortByTimePreservingOrder()
 
         return self.firstIndex(of: new)
     }
@@ -246,7 +257,7 @@ extension Array where Element == RecordedEvent {
         for i in indices where self.indices.contains(i) {
             self[i].time = baseTime + (self[i].time - baseTime) * f
         }
-        self.sort { $0.time < $1.time }
+        self.sortByTimePreservingOrder()
 
     }
 
@@ -265,7 +276,7 @@ extension Array where Element == RecordedEvent {
         for i in indices where self.indices.contains(i) {
             self[i].time = Swift.max(0, self[i].time + delta)
         }
-        self.sort { $0.time < $1.time }
+        self.sortByTimePreservingOrder()
 
     }
 
@@ -314,7 +325,7 @@ extension Array where Element == RecordedEvent {
         let up = RecordedEvent(kind: .leftMouseUp, time: t + 0.1, x: 100, y: 100, keyCode: 0, flags: 0, mouseButton: 0, clickCount: 1, scrollDeltaY: 0, scrollDeltaX: 0)
         for i in clamped..<self.count { self[i].time += 0.2 }
         self.insert(contentsOf: [down, up], at: clamped)
-        self.sort { $0.time < $1.time }
+        self.sortByTimePreservingOrder()
 
     }
     
@@ -325,7 +336,7 @@ extension Array where Element == RecordedEvent {
         let up = RecordedEvent(kind: .leftMouseUp, time: t + 0.1, x: 100, y: 100, keyCode: 0, flags: 0, mouseButton: 0, clickCount: 2, scrollDeltaY: 0, scrollDeltaX: 0)
         for i in clamped..<self.count { self[i].time += 0.2 }
         self.insert(contentsOf: [down, up], at: clamped)
-        self.sort { $0.time < $1.time }
+        self.sortByTimePreservingOrder()
     }
 
     public mutating func insertMultiPointClick(at index: Int) {
@@ -340,7 +351,7 @@ extension Array where Element == RecordedEvent {
         let duration = (inserted.last?.time ?? t) - t + 0.04
         for i in clamped..<self.count { self[i].time += duration }
         self.insert(contentsOf: inserted, at: clamped)
-        self.sort { $0.time < $1.time }
+        self.sortByTimePreservingOrder()
     }
     
     public mutating func insertTextClick(at index: Int) {
@@ -383,7 +394,7 @@ extension Array where Element == RecordedEvent {
         )
         for i in clamped..<self.count { self[i].time += 0.2 }
         self.insert(contentsOf: [down, up], at: clamped)
-        self.sort { $0.time < $1.time }
+        self.sortByTimePreservingOrder()
     }
     
     public mutating func insertDrag(at index: Int) {
@@ -394,7 +405,7 @@ extension Array where Element == RecordedEvent {
         let up = RecordedEvent(kind: .leftMouseUp, time: t + 0.4, x: 200, y: 200, keyCode: 0, flags: 0, mouseButton: 0, clickCount: 1, scrollDeltaY: 0, scrollDeltaX: 0)
         for i in clamped..<self.count { self[i].time += 0.5 }
         self.insert(contentsOf: [down, drag, up], at: clamped)
-        self.sort { $0.time < $1.time }
+        self.sortByTimePreservingOrder()
 
     }
     
@@ -404,7 +415,7 @@ extension Array where Element == RecordedEvent {
         let scroll = RecordedEvent(kind: .scrollWheel, time: t, x: 100, y: 100, keyCode: 0, flags: 0, mouseButton: 0, clickCount: 0, scrollDeltaY: 10, scrollDeltaX: 0, scrollPayload: ScrollPayload(deltaX: 0, deltaY: 10, phase: 0, isContinuous: false))
         for i in clamped..<self.count { self[i].time += 0.2 }
         self.insert(scroll, at: clamped)
-        self.sort { $0.time < $1.time }
+        self.sortByTimePreservingOrder()
     }
 
     public mutating func appendMultiPointClick(at indices: [Int], point: CGPoint) {
@@ -416,7 +427,7 @@ extension Array where Element == RecordedEvent {
         let duration = (inserted.last?.time ?? startTime) - startTime + 0.04
         for i in insertIndex..<self.count { self[i].time += duration }
         self.insert(contentsOf: inserted, at: insertIndex)
-        self.sort { $0.time < $1.time }
+        self.sortByTimePreservingOrder()
     }
 
     public mutating func translateMultiPointClickPoint(at indices: [Int], pointIndex: Int, dx: CGFloat, dy: CGFloat, surfaces: [String: PlaybackSurface] = [:]) {
@@ -489,18 +500,27 @@ extension Array where Element == RecordedEvent {
         let up = RecordedEvent(kind: .keyUp, time: t + 0.1, x: 0, y: 0, keyCode: 49, flags: 0, mouseButton: 0, clickCount: 0, scrollDeltaY: 0, scrollDeltaX: 0)
         for i in clamped..<self.count { self[i].time += 0.2 }
         self.insert(contentsOf: [down, up], at: clamped)
-        self.sort { $0.time < $1.time }
+        self.sortByTimePreservingOrder()
 
     }
     
     public mutating func insertWaitForText(at index: Int) {
         let t = self.isEmpty ? 0 : (index > 0 && index <= self.count ? self[index - 1].time + 0.1 : self.last!.time + 0.1)
         let clamped = Swift.max(0, Swift.min(index, self.count))
-        let ev = RecordedEvent(kind: .waitForText, time: t, x: 0, y: 0, keyCode: 0, flags: 0, mouseButton: 0, clickCount: 0, scrollDeltaY: 0, scrollDeltaX: 0, textAnchor: TextAnchor(text: "", observedFrame: RectValue(x: 0, y: 0, width: 0, height: 0)), textTimeout: 10.0)
+        let ev = RecordedEvent(kind: .waitForText, time: t, x: 0, y: 0, keyCode: 0, flags: 0, mouseButton: 0, clickCount: 0, scrollDeltaY: 0, scrollDeltaX: 0, textAnchor: TextAnchor(text: "", observedFrame: RectValue(x: 0, y: 0, width: 0, height: 0)), textTimeout: 10.0, verifyMustExist: true)
         for i in clamped..<self.count { self[i].time += 0.2 }
         self.insert(ev, at: clamped)
-        self.sort { $0.time < $1.time }
+        self.sortByTimePreservingOrder()
 
+    }
+
+    public mutating func insertWaitForTextGone(at index: Int) {
+        let t = self.isEmpty ? 0 : (index > 0 && index <= self.count ? self[index - 1].time + 0.1 : self.last!.time + 0.1)
+        let clamped = Swift.max(0, Swift.min(index, self.count))
+        let ev = RecordedEvent(kind: .waitForText, time: t, x: 0, y: 0, keyCode: 0, flags: 0, mouseButton: 0, clickCount: 0, scrollDeltaY: 0, scrollDeltaX: 0, textAnchor: TextAnchor(text: "", observedFrame: RectValue(x: 0, y: 0, width: 0, height: 0)), textTimeout: 10.0, verifyMustExist: false)
+        for i in clamped..<self.count { self[i].time += 0.2 }
+        self.insert(ev, at: clamped)
+        self.sortByTimePreservingOrder()
     }
     
     public mutating func insertVerifyText(at index: Int) {
@@ -509,8 +529,62 @@ extension Array where Element == RecordedEvent {
         let ev = RecordedEvent(kind: .verifyText, time: t, x: 0, y: 0, keyCode: 0, flags: 0, mouseButton: 0, clickCount: 0, scrollDeltaY: 0, scrollDeltaX: 0, textAnchor: TextAnchor(text: "", observedFrame: RectValue(x: 0, y: 0, width: 0, height: 0)), verifyMustExist: true)
         for i in clamped..<self.count { self[i].time += 0.2 }
         self.insert(ev, at: clamped)
-        self.sort { $0.time < $1.time }
+        self.sortByTimePreservingOrder()
 
+    }
+
+    @discardableResult
+    public mutating func insertRevealAndClickTextFlow(
+        at index: Int,
+        preDelay: TimeInterval
+    ) -> Range<Int> {
+        let clamped = Swift.max(0, Swift.min(index, self.count))
+        let previousTime = clamped > 0 ? self[clamped - 1].time : 0
+        let revealDownTime = previousTime + Swift.max(0, preDelay)
+        let anchor = TextAnchor(text: "", observedFrame: RectValue(x: 0, y: 0, width: 0, height: 0))
+        let revealDown = RecordedEvent(kind: .leftMouseDown, time: revealDownTime, x: 100, y: 100, keyCode: 0, flags: 0, mouseButton: 0, clickCount: 1, scrollDeltaY: 0, scrollDeltaX: 0)
+        let revealUp = RecordedEvent(kind: .leftMouseUp, time: revealDownTime + 0.08, x: 100, y: 100, keyCode: 0, flags: 0, mouseButton: 0, clickCount: 1, scrollDeltaY: 0, scrollDeltaX: 0)
+        let waitText = RecordedEvent(kind: .waitForText, time: revealDownTime + 0.18, x: 0, y: 0, keyCode: 0, flags: 0, mouseButton: 0, clickCount: 0, scrollDeltaY: 0, scrollDeltaX: 0, textAnchor: anchor, textTimeout: 10.0, verifyMustExist: true)
+        let textDown = RecordedEvent(
+            kind: .leftMouseDown,
+            time: revealDownTime + 0.30,
+            x: 100,
+            y: 100,
+            keyCode: 0,
+            flags: 0,
+            mouseButton: 0,
+            clickCount: 1,
+            scrollDeltaY: 0,
+            scrollDeltaX: 0,
+            coordinateBinding: .targetWindow,
+            coordinateStrategy: .locatorOnly,
+            locatorFallbackPolicy: .fail,
+            textAnchor: anchor,
+            textTimeout: 10.0
+        )
+        let textUp = RecordedEvent(
+            kind: .leftMouseUp,
+            time: revealDownTime + 0.38,
+            x: 100,
+            y: 100,
+            keyCode: 0,
+            flags: 0,
+            mouseButton: 0,
+            clickCount: 1,
+            scrollDeltaY: 0,
+            scrollDeltaX: 0,
+            coordinateBinding: .targetWindow,
+            coordinateStrategy: .locatorOnly,
+            locatorFallbackPolicy: .fail,
+            textAnchor: anchor,
+            textTimeout: 10.0
+        )
+        let inserted = [revealDown, revealUp, waitText, textDown, textUp]
+        let shift = (inserted.last?.time ?? revealDownTime) - previousTime + 0.08
+        for i in clamped..<self.count { self[i].time += shift }
+        self.insert(contentsOf: inserted, at: clamped)
+        self.sortByTimePreservingOrder()
+        return clamped..<(clamped + inserted.count)
     }
 
     public mutating func reorderGroup(sourceEventIndices: [Int], beforeEventIndex: Int?) {
@@ -541,9 +615,9 @@ extension Array where Element == RecordedEvent {
         let start_delay = nonWaitGroups[0].startTime
         var intervals = [TimeInterval](repeating: 0, count: n - 1)
         for i in 0..<n-1 {
-            intervals[i] = nonWaitGroups[i+1].startTime - nonWaitGroups[i].endTime
+            intervals[i] = Swift.max(0, nonWaitGroups[i+1].startTime - nonWaitGroups[i].endTime)
         }
-        let end_delay = (self.last?.time ?? 0) - nonWaitGroups.last!.endTime
+        let end_delay = Swift.max(0, (self.last?.time ?? 0) - nonWaitGroups.last!.endTime)
         
         var newOrder: [Int] = (0..<n).map { $0 }
         let movingSet = Set(movingIndices)
@@ -575,7 +649,7 @@ extension Array where Element == RecordedEvent {
             self[evIdx].time = t
         }
         
-        self.sort { $0.time < $1.time }
+        self.sortByTimePreservingOrder()
     }
 
     /// Duplicate a group of events. The copies are placed right after the originals

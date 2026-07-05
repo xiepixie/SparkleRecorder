@@ -4,6 +4,7 @@ import SparkleRecorderCore
 struct AutomationWorkflowRow: View {
     let workflow: AutomationWorkflowProjection
     let isSelected: Bool
+    @State private var isHovered = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -30,7 +31,13 @@ struct AutomationWorkflowRow: View {
         }
         .padding(10)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .controlSurface(cornerRadius: 8, tint: Brand.libraryBlue, isActive: isSelected)
+        .background(
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .fill(isSelected ? Brand.libraryBlue.opacity(0.15) : (isHovered ? Color.primary.opacity(0.05) : Color.clear))
+        )
+        .onHover { hover in
+            isHovered = hover
+        }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(String(
             format: NSLocalizedString("%@, %d tasks, %d dependencies", comment: ""),

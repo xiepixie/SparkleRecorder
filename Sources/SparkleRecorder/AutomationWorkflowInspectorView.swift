@@ -22,36 +22,31 @@ struct AutomationWorkflowInspectorView: View {
                     .textFieldStyle(.roundedBorder)
                     .onSubmit(saveWorkflowName)
 
-                Button("Save Workflow", systemImage: "checkmark", action: saveWorkflowName)
-                    .buttonStyle(.borderless)
-                    .controlSurface(cornerRadius: 8, tint: Brand.libraryBlue, isActive: false)
-                    .disabled(trimmedName.isEmpty || trimmedName == workflow.name)
+                Button(action: saveWorkflowName) {
+                    Label("Save Workflow", systemImage: "checkmark")
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.bordered)
+                .disabled(trimmedName.isEmpty || trimmedName == workflow.name)
 
                 VStack(alignment: .leading, spacing: 8) {
                     Button(action: onImportWorkflowPackage) {
                         Label(NSLocalizedString("Import Workflow Package", comment: ""), systemImage: "square.and.arrow.down")
-                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .frame(maxWidth: .infinity)
                     }
-                        .buttonStyle(.borderless)
-                        .controlSurface(cornerRadius: 8, tint: Brand.sigTeal, isActive: false)
+                    .buttonStyle(.bordered)
 
-                    Button {
-                        onExportWorkflowPackage(workflow)
-                    } label: {
+                    Button(action: { onExportWorkflowPackage(workflow) }) {
                         Label(NSLocalizedString("Export Workflow", comment: ""), systemImage: "square.and.arrow.up")
-                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .frame(maxWidth: .infinity)
                     }
-                    .buttonStyle(.borderless)
-                    .controlSurface(cornerRadius: 8, tint: Brand.libraryGreen, isActive: false)
+                    .buttonStyle(.bordered)
 
-                    Button {
-                        onShareWorkflowPackage(workflow)
-                    } label: {
+                    Button(action: { onShareWorkflowPackage(workflow) }) {
                         Label(NSLocalizedString("Share Workflow", comment: ""), systemImage: "square.and.arrow.up.on.square")
-                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .frame(maxWidth: .infinity)
                     }
-                    .buttonStyle(.borderless)
-                    .controlSurface(cornerRadius: 8, tint: Brand.sigAmber, isActive: false)
+                    .buttonStyle(.bordered)
                 }
             }
             .padding(10)
@@ -82,14 +77,14 @@ struct AutomationWorkflowInspectorView: View {
                     Button("Manual approval", systemImage: "hand.raised.fill") {
                         onAddConditionTask(.manualApproval)
                     }
-                    .buttonStyle(.borderless)
-                    .controlSurface(cornerRadius: 8, tint: Brand.sigAmber, isActive: false)
+                    .buttonStyle(.bordered)
+                    .tint(Brand.sigAmber)
 
                     Button("External signal", systemImage: "antenna.radiowaves.left.and.right") {
                         onAddConditionTask(.externalSignal(NSLocalizedString("Ready", comment: "")))
                     }
-                    .buttonStyle(.borderless)
-                    .controlSurface(cornerRadius: 8, tint: Brand.sigTeal, isActive: false)
+                    .buttonStyle(.bordered)
+                    .tint(Brand.sigTeal)
                 }
             }
             .padding(10)
@@ -112,7 +107,8 @@ struct AutomationWorkflowInspectorView: View {
                     }
                     .buttonStyle(.plain)
                     .padding(8)
-                    .controlSurface(cornerRadius: 8, tint: Brand.libraryBlue, isActive: false)
+                    .background(Color.secondary.opacity(0.1))
+                    .cornerRadius(8)
                 }
             }
 
@@ -135,7 +131,8 @@ struct AutomationWorkflowInspectorView: View {
                     }
                     .buttonStyle(.plain)
                     .padding(8)
-                    .controlSurface(cornerRadius: 8, tint: Brand.sigTeal, isActive: false)
+                    .background(Color.secondary.opacity(0.1))
+                    .cornerRadius(8)
                 }
             }
         }

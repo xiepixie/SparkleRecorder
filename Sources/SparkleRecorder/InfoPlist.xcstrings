@@ -1,0 +1,23 @@
+{
+  "sourceLanguage": "en",
+  "strings": {
+    "NSAppleEventsUsageDescription": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "SparkleRecorder uses system events to record and replay your input."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "SparkleRecorder 使用系统事件来录制和回放你的输入。"
+          }
+        }
+      }
+    }
+  },
+  "version": "1.0"
+}

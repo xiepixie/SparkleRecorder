@@ -1,6 +1,6 @@
 import Foundation
 
-public struct WaveformBar: Identifiable, Equatable, Sendable {
+public struct WaveformBar: Identifiable, Equatable, Codable, Sendable {
     public let id: Int
     public let kind: RecordedEvent.Kind
     public let positionFraction: Double

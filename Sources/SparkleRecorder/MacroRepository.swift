@@ -74,7 +74,14 @@ public actor MacroRepository {
             if url.pathExtension == "sparkrec" {
                 let manifestURL = url.appendingPathComponent("macro.json")
                 if let data = try? Data(contentsOf: manifestURL) {
-                    if let macro = try? decoder.decode(SavedMacro.self, from: data) {
+                    if var macro = try? decoder.decode(SavedMacro.self, from: data) {
+                        if macro.needsPreviewCacheRefresh,
+                           let events = try? loadEvents(for: macro.id) {
+                            macro.events = events
+                            macro.refreshCachesFromEvents()
+                            try? saveMetadata(macro)
+                            macro.events = []
+                        }
                         macros.append(macro)
                     }
                 }
@@ -105,8 +112,12 @@ public actor MacroRepository {
         }
         
         var manifest = macro
-        manifest.cachedDuration = macro.duration
-        manifest.cachedEventCount = macro.eventCount
+        if !manifest.events.isEmpty {
+            manifest.refreshCachesFromEvents()
+        } else {
+            manifest.cachedDuration = macro.duration
+            manifest.cachedEventCount = macro.eventCount
+        }
         manifest.events = [] // Clear out events so macro.json is lightweight!
         
         let manifestURL = packageURL.appendingPathComponent("macro.json")

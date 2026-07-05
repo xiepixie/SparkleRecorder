@@ -2,6 +2,8 @@
 
 本文档目录记录 SparkleRecorder 从“单个宏录制/播放器”走向“可编排桌面自动化引擎”的规划。这里不是产品说明页，而是工程执行索引：哪些已经完成、哪些必须串行、哪些可以并行、验收条件是什么。
 
+下一阶段 Workflow 页面产品化、前后端交付合同、CLI-first AI 接口规划在 [../workflow-page-productization/](../workflow-page-productization/) 维护。`automation-engine/` 继续作为底层引擎合同源头，不把当前 FlowGraph first pass 误认为最终可用页面。
+
 ## 阅读顺序
 
 1. [00-current-status.md](00-current-status.md)

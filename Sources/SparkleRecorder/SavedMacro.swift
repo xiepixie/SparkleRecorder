@@ -60,9 +60,16 @@ public struct SavedMacro: Codable, Identifiable, Equatable, Sendable {
     // Cached values for fast loading without parsing the heavy events array
     public var cachedDuration: TimeInterval?
     public var cachedEventCount: Int?
+    public var cachedWaveformBars: [WaveformBar]?
 
     public var duration: TimeInterval { cachedDuration ?? (events.last?.time ?? 0) }
     public var eventCount: Int { cachedEventCount ?? events.count }
+    public var waveformBars: [WaveformBar] {
+        if let cachedWaveformBars, !cachedWaveformBars.isEmpty {
+            return cachedWaveformBars
+        }
+        return WaveformProjection.timedBars(from: events, maxBars: Self.previewWaveformBarLimit, duration: duration)
+    }
     public var clickCount: Int {
         events.filter { $0.kind == .leftMouseDown || $0.kind == .rightMouseDown || $0.kind == .otherMouseDown }.count
     }
@@ -74,8 +81,10 @@ public struct SavedMacro: Codable, Identifiable, Equatable, Sendable {
         case loops, speed, surface, surfaces, followWindowOffset
         case icon, accent, tags, favorite, hotkey, notes, chainTo
         case playCount, lastPlayedAt, totalRunTime
-        case cachedDuration, cachedEventCount
+        case cachedDuration, cachedEventCount, cachedWaveformBars
     }
+
+    public static let previewWaveformBarLimit = 60
 
     public init(id: UUID = UUID(),
                 name: String,
@@ -117,6 +126,7 @@ public struct SavedMacro: Codable, Identifiable, Equatable, Sendable {
         self.playCount = playCount
         self.lastPlayedAt = lastPlayedAt
         self.totalRunTime = totalRunTime
+        refreshCachesFromEvents()
     }
 
     public init(from decoder: Decoder) throws {
@@ -147,6 +157,10 @@ public struct SavedMacro: Codable, Identifiable, Equatable, Sendable {
         self.totalRunTime = try c.decodeIfPresent(TimeInterval.self, forKey: .totalRunTime) ?? 0
         self.cachedDuration = try c.decodeIfPresent(TimeInterval.self, forKey: .cachedDuration)
         self.cachedEventCount = try c.decodeIfPresent(Int.self, forKey: .cachedEventCount)
+        self.cachedWaveformBars = try c.decodeIfPresent([WaveformBar].self, forKey: .cachedWaveformBars)
+        if !events.isEmpty {
+            fillMissingCachesFromEvents()
+        }
     }
 
     public func encode(to encoder: Encoder) throws {
@@ -173,5 +187,32 @@ public struct SavedMacro: Codable, Identifiable, Equatable, Sendable {
         try c.encode(totalRunTime, forKey: .totalRunTime)
         try c.encodeIfPresent(cachedDuration, forKey: .cachedDuration)
         try c.encodeIfPresent(cachedEventCount, forKey: .cachedEventCount)
+        try c.encodeIfPresent(cachedWaveformBars, forKey: .cachedWaveformBars)
+    }
+
+    public var needsPreviewCacheRefresh: Bool {
+        cachedDuration == nil || cachedEventCount == nil || cachedWaveformBars == nil
+    }
+
+    public mutating func refreshCachesFromEvents(maxWaveformBars: Int = Self.previewWaveformBarLimit) {
+        cachedDuration = events.last?.time ?? 0
+        cachedEventCount = events.count
+        cachedWaveformBars = WaveformProjection.timedBars(from: events, maxBars: maxWaveformBars, duration: cachedDuration)
+    }
+
+    private mutating func fillMissingCachesFromEvents() {
+        if cachedDuration == nil {
+            cachedDuration = events.last?.time ?? 0
+        }
+        if cachedEventCount == nil {
+            cachedEventCount = events.count
+        }
+        if cachedWaveformBars == nil {
+            cachedWaveformBars = WaveformProjection.timedBars(
+                from: events,
+                maxBars: Self.previewWaveformBarLimit,
+                duration: cachedDuration
+            )
+        }
     }
 }

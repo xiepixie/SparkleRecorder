@@ -52,7 +52,15 @@ public enum PreviewPathProjector {
         }()
 
         let projectedEnd: CGPoint? = {
-            guard let rawEndPoint = dragPath.last else { return selectedPoint }
+            guard let rawEndPoint = dragPath.last ?? selectedPoint else { return nil }
+            if dragPath.count <= 1 {
+                switch edit {
+                case .start(let translation), .end(let translation), .body(let translation):
+                    return translated(rawEndPoint, by: translation)
+                case .point, nil:
+                    return rawEndPoint
+                }
+            }
             switch edit {
             case .end(let translation), .body(let translation):
                 return translated(rawEndPoint, by: translation)
@@ -74,42 +82,54 @@ public enum PreviewPathProjector {
         previewsPointSequence: Bool,
         edit: PreviewPathEdit?
     ) -> [CGPoint] {
-        guard dragPath.count > 1 else { return [] }
-        guard let edit else { return dragPath }
+        let basePath: [CGPoint]
+        if dragPath.isEmpty, let selectedPoint {
+            basePath = [selectedPoint]
+        } else {
+            basePath = dragPath
+        }
+        guard !basePath.isEmpty else { return [] }
+        guard let edit else { return basePath }
 
         switch edit {
         case .start(let translation):
             if previewsPointSequence {
-                return dragPath
+                return basePath
             }
-            guard let start = selectedPoint ?? dragPath.first,
-                  let end = dragPath.last else {
-                return dragPath
+            guard let start = selectedPoint ?? basePath.first,
+                  let end = basePath.last else {
+                return basePath
+            }
+            guard basePath.count > 1 else {
+                return basePath.map { translated($0, by: translation) }
             }
             let newStart = translated(start, by: translation)
-            return dragPath.map {
+            return basePath.map {
                 conformPathPoint($0, oldStart: start, oldEnd: end, newStart: newStart, newEnd: end)
             }
 
         case .end(let translation):
             if previewsPointSequence {
-                return dragPath
+                return basePath
             }
-            guard let start = selectedPoint ?? dragPath.first,
-                  let end = dragPath.last else {
-                return dragPath
+            guard let start = selectedPoint ?? basePath.first,
+                  let end = basePath.last else {
+                return basePath
+            }
+            guard basePath.count > 1 else {
+                return basePath.map { translated($0, by: translation) }
             }
             let newEnd = translated(end, by: translation)
-            return dragPath.map {
+            return basePath.map {
                 conformPathPoint($0, oldStart: start, oldEnd: end, newStart: start, newEnd: newEnd)
             }
 
         case .body(let translation):
-            return dragPath.map { translated($0, by: translation) }
+            return basePath.map { translated($0, by: translation) }
 
         case .point(let pointIndex, let translation):
-            guard dragPath.indices.contains(pointIndex) else { return dragPath }
-            return dragPath.enumerated().map { index, point in
+            guard basePath.indices.contains(pointIndex) else { return basePath }
+            return basePath.enumerated().map { index, point in
                 index == pointIndex ? translated(point, by: translation) : point
             }
         }
