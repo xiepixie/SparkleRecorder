@@ -67,6 +67,17 @@ private func runWorkflowCLI(_ args: [String]) -> Never {
 
         if workflowArgs.count >= 2,
            workflowArgs[0] == "product-evidence",
+           workflowArgs[1] == "capture-plan" {
+            let exitCode = try runWorkflowProductEvidenceCapturePlan(
+                Array(workflowArgs.dropFirst(2)),
+                command: "workflow product-evidence capture-plan",
+                wantsJSON: wantsJSON
+            )
+            exit(Int32(exitCode))
+        }
+
+        if workflowArgs.count >= 2,
+           workflowArgs[0] == "product-evidence",
            workflowArgs[1] == "sidecar-template" {
             let exitCode = try runWorkflowProductEvidenceSidecarTemplate(
                 Array(workflowArgs.dropFirst(2)),
@@ -502,6 +513,102 @@ private func runWorkflowProductEvidenceAudit(
     }
 
     return requireLive && !payload.allRequiredPresent ? 1 : 0
+}
+
+private func runWorkflowProductEvidenceCapturePlan(
+    _ arguments: [String],
+    command: String,
+    wantsJSON: Bool
+) throws -> Int {
+    var directoryURL = URL(fileURLWithPath: AutomationProductEvidenceAudit.defaultDirectory, isDirectory: true)
+    var index = 0
+
+    while index < arguments.count {
+        let token = arguments[index]
+        switch token {
+        case "--json":
+            break
+        case "--directory":
+            guard index + 1 < arguments.count else {
+                throw WorkflowCLIError("missingArgument", "--directory requires a path.", path: token)
+            }
+            directoryURL = URL(fileURLWithPath: arguments[index + 1], isDirectory: true)
+            index += 1
+        default:
+            if token.hasPrefix("--") {
+                throw WorkflowCLIError("unsupportedOption", "Unsupported option '\(token)'.", path: token)
+            }
+            throw WorkflowCLIError("unexpectedArgument", "Unexpected argument '\(token)'.", path: token)
+        }
+        index += 1
+    }
+
+    let resolvedDirectoryURL = directoryURL.standardizedFileURL
+    let existingPaths = try productEvidenceExistingPaths(in: resolvedDirectoryURL)
+    let sidecarContents = try productEvidenceSidecarContents(
+        in: resolvedDirectoryURL,
+        existingPaths: existingPaths
+    )
+    let payload = AutomationProductEvidenceAudit.liveCapturePlan(
+        directory: resolvedDirectoryURL.path,
+        existingPaths: existingPaths,
+        sidecarContents: sidecarContents
+    )
+    let warnings = payload.items
+        .filter { !$0.satisfied }
+        .map { item in
+            AutomationCLIMessage(
+                code: "missingLiveProductEvidence",
+                message: "\(item.title) still needs a live clip and completed sidecar.",
+                path: item.id
+            )
+        }
+    let envelope = AutomationCLIResultEnvelope<AutomationProductEvidenceCapturePlanPayload>(
+        ok: true,
+        command: command,
+        data: payload,
+        warnings: warnings,
+        nextActions: payload.allLiveSatisfied ? [
+            AutomationCLINextAction(
+                command: "SparkleRecorder workflow product-evidence audit --require-live --json",
+                reason: "Run the strict gate before marking S0 complete."
+            )
+        ] : [
+            AutomationCLINextAction(
+                command: "Use the sidecarTemplateCommand from each missing item, fill the sidecar, save the live clip, then rerun capture-plan.",
+                reason: "The plan keeps capture preparation separate from the strict completion gate."
+            ),
+            AutomationCLINextAction(
+                command: "SparkleRecorder workflow product-evidence audit --require-live --json",
+                reason: "Strict S0 audit must remain red until every live clip and sidecar is present."
+            )
+        ]
+    )
+
+    if wantsJSON {
+        writeWorkflowJSON(envelope)
+    } else {
+        let summary = "SparkleRecorder: S0 live capture plan \(payload.missingLiveCount)/\(payload.items.count) live gates missing."
+        FileHandle.standardOutput.write(Data((summary + "\n").utf8))
+        for item in payload.items {
+            let status = item.satisfied ? "satisfied" : "missing"
+            FileHandle.standardOutput.write(Data(("\n- \(item.title) [\(status)]\n").utf8))
+            FileHandle.standardOutput.write(Data(("  \(item.note)\n").utf8))
+            for option in item.options {
+                FileHandle.standardOutput.write(Data(("  option sidecar: \(option.sidecarPath)\n").utf8))
+                FileHandle.standardOutput.write(Data(("    clips: \(option.clipPathCandidates.joined(separator: ", "))\n").utf8))
+                FileHandle.standardOutput.write(Data(("    template: \(option.sidecarTemplateCommand)\n").utf8))
+                if !option.missingPaths.isEmpty {
+                    FileHandle.standardOutput.write(Data(("    missing: \(option.missingPaths.joined(separator: ", "))\n").utf8))
+                }
+                if !option.incompleteSidecarLabels.isEmpty {
+                    FileHandle.standardOutput.write(Data(("    incomplete labels: \(option.incompleteSidecarLabels.joined(separator: ", "))\n").utf8))
+                }
+            }
+        }
+    }
+
+    return 0
 }
 
 private func runWorkflowProductEvidenceSidecarTemplate(

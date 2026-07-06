@@ -126,6 +126,72 @@ public struct AutomationProductEvidenceSidecarTemplatePayload: Codable, Equatabl
     }
 }
 
+public struct AutomationProductEvidenceCapturePlanPayload: Codable, Equatable, Sendable {
+    public var directory: String
+    public var missingLiveCount: Int
+    public var allLiveSatisfied: Bool
+    public var items: [AutomationProductEvidenceCapturePlanItem]
+
+    public init(
+        directory: String,
+        missingLiveCount: Int,
+        allLiveSatisfied: Bool,
+        items: [AutomationProductEvidenceCapturePlanItem]
+    ) {
+        self.directory = directory
+        self.missingLiveCount = missingLiveCount
+        self.allLiveSatisfied = allLiveSatisfied
+        self.items = items
+    }
+}
+
+public struct AutomationProductEvidenceCapturePlanItem: Codable, Equatable, Sendable {
+    public var id: String
+    public var title: String
+    public var satisfied: Bool
+    public var note: String
+    public var options: [AutomationProductEvidenceCapturePlanOption]
+
+    public init(
+        id: String,
+        title: String,
+        satisfied: Bool,
+        note: String,
+        options: [AutomationProductEvidenceCapturePlanOption]
+    ) {
+        self.id = id
+        self.title = title
+        self.satisfied = satisfied
+        self.note = note
+        self.options = options
+    }
+}
+
+public struct AutomationProductEvidenceCapturePlanOption: Codable, Equatable, Sendable {
+    public var sidecarPath: String
+    public var clipPathCandidates: [String]
+    public var missingPaths: [String]
+    public var incompleteSidecarLabels: [String]
+    public var sidecarTemplateCommand: String
+    public var acceptanceFocus: String
+
+    public init(
+        sidecarPath: String,
+        clipPathCandidates: [String],
+        missingPaths: [String],
+        incompleteSidecarLabels: [String],
+        sidecarTemplateCommand: String,
+        acceptanceFocus: String
+    ) {
+        self.sidecarPath = sidecarPath
+        self.clipPathCandidates = clipPathCandidates
+        self.missingPaths = missingPaths
+        self.incompleteSidecarLabels = incompleteSidecarLabels
+        self.sidecarTemplateCommand = sidecarTemplateCommand
+        self.acceptanceFocus = acceptanceFocus
+    }
+}
+
 public enum AutomationProductEvidenceAudit {
     public static let defaultDirectory = "docs/workflow-page-productization/product-evidence"
 
@@ -359,6 +425,73 @@ public enum AutomationProductEvidenceAudit {
         )
     }
 
+    public static func liveCapturePlan(
+        directory: String,
+        existingPaths: Set<String>,
+        sidecarContents: [String: String] = [:],
+        specs: [AutomationProductEvidenceAuditSpec] = defaultSpecs
+    ) -> AutomationProductEvidenceCapturePlanPayload {
+        let audit = evaluate(
+            directory: directory,
+            existingPaths: existingPaths,
+            sidecarContents: sidecarContents,
+            specs: specs
+        )
+        let liveSpecs = specs.filter { !$0.sidecarRequiredPhrases.isEmpty }
+        let liveItems = liveSpecs.map { spec -> AutomationProductEvidenceCapturePlanItem in
+            let auditItem = audit.items.first { $0.id == spec.id }
+            let sidecarPaths = orderedUnique(
+                spec.fileGroups.flatMap { $0 }.filter { $0.hasSuffix(".md") }
+            )
+            let options = sidecarPaths.compactMap { sidecarPath -> AutomationProductEvidenceCapturePlanOption? in
+                guard let template = liveSidecarTemplate(
+                    id: spec.id,
+                    sidecarPath: sidecarPath,
+                    specs: specs
+                ) else {
+                    return nil
+                }
+                let groupFiles = orderedUnique(spec.fileGroups
+                    .filter { $0.contains(sidecarPath) }
+                    .flatMap { $0 })
+                let missingPaths = groupFiles
+                    .filter { !existingPaths.contains($0) }
+                    .sorted()
+                let incompleteLabels = missingRequiredPhrases(
+                    path: sidecarPath,
+                    exists: existingPaths.contains(sidecarPath),
+                    contents: sidecarContents[sidecarPath],
+                    requiredPhrases: spec.sidecarRequiredPhrases
+                )
+                return AutomationProductEvidenceCapturePlanOption(
+                    sidecarPath: sidecarPath,
+                    clipPathCandidates: template.clipPathCandidates,
+                    missingPaths: missingPaths,
+                    incompleteSidecarLabels: incompleteLabels,
+                    sidecarTemplateCommand: sidecarTemplateCommand(
+                        id: spec.id,
+                        sidecarPath: sidecarPaths.count > 1 ? sidecarPath : nil
+                    ),
+                    acceptanceFocus: spec.note
+                )
+            }
+            return AutomationProductEvidenceCapturePlanItem(
+                id: spec.id,
+                title: spec.title,
+                satisfied: auditItem?.satisfied == true,
+                note: spec.note,
+                options: options
+            )
+        }
+        let missingLiveCount = liveItems.filter { !$0.satisfied }.count
+        return AutomationProductEvidenceCapturePlanPayload(
+            directory: directory,
+            missingLiveCount: missingLiveCount,
+            allLiveSatisfied: missingLiveCount == 0,
+            items: liveItems
+        )
+    }
+
     private static func missingRequiredPhrases(
         path: String,
         exists: Bool,
@@ -419,5 +552,23 @@ public enum AutomationProductEvidenceAudit {
         - Do not leave angle-bracket placeholders in the final sidecar; strict audit treats placeholders as incomplete.
         - Re-run `swift run SparkleRecorder workflow product-evidence audit --require-live --json` before marking S0 complete.
         """
+    }
+
+    private static func sidecarTemplateCommand(id: String, sidecarPath: String?) -> String {
+        var command = "SparkleRecorder workflow product-evidence sidecar-template \(id)"
+        if let sidecarPath {
+            command += " --sidecar \(sidecarPath)"
+        }
+        return command
+    }
+
+    private static func orderedUnique(_ values: [String]) -> [String] {
+        var seen = Set<String>()
+        var result: [String] = []
+        for value in values where !seen.contains(value) {
+            seen.insert(value)
+            result.append(value)
+        }
+        return result
     }
 }

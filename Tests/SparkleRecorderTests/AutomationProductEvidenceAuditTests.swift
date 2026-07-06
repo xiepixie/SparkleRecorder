@@ -140,6 +140,74 @@ struct AutomationProductEvidenceAuditTests {
         #expect(payload.template.contains("Do not leave angle-bracket placeholders"))
     }
 
+    @Test("Live capture plan lists missing S0 gates and sidecar commands")
+    func liveCapturePlanListsMissingS0GatesAndSidecarCommands() {
+        let payload = AutomationProductEvidenceAudit.liveCapturePlan(
+            directory: "/tmp/product-evidence",
+            existingPaths: Self.fixtureFiles
+        )
+
+        #expect(payload.missingLiveCount == 4)
+        #expect(!payload.allLiveSatisfied)
+        #expect(payload.items.map(\.id) == [
+            "live-visual-diagnostics-open-reveal",
+            "live-macro-evidence-open-reveal",
+            "live-branch-evidence-consistency",
+            "live-authoring-wysiwyg"
+        ])
+
+        let visual = payload.items.first { $0.id == "live-visual-diagnostics-open-reveal" }
+        #expect(visual?.satisfied == false)
+        #expect(visual?.options.first?.sidecarPath == "live-visual-diagnostics-open-reveal.md")
+        #expect(visual?.options.first?.clipPathCandidates == [
+            "live-visual-diagnostics-open-reveal.mov",
+            "live-visual-diagnostics-open-reveal.mp4"
+        ])
+        #expect(visual?.options.first?.missingPaths == [
+            "live-visual-diagnostics-open-reveal.md",
+            "live-visual-diagnostics-open-reveal.mov",
+            "live-visual-diagnostics-open-reveal.mp4"
+        ])
+        #expect(visual?.options.first?.sidecarTemplateCommand == "SparkleRecorder workflow product-evidence sidecar-template live-visual-diagnostics-open-reveal")
+    }
+
+    @Test("Authoring capture plan offers reorder and drag-link options")
+    func authoringCapturePlanOffersReorderAndDragLinkOptions() throws {
+        let payload = AutomationProductEvidenceAudit.liveCapturePlan(
+            directory: "/tmp/product-evidence",
+            existingPaths: Self.fixtureFiles
+        )
+        let authoring = try #require(payload.items.first { $0.id == "live-authoring-wysiwyg" })
+
+        #expect(authoring.options.map(\.sidecarPath) == [
+            "live-task-reorder-wysiwyg.md",
+            "live-drag-link-wysiwyg.md"
+        ])
+        #expect(authoring.options[0].clipPathCandidates == [
+            "live-task-reorder-wysiwyg.mov",
+            "live-task-reorder-wysiwyg.mp4"
+        ])
+        #expect(authoring.options[1].sidecarTemplateCommand == "SparkleRecorder workflow product-evidence sidecar-template live-authoring-wysiwyg --sidecar live-drag-link-wysiwyg.md")
+    }
+
+    @Test("Live capture plan reports satisfied live gates")
+    func liveCapturePlanReportsSatisfiedLiveGates() {
+        let payload = AutomationProductEvidenceAudit.liveCapturePlan(
+            directory: "/tmp/product-evidence",
+            existingPaths: Self.fixtureFiles
+                .union(Self.requiredLiveFilesWithoutAuthoring)
+                .union([
+                    "live-drag-link-wysiwyg.mp4",
+                    "live-drag-link-wysiwyg.md"
+                ]),
+            sidecarContents: Self.validLiveSidecars
+        )
+
+        #expect(payload.missingLiveCount == 0)
+        #expect(payload.allLiveSatisfied)
+        #expect(payload.items.allSatisfy { $0.satisfied })
+    }
+
     @Test("Template placeholders keep live evidence incomplete")
     func templatePlaceholdersKeepLiveEvidenceIncomplete() throws {
         let template = try #require(AutomationProductEvidenceAudit.liveSidecarTemplate(
