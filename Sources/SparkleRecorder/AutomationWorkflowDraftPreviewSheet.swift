@@ -36,6 +36,7 @@ struct AutomationWorkflowDraftPreviewSheet: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 14) {
                     summarySection
+                    loopExpansionSection
                     draftEditSection
                     taskSection
                     dependencySection
@@ -116,7 +117,11 @@ struct AutomationWorkflowDraftPreviewSheet: View {
         VStack(alignment: .leading, spacing: 8) {
             AutomationSectionHeader(title: NSLocalizedString("DRAFT SUMMARY", comment: ""))
 
-            HStack(spacing: 8) {
+            LazyVGrid(
+                columns: [GridItem(.adaptive(minimum: 116), spacing: 8, alignment: .leading)],
+                alignment: .leading,
+                spacing: 8
+            ) {
                 summaryPill(
                     title: NSLocalizedString("Tasks", comment: ""),
                     value: "\(previewState.projection.taskRows.count)",
@@ -126,6 +131,11 @@ struct AutomationWorkflowDraftPreviewSheet: View {
                     title: NSLocalizedString("Dependencies", comment: ""),
                     value: "\(previewState.projection.dependencyRows.count)",
                     systemImage: "arrow.triangle.branch"
+                )
+                summaryPill(
+                    title: NSLocalizedString("Loops", comment: ""),
+                    value: "\(previewState.projection.loopExpansionRows.count)",
+                    systemImage: "arrow.triangle.2.circlepath"
                 )
                 summaryPill(
                     title: NSLocalizedString("Macros", comment: ""),
@@ -151,6 +161,24 @@ struct AutomationWorkflowDraftPreviewSheet: View {
         }
         .padding(10)
         .sectionSurface(cornerRadius: 10)
+    }
+
+    @ViewBuilder
+    private var loopExpansionSection: some View {
+        if !previewState.projection.loopExpansionRows.isEmpty {
+            VStack(alignment: .leading, spacing: 8) {
+                AutomationSectionHeader(
+                    title: NSLocalizedString("LOOP EXPANSION", comment: ""),
+                    count: previewState.projection.loopExpansionRows.count
+                )
+
+                ForEach(previewState.projection.loopExpansionRows) { row in
+                    loopExpansionRow(row)
+                }
+            }
+            .padding(10)
+            .sectionSurface(cornerRadius: 10)
+        }
     }
 
     private var footer: some View {
@@ -431,6 +459,62 @@ struct AutomationWorkflowDraftPreviewSheet: View {
         .accessibilityElement(children: .combine)
     }
 
+    private func loopExpansionRow(_ row: AutomationWorkflowDraftPreviewProjection.LoopExpansionRow) -> some View {
+        HStack(alignment: .top, spacing: 9) {
+            Image(systemName: "arrow.triangle.2.circlepath")
+                .foregroundStyle(Brand.sigAmber)
+                .frame(width: 20)
+                .accessibilityHidden(true)
+
+            VStack(alignment: .leading, spacing: 5) {
+                HStack(spacing: 6) {
+                    Text(row.title)
+                        .font(.caption)
+                        .bold()
+                        .lineLimit(1)
+                    Text(row.key)
+                        .font(.caption2.monospaced())
+                        .foregroundStyle(.tertiary)
+                        .lineLimit(1)
+                }
+
+                Text(row.summary)
+                    .font(.caption)
+                    .foregroundStyle(.primary)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                HStack(spacing: 6) {
+                    loopMetricPill(
+                        value: "\(row.repeatCount)",
+                        title: NSLocalizedString("repeats", comment: "")
+                    )
+                    loopMetricPill(
+                        value: "\(row.bodyStepCount)",
+                        title: NSLocalizedString("body steps", comment: "")
+                    )
+                    loopMetricPill(
+                        value: "\(row.expandedTaskCount)",
+                        title: NSLocalizedString("imported steps", comment: "")
+                    )
+                }
+
+                Text(row.importBoundaryLabel)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                Text(row.capabilityLabel)
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            Spacer(minLength: 0)
+        }
+        .padding(8)
+        .background(rowBackground(tint: Brand.sigAmber))
+        .accessibilityElement(children: .combine)
+    }
+
     private func dependencyRow(_ row: AutomationWorkflowDraftPreviewProjection.DependencyRow) -> some View {
         HStack(spacing: 8) {
             Image(systemName: "arrow.right")
@@ -612,6 +696,23 @@ struct AutomationWorkflowDraftPreviewSheet: View {
         .padding(.horizontal, 8)
         .padding(.vertical, 6)
         .background(rowBackground())
+    }
+
+    private func loopMetricPill(value: String, title: String) -> some View {
+        HStack(spacing: 4) {
+            Text(value)
+                .font(.caption2.monospacedDigit())
+                .bold()
+            Text(title)
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+        }
+        .padding(.horizontal, 7)
+        .padding(.vertical, 4)
+        .background(
+            RoundedRectangle(cornerRadius: 6, style: .continuous)
+                .fill(Color.primary.opacity(0.045))
+        )
     }
 
     private var selectedTaskForRemoval: AutomationWorkflowDraftTask? {
@@ -924,6 +1025,8 @@ struct AutomationWorkflowDraftPreviewSheet: View {
             return "timer"
         case NSLocalizedString("Notification", comment: ""):
             return "bell"
+        case NSLocalizedString("Loop", comment: ""):
+            return "arrow.triangle.2.circlepath"
         default:
             return "square"
         }

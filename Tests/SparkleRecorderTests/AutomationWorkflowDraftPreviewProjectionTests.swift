@@ -193,6 +193,7 @@ struct AutomationWorkflowDraftPreviewProjectionTests {
         )
 
         let loopRow = try #require(projection.taskRows.first)
+        let loopExpansionRow = try #require(projection.loopExpansionRows.first)
         let importPreview = try #require(projection.importPreview)
 
         #expect(projection.isValid)
@@ -200,6 +201,12 @@ struct AutomationWorkflowDraftPreviewProjectionTests {
         #expect(loopRow.key == "repeat_checkout")
         #expect(loopRow.typeLabel == "Loop")
         #expect(loopRow.detail == "Repeats 2 times, 2 steps")
+        #expect(loopExpansionRow.key == "repeat_checkout")
+        #expect(loopExpansionRow.repeatCount == 2)
+        #expect(loopExpansionRow.bodyStepCount == 2)
+        #expect(loopExpansionRow.expandedTaskCount == 4)
+        #expect(loopExpansionRow.summary == "Expands to 4 imported steps")
+        #expect(loopExpansionRow.importBoundaryLabel == "Draft-only loop; imported workflow stays acyclic")
         #expect(projection.simulationRows.map(\.taskKey) == [
             "repeat_checkout__1__tap",
             "repeat_checkout__1__wait_text",

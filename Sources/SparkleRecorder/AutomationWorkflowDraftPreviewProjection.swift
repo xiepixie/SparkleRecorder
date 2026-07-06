@@ -8,6 +8,7 @@ public struct AutomationWorkflowDraftPreviewProjection: Codable, Equatable, Send
     public var isReadyForImport: Bool
     public var taskRows: [TaskRow]
     public var dependencyRows: [DependencyRow]
+    public var loopExpansionRows: [LoopExpansionRow]
     public var simulationRows: [SimulationRow]
     public var branchRows: [BranchRow]
     public var resourceRows: [ResourceRow]
@@ -34,6 +35,7 @@ public struct AutomationWorkflowDraftPreviewProjection: Codable, Equatable, Send
             TaskRow(task: task, macroResolution: Self.macroResolution(for: task, catalog: catalog))
         }
         dependencyRows = document.workflow.dependencies.map(DependencyRow.init(dependency:))
+        loopExpansionRows = document.workflow.tasks.compactMap(LoopExpansionRow.init(task:))
         simulationRows = simulation?.steps.map(SimulationRow.init(step:)) ?? []
         branchRows = simulation?.branchDecisions.map(BranchRow.init(decision:)) ?? []
         resourceRows = simulation?.resourceTimeline.map(ResourceRow.init(occupancy:)) ?? []
@@ -255,6 +257,39 @@ public struct AutomationWorkflowDraftPreviewProjection: Codable, Equatable, Send
             default:
                 return task.type
             }
+        }
+    }
+
+    public struct LoopExpansionRow: Codable, Equatable, Identifiable, Sendable {
+        public var id: String { key }
+        public var key: String
+        public var title: String
+        public var repeatCount: Int
+        public var bodyStepCount: Int
+        public var expandedTaskCount: Int
+        public var summary: String
+        public var importBoundaryLabel: String
+        public var capabilityLabel: String
+
+        public init?(task: AutomationWorkflowDraftTask) {
+            guard task.type == "loop" else {
+                return nil
+            }
+            key = task.key
+            title = task.name?.nilIfBlankForDraftPreview ?? task.key
+            repeatCount = task.loop?.count ?? 0
+            bodyStepCount = task.loop?.tasks.count ?? 0
+            expandedTaskCount = max(0, repeatCount) * bodyStepCount
+            if repeatCount > 0, bodyStepCount > 0 {
+                summary = String(
+                    format: NSLocalizedString("Expands to %d imported steps", comment: ""),
+                    expandedTaskCount
+                )
+            } else {
+                summary = NSLocalizedString("Loop needs a repeat count and body tasks before import", comment: "")
+            }
+            importBoundaryLabel = NSLocalizedString("Draft-only loop; imported workflow stays acyclic", comment: "")
+            capabilityLabel = NSLocalizedString("Repeat-until, foreach, and runtime loop evidence are not active yet", comment: "")
         }
     }
 
