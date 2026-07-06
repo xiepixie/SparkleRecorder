@@ -16,6 +16,14 @@ struct SemanticRecordingPreflightPresentationTests {
         #expect(presentation.primaryAction.kind == .startRecording)
         #expect(presentation.secondaryAction == nil)
         #expect(presentation.issues.isEmpty)
+        #expect(presentation.decisionRows.map(\.role) == [
+            .nextStep,
+            .evidenceImpact,
+            .privacyBoundary
+        ])
+        #expect(presentation.decisionRows[0].detail.contains("menu bar"))
+        #expect(presentation.decisionRows[1].detail.contains("video"))
+        #expect(presentation.decisionRows[2].detail.contains("privacy exclusions"))
         #expect(presentation.availableCapabilityLabels == [
             "Playable macro events",
             "Video recording",
@@ -48,6 +56,14 @@ struct SemanticRecordingPreflightPresentationTests {
         #expect(presentation.primaryAction.kind == .openPermissionSettings)
         #expect(presentation.primaryAction.permission == .inputMonitoring)
         #expect(presentation.secondaryAction?.kind == .retryPreflight)
+        #expect(presentation.decisionRows.map(\.role) == [
+            .nextStep,
+            .evidenceImpact,
+            .privacyBoundary
+        ])
+        #expect(presentation.decisionRows[0].detail.contains("blocked permission"))
+        #expect(presentation.decisionRows[1].detail.contains("No visual evidence bundle"))
+        #expect(presentation.decisionRows[2].detail.contains("visual evidence stays off"))
         #expect(presentation.availableCapabilityLabels == [
             "AX element snapshots",
             "Window metadata"
@@ -81,6 +97,14 @@ struct SemanticRecordingPreflightPresentationTests {
         #expect(presentation.primaryAction.kind == .continueDegraded)
         #expect(presentation.secondaryAction?.kind == .openPermissionSettings)
         #expect(presentation.secondaryAction?.permission == .accessibility)
+        #expect(presentation.decisionRows.map(\.role) == [
+            .nextStep,
+            .evidenceImpact,
+            .privacyBoundary
+        ])
+        #expect(presentation.decisionRows[0].detail.contains("record now"))
+        #expect(presentation.decisionRows[1].detail.contains("degraded evidence"))
+        #expect(presentation.decisionRows[2].detail.contains("missing context is visible"))
         #expect(presentation.availableCapabilityLabels == [
             "Playable macro events",
             "Video recording",
@@ -92,6 +116,66 @@ struct SemanticRecordingPreflightPresentationTests {
             "AX element snapshots",
             "Window metadata"
         ])
+    }
+
+    @Test("Preflight presentation decision copy has localized catalog entries")
+    func preflightPresentationDecisionCopyHasLocalizedCatalogEntries() async throws {
+        let presentations = await [
+            SemanticRecordingPreflightClient.fixed(.allAuthorizedForPresentation).evaluate(),
+            SemanticRecordingPreflightClient.fixed(SemanticRecordingPermissionSnapshot(
+                inputMonitoring: .denied,
+                accessibility: .authorized,
+                screenRecording: .denied
+            )).evaluate(),
+            SemanticRecordingPreflightClient.fixed(SemanticRecordingPermissionSnapshot(
+                inputMonitoring: .authorized,
+                accessibility: .denied,
+                screenRecording: .authorized
+            )).evaluate()
+        ].map(SemanticRecordingPreflightPresenter.presentation)
+        let keys = Set(presentations.flatMap { presentation in
+            [presentation.title, presentation.summary] +
+                presentation.decisionRows.flatMap { [$0.title, $0.detail] }
+        })
+        let catalog = try localizationCatalog()
+
+        var missingEntries: [String] = []
+        var missingEnglish: [String] = []
+        var missingSimplifiedChinese: [String] = []
+        for key in keys.sorted() {
+            guard let entry = catalog[key] as? [String: Any] else {
+                missingEntries.append(key)
+                continue
+            }
+            let localizations = entry["localizations"] as? [String: Any] ?? [:]
+            if localizations["en"] == nil {
+                missingEnglish.append(key)
+            }
+            if localizations["zh-Hans"] == nil {
+                missingSimplifiedChinese.append(key)
+            }
+        }
+
+        #expect(missingEntries.isEmpty, "Missing Localizable.xcstrings entries: \(missingEntries)")
+        #expect(missingEnglish.isEmpty, "Missing English localizations: \(missingEnglish)")
+        #expect(missingSimplifiedChinese.isEmpty, "Missing Simplified Chinese localizations: \(missingSimplifiedChinese)")
+    }
+
+    private func localizationCatalog() throws -> [String: Any] {
+        let url = repositoryRoot()
+            .appendingPathComponent("Sources/SparkleRecorder/Localizable.xcstrings")
+        let data = try Data(contentsOf: url)
+        let rootObject = try #require(
+            try JSONSerialization.jsonObject(with: data) as? [String: Any]
+        )
+        return try #require(rootObject["strings"] as? [String: Any])
+    }
+
+    private func repositoryRoot() -> URL {
+        URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
     }
 }
 

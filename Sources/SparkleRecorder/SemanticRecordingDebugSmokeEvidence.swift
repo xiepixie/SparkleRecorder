@@ -364,6 +364,7 @@ public enum SemanticRecordingDebugSmokeEvidenceSidecar {
         - can start: \(preflightPresentation.canStart)
         - title: \(preflightPresentation.title)
         - summary: \(preflightPresentation.summary)
+        - decision rows: \(preflightDecisionRowList(preflightPresentation.decisionRows))
         - available capability labels: \(preflightCapabilityLabelList(preflightPresentation.availableCapabilityLabels))
         - primary action: \(preflightActionSummary(preflightPresentation.primaryAction))
         - secondary action: \(preflightActionSummary(preflightPresentation.secondaryAction))
@@ -511,6 +512,19 @@ public enum SemanticRecordingDebugSmokeEvidenceSidecar {
                     "action=\(issue.action.kind.rawValue)",
                     "capabilities=\(preflightCapabilityLabelList(issue.affectedCapabilityLabels))"
                 ].joined(separator: " ")
+            }
+            .joined(separator: " | ")
+    }
+
+    private static func preflightDecisionRowList(
+        _ rows: [SemanticRecordingPreflightDecisionRow]
+    ) -> String {
+        guard !rows.isEmpty else {
+            return "none"
+        }
+        return rows
+            .map { row in
+                "\(row.role.rawValue)=\(row.title): \(row.detail)"
             }
             .joined(separator: " | ")
     }

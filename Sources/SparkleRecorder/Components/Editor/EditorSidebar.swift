@@ -1365,11 +1365,11 @@ struct EditorSidebar: View {
     }
 
     func updatedAnchor(for group: ActionGroup, text: String) -> TextAnchor {
-        if var anchor = firstEvent(for: group)?.textAnchor ?? group.textAnchor {
-            anchor.text = text
-            return anchor
-        }
-        return TextAnchor(text: text, observedFrame: RectValue(x: 0, y: 0, width: 0, height: 0))
+        TextTargetAnchorFactory.anchor(
+            existing: firstEvent(for: group)?.textAnchor ?? group.textAnchor,
+            text: text,
+            fallbackEvent: firstEvent(for: group)
+        )
     }
 
     func convertClickType(grp: ActionGroup, newKind: ActionGroupKind) {

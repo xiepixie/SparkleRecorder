@@ -295,7 +295,8 @@ public enum TextClickEventFactory {
         fallbackPolicy: LocatorFallbackPolicy = .fail,
         surfaceId: String? = nil
     ) -> [RecordedEvent] {
-        let point = clickPoint(for: textAnchor)
+        let clickableAnchor = TextTargetAnchorFactory.clickableAnchor(textAnchor)
+        let point = clickPoint(for: clickableAnchor)
         let down = RecordedEvent(
             kind: .leftMouseDown,
             time: startTime,
@@ -311,7 +312,7 @@ public enum TextClickEventFactory {
             coordinateStrategy: .locatorOnly,
             locatorFallbackPolicy: fallbackPolicy,
             surfaceId: surfaceId,
-            textAnchor: textAnchor,
+            textAnchor: clickableAnchor,
             textTimeout: timeout
         )
         let up = RecordedEvent(
@@ -329,7 +330,7 @@ public enum TextClickEventFactory {
             coordinateStrategy: .locatorOnly,
             locatorFallbackPolicy: fallbackPolicy,
             surfaceId: surfaceId,
-            textAnchor: textAnchor,
+            textAnchor: clickableAnchor,
             textTimeout: timeout
         )
         return [down, up]
@@ -346,5 +347,87 @@ public enum TextClickEventFactory {
             )
         }
         return PointValue(x: 100, y: 100)
+    }
+}
+
+public enum TextTargetAnchorFactory {
+    public static func anchor(
+        existing: TextAnchor?,
+        text: String,
+        fallbackEvent: RecordedEvent? = nil
+    ) -> TextAnchor {
+        var anchor = existing ?? TextAnchor(
+            text: text,
+            observedFrame: RectValue(x: 0, y: 0, width: 0, height: 0)
+        )
+        anchor.text = text
+        return clickableAnchor(anchor, fallbackEvent: fallbackEvent)
+    }
+
+    public static func clickableAnchor(
+        _ anchor: TextAnchor,
+        fallbackEvent: RecordedEvent? = nil
+    ) -> TextAnchor {
+        var result = anchor
+
+        if result.coordinateFallback == nil {
+            if let point = absoluteFallbackPoint(from: fallbackEvent) {
+                result.coordinateFallback = point
+            } else if result.observedFrame.width > 0, result.observedFrame.height > 0 {
+                result.coordinateFallback = PointValue(
+                    x: result.observedFrame.x + result.observedFrame.width / 2,
+                    y: result.observedFrame.y + result.observedFrame.height / 2
+                )
+            }
+        }
+
+        if result.coordinateFallbackContentNormalized == nil {
+            if let point = contentNormalizedFallbackPoint(from: fallbackEvent) {
+                result.coordinateFallbackContentNormalized = point
+            } else if let observed = result.observedContentNormalizedFrame,
+                      observed.width > 0,
+                      observed.height > 0 {
+                result.coordinateFallbackContentNormalized = PointValue(
+                    x: observed.x + observed.width / 2,
+                    y: observed.y + observed.height / 2
+                )
+            }
+        }
+
+        return result
+    }
+
+    private static func absoluteFallbackPoint(from event: RecordedEvent?) -> PointValue? {
+        guard let event,
+              isClickableFallbackEvent(event),
+              event.x.isFinite,
+              event.y.isFinite else {
+            return nil
+        }
+        return PointValue(x: event.x, y: event.y)
+    }
+
+    private static func contentNormalizedFallbackPoint(from event: RecordedEvent?) -> PointValue? {
+        guard let event,
+              isClickableFallbackEvent(event),
+              let x = event.contentNormalizedX,
+              let y = event.contentNormalizedY,
+              x.isFinite,
+              y.isFinite else {
+            return nil
+        }
+        return PointValue(x: x, y: y)
+    }
+
+    private static func isClickableFallbackEvent(_ event: RecordedEvent) -> Bool {
+        switch event.kind {
+        case .leftMouseDown, .leftMouseUp,
+             .rightMouseDown, .rightMouseUp,
+             .otherMouseDown, .otherMouseUp,
+             .leftMouseDragged, .rightMouseDragged, .otherMouseDragged:
+            return true
+        default:
+            return false
+        }
     }
 }

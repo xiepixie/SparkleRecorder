@@ -52,6 +52,465 @@
         }
       }
     },
+    "Semantic recording is blocked": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Semantic recording is blocked"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "语义录制已阻止"
+          }
+        }
+      }
+    },
+    "Grant the required permissions before recording video, keyframes and playable macro events.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Grant the required permissions before recording video, keyframes and playable macro events."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "请先授予必需权限，再录制视频、关键帧和可回放宏事件。"
+          }
+        }
+      }
+    },
+    "Semantic recording can start with limited context": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Semantic recording can start with limited context"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "语义录制可在有限上下文中开始"
+          }
+        }
+      }
+    },
+    "The recording can proceed, but some semantic evidence will be omitted until the degraded permission is granted.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The recording can proceed, but some semantic evidence will be omitted until the degraded permission is granted."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "录制可以继续，但在授予降级权限前，部分语义证据会被省略。"
+          }
+        }
+      }
+    },
+    "Continue without full context": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Continue without full context"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "在缺少完整上下文时继续"
+          }
+        }
+      }
+    },
+    "Semantic recording is ready": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Semantic recording is ready"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "语义录制已就绪"
+          }
+        }
+      }
+    },
+    "Video, keyframes, playable events and semantic observations are available.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Video, keyframes, playable events and semantic observations are available."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "视频、关键帧、可回放事件和语义观察均可用。"
+          }
+        }
+      }
+    },
+    "Start semantic recording": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Start semantic recording"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "开始语义录制"
+          }
+        }
+      }
+    },
+    "Next step": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Next step"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "下一步"
+          }
+        }
+      }
+    },
+    "Open the blocked permission rows below, then check again before recording.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open the blocked permission rows below, then check again before recording."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "打开下方被阻止的权限项，然后在录制前再次检查。"
+          }
+        }
+      }
+    },
+    "Evidence impact": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Evidence impact"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "证据影响"
+          }
+        }
+      }
+    },
+    "No visual evidence bundle is created while required permissions are blocked.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No visual evidence bundle is created while required permissions are blocked."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "必需权限被阻止时，不会创建视觉证据包。"
+          }
+        }
+      }
+    },
+    "Privacy boundary": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Privacy boundary"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "隐私边界"
+          }
+        }
+      }
+    },
+    "Playable macro recording remains separate; visual evidence stays off until preflight passes.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Playable macro recording remains separate; visual evidence stays off until preflight passes."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "可回放宏录制保持独立；预检通过前视觉证据保持关闭。"
+          }
+        }
+      }
+    },
+    "You can record now, or grant the recommended permission first for richer context.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "You can record now, or grant the recommended permission first for richer context."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "你可以现在录制，也可以先授予推荐权限以获得更完整的上下文。"
+          }
+        }
+      }
+    },
+    "Some semantic context will be omitted and shown as degraded evidence.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Some semantic context will be omitted and shown as degraded evidence."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "部分语义上下文会被省略，并显示为降级证据。"
+          }
+        }
+      }
+    },
+    "Playable macro events still record; missing context is visible instead of being guessed.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Playable macro events still record; missing context is visible instead of being guessed."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "可回放宏事件仍会录制；缺失上下文会明确显示，而不是被猜测填充。"
+          }
+        }
+      }
+    },
+    "Start the next recording from the menu bar when you are ready.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Start the next recording from the menu bar when you are ready."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "准备好后，从菜单栏开始下一次录制。"
+          }
+        }
+      }
+    },
+    "The next recording can save video, keyframes, OCR, AX context and window metadata together.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The next recording can save video, keyframes, OCR, AX context and window metadata together."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "下一次录制可以同时保存视频、关键帧、OCR、AX 上下文和窗口元数据。"
+          }
+        }
+      }
+    },
+    "Retention and privacy exclusions below control local visual evidence before recording.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Retention and privacy exclusions below control local visual evidence before recording."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "下方的保留策略和隐私排除项会在录制前控制本地视觉证据。"
+          }
+        }
+      }
+    },
+    "Check again": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Check again"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "再次检查"
+          }
+        }
+      }
+    },
+    "Playable macro events": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Playable macro events"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "可回放宏事件"
+          }
+        }
+      }
+    },
+    "Video recording": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Video recording"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "视频录制"
+          }
+        }
+      }
+    },
+    "Event-aligned keyframes": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Event-aligned keyframes"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "事件对齐关键帧"
+          }
+        }
+      }
+    },
+    "OCR indexing": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "OCR indexing"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "OCR 索引"
+          }
+        }
+      }
+    },
+    "AX element snapshots": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "AX element snapshots"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "AX 元素快照"
+          }
+        }
+      }
+    },
+    "Window metadata": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Window metadata"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "窗口元数据"
+          }
+        }
+      }
+    },
     "Waiting…": {
       "extractionState": "manual",
       "localizations": {

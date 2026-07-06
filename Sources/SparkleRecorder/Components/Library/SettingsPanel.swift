@@ -318,6 +318,15 @@ struct SettingsPanel: View {
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
 
+                if !presentation.decisionRows.isEmpty {
+                    VStack(alignment: .leading, spacing: 6) {
+                        ForEach(presentation.decisionRows) { row in
+                            semanticRecordingDecisionRow(row, status: presentation.status)
+                        }
+                    }
+                    .padding(.top, 1)
+                }
+
                 ForEach(presentation.issues) { issue in
                     semanticRecordingIssueRow(issue)
                 }
@@ -542,6 +551,56 @@ struct SettingsPanel: View {
                 format: NSLocalizedString("Visual evidence cleanup failed: %@", comment: ""),
                 error.localizedDescription
             )
+        }
+    }
+
+    @ViewBuilder
+    func semanticRecordingDecisionRow(
+        _ row: SemanticRecordingPreflightDecisionRow,
+        status: SemanticRecordingPreflightPresentationStatus
+    ) -> some View {
+        HStack(alignment: .top, spacing: 7) {
+            Image(systemName: semanticRecordingDecisionIcon(row.role))
+                .font(.system(size: 10.5, weight: .semibold))
+                .foregroundStyle(semanticRecordingDecisionColor(row.role, status: status))
+                .frame(width: 15, height: 16, alignment: .center)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(NSLocalizedString(row.title, comment: ""))
+                    .font(.system(size: 10.5, weight: .semibold))
+                Text(NSLocalizedString(row.detail, comment: ""))
+                    .font(.system(size: 10))
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .accessibilityElement(children: .combine)
+    }
+
+    func semanticRecordingDecisionIcon(
+        _ role: SemanticRecordingPreflightDecisionRole
+    ) -> String {
+        switch role {
+        case .nextStep:
+            return "arrow.right.circle.fill"
+        case .evidenceImpact:
+            return "film.stack.fill"
+        case .privacyBoundary:
+            return "lock.shield.fill"
+        }
+    }
+
+    func semanticRecordingDecisionColor(
+        _ role: SemanticRecordingPreflightDecisionRole,
+        status: SemanticRecordingPreflightPresentationStatus
+    ) -> Color {
+        switch role {
+        case .nextStep:
+            return semanticRecordingPreflightColor(status)
+        case .evidenceImpact:
+            return .blue
+        case .privacyBoundary:
+            return .purple
         }
     }
 

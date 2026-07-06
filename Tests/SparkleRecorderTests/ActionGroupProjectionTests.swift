@@ -360,12 +360,54 @@ struct ActionGroupProjectionTests {
     func textClickFactoryUsesObservedFrameCenterWhenFallbackIsMissing() {
         let anchor = TextAnchor(
             text: "Confirm",
-            observedFrame: RectValue(x: 90, y: 90, width: 80, height: 24)
+            observedFrame: RectValue(x: 90, y: 90, width: 80, height: 24),
+            observedContentNormalizedFrame: RectValue(x: 0.2, y: 0.3, width: 0.1, height: 0.2)
         )
 
         let events = TextClickEventFactory.makeEvents(startTime: 1.25, textAnchor: anchor)
 
         #expect(events.map(\.x) == [130, 130])
         #expect(events.map(\.y) == [102, 102])
+        #expect(events.allSatisfy { $0.textAnchor?.coordinateFallback == PointValue(x: 130, y: 102) })
+        #expect(events.allSatisfy { $0.textAnchor?.coordinateFallbackContentNormalized == PointValue(x: 0.25, y: 0.4) })
+    }
+
+    @Test("Text target anchor factory preserves recorded click as fallback")
+    func textTargetAnchorFactoryPreservesRecordedClickAsFallback() {
+        var click = RecordedEvent.make(
+            .leftMouseDown,
+            time: 0.25,
+            x: 420,
+            y: 280,
+            mouseButton: 0,
+            clickCount: 1
+        )
+        click.contentNormalizedX = 0.42
+        click.contentNormalizedY = 0.64
+
+        let anchor = TextTargetAnchorFactory.anchor(
+            existing: nil,
+            text: "Continue",
+            fallbackEvent: click
+        )
+
+        #expect(anchor.text == "Continue")
+        #expect(anchor.coordinateFallback == PointValue(x: 420, y: 280))
+        #expect(anchor.coordinateFallbackContentNormalized == PointValue(x: 0.42, y: 0.64))
+        #expect(ActionGroupProjection.textAnchorIsReady(anchor))
+    }
+
+    @Test("Text target anchor factory does not treat wait event origin as click fallback")
+    func textTargetAnchorFactoryIgnoresWaitEventOriginFallback() {
+        let wait = RecordedEvent.make(.waitForText, time: 0, x: 0, y: 0)
+
+        let anchor = TextTargetAnchorFactory.anchor(
+            existing: nil,
+            text: "Continue",
+            fallbackEvent: wait
+        )
+
+        #expect(anchor.coordinateFallback == nil)
+        #expect(anchor.coordinateFallbackContentNormalized == nil)
     }
 }

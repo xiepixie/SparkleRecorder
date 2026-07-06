@@ -57,11 +57,35 @@ public struct SemanticRecordingPreflightIssuePresentation: Codable, Equatable, S
     }
 }
 
+public enum SemanticRecordingPreflightDecisionRole: String, Codable, Equatable, Sendable {
+    case nextStep
+    case evidenceImpact
+    case privacyBoundary
+}
+
+public struct SemanticRecordingPreflightDecisionRow: Codable, Equatable, Sendable, Identifiable {
+    public var id: String { role.rawValue }
+    public var role: SemanticRecordingPreflightDecisionRole
+    public var title: String
+    public var detail: String
+
+    public init(
+        role: SemanticRecordingPreflightDecisionRole,
+        title: String,
+        detail: String
+    ) {
+        self.role = role
+        self.title = title
+        self.detail = detail
+    }
+}
+
 public struct SemanticRecordingPreflightPresentation: Codable, Equatable, Sendable {
     public var status: SemanticRecordingPreflightPresentationStatus
     public var canStart: Bool
     public var title: String
     public var summary: String
+    public var decisionRows: [SemanticRecordingPreflightDecisionRow]
     public var availableCapabilityLabels: [String]
     public var issues: [SemanticRecordingPreflightIssuePresentation]
     public var primaryAction: SemanticRecordingPreflightPresentationAction
@@ -72,6 +96,7 @@ public struct SemanticRecordingPreflightPresentation: Codable, Equatable, Sendab
         canStart: Bool,
         title: String,
         summary: String,
+        decisionRows: [SemanticRecordingPreflightDecisionRow] = [],
         availableCapabilityLabels: [String],
         issues: [SemanticRecordingPreflightIssuePresentation],
         primaryAction: SemanticRecordingPreflightPresentationAction,
@@ -81,6 +106,7 @@ public struct SemanticRecordingPreflightPresentation: Codable, Equatable, Sendab
         self.canStart = canStart
         self.title = title
         self.summary = summary
+        self.decisionRows = decisionRows
         self.availableCapabilityLabels = availableCapabilityLabels
         self.issues = issues
         self.primaryAction = primaryAction
@@ -104,6 +130,7 @@ public enum SemanticRecordingPreflightPresenter {
                 canStart: false,
                 title: "Semantic recording is blocked",
                 summary: "Grant the required permissions before recording video, keyframes and playable macro events.",
+                decisionRows: blockedDecisionRows(),
                 availableCapabilityLabels: availableCapabilityLabels,
                 issues: issues,
                 primaryAction: permissionAction(for: firstBlockingPermission),
@@ -117,6 +144,7 @@ public enum SemanticRecordingPreflightPresenter {
                 canStart: true,
                 title: "Semantic recording can start with limited context",
                 summary: "The recording can proceed, but some semantic evidence will be omitted until the degraded permission is granted.",
+                decisionRows: degradedDecisionRows(),
                 availableCapabilityLabels: availableCapabilityLabels,
                 issues: issues,
                 primaryAction: SemanticRecordingPreflightPresentationAction(
@@ -132,6 +160,7 @@ public enum SemanticRecordingPreflightPresenter {
             canStart: true,
             title: "Semantic recording is ready",
             summary: "Video, keyframes, playable events and semantic observations are available.",
+            decisionRows: readyDecisionRows(),
             availableCapabilityLabels: availableCapabilityLabels,
             issues: [],
             primaryAction: SemanticRecordingPreflightPresentationAction(
@@ -139,6 +168,66 @@ public enum SemanticRecordingPreflightPresenter {
                 label: "Start semantic recording"
             )
         )
+    }
+
+    private static func blockedDecisionRows() -> [SemanticRecordingPreflightDecisionRow] {
+        [
+            SemanticRecordingPreflightDecisionRow(
+                role: .nextStep,
+                title: "Next step",
+                detail: "Open the blocked permission rows below, then check again before recording."
+            ),
+            SemanticRecordingPreflightDecisionRow(
+                role: .evidenceImpact,
+                title: "Evidence impact",
+                detail: "No visual evidence bundle is created while required permissions are blocked."
+            ),
+            SemanticRecordingPreflightDecisionRow(
+                role: .privacyBoundary,
+                title: "Privacy boundary",
+                detail: "Playable macro recording remains separate; visual evidence stays off until preflight passes."
+            )
+        ]
+    }
+
+    private static func degradedDecisionRows() -> [SemanticRecordingPreflightDecisionRow] {
+        [
+            SemanticRecordingPreflightDecisionRow(
+                role: .nextStep,
+                title: "Next step",
+                detail: "You can record now, or grant the recommended permission first for richer context."
+            ),
+            SemanticRecordingPreflightDecisionRow(
+                role: .evidenceImpact,
+                title: "Evidence impact",
+                detail: "Some semantic context will be omitted and shown as degraded evidence."
+            ),
+            SemanticRecordingPreflightDecisionRow(
+                role: .privacyBoundary,
+                title: "Privacy boundary",
+                detail: "Playable macro events still record; missing context is visible instead of being guessed."
+            )
+        ]
+    }
+
+    private static func readyDecisionRows() -> [SemanticRecordingPreflightDecisionRow] {
+        [
+            SemanticRecordingPreflightDecisionRow(
+                role: .nextStep,
+                title: "Next step",
+                detail: "Start the next recording from the menu bar when you are ready."
+            ),
+            SemanticRecordingPreflightDecisionRow(
+                role: .evidenceImpact,
+                title: "Evidence impact",
+                detail: "The next recording can save video, keyframes, OCR, AX context and window metadata together."
+            ),
+            SemanticRecordingPreflightDecisionRow(
+                role: .privacyBoundary,
+                title: "Privacy boundary",
+                detail: "Retention and privacy exclusions below control local visual evidence before recording."
+            )
+        ]
     }
 
     private static let retryAction = SemanticRecordingPreflightPresentationAction(

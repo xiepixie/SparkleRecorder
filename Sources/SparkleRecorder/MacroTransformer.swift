@@ -193,7 +193,9 @@ extension Array where Element == RecordedEvent {
             guard idx >= 0 && idx < newEvents.count else { continue }
             newEvents[idx].coordinateStrategy = strategy
             if let t = textAnchor {
-                newEvents[idx].textAnchor = t
+                newEvents[idx].textAnchor = strategy == .locatorOnly
+                    ? TextTargetAnchorFactory.clickableAnchor(t, fallbackEvent: newEvents[idx])
+                    : t
             }
             if let fallbackPolicy {
                 newEvents[idx].locatorFallbackPolicy = fallbackPolicy
