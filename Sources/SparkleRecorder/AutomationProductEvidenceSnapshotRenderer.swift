@@ -595,11 +595,26 @@ enum AutomationProductEvidenceSnapshotRenderer {
                 selectedEventID: SemanticRecordingFixture.waitEventID
             )
             let candidateID = projection.selectedFrame?.conditionCandidates.first?.id
+            let initialSelection = SemanticRecordingFrameRegionSelection(
+                frameID: SemanticRecordingFixture.afterClickFrameID,
+                surfaceID: SemanticRecordingFixture.surfaceID,
+                bounds: RecordingBounds(
+                    rect: RecordingRect(x: 690, y: 200, width: 286, height: 58),
+                    coordinateSpace: .windowPixels
+                ),
+                imageSize: RecordingImageSize(width: 1_440, height: 900),
+                label: "Reviewed confirmation region",
+                candidateKind: .ocrWait,
+                sourcePreviewRefID: SemanticRecordingFixture.sourceOCRRefID,
+                observationID: SemanticRecordingFixture.ocrObservationID,
+                artifactPath: "visual-index/ocr/confirmation-region.png"
+            )
             let view = SemanticRecordingReviewFixtureView(
                 bundle: bundle,
                 suggestions: suggestions,
                 selectedEventID: SemanticRecordingFixture.waitEventID,
                 initialDraftPatchCandidateID: candidateID,
+                initialRegionSelection: initialSelection,
                 initialAcceptedSuggestionID: suggestions.first?.id
             )
             .frame(width: width, height: height)

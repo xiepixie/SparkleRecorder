@@ -43,6 +43,7 @@ struct SemanticRecordingReviewFixtureView: View {
         selectedEventID: UUID? = nil,
         selectedFrameID: UUID? = nil,
         initialDraftPatchCandidateID: String? = nil,
+        initialRegionSelection: SemanticRecordingFrameRegionSelection? = nil,
         initialAcceptedSuggestionID: UUID? = nil,
         initialRejectedSuggestionID: UUID? = nil
     ) {
@@ -62,10 +63,12 @@ struct SemanticRecordingReviewFixtureView: View {
         _selectedEventID = State(initialValue: selectedEventID)
         _selectedFrameID = State(initialValue: selectedFrameID)
         _selectedCandidateID = State(initialValue: initialDraftPatchCandidateID)
+        _regionSelection = State(initialValue: initialRegionSelection)
         _draftPatchResult = State(initialValue: Self.initialDraftPatchResult(
             bundle: bundle,
             projection: projection,
-            candidateID: initialDraftPatchCandidateID
+            candidateID: initialDraftPatchCandidateID,
+            regionSelection: initialRegionSelection
         ))
         _draftPatchSourceSuggestionID = State(initialValue: initialAcceptedSuggestionID)
         _suggestionReviewDecisions = State(initialValue: Self.initialSuggestionReviewDecisions(
@@ -103,7 +106,8 @@ struct SemanticRecordingReviewFixtureView: View {
     private static func initialDraftPatchResult(
         bundle: SemanticRecordingBundle,
         projection: SemanticRecordingReviewProjection,
-        candidateID: String?
+        candidateID: String?,
+        regionSelection: SemanticRecordingFrameRegionSelection? = nil
     ) -> SemanticRecordingReviewDraftPatchResult? {
         guard let candidateID,
               let candidate = projection.selectedFrame?.conditionCandidates.first(where: { $0.id == candidateID }) else {
@@ -112,7 +116,10 @@ struct SemanticRecordingReviewFixtureView: View {
 
         return try? SemanticRecordingReviewDraftPatchBuilder.makePatch(
             bundle: bundle,
-            request: SemanticRecordingReviewDraftPatchRequest(candidate: candidate)
+            request: SemanticRecordingReviewDraftPatchRequest(
+                candidate: candidate,
+                regionSelection: regionSelection
+            )
         )
     }
 
@@ -143,7 +150,7 @@ struct SemanticRecordingReviewFixtureView: View {
     }
 
     var body: some View {
-        ZStack {
+        ZStack(alignment: .topLeading) {
             Color(red: 0.08, green: 0.09, blue: 0.10)
                 .ignoresSafeArea()
 
@@ -162,6 +169,7 @@ struct SemanticRecordingReviewFixtureView: View {
                 }
             }
             .padding(26)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         }
         .sheet(item: $draftPreviewState) { state in
             AutomationWorkflowDraftPreviewSheet(
@@ -461,12 +469,59 @@ struct SemanticRecordingReviewFixtureView: View {
     }
 
     private var inspector: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            conditionCandidates
-            draftPatchSection
-            comparisonSection
-            suggestionSection
-            safetySection
+        ScrollView(.vertical, showsIndicators: false) {
+            VStack(alignment: .leading, spacing: 14) {
+                conditionCandidates
+                regionSelectionSection
+                draftPatchSection
+                comparisonSection
+                suggestionSection
+                safetySection
+            }
+            .frame(maxWidth: .infinity, alignment: .topLeading)
+        }
+    }
+
+    @ViewBuilder
+    private var regionSelectionSection: some View {
+        if let frame = projection.selectedFrame,
+           let regionSelection,
+           regionSelection.frameID == frame.id {
+            VStack(alignment: .leading, spacing: 10) {
+                sectionTitle("Selected Region")
+                inspectorRow(
+                    title: regionSelection.label ?? NSLocalizedString("Reviewed frame selection", comment: ""),
+                    subtitle: regionSelection.candidateKind.rawValue,
+                    detail: regionSelectionDetail(regionSelection),
+                    accent: Color(red: 0.48, green: 0.76, blue: 0.52)
+                )
+
+                HStack(spacing: 8) {
+                    Button(NSLocalizedString("Draft Selection", comment: ""), systemImage: "selection.pin.in.out") {
+                        if let candidate = selectedCandidate(in: frame) ?? frame.conditionCandidates.first {
+                            createDraftPatch(for: candidate)
+                        }
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                    .disabled(bundle == nil || frame.conditionCandidates.isEmpty)
+
+                    Button("", systemImage: "xmark.circle") {
+                        clearSelectedRegion()
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                    .help(NSLocalizedString("Clear selected frame region", comment: ""))
+                    .accessibilityLabel(NSLocalizedString("Clear selected frame region", comment: ""))
+
+                    Spacer(minLength: 0)
+                }
+
+                Text(NSLocalizedString("Drafts from this region stay review-only until Draft Preview import.", comment: ""))
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(Color.white.opacity(0.46))
+                    .fixedSize(horizontal: false, vertical: true)
+            }
         }
     }
 
@@ -1008,7 +1063,9 @@ struct SemanticRecordingReviewFixtureView: View {
                     observationID: candidate?.observationID,
                     artifactPath: candidate?.artifactPath
                 )
+                selectedCandidateID = candidate?.id
                 draftPatchResult = nil
+                draftPatchSourceSuggestionID = nil
                 draftPatchErrorMessage = ""
                 patchSaveMessage = ""
             }
@@ -1120,6 +1177,14 @@ struct SemanticRecordingReviewFixtureView: View {
             return nil
         }
         return frame.conditionCandidates.first { $0.id == selectedCandidateID }
+    }
+
+    private func clearSelectedRegion() {
+        regionSelection = nil
+        draftPatchResult = nil
+        draftPatchSourceSuggestionID = nil
+        draftPatchErrorMessage = ""
+        patchSaveMessage = ""
     }
 
     private func createDraftPatch(
@@ -1322,6 +1387,28 @@ struct SemanticRecordingReviewFixtureView: View {
         }
         if let baselineAsset = result.baselineAsset {
             parts.append("baseline \(baselineAsset.key)")
+        }
+        return parts.joined(separator: " · ")
+    }
+
+    private func regionSelectionDetail(
+        _ selection: SemanticRecordingFrameRegionSelection
+    ) -> String {
+        let rect = selection.bounds.rect
+        let bounds = String(
+            format: "%.0f, %.0f  %.0fx%.0f %@",
+            rect.x,
+            rect.y,
+            rect.width,
+            rect.height,
+            selection.bounds.coordinateSpace.rawValue
+        )
+        var parts = [
+            bounds,
+            "frame \(shortID(selection.frameID))"
+        ]
+        if let surfaceID = selection.surfaceID {
+            parts.append("surface \(surfaceID)")
         }
         return parts.joined(separator: " · ")
     }

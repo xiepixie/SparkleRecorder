@@ -1,7 +1,7 @@
 # S3 Review UX And Evidence Editing
 
 更新时间：2026-07-06
-状态：Macro Review integration + linked Run Detail opener + Draft Preview handoff + manual crop materialization/provenance first pass; live product evidence open
+状态：Macro Review integration + linked Run Detail opener + Draft Preview handoff + selected-region draft selection + manual crop materialization/provenance first pass; live product evidence open
 Owner：S3, Review UX / Evidence Editing
 并行对象：S0 Workflow Evidence Closure, S1 Contract/Core, S2 App Capture/Visual Index, S4 CLI/AI
 
@@ -39,6 +39,7 @@ S3 does not own:
 - Workflow draft patch visual asset upserts: `upsertVisualRegion`, `upsertVisualImage`, `upsertVisualBaseline`
 - Review visual asset materialization: `SemanticRecordingReviewAssetMaterializer`
 - Review manual frame-crop extraction for image/template and baseline candidates
+- Reviewed selected-region inspector and `Draft Selection` action
 - Draft Preview visual asset provenance badges for Review-generated crops
 - Review source/runtime/diff evidence drill-in tiles
 - Run Detail Macro Review entry: `AutomationTaskRunDetailView`
@@ -60,6 +61,7 @@ S3 does not own:
 - Frame-to-condition 现在可以生成 `AutomationWorkflowDraftPatchDocument`：OCR region -> `ocrText`；image template -> `imageAppeared` / `imageDisappeared`；region baseline -> `regionChanged`；pixel sample -> `pixelMatched` when color evidence is supplied。
 - Draft patch 先 upsert `AutomationWorkflowDraftVisualAssets` region/image/baseline refs，再 `addTask` 或 `setCondition`。测试会把 patch apply 到真实 `AutomationWorkflowDraftDocument`，不是只检查 UI 字符串。
 - Review UI 可以从 app-edge presenter 加载 live bundle manifest，显示存在的 frame image artifact，Open/Reveal source/runtime/diff artifacts，并允许用户在 frame canvas 上拖拽生成 region selection。
+- Frame canvas 上的 reviewed region selection 现在会在 inspector 中显示 candidate kind、frame id、surface id 和 bounds；`Draft Selection` 会把该 selection 作为 `SemanticRecordingReviewDraftPatchRequest.regionSelection` 传入 frame-to-condition builder，清除按钮只清本地 selection/draft 状态，不修改 workflow。
 - Source / Runtime comparison rows now render Source / Runtime / Diff evidence tiles. In fixture mode they expose the safe refs inline; when opened from a real bundle state they show available/missing status and image thumbnails from presenter-resolved artifact URLs before the user opens or reveals files.
 - Review UI 的候选 patch 现在可以打开 `AutomationWorkflowDraftPreviewSheet`。用户确认前不会修改原 workflow；确认时复用既有 Draft Preview import path，并在已有 workflow 上覆盖 compiled id/createdAt，避免生成重复 workflow。
 - Pixel candidates now expose `AutomationVisualColorPickerView` inside Review, and the selected hex is passed into `SemanticRecordingReviewDraftPatchRequest.pixelColorHex` so `pixelMatched` patches no longer require metadata-provided `colorHex` when the user supplies a reviewed target color.
@@ -137,7 +139,7 @@ Observed status on 2026-07-06:
 
 - `SemanticRecordingReviewProjectionTests`: 9 tests passed; coverage includes OCR wait patch, image appeared patch, visual asset upsert operations, package-local materialization path rewriting, manual frame region override, manual frame crop extraction data flow and user-picked pixel color -> `pixelMatched` patch.
 - Swift 6 build: passed.
-- Product evidence snapshot: generated `docs/workflow-page-productization/product-evidence/semantic-review-timeline.png` with sidecar `semantic-review-timeline.md`; current artifact includes source/runtime/diff evidence tiles, suggestion evidence refs, `Accept` / `Reject` controls, accepted status, evidence-backed staged patch explanation and an Undo review-decision control.
+- Product evidence snapshot: generated `docs/workflow-page-productization/product-evidence/semantic-review-timeline.png` with sidecar `semantic-review-timeline.md`; current artifact includes the selected-region inspector, `Draft Selection`, source/runtime/diff evidence tiles, suggestion evidence refs, `Accept` / `Reject` controls, accepted status, evidence-backed staged patch explanation and an Undo review-decision control.
 - Run Detail product evidence snapshot: generated `docs/workflow-page-productization/product-evidence/semantic-review-run-detail.png` with sidecar `semantic-review-run-detail.md`; current artifact shows linked Macro Review metadata and Open/Reveal/manual bundle controls from the Workflow inspector.
 - Draft Preview product evidence snapshot: generated `docs/workflow-page-productization/product-evidence/semantic-review-draft-preview.png` with sidecar `semantic-review-draft-preview.md`; current artifact shows Review-generated package-local image asset provenance before confirmed import.
 
@@ -166,3 +168,4 @@ Observed status on 2026-07-06:
 - 2026-07-06: Added `semantic-review-draft-preview` product evidence snapshot. The snapshot command builds a Review-generated image condition patch from the checkout fixture, applies it to a real draft document, and renders `AutomationWorkflowDraftPreviewSheet` with provenance badges visible in Draft Visual Assets.
 - 2026-07-06: Added Review source/runtime evidence drill-in tiles. The Macro Review inspector now renders Source, Runtime and Diff artifact slots with safe refs in fixture mode and available/missing/thumbnail states for real bundles loaded through `SemanticRecordingReviewPresenter`; `semantic-review-timeline.png` was regenerated to show the drill-in slots in the S3 fixture surface.
 - 2026-07-06: Added evidence-backed suggestion decision explanations. Accepted suggestions now show the cited frame/artifact, staged patch operation and Draft Preview import boundary inline; rejected suggestions keep their evidence refs while making the no-mutation decision explicit.
+- 2026-07-06: Added selected-region draft selection polish. A reviewed frame region now appears as a first-class inspector block with bounds/frame/surface metadata, `Draft Selection` routes that region into frame-to-condition patch generation, and the timeline product evidence snapshot shows the selected overlay plus review-only mutation boundary.
