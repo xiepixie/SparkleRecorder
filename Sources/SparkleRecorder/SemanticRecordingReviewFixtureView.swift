@@ -47,7 +47,8 @@ struct SemanticRecordingReviewFixtureView: View {
         initialRegionSelection: SemanticRecordingFrameRegionSelection? = nil,
         initialPixelColorHexes: [String: String] = [:],
         initialAcceptedSuggestionID: UUID? = nil,
-        initialRejectedSuggestionID: UUID? = nil
+        initialRejectedSuggestionID: UUID? = nil,
+        initialDraftPreviewActionPresentations: [SemanticRecordingReviewActionPresentation] = []
     ) {
         let projection = SemanticRecordingReviewProjection(
             bundle: bundle,
@@ -79,6 +80,7 @@ struct SemanticRecordingReviewFixtureView: View {
             acceptedID: initialAcceptedSuggestionID,
             rejectedID: initialRejectedSuggestionID
         ))
+        _draftPreviewActionPresentations = State(initialValue: initialDraftPreviewActionPresentations)
     }
 
     init(

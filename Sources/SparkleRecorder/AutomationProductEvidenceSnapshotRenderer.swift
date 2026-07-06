@@ -15,6 +15,7 @@ enum AutomationProductEvidenceSnapshotScenario: String, CaseIterable {
     case semanticReviewTimeline = "semantic-review-timeline"
     case semanticReviewStoredBundle = "semantic-review-stored-bundle"
     case semanticReviewPixelColor = "semantic-review-pixel-color"
+    case semanticReviewMaterializedActions = "semantic-review-materialized-actions"
     case semanticReviewDraftPreview = "semantic-review-draft-preview"
     case semanticReviewRunDetail = "semantic-review-run-detail"
 
@@ -44,6 +45,8 @@ enum AutomationProductEvidenceSnapshotScenario: String, CaseIterable {
             self = .semanticReviewStoredBundle
         case "semantic-review-pixel-color", "review-pixel-color", "pixel-color":
             self = .semanticReviewPixelColor
+        case "semantic-review-materialized-actions", "review-materialized-actions", "materialized-review-actions":
+            self = .semanticReviewMaterializedActions
         case "semantic-review-draft-preview", "review-draft-preview", "semantic-draft-preview":
             self = .semanticReviewDraftPreview
         case "semantic-review-run-detail", "review-run-detail", "macro-review-run-detail":
@@ -79,6 +82,8 @@ enum AutomationProductEvidenceSnapshotScenario: String, CaseIterable {
             return "semantic-review-stored-bundle.png"
         case .semanticReviewPixelColor:
             return "semantic-review-pixel-color.png"
+        case .semanticReviewMaterializedActions:
+            return "semantic-review-materialized-actions.png"
         case .semanticReviewDraftPreview:
             return "semantic-review-draft-preview.png"
         case .semanticReviewRunDetail:
@@ -100,6 +105,8 @@ enum AutomationProductEvidenceSnapshotScenario: String, CaseIterable {
             return 1_180
         case .semanticReviewPixelColor:
             return 1_040
+        case .semanticReviewMaterializedActions:
+            return 1_560
         case .semanticReviewDraftPreview:
             return 1_080
         case .idle, .dragLinkAuthoring, .taskReorderAuthoring, .running:
@@ -121,7 +128,7 @@ enum AutomationProductEvidenceSnapshotScenario: String, CaseIterable {
             return Self.fixedUUID("00000000-0000-0000-0000-00000000c20b")
         case .branchEvidence:
             return Self.fixedUUID("00000000-0000-0000-0000-00000000c206")
-        case .templateBaselinePreviewRefs, .semanticReviewTimeline, .semanticReviewStoredBundle, .semanticReviewPixelColor, .semanticReviewDraftPreview:
+        case .templateBaselinePreviewRefs, .semanticReviewTimeline, .semanticReviewStoredBundle, .semanticReviewPixelColor, .semanticReviewMaterializedActions, .semanticReviewDraftPreview:
             return nil
         }
     }
@@ -135,7 +142,7 @@ enum AutomationProductEvidenceSnapshotScenario: String, CaseIterable {
         case .branchEvidence:
             return Self.fixedUUID("00000000-0000-0000-0000-00000000c406")
         case .idle, .dragLinkAuthoring, .taskReorderAuthoring, .running, .templateBaselinePreviewRefs,
-             .semanticReviewTimeline, .semanticReviewStoredBundle, .semanticReviewPixelColor, .semanticReviewDraftPreview:
+             .semanticReviewTimeline, .semanticReviewStoredBundle, .semanticReviewPixelColor, .semanticReviewMaterializedActions, .semanticReviewDraftPreview:
             return nil
         }
     }
@@ -145,7 +152,7 @@ enum AutomationProductEvidenceSnapshotScenario: String, CaseIterable {
         case .dragLinkAuthoring:
             return Self.fixedUUID("00000000-0000-0000-0000-00000000c202")
         case .idle, .taskReorderAuthoring, .running, .failedRunDetail, .failedRunPreviewUnavailable, .visualDiagnostics, .branchEvidence,
-             .semanticReviewTimeline, .semanticReviewStoredBundle, .semanticReviewPixelColor, .semanticReviewDraftPreview, .semanticReviewRunDetail:
+             .semanticReviewTimeline, .semanticReviewStoredBundle, .semanticReviewPixelColor, .semanticReviewMaterializedActions, .semanticReviewDraftPreview, .semanticReviewRunDetail:
             return nil
         case .templateBaselinePreviewRefs:
             return nil
@@ -157,7 +164,7 @@ enum AutomationProductEvidenceSnapshotScenario: String, CaseIterable {
         case .dragLinkAuthoring:
             return .onConditionMatched
         case .idle, .taskReorderAuthoring, .running, .failedRunDetail, .failedRunPreviewUnavailable, .visualDiagnostics, .branchEvidence,
-             .semanticReviewTimeline, .semanticReviewStoredBundle, .semanticReviewPixelColor, .semanticReviewDraftPreview, .semanticReviewRunDetail:
+             .semanticReviewTimeline, .semanticReviewStoredBundle, .semanticReviewPixelColor, .semanticReviewMaterializedActions, .semanticReviewDraftPreview, .semanticReviewRunDetail:
             return .onSuccess
         case .templateBaselinePreviewRefs:
             return .onSuccess
@@ -169,7 +176,7 @@ enum AutomationProductEvidenceSnapshotScenario: String, CaseIterable {
         case .failedRunDetail, .failedRunPreviewUnavailable:
             return true
         case .idle, .dragLinkAuthoring, .taskReorderAuthoring, .running, .visualDiagnostics, .branchEvidence,
-             .templateBaselinePreviewRefs, .semanticReviewTimeline, .semanticReviewStoredBundle, .semanticReviewPixelColor, .semanticReviewDraftPreview, .semanticReviewRunDetail:
+             .templateBaselinePreviewRefs, .semanticReviewTimeline, .semanticReviewStoredBundle, .semanticReviewPixelColor, .semanticReviewMaterializedActions, .semanticReviewDraftPreview, .semanticReviewRunDetail:
             return false
         }
     }
@@ -179,7 +186,7 @@ enum AutomationProductEvidenceSnapshotScenario: String, CaseIterable {
         case .failedRunPreviewUnavailable:
             return "fixture-macros-preview-unavailable"
         case .idle, .dragLinkAuthoring, .taskReorderAuthoring, .running, .failedRunDetail, .visualDiagnostics,
-             .branchEvidence, .templateBaselinePreviewRefs, .semanticReviewTimeline, .semanticReviewStoredBundle, .semanticReviewPixelColor, .semanticReviewDraftPreview,
+             .branchEvidence, .templateBaselinePreviewRefs, .semanticReviewTimeline, .semanticReviewStoredBundle, .semanticReviewPixelColor, .semanticReviewMaterializedActions, .semanticReviewDraftPreview,
              .semanticReviewRunDetail:
             return "fixture-macros"
         }
@@ -194,7 +201,7 @@ enum AutomationProductEvidenceSnapshotScenario: String, CaseIterable {
             )
         case .idle, .dragLinkAuthoring, .running, .failedRunDetail,
              .failedRunPreviewUnavailable, .visualDiagnostics, .branchEvidence, .templateBaselinePreviewRefs,
-             .semanticReviewTimeline, .semanticReviewStoredBundle, .semanticReviewPixelColor, .semanticReviewDraftPreview, .semanticReviewRunDetail:
+             .semanticReviewTimeline, .semanticReviewStoredBundle, .semanticReviewPixelColor, .semanticReviewMaterializedActions, .semanticReviewDraftPreview, .semanticReviewRunDetail:
             return nil
         }
     }
@@ -209,7 +216,7 @@ enum AutomationProductEvidenceSnapshotScenario: String, CaseIterable {
             return .succeeded(.revealReport)
         case .idle, .dragLinkAuthoring, .taskReorderAuthoring, .running,
              .failedRunPreviewUnavailable, .visualDiagnostics, .branchEvidence, .templateBaselinePreviewRefs,
-             .semanticReviewTimeline, .semanticReviewStoredBundle, .semanticReviewPixelColor, .semanticReviewDraftPreview, .semanticReviewRunDetail:
+             .semanticReviewTimeline, .semanticReviewStoredBundle, .semanticReviewPixelColor, .semanticReviewMaterializedActions, .semanticReviewDraftPreview, .semanticReviewRunDetail:
             return nil
         }
     }
@@ -220,7 +227,7 @@ enum AutomationProductEvidenceSnapshotScenario: String, CaseIterable {
             return ["regionSampleImage": .succeeded(.reveal)]
         case .idle, .dragLinkAuthoring, .taskReorderAuthoring, .running,
              .failedRunDetail, .failedRunPreviewUnavailable, .branchEvidence, .templateBaselinePreviewRefs,
-             .semanticReviewTimeline, .semanticReviewStoredBundle, .semanticReviewPixelColor, .semanticReviewDraftPreview, .semanticReviewRunDetail:
+             .semanticReviewTimeline, .semanticReviewStoredBundle, .semanticReviewPixelColor, .semanticReviewMaterializedActions, .semanticReviewDraftPreview, .semanticReviewRunDetail:
             return [:]
         }
     }
@@ -694,6 +701,29 @@ enum AutomationProductEvidenceSnapshotRenderer {
             )
             return
         }
+        if scenario == .semanticReviewMaterializedActions {
+            let materializedFixture = try semanticReviewMaterializedActionFixture(createdAt: now)
+            let view = SemanticRecordingReviewFixtureView(
+                bundle: materializedFixture.bundle,
+                suggestions: materializedFixture.suggestions,
+                selectedEventID: SemanticRecordingFixture.clickEventID,
+                initialDraftPatchCandidateID: materializedFixture.candidateID,
+                initialDraftPreviewActionPresentations: materializedFixture.presentations
+            )
+            .frame(width: width, height: height)
+            .environment(\.colorScheme, .dark)
+            .environment(\.locale, Locale(identifier: "en_US_POSIX"))
+            .background(Color(red: 0.08, green: 0.09, blue: 0.10))
+
+            try writeSwiftUISnapshot(
+                view,
+                outputURL: outputURL,
+                width: width,
+                height: height,
+                scale: scale
+            )
+            return
+        }
         if scenario == .semanticReviewDraftPreview {
             let state = try semanticReviewDraftPreviewState(
                 now: now,
@@ -806,6 +836,54 @@ enum AutomationProductEvidenceSnapshotRenderer {
             bundle,
             "\(pixelSourceID.uuidString)-pixelMatched",
             "#2BC66A"
+        )
+    }
+
+    private static func semanticReviewMaterializedActionFixture(
+        createdAt: Date
+    ) throws -> (
+        bundle: SemanticRecordingBundle,
+        suggestions: [RecordingSuggestion],
+        candidateID: String,
+        presentations: [SemanticRecordingReviewActionPresentation]
+    ) {
+        let bundle = SemanticRecordingFixture.checkoutBundle(createdAt: createdAt)
+        let suggestions = SemanticRecordingFixture.checkoutSuggestions(bundle: bundle)
+        let projection = SemanticRecordingReviewProjection(
+            bundle: bundle,
+            suggestions: suggestions,
+            selectedEventID: SemanticRecordingFixture.clickEventID
+        )
+        guard let candidate = projection.selectedFrame?.conditionCandidates.first(where: { $0.kind == .imageAppeared }) else {
+            throw SnapshotError.fixturePreparationFailed("Semantic Review fixture did not expose an imageAppeared candidate.")
+        }
+        let result = try SemanticRecordingReviewDraftPatchBuilder.makePatch(
+            bundle: bundle,
+            request: SemanticRecordingReviewDraftPatchRequest(candidate: candidate)
+        )
+        let materialized = try SemanticRecordingReviewAssetMaterializer.materialize(
+            patch: result.patch,
+            readArtifact: { path in
+                Data("semantic-review-materialized-actions:\(path)".utf8)
+            },
+            writeAsset: { _, _ in }
+        )
+        let previewAction = SemanticRecordingReviewActionSemantics.previewDraft(
+            result,
+            materializedAssets: materialized.copiedAssets
+        )
+        let importAction = SemanticRecordingReviewActionSemantics.importDraft(
+            result,
+            materializedAssets: materialized.copiedAssets
+        )
+        return (
+            bundle,
+            suggestions,
+            candidate.id,
+            [
+                SemanticRecordingReviewActionPresentation(previewAction),
+                SemanticRecordingReviewActionPresentation(importAction)
+            ]
         )
     }
 
