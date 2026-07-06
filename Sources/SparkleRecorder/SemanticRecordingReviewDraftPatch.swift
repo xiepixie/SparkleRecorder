@@ -367,6 +367,214 @@ public struct SemanticRecordingReviewActionSemantics: Codable, Equatable, Sendab
     }
 }
 
+public struct SemanticRecordingReviewActionPresentation: Codable, Equatable, Sendable {
+    public enum RowKind: String, Codable, Equatable, Sendable {
+        case action
+        case mutationBoundary
+        case mutationEffect
+        case suggestion
+        case frame
+        case events
+        case observations
+        case sourcePreview
+        case artifact
+        case materializedArtifact
+        case materializedDigest
+        case draftTask
+        case draftCondition
+        case visualRegion
+        case visualAsset
+        case bounds
+        case summary
+    }
+
+    public struct Row: Codable, Equatable, Sendable, Identifiable {
+        public var id: String { "\(kind.rawValue):\(value)" }
+        public var kind: RowKind
+        public var label: String
+        public var value: String
+
+        public init(kind: RowKind, label: String, value: String) {
+            self.kind = kind
+            self.label = label
+            self.value = value
+        }
+    }
+
+    public var actionName: SemanticRecordingReviewActionSemantics.ActionName
+    public var title: String
+    public var summary: String
+    public var rows: [Row]
+
+    public init(_ semantics: SemanticRecordingReviewActionSemantics) {
+        self.actionName = semantics.actionName
+        self.title = semantics.title
+        self.summary = Self.summary(for: semantics)
+        self.rows = Self.rows(for: semantics)
+    }
+
+    public static func rows(
+        for semantics: SemanticRecordingReviewActionSemantics
+    ) -> [Row] {
+        let evidence = semantics.evidence
+        var rows: [Row] = [
+            Row(kind: .action, label: "Action", value: semantics.actionName.rawValue),
+            Row(
+                kind: .mutationBoundary,
+                label: "Mutation boundary",
+                value: mutationBoundaryLabel(semantics.mutationBoundary)
+            ),
+            Row(
+                kind: .mutationEffect,
+                label: "Effect",
+                value: mutationEffectLabel(semantics)
+            )
+        ]
+
+        if let suggestionID = evidence.suggestionID {
+            rows.append(Row(kind: .suggestion, label: "Suggestion", value: shortID(suggestionID)))
+        }
+        if let frameID = evidence.frameID {
+            rows.append(Row(kind: .frame, label: "Frame", value: shortID(frameID)))
+        }
+        if !evidence.eventIDs.isEmpty {
+            rows.append(Row(
+                kind: .events,
+                label: evidence.eventIDs.count == 1 ? "Event" : "Events",
+                value: evidence.eventIDs.map(shortID).joined(separator: ", ")
+            ))
+        }
+        if !evidence.observationIDs.isEmpty {
+            rows.append(Row(
+                kind: .observations,
+                label: evidence.observationIDs.count == 1 ? "Observation" : "Observations",
+                value: evidence.observationIDs.map(shortID).joined(separator: ", ")
+            ))
+        }
+        if let sourcePreviewRefID = evidence.sourcePreviewRefID {
+            rows.append(Row(
+                kind: .sourcePreview,
+                label: "Source preview",
+                value: shortID(sourcePreviewRefID)
+            ))
+        }
+        if let artifactPath = evidence.artifactPath {
+            rows.append(Row(kind: .artifact, label: "Source artifact", value: artifactPath))
+        }
+        if let materializedArtifactPath = evidence.materializedArtifactPath {
+            rows.append(Row(
+                kind: .materializedArtifact,
+                label: "Package artifact",
+                value: materializedArtifactPath
+            ))
+        }
+        if let materializedSHA256 = evidence.materializedSHA256 {
+            rows.append(Row(
+                kind: .materializedDigest,
+                label: "Package SHA-256",
+                value: shortDigest(materializedSHA256)
+            ))
+        }
+        if let draftTaskKey = evidence.draftTaskKey {
+            rows.append(Row(kind: .draftTask, label: "Draft task", value: draftTaskKey))
+        }
+        if let draftConditionType = evidence.draftConditionType {
+            rows.append(Row(
+                kind: .draftCondition,
+                label: "Condition",
+                value: draftConditionType
+            ))
+        }
+        if let visualRegionKey = evidence.visualRegionKey {
+            rows.append(Row(kind: .visualRegion, label: "Visual region", value: visualRegionKey))
+        }
+        if let visualAssetKey = evidence.visualAssetKey {
+            let label = evidence.visualAssetKind.map { "\($0.rawValue.capitalized) asset" } ?? "Visual asset"
+            rows.append(Row(kind: .visualAsset, label: label, value: visualAssetKey))
+        }
+        if let bounds = evidence.bounds {
+            rows.append(Row(kind: .bounds, label: "Bounds", value: boundsLabel(bounds)))
+        }
+        if let summary = evidence.summary {
+            rows.append(Row(kind: .summary, label: "Summary", value: summary))
+        }
+
+        return rows
+    }
+
+    private static func summary(
+        for semantics: SemanticRecordingReviewActionSemantics
+    ) -> String {
+        let evidence = semantics.evidence
+        var parts = [semantics.actionName.rawValue]
+        if let draftConditionType = evidence.draftConditionType {
+            parts.append(draftConditionType)
+        }
+        if let draftTaskKey = evidence.draftTaskKey {
+            parts.append("task \(draftTaskKey)")
+        }
+        if let materializedArtifactPath = evidence.materializedArtifactPath {
+            parts.append("package \(materializedArtifactPath)")
+        } else if let artifactPath = evidence.artifactPath {
+            parts.append("source \(artifactPath)")
+        } else if let frameID = evidence.frameID {
+            parts.append("frame \(shortID(frameID))")
+        }
+        parts.append(mutationBoundaryLabel(semantics.mutationBoundary))
+        return parts.joined(separator: " · ")
+    }
+
+    private static func mutationBoundaryLabel(
+        _ boundary: SemanticRecordingReviewActionSemantics.MutationBoundary
+    ) -> String {
+        switch boundary {
+        case .reviewLocal:
+            return "Review local"
+        case .draftPatchOnly:
+            return "Draft patch only"
+        case .draftPreviewRequired:
+            return "Draft Preview required"
+        case .confirmedImport:
+            return "Confirmed import"
+        }
+    }
+
+    private static func mutationEffectLabel(
+        _ semantics: SemanticRecordingReviewActionSemantics
+    ) -> String {
+        if semantics.mutatesWorkflow {
+            return "Mutates workflow after confirmation"
+        }
+        if semantics.createsDraftPatch {
+            return "Creates reviewed draft patch"
+        }
+        return "No workflow mutation"
+    }
+
+    private static func boundsLabel(_ bounds: RecordingBounds) -> String {
+        let rect = bounds.rect
+        return "\(format(rect.x)),\(format(rect.y)) \(format(rect.width))x\(format(rect.height)) \(bounds.coordinateSpace.rawValue)"
+    }
+
+    private static func format(_ value: Double) -> String {
+        if value.rounded() == value {
+            return String(Int(value))
+        }
+        return String(format: "%.2f", value)
+    }
+
+    private static func shortID(_ id: UUID) -> String {
+        String(id.uuidString.suffix(8)).lowercased()
+    }
+
+    private static func shortDigest(_ digest: String) -> String {
+        guard digest.count > 12 else {
+            return digest
+        }
+        return String(digest.prefix(12))
+    }
+}
+
 public enum SemanticRecordingReviewDraftPatchError: Error, Equatable, Sendable {
     case missingSourceFrame(UUID)
     case missingRegionBounds(String)

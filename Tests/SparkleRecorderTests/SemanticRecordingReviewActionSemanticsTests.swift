@@ -362,6 +362,82 @@ struct SemanticRecordingReviewActionSemanticsTests {
         #expect(preview.evidence.materializedSHA256 != unrelatedExactPathAsset.sha256)
     }
 
+    @Test("Review action presentation summarizes materialized draft alignment")
+    func reviewActionPresentationSummarizesMaterializedDraftAlignment() throws {
+        let bundle = SemanticRecordingFixture.checkoutBundle()
+        let projection = SemanticRecordingReviewProjection(
+            bundle: bundle,
+            selectedEventID: SemanticRecordingFixture.clickEventID
+        )
+        let candidate = try #require(
+            projection.selectedFrame?.conditionCandidates.first { $0.kind == .imageAppeared }
+        )
+        let result = try SemanticRecordingReviewDraftPatchBuilder.makePatch(
+            bundle: bundle,
+            request: SemanticRecordingReviewDraftPatchRequest(
+                candidate: candidate,
+                newTaskKey: "wait_checkout_button"
+            )
+        )
+        let materialized = try SemanticRecordingReviewAssetMaterializer.materialize(
+            patch: result.patch,
+            readArtifact: { _ in Data("template-data".utf8) },
+            writeAsset: { _, _ in }
+        )
+        let importAction = SemanticRecordingReviewActionSemantics.importDraft(
+            result,
+            materializedAssets: materialized.copiedAssets
+        )
+
+        let presentation = SemanticRecordingReviewActionPresentation(importAction)
+        let rowsByKind = Dictionary(uniqueKeysWithValues: presentation.rows.map { ($0.kind, $0) })
+
+        #expect(presentation.actionName == .importDraft)
+        #expect(presentation.title == "Import reviewed draft")
+        #expect(presentation.summary.contains("review.importDraft"))
+        #expect(presentation.summary.contains("imageAppeared"))
+        #expect(presentation.summary.contains("task wait_checkout_button"))
+        #expect(presentation.summary.contains("assets/images/sr_00000001_checkout_button_0000000f_template.png"))
+        #expect(rowsByKind[.mutationBoundary]?.value == "Confirmed import")
+        #expect(rowsByKind[.mutationEffect]?.value == "Mutates workflow after confirmation")
+        #expect(rowsByKind[.frame]?.value == "00000004")
+        #expect(rowsByKind[.events]?.value == "00000007")
+        #expect(rowsByKind[.sourcePreview]?.value == "0000000f")
+        #expect(rowsByKind[.artifact]?.value == "visual-index/templates/checkout-button.png")
+        #expect(rowsByKind[.materializedArtifact]?.value == "assets/images/sr_00000001_checkout_button_0000000f_template.png")
+        #expect(rowsByKind[.materializedDigest]?.value == "20dc26ad5871")
+        #expect(rowsByKind[.draftTask]?.value == "wait_checkout_button")
+        #expect(rowsByKind[.draftCondition]?.value == "imageAppeared")
+        #expect(rowsByKind[.visualRegion]?.value == result.region?.key)
+        #expect(rowsByKind[.visualAsset]?.label == "Image asset")
+        #expect(rowsByKind[.visualAsset]?.value == result.imageAsset?.key)
+        #expect(rowsByKind[.bounds]?.value == "880,620 180x48 windowPixels")
+    }
+
+    @Test("Review action presentation remains Codable for UI and S4 payloads")
+    func reviewActionPresentationRemainsCodableForUIAndS4Payloads() throws {
+        let bundle = SemanticRecordingFixture.checkoutBundle()
+        let suggestion = try #require(
+            SemanticRecordingFixture.checkoutSuggestions(bundle: bundle).first
+        )
+        let presentation = SemanticRecordingReviewActionPresentation(
+            .acceptSuggestion(suggestion)
+        )
+
+        let data = try JSONEncoder().encode(presentation)
+        let decoded = try JSONDecoder().decode(
+            SemanticRecordingReviewActionPresentation.self,
+            from: data
+        )
+
+        #expect(decoded == presentation)
+        #expect(decoded.rows.map(\.kind).contains(.suggestion))
+        #expect(decoded.rows.map(\.kind).contains(.frame))
+        #expect(decoded.rows.map(\.kind).contains(.artifact))
+        #expect(decoded.summary.contains("review.acceptSuggestion"))
+        #expect(decoded.summary.contains("visual-index/ocr/confirmation-region.png"))
+    }
+
     @Test("Review action semantics are Codable for S4 JSON payloads")
     func reviewActionSemanticsAreCodableForS4JSONPayloads() throws {
         let bundle = SemanticRecordingFixture.checkoutBundle()
