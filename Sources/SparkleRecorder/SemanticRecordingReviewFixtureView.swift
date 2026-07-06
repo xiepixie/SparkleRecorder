@@ -1358,7 +1358,11 @@ struct SemanticRecordingReviewFixtureView: View {
             draftPatchErrorMessage = NSLocalizedString("Open a live bundle before accepting a suggestion.", comment: "")
             return
         }
-        guard let match = suggestionPatchCandidate(suggestion, bundle: bundle) else {
+        guard let match = SemanticRecordingReviewSuggestionPatchResolver.makeRequest(
+            suggestion: suggestion,
+            bundle: bundle,
+            regionSelection: regionSelection
+        ) else {
             draftPatchResult = nil
             draftPatchErrorMessage = NSLocalizedString("No patchable evidence was found for this suggestion.", comment: "")
             return
@@ -1367,15 +1371,12 @@ struct SemanticRecordingReviewFixtureView: View {
         selectedEventID = match.eventID
         selectedFrameID = match.frameID
         selectedCandidateID = match.candidate.id
-        let effectiveSelection = regionSelection?.frameID == match.candidate.sourceFrameID ? regionSelection : nil
+        var request = match.request
+        request.pixelColorHex = pixelColorHex(for: match.candidate)
         do {
             draftPatchResult = try SemanticRecordingReviewDraftPatchBuilder.makePatch(
                 bundle: bundle,
-                request: SemanticRecordingReviewDraftPatchRequest(
-                    candidate: match.candidate,
-                    regionSelection: effectiveSelection,
-                    pixelColorHex: pixelColorHex(for: match.candidate)
-                )
+                request: request
             )
             draftPatchErrorMessage = ""
             patchSaveMessage = ""
