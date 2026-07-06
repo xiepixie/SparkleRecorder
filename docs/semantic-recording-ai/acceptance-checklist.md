@@ -47,6 +47,7 @@
 
 - [x] Pure semantic capture session can build a validating bundle from fake movie/frame/index clients and `RecordedEvent` inputs.
 - [x] Semantic recording preflight evaluator distinguishes blocking and degraded capabilities for Input Monitoring, Screen Recording and Accessibility. Evidence: `SemanticRecordingPreflightTests` covers authorized, missing Screen Recording, missing Accessibility, keyframe-only and missing Input Monitoring paths.
+- [x] Semantic recording preflight presentation projects ready/blocked/degraded results into app-shell status, issue rows and action intents without SwiftUI side effects. Evidence: `SemanticRecordingPreflightPresentationTests`.
 - [ ] App UI surfaces semantic recording preflight/degraded-mode guidance before starting semantic capture.
 - [ ] Record target-window `.mov` during macro recording through `SCRecordingOutput`.
 - [ ] Record target-window keyframes during macro recording.
