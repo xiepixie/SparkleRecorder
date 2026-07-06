@@ -66,11 +66,15 @@ S0 live-product evidence still expected:
 S0 can check this directory without manually scanning filenames:
 
 ```bash
+swift run SparkleRecorder workflow product-evidence capture-plan
+swift run SparkleRecorder workflow product-evidence capture-plan --json
+swift run SparkleRecorder workflow product-evidence prepare-live-capture
+swift run SparkleRecorder workflow product-evidence prepare-live-capture --json
 swift run SparkleRecorder workflow product-evidence audit --json
 swift run SparkleRecorder workflow product-evidence audit --require-live --json
 ```
 
-The normal audit reports fixture/live status and exits 0. The strict `--require-live` mode exits 1 until every S0 live-product artifact exists and the paired sidecar includes the required live capture labels: `Capture date:`, `App build/run source:`, `Workflow/package:`, `User action:`, `Checklist item:`, `Known gaps:`, and `Evidence source:`. Current smoke result is 9/13 required items present: all fixture artifacts are present, and the four S0 live artifacts above are missing. The pure audit semantics are covered by `AutomationProductEvidenceAuditTests`.
+`capture-plan` is the operator/agent checklist for closing S0: it lists missing live gates, accepted clip filenames, sidecar template commands and missing sidecar labels. `prepare-live-capture` materializes the missing sidecar drafts before recording; it preserves existing notes by default, supports `--overwrite` for regeneration, and intentionally leaves placeholders that strict audit rejects until the real clip is captured and reviewed. The normal audit reports fixture/live status and exits 0. The strict `--require-live` mode exits 1 until every S0 live-product artifact exists and the paired sidecar includes the required live capture labels: `Capture date:`, `App build/run source:`, `Workflow/package:`, `User action:`, `Checklist item:`, `Known gaps:`, and `Evidence source:`. Current smoke result is 9/13 required items present: all fixture artifacts are present; the five live sidecar drafts exist; the four S0 live gates still miss clips and completed sidecar fields. The pure audit, capture-plan and sidecar-draft selection semantics are covered by `AutomationProductEvidenceAuditTests`.
 
 Generate a live sidecar template before saving a capture:
 

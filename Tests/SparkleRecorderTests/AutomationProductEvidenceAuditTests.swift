@@ -208,6 +208,65 @@ struct AutomationProductEvidenceAuditTests {
         #expect(payload.items.allSatisfy { $0.satisfied })
     }
 
+    @Test("Live sidecar drafts prepare missing S0 gate notes")
+    func liveSidecarDraftsPrepareMissingS0GateNotes() {
+        let payload = AutomationProductEvidenceAudit.liveSidecarDrafts(
+            directory: "/tmp/product-evidence",
+            existingPaths: Self.fixtureFiles
+        )
+
+        #expect(payload.includeSatisfied == false)
+        #expect(payload.drafts.map(\.sidecarPath) == [
+            "live-visual-diagnostics-open-reveal.md",
+            "live-macro-evidence-open-reveal.md",
+            "live-branch-evidence-consistency.md",
+            "live-task-reorder-wysiwyg.md",
+            "live-drag-link-wysiwyg.md"
+        ])
+        #expect(payload.drafts.allSatisfy { draft in
+            draft.template.contains("Do not leave angle-bracket placeholders")
+        })
+    }
+
+    @Test("Live sidecar drafts skip satisfied gates by default")
+    func liveSidecarDraftsSkipSatisfiedGatesByDefault() {
+        let payload = AutomationProductEvidenceAudit.liveSidecarDrafts(
+            directory: "/tmp/product-evidence",
+            existingPaths: Self.fixtureFiles
+                .union([
+                    "live-visual-diagnostics-open-reveal.mp4",
+                    "live-visual-diagnostics-open-reveal.md"
+                ]),
+            sidecarContents: Self.validLiveSidecars
+        )
+
+        #expect(!payload.drafts.map(\.sidecarPath).contains("live-visual-diagnostics-open-reveal.md"))
+        #expect(payload.drafts.map(\.sidecarPath).contains("live-macro-evidence-open-reveal.md"))
+    }
+
+    @Test("Live sidecar drafts can include satisfied gates for rehearsal")
+    func liveSidecarDraftsCanIncludeSatisfiedGatesForRehearsal() {
+        let payload = AutomationProductEvidenceAudit.liveSidecarDrafts(
+            directory: "/tmp/product-evidence",
+            existingPaths: Self.fixtureFiles
+                .union(Self.requiredLiveFilesWithoutAuthoring)
+                .union([
+                    "live-drag-link-wysiwyg.mov",
+                    "live-drag-link-wysiwyg.md"
+                ]),
+            sidecarContents: Self.validLiveSidecars,
+            includeSatisfied: true
+        )
+
+        #expect(payload.drafts.map(\.sidecarPath) == [
+            "live-visual-diagnostics-open-reveal.md",
+            "live-macro-evidence-open-reveal.md",
+            "live-branch-evidence-consistency.md",
+            "live-task-reorder-wysiwyg.md",
+            "live-drag-link-wysiwyg.md"
+        ])
+    }
+
     @Test("Template placeholders keep live evidence incomplete")
     func templatePlaceholdersKeepLiveEvidenceIncomplete() throws {
         let template = try #require(AutomationProductEvidenceAudit.liveSidecarTemplate(

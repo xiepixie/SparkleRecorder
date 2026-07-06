@@ -192,6 +192,22 @@ public struct AutomationProductEvidenceCapturePlanOption: Codable, Equatable, Se
     }
 }
 
+public struct AutomationProductEvidenceSidecarDraftsPayload: Codable, Equatable, Sendable {
+    public var directory: String
+    public var includeSatisfied: Bool
+    public var drafts: [AutomationProductEvidenceSidecarTemplatePayload]
+
+    public init(
+        directory: String,
+        includeSatisfied: Bool,
+        drafts: [AutomationProductEvidenceSidecarTemplatePayload]
+    ) {
+        self.directory = directory
+        self.includeSatisfied = includeSatisfied
+        self.drafts = drafts
+    }
+}
+
 public enum AutomationProductEvidenceAudit {
     public static let defaultDirectory = "docs/workflow-page-productization/product-evidence"
 
@@ -489,6 +505,43 @@ public enum AutomationProductEvidenceAudit {
             missingLiveCount: missingLiveCount,
             allLiveSatisfied: missingLiveCount == 0,
             items: liveItems
+        )
+    }
+
+    public static func liveSidecarDrafts(
+        directory: String,
+        existingPaths: Set<String>,
+        sidecarContents: [String: String] = [:],
+        includeSatisfied: Bool = false,
+        specs: [AutomationProductEvidenceAuditSpec] = defaultSpecs
+    ) -> AutomationProductEvidenceSidecarDraftsPayload {
+        let plan = liveCapturePlan(
+            directory: directory,
+            existingPaths: existingPaths,
+            sidecarContents: sidecarContents,
+            specs: specs
+        )
+        var seenSidecars = Set<String>()
+        var drafts: [AutomationProductEvidenceSidecarTemplatePayload] = []
+
+        for item in plan.items where includeSatisfied || !item.satisfied {
+            for option in item.options where !seenSidecars.contains(option.sidecarPath) {
+                guard let draft = liveSidecarTemplate(
+                    id: item.id,
+                    sidecarPath: option.sidecarPath,
+                    specs: specs
+                ) else {
+                    continue
+                }
+                seenSidecars.insert(option.sidecarPath)
+                drafts.append(draft)
+            }
+        }
+
+        return AutomationProductEvidenceSidecarDraftsPayload(
+            directory: directory,
+            includeSatisfied: includeSatisfied,
+            drafts: drafts
         )
     }
 

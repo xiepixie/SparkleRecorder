@@ -26,6 +26,24 @@ private struct WorkflowProductEvidenceSnapshotPayload: Codable, Equatable, Senda
     var scale: Double
 }
 
+private struct WorkflowProductEvidencePreparedSidecarPayload: Codable, Equatable, Sendable {
+    var id: String
+    var title: String
+    var sidecarPath: String
+    var clipPathCandidates: [String]
+    var action: String
+}
+
+private struct WorkflowProductEvidencePrepareLiveCapturePayload: Codable, Equatable, Sendable {
+    var directory: String
+    var includeSatisfied: Bool
+    var overwrite: Bool
+    var writtenCount: Int
+    var overwrittenCount: Int
+    var skippedExistingCount: Int
+    var sidecars: [WorkflowProductEvidencePreparedSidecarPayload]
+}
+
 private enum SemanticRecordingDebugSmokeStatus: String, Codable, Equatable, Sendable {
     case blocked
     case finished
@@ -142,6 +160,17 @@ private func runWorkflowCLI(_ args: [String]) -> Never {
             let exitCode = try runWorkflowProductEvidenceCapturePlan(
                 Array(workflowArgs.dropFirst(2)),
                 command: "workflow product-evidence capture-plan",
+                wantsJSON: wantsJSON
+            )
+            exit(Int32(exitCode))
+        }
+
+        if workflowArgs.count >= 2,
+           workflowArgs[0] == "product-evidence",
+           workflowArgs[1] == "prepare-live-capture" {
+            let exitCode = try runWorkflowProductEvidencePrepareLiveCapture(
+                Array(workflowArgs.dropFirst(2)),
+                command: "workflow product-evidence prepare-live-capture",
                 wantsJSON: wantsJSON
             )
             exit(Int32(exitCode))
@@ -676,6 +705,141 @@ private func runWorkflowProductEvidenceCapturePlan(
                     FileHandle.standardOutput.write(Data(("    incomplete labels: \(option.incompleteSidecarLabels.joined(separator: ", "))\n").utf8))
                 }
             }
+        }
+    }
+
+    return 0
+}
+
+private func runWorkflowProductEvidencePrepareLiveCapture(
+    _ arguments: [String],
+    command: String,
+    wantsJSON: Bool
+) throws -> Int {
+    var directoryURL = URL(fileURLWithPath: AutomationProductEvidenceAudit.defaultDirectory, isDirectory: true)
+    var includeSatisfied = false
+    var overwrite = false
+    var index = 0
+
+    while index < arguments.count {
+        let token = arguments[index]
+        switch token {
+        case "--json":
+            break
+        case "--include-satisfied":
+            includeSatisfied = true
+        case "--overwrite":
+            overwrite = true
+        case "--directory":
+            guard index + 1 < arguments.count else {
+                throw WorkflowCLIError("missingArgument", "--directory requires a path.", path: token)
+            }
+            directoryURL = URL(fileURLWithPath: arguments[index + 1], isDirectory: true)
+            index += 1
+        default:
+            if token.hasPrefix("--") {
+                throw WorkflowCLIError("unsupportedOption", "Unsupported option '\(token)'.", path: token)
+            }
+            throw WorkflowCLIError("unexpectedArgument", "Unexpected argument '\(token)'.", path: token)
+        }
+        index += 1
+    }
+
+    let resolvedDirectoryURL = directoryURL.standardizedFileURL
+    try FileManager.default.createDirectory(
+        at: resolvedDirectoryURL,
+        withIntermediateDirectories: true
+    )
+    let existingPaths = try productEvidenceExistingPaths(in: resolvedDirectoryURL)
+    let sidecarContents = try productEvidenceSidecarContents(
+        in: resolvedDirectoryURL,
+        existingPaths: existingPaths
+    )
+    let draftsPayload = AutomationProductEvidenceAudit.liveSidecarDrafts(
+        directory: resolvedDirectoryURL.path,
+        existingPaths: existingPaths,
+        sidecarContents: sidecarContents,
+        includeSatisfied: includeSatisfied
+    )
+
+    var writtenCount = 0
+    var overwrittenCount = 0
+    var skippedExistingCount = 0
+    var sidecars: [WorkflowProductEvidencePreparedSidecarPayload] = []
+
+    for draft in draftsPayload.drafts {
+        let sidecarURL = resolvedDirectoryURL.appendingPathComponent(
+            draft.sidecarPath,
+            isDirectory: false
+        )
+        let exists = FileManager.default.fileExists(atPath: sidecarURL.path)
+        let action: String
+        if exists && !overwrite {
+            skippedExistingCount += 1
+            action = "skippedExisting"
+        } else {
+            try draft.template.write(to: sidecarURL, atomically: true, encoding: .utf8)
+            if exists {
+                overwrittenCount += 1
+                action = "overwritten"
+            } else {
+                writtenCount += 1
+                action = "written"
+            }
+        }
+        sidecars.append(WorkflowProductEvidencePreparedSidecarPayload(
+            id: draft.id,
+            title: draft.title,
+            sidecarPath: draft.sidecarPath,
+            clipPathCandidates: draft.clipPathCandidates,
+            action: action
+        ))
+    }
+
+    let payload = WorkflowProductEvidencePrepareLiveCapturePayload(
+        directory: resolvedDirectoryURL.path,
+        includeSatisfied: includeSatisfied,
+        overwrite: overwrite,
+        writtenCount: writtenCount,
+        overwrittenCount: overwrittenCount,
+        skippedExistingCount: skippedExistingCount,
+        sidecars: sidecars
+    )
+    let envelope = AutomationCLIResultEnvelope<WorkflowProductEvidencePrepareLiveCapturePayload>(
+        ok: true,
+        command: command,
+        data: payload,
+        warnings: skippedExistingCount == 0 ? [] : [
+            AutomationCLIMessage(
+                code: "existingSidecarSkipped",
+                message: "\(skippedExistingCount) sidecar draft(s) already existed and were left untouched.",
+                path: resolvedDirectoryURL.path
+            )
+        ],
+        nextActions: [
+            AutomationCLINextAction(
+                command: "Fill every sidecar placeholder, save the matching live .mov or .mp4 clip, then rerun capture-plan.",
+                reason: "Prepared sidecars intentionally remain incomplete until a real App recording is reviewed."
+            ),
+            AutomationCLINextAction(
+                command: "SparkleRecorder workflow product-evidence audit --require-live --json",
+                reason: "Strict S0 audit must stay red until clips and completed sidecars exist."
+            )
+        ]
+    )
+
+    if wantsJSON {
+        writeWorkflowJSON(envelope)
+    } else {
+        let summary = "SparkleRecorder: prepared \(writtenCount) S0 live sidecar draft(s), overwrote \(overwrittenCount), skipped \(skippedExistingCount)."
+        FileHandle.standardOutput.write(Data((summary + "\n").utf8))
+        for sidecar in sidecars {
+            FileHandle.standardOutput.write(Data(
+                "- \(sidecar.sidecarPath) [\(sidecar.action)] clips: \(sidecar.clipPathCandidates.joined(separator: ", "))\n".utf8
+            ))
+        }
+        if sidecars.isEmpty {
+            FileHandle.standardOutput.write(Data("No sidecar drafts were needed for the selected capture set.\n".utf8))
         }
     }
 

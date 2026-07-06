@@ -36,7 +36,7 @@ S0 does not own:
 | Branch evidence drill-in | Fixture screenshot proves durable `AutomationTaskRun.branchEvidence` UI path | Need real run showing FlowGraph edge, selected run row and Run Detail agree |
 | Drag/link and task reorder | Fixture screenshots prove visible authoring states | Need real `.mov` / `.mp4` proving indicator, mutation and final graph/list position match |
 | Template/baseline preview refs | S1 accepted first-pass source-frame/runtime-sample preview contract in `SemanticRecordingBundle`; fixture artifact `template-baseline-preview-refs.png` renders Source / Runtime / Decision together | Need S3/Review UI integration and later live sample evidence before product drill-in is complete |
-| Evidence audit gate | `workflow product-evidence audit` reads the product evidence directory and separates fixture/live requirements; pure core logic is covered by `AutomationProductEvidenceAuditTests` | Current audit is 9/13 required items present; all four live S0 items are missing |
+| Evidence audit gate | `workflow product-evidence audit` reads the product evidence directory and separates fixture/live requirements; pure core logic is covered by `AutomationProductEvidenceAuditTests` | Current audit is 9/13 required items present; all four live S0 items are still missing because clips are absent and draft sidecars still contain placeholders |
 
 S0 should not mark live-product checklist items done from fixture screenshots. Fixtures prove UI wiring; S0 completion requires live product evidence or an accepted contract note for pure design tasks.
 
@@ -44,10 +44,10 @@ S0 should not mark live-product checklist items done from fixture screenshots. F
 
 | ID | Task | Output | Blocks / Feeds |
 | --- | --- | --- | --- |
-| S0-1 | Capture live visual diagnostics Open/Reveal | `live-visual-diagnostics-open-reveal.mov` or `.mp4` + `.md` sidecar | Proves artifact presenter path before semantic runtime samples reuse it |
-| S0-2 | Capture live macro evidence Open Screenshot / Reveal Report | `live-macro-evidence-open-reveal.mov` or `.mp4` + `.md` sidecar | Proves failed run evidence path before recording bundle failure comparisons |
-| S0-3 | Capture branch evidence real-run consistency | `live-branch-evidence-consistency.mov` or `.mp4` + `.md` sidecar | Proves durable branch payload is not only fixture-correct |
-| S0-4 | Capture drag/reorder WYSIWYG mutation | `live-task-reorder-wysiwyg.mov` / `.mp4` or `live-drag-link-wysiwyg.mov` / `.mp4` + `.md` sidecar | Gives S3 a baseline for future recording review interactions |
+| S0-1 | Capture live visual diagnostics Open/Reveal | `live-visual-diagnostics-open-reveal.mov` or `.mp4`; draft sidecar exists and must be filled | Proves artifact presenter path before semantic runtime samples reuse it |
+| S0-2 | Capture live macro evidence Open Screenshot / Reveal Report | `live-macro-evidence-open-reveal.mov` or `.mp4`; draft sidecar exists and must be filled | Proves failed run evidence path before recording bundle failure comparisons |
+| S0-3 | Capture branch evidence real-run consistency | `live-branch-evidence-consistency.mov` or `.mp4`; draft sidecar exists and must be filled | Proves durable branch payload is not only fixture-correct |
+| S0-4 | Capture drag/reorder WYSIWYG mutation | `live-task-reorder-wysiwyg.mov` / `.mp4` or `live-drag-link-wysiwyg.mov` / `.mp4`; both draft sidecars exist and at least one must be filled | Gives S3 a baseline for future recording review interactions |
 | S0-5 | Accept template/baseline preview refs request with S1 and render fixture evidence | [../09-template-baseline-preview-refs.md](../09-template-baseline-preview-refs.md), [s1-contract-core.md](s1-contract-core.md), and `product-evidence/template-baseline-preview-refs.png` | Core contract accepted; fixture rendering done; real Review UI integration remains open |
 
 Recommended order: S0-5 core contract is accepted. S0-1 and S0-3 remain the highest-risk live evidence gates.
@@ -133,11 +133,15 @@ swift run SparkleRecorder workflow product-evidence snapshot task-reorder-author
 Evidence audit:
 
 ```bash
+swift run SparkleRecorder workflow product-evidence capture-plan
+swift run SparkleRecorder workflow product-evidence capture-plan --json
+swift run SparkleRecorder workflow product-evidence prepare-live-capture
+swift run SparkleRecorder workflow product-evidence prepare-live-capture --json
 swift run SparkleRecorder workflow product-evidence audit --json
 swift run SparkleRecorder workflow product-evidence audit --require-live --json
 ```
 
-The first command reports current status without failing the shell. The second is the strict S0 closure gate and must fail until live artifacts are present.
+`capture-plan` is the operator/agent checklist: it lists every live gate, accepted clip filenames, sidecar template command and currently missing files or labels. `prepare-live-capture` writes missing sidecar drafts into the evidence directory without overwriting existing notes unless `--overwrite` is passed; the drafts intentionally contain placeholders and do not satisfy strict audit. The normal audit reports current status without failing the shell. The strict audit is the S0 closure gate and must fail until live artifacts are present.
 
 Live sidecar template, before recording or immediately after naming the clip:
 
@@ -174,7 +178,7 @@ S0 can call Workflow evidence closure complete only when:
 - template/baseline preview refs have an accepted S1 contract note and fixture artifact; final Review UI still needs the same source/runtime/decision evidence without raw path handling in SwiftUI
 - `06-current-work-and-next-tasks.md`, `08-parallel-workstreams.md`, product evidence README and semantic checklist agree about what is done versus fixture-only
 
-Current status: not complete. The fixture foundation is strong, S1 preview-ref acceptance is done, and the preview-ref fixture artifact is present, but live Workflow evidence remains open.
+Current status: not complete. The fixture foundation is strong, S1 preview-ref acceptance is done, the preview-ref fixture artifact is present, and live sidecar drafts have been materialized in the product-evidence directory. Live Workflow evidence remains open until real clips exist and every placeholder in the matching sidecar is filled.
 
 ## 8. Implementation Log
 
@@ -185,3 +189,6 @@ Current status: not complete. The fixture foundation is strong, S1 preview-ref a
 - 2026-07-06: Added `template-baseline-preview-refs.png` / `.md` product-evidence fixture rendered from `SemanticRecordingFixture.checkoutBundle`, and added it to the product-evidence audit gate. This closes the fixture rendering proof for Source / Runtime / Decision, not the final S3 Review UI or live evidence gates.
 - 2026-07-06: Strengthened `workflow product-evidence audit` for S0 live evidence: live clips may be `.mov` or `.mp4`, but the paired `.md` sidecar must contain the required capture labels before the item can satisfy the strict gate.
 - 2026-07-06: Added `workflow product-evidence sidecar-template` so each live S0 gate can generate the exact sidecar labels expected by strict audit; placeholders still fail audit until filled.
+- 2026-07-06: Added `workflow product-evidence capture-plan` so S0 operators and agents can read the exact missing live gates, filename options, sidecar template commands and missing labels before recording. This does not satisfy any live evidence gate by itself.
+- 2026-07-06: Added `workflow product-evidence prepare-live-capture` so S0 operators and agents can materialize missing sidecar drafts before recording. Existing sidecars are preserved by default, and placeholder drafts remain incomplete until the live clip is captured and reviewed.
+- 2026-07-06: Ran `workflow product-evidence prepare-live-capture` against the real product-evidence directory. The five live sidecar drafts now exist, but `capture-plan` still reports four missing live gates because clips are absent and placeholder fields remain unfilled.
