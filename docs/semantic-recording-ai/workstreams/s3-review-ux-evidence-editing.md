@@ -65,7 +65,7 @@ S3 does not own:
 - frame crop file copy / package materialization semantics；当前 patch 登记 safe refs，真实文件复制仍属于 app-edge presenter/package import 层。
 - frame-to-condition live clip and real product evidence.
 - image/baseline crop extraction UI still needs package-local file materialization before broad shipping.
-- refreshed product evidence snapshot for suggestion review accept/reject; current shared worktree build is blocked by S2 `LiveSemanticRecordingSuppressionContext.swift`, so screenshot refresh waits for that compile issue to clear.
+- installed-app product evidence for suggestion accept/reject and Review -> Draft Preview remains open; current proof is fixture product evidence.
 
 ## Accepted S1 Contract Usage
 
@@ -123,15 +123,14 @@ Observed status on 2026-07-06:
 
 - `SemanticRecordingReviewProjectionTests`: 7 tests passed; coverage includes OCR wait patch, image appeared patch, visual asset upsert operations, manual frame region override and user-picked pixel color -> `pixelMatched` patch.
 - Swift 6 build: passed.
-- Product evidence snapshot: generated `docs/workflow-page-productization/product-evidence/semantic-review-timeline.png` with sidecar `semantic-review-timeline.md`.
+- Product evidence snapshot: generated `docs/workflow-page-productization/product-evidence/semantic-review-timeline.png` with sidecar `semantic-review-timeline.md`; current artifact includes suggestion evidence refs plus `Accept Patch` / `Reject` controls.
 
 ## Next Tasks
 
 1. Add S2 automatic run/macro -> semantic bundle association so Run Detail can open the correct Review without an open panel.
 2. Define frame crop file copy/package materialization semantics for package-local image/baseline refs.
-3. Refresh `semantic-review-timeline.png` once the shared app build is green, so fixture product evidence shows suggestion evidence refs plus Accept Patch / Reject actions.
-4. Capture live product evidence for frame-to-condition creation once a live bundle can be opened from the installed app.
-5. Add product evidence for pixel color picking and the Review -> Draft Preview -> confirm import handoff from an installed-app bundle once automatic binding lands.
+3. Capture live product evidence for frame-to-condition creation once a live bundle can be opened from the installed app.
+4. Add product evidence for pixel color picking, suggestion accept/reject and the Review -> Draft Preview -> confirm import handoff from an installed-app bundle once automatic binding lands.
 
 ## Implementation Log
 
