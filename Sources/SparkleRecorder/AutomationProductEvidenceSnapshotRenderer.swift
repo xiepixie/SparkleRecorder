@@ -12,6 +12,7 @@ enum AutomationProductEvidenceSnapshotScenario: String, CaseIterable {
     case visualDiagnostics = "visual-diagnostics-drill-in"
     case branchEvidence = "branch-evidence"
     case templateBaselinePreviewRefs = "template-baseline-preview-refs"
+    case semanticReviewTimeline = "semantic-review-timeline"
 
     init?(argument: String) {
         switch argument {
@@ -33,6 +34,8 @@ enum AutomationProductEvidenceSnapshotScenario: String, CaseIterable {
             self = .branchEvidence
         case "template-baseline-preview-refs", "preview-refs", "semantic-preview-refs":
             self = .templateBaselinePreviewRefs
+        case "semantic-review", "semantic-review-timeline", "review-timeline":
+            self = .semanticReviewTimeline
         default:
             return nil
         }
@@ -58,6 +61,8 @@ enum AutomationProductEvidenceSnapshotScenario: String, CaseIterable {
             return "branch-evidence-drill-in.png"
         case .templateBaselinePreviewRefs:
             return "template-baseline-preview-refs.png"
+        case .semanticReviewTimeline:
+            return "semantic-review-timeline.png"
         }
     }
 
@@ -69,6 +74,8 @@ enum AutomationProductEvidenceSnapshotScenario: String, CaseIterable {
             return 1_120
         case .templateBaselinePreviewRefs:
             return 980
+        case .semanticReviewTimeline:
+            return 1_040
         case .idle, .dragLinkAuthoring, .taskReorderAuthoring, .running:
             return 940
         }
@@ -88,7 +95,7 @@ enum AutomationProductEvidenceSnapshotScenario: String, CaseIterable {
             return Self.fixedUUID("00000000-0000-0000-0000-00000000c20b")
         case .branchEvidence:
             return Self.fixedUUID("00000000-0000-0000-0000-00000000c206")
-        case .templateBaselinePreviewRefs:
+        case .templateBaselinePreviewRefs, .semanticReviewTimeline:
             return nil
         }
     }
@@ -101,7 +108,8 @@ enum AutomationProductEvidenceSnapshotScenario: String, CaseIterable {
             return Self.fixedUUID("00000000-0000-0000-0000-00000000c40c")
         case .branchEvidence:
             return Self.fixedUUID("00000000-0000-0000-0000-00000000c406")
-        case .idle, .dragLinkAuthoring, .taskReorderAuthoring, .running, .templateBaselinePreviewRefs:
+        case .idle, .dragLinkAuthoring, .taskReorderAuthoring, .running, .templateBaselinePreviewRefs,
+             .semanticReviewTimeline:
             return nil
         }
     }
@@ -110,7 +118,8 @@ enum AutomationProductEvidenceSnapshotScenario: String, CaseIterable {
         switch self {
         case .dragLinkAuthoring:
             return Self.fixedUUID("00000000-0000-0000-0000-00000000c202")
-        case .idle, .taskReorderAuthoring, .running, .failedRunDetail, .failedRunPreviewUnavailable, .visualDiagnostics, .branchEvidence:
+        case .idle, .taskReorderAuthoring, .running, .failedRunDetail, .failedRunPreviewUnavailable, .visualDiagnostics, .branchEvidence,
+             .semanticReviewTimeline:
             return nil
         case .templateBaselinePreviewRefs:
             return nil
@@ -121,7 +130,8 @@ enum AutomationProductEvidenceSnapshotScenario: String, CaseIterable {
         switch self {
         case .dragLinkAuthoring:
             return .onConditionMatched
-        case .idle, .taskReorderAuthoring, .running, .failedRunDetail, .failedRunPreviewUnavailable, .visualDiagnostics, .branchEvidence:
+        case .idle, .taskReorderAuthoring, .running, .failedRunDetail, .failedRunPreviewUnavailable, .visualDiagnostics, .branchEvidence,
+             .semanticReviewTimeline:
             return .onSuccess
         case .templateBaselinePreviewRefs:
             return .onSuccess
@@ -133,7 +143,7 @@ enum AutomationProductEvidenceSnapshotScenario: String, CaseIterable {
         case .failedRunDetail, .failedRunPreviewUnavailable:
             return true
         case .idle, .dragLinkAuthoring, .taskReorderAuthoring, .running, .visualDiagnostics, .branchEvidence,
-             .templateBaselinePreviewRefs:
+             .templateBaselinePreviewRefs, .semanticReviewTimeline:
             return false
         }
     }
@@ -143,7 +153,7 @@ enum AutomationProductEvidenceSnapshotScenario: String, CaseIterable {
         case .failedRunPreviewUnavailable:
             return "fixture-macros-preview-unavailable"
         case .idle, .dragLinkAuthoring, .taskReorderAuthoring, .running, .failedRunDetail, .visualDiagnostics,
-             .branchEvidence, .templateBaselinePreviewRefs:
+             .branchEvidence, .templateBaselinePreviewRefs, .semanticReviewTimeline:
             return "fixture-macros"
         }
     }
@@ -156,7 +166,8 @@ enum AutomationProductEvidenceSnapshotScenario: String, CaseIterable {
                 insertionIndex: 1
             )
         case .idle, .dragLinkAuthoring, .running, .failedRunDetail,
-             .failedRunPreviewUnavailable, .visualDiagnostics, .branchEvidence, .templateBaselinePreviewRefs:
+             .failedRunPreviewUnavailable, .visualDiagnostics, .branchEvidence, .templateBaselinePreviewRefs,
+             .semanticReviewTimeline:
             return nil
         }
     }
@@ -170,7 +181,8 @@ enum AutomationProductEvidenceSnapshotScenario: String, CaseIterable {
         case .failedRunDetail:
             return .succeeded(.revealReport)
         case .idle, .dragLinkAuthoring, .taskReorderAuthoring, .running,
-             .failedRunPreviewUnavailable, .visualDiagnostics, .branchEvidence, .templateBaselinePreviewRefs:
+             .failedRunPreviewUnavailable, .visualDiagnostics, .branchEvidence, .templateBaselinePreviewRefs,
+             .semanticReviewTimeline:
             return nil
         }
     }
@@ -180,7 +192,8 @@ enum AutomationProductEvidenceSnapshotScenario: String, CaseIterable {
         case .visualDiagnostics:
             return ["regionSampleImage": .succeeded(.reveal)]
         case .idle, .dragLinkAuthoring, .taskReorderAuthoring, .running,
-             .failedRunDetail, .failedRunPreviewUnavailable, .branchEvidence, .templateBaselinePreviewRefs:
+             .failedRunDetail, .failedRunPreviewUnavailable, .branchEvidence, .templateBaselinePreviewRefs,
+             .semanticReviewTimeline:
             return [:]
         }
     }
@@ -550,6 +563,35 @@ enum AutomationProductEvidenceSnapshotRenderer {
             .environment(\.colorScheme, .dark)
             .environment(\.locale, Locale(identifier: "en_US_POSIX"))
             .background(Color(red: 0.10, green: 0.12, blue: 0.13))
+
+            try writeSwiftUISnapshot(
+                view,
+                outputURL: outputURL,
+                width: width,
+                height: height,
+                scale: scale
+            )
+            return
+        }
+        if scenario == .semanticReviewTimeline {
+            let bundle = SemanticRecordingFixture.checkoutBundle(createdAt: now)
+            let suggestions = SemanticRecordingFixture.checkoutSuggestions(bundle: bundle)
+            let projection = SemanticRecordingReviewProjection(
+                bundle: bundle,
+                suggestions: suggestions,
+                selectedEventID: SemanticRecordingFixture.waitEventID
+            )
+            let candidateID = projection.selectedFrame?.conditionCandidates.first?.id
+            let view = SemanticRecordingReviewFixtureView(
+                bundle: bundle,
+                suggestions: suggestions,
+                selectedEventID: SemanticRecordingFixture.waitEventID,
+                initialDraftPatchCandidateID: candidateID
+            )
+            .frame(width: width, height: height)
+            .environment(\.colorScheme, .dark)
+            .environment(\.locale, Locale(identifier: "en_US_POSIX"))
+            .background(Color(red: 0.08, green: 0.09, blue: 0.10))
 
             try writeSwiftUISnapshot(
                 view,

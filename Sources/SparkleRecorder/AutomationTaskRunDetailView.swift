@@ -8,11 +8,16 @@ struct AutomationTaskRunDetailView: View {
     let display: AutomationTaskRunDisplay
     let retryPolicy: AutomationRetryPolicy
     let hasLaterAttempt: Bool
+    var macros: [SavedMacro] = []
+    var onImportWorkflowFromDraftPreview: (AutomationWorkflow, URL?) -> Void = { _, _ in }
 
     @State private var evidencePayload: AutomationTaskRunEvidencePayload?
     @State private var evidenceErrorMessage = ""
     @State private var isLoadingEvidence = false
     @State private var evidenceRequestRunID: UUID?
+    @State private var semanticReviewState: SemanticRecordingReviewState?
+    @State private var semanticReviewErrorMessage = ""
+    @State private var isOpeningSemanticReview = false
     @Environment(\.automationTaskRunEvidenceMacroPackageBaseURL) private var macroPackageBaseURL
     @Environment(\.automationTaskRunEvidenceAutoload) private var shouldAutoloadEvidence
     @Environment(\.automationTaskRunEvidenceInitialActionFeedback) private var initialEvidenceActionFeedback
@@ -128,6 +133,10 @@ struct AutomationTaskRunDetailView: View {
 
             Divider().opacity(0.45)
 
+            macroReviewSection
+
+            Divider().opacity(0.45)
+
             Label(nextCheckSummary, systemImage: nextCheckImage)
                 .font(.caption)
                 .foregroundStyle(.secondary)
@@ -138,6 +147,7 @@ struct AutomationTaskRunDetailView: View {
         .accessibilityElement(children: .contain)
         .onChange(of: run.id) {
             resetEvidence()
+            resetSemanticReview()
         }
         .task(id: run.id) {
             if shouldAutoloadEvidence,
@@ -147,6 +157,70 @@ struct AutomationTaskRunDetailView: View {
                 loadEvidence()
             }
         }
+        .sheet(item: $semanticReviewState) { state in
+            SemanticRecordingReviewFixtureView(
+                state: state,
+                workflow: workflow,
+                macros: macros,
+                onImportWorkflow: onImportWorkflowFromDraftPreview
+            )
+                .frame(minWidth: 1_180, idealWidth: 1_280, minHeight: 760, idealHeight: 820)
+        }
+    }
+
+    private var macroReviewSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                Label(NSLocalizedString("Macro Review", comment: ""), systemImage: "film.stack")
+                    .font(.caption)
+                    .bold()
+                    .lineLimit(1)
+
+                Spacer(minLength: 0)
+
+                Button(reviewButtonTitle, systemImage: "rectangle.stack.badge.play") {
+                    openSemanticReview()
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+                .disabled(isOpeningSemanticReview)
+            }
+
+            Text(NSLocalizedString("Open a semantic recording bundle for frame timeline, visual evidence, region selection, and review-only draft patch generation.", comment: ""))
+                .font(.caption)
+                .foregroundStyle(.tertiary)
+                .fixedSize(horizontal: false, vertical: true)
+
+            if isOpeningSemanticReview {
+                HStack(spacing: 8) {
+                    ProgressView()
+                        .controlSize(.small)
+                    Text(NSLocalizedString("Opening review bundle", comment: ""))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            } else if !semanticReviewErrorMessage.isEmpty {
+                Label(semanticReviewErrorMessage, systemImage: "exclamationmark.triangle")
+                    .font(.caption)
+                    .foregroundStyle(Brand.sigAmber)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .padding(8)
+        .background(
+            RoundedRectangle(cornerRadius: 8)
+                .fill(Color.primary.opacity(0.025))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8)
+                        .strokeBorder(Color.primary.opacity(0.075), lineWidth: 0.6)
+                )
+        )
+    }
+
+    private var reviewButtonTitle: String {
+        isOpeningSemanticReview
+            ? NSLocalizedString("Opening", comment: "")
+            : NSLocalizedString("Open Review", comment: "")
     }
 
     private var attemptSummary: String {
@@ -289,6 +363,24 @@ struct AutomationTaskRunDetailView: View {
         }
     }
 
+    private func openSemanticReview() {
+        isOpeningSemanticReview = true
+        semanticReviewErrorMessage = ""
+        SemanticRecordingReviewPresenter.openBundle { result in
+            isOpeningSemanticReview = false
+            switch result {
+            case .success(let state):
+                semanticReviewState = state
+            case .failure(let error):
+                semanticReviewState = nil
+                semanticReviewErrorMessage = String(
+                    format: NSLocalizedString("Could not open Macro Review: %@", comment: ""),
+                    String(describing: error)
+                )
+            }
+        }
+    }
+
     private var noEvidenceMessage: String {
         if run.evidenceID != nil {
             return NSLocalizedString("No per-run evidence report found for this run yet.", comment: "")
@@ -301,6 +393,12 @@ struct AutomationTaskRunDetailView: View {
         evidenceErrorMessage = ""
         isLoadingEvidence = false
         evidenceRequestRunID = nil
+    }
+
+    private func resetSemanticReview() {
+        semanticReviewState = nil
+        semanticReviewErrorMessage = ""
+        isOpeningSemanticReview = false
     }
 }
 

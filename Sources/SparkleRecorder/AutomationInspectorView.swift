@@ -21,6 +21,7 @@ struct AutomationInspectorView: View {
     let onExportWorkflowDraft: (AutomationWorkflow) -> Void
     let onShareWorkflowPackage: (AutomationWorkflow) -> Void
     let onDeleteWorkflow: (UUID) -> Void
+    let onImportWorkflowFromDraftPreview: (AutomationWorkflow, URL?) -> Void
     let onAction: (AutomationAction) -> Void
     let onCancelLink: () -> Void
 
@@ -67,6 +68,7 @@ struct AutomationInspectorView: View {
                                 taskRuns: taskRuns(for: task.id),
                                 activeRunID: activeRunID(for: task.id),
                                 initialSelectedRunID: initialSelectedRunID,
+                                onImportWorkflowFromDraftPreview: onImportWorkflowFromDraftPreview,
                                 onSelectTask: onSelectTask,
                                 onSelectDependency: onSelectDependency,
                                 onAction: onAction

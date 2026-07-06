@@ -8,6 +8,8 @@ struct AutomationTaskRunHistoryView: View {
     var resourceRequirement: AutomationResourceRequirement?
     var retryPolicy: AutomationRetryPolicy = .none
     var initialSelectedRunID: UUID?
+    var macros: [SavedMacro] = []
+    var onImportWorkflowFromDraftPreview: (AutomationWorkflow, URL?) -> Void = { _, _ in }
 
     @State private var selectedRunID: UUID?
 
@@ -17,7 +19,9 @@ struct AutomationTaskRunHistoryView: View {
         dependencyEdges: [AutomationDependencyEdgeProjection],
         resourceRequirement: AutomationResourceRequirement? = nil,
         retryPolicy: AutomationRetryPolicy = .none,
-        initialSelectedRunID: UUID? = nil
+        initialSelectedRunID: UUID? = nil,
+        macros: [SavedMacro] = [],
+        onImportWorkflowFromDraftPreview: @escaping (AutomationWorkflow, URL?) -> Void = { _, _ in }
     ) {
         self.runs = runs
         self.workflow = workflow
@@ -25,6 +29,8 @@ struct AutomationTaskRunHistoryView: View {
         self.resourceRequirement = resourceRequirement
         self.retryPolicy = retryPolicy
         self.initialSelectedRunID = initialSelectedRunID
+        self.macros = macros
+        self.onImportWorkflowFromDraftPreview = onImportWorkflowFromDraftPreview
         _selectedRunID = State(initialValue: initialSelectedRunID)
     }
 
@@ -86,7 +92,9 @@ struct AutomationTaskRunHistoryView: View {
                             resourceRequirement: resourceRequirement
                         ),
                         retryPolicy: retryPolicy,
-                        hasLaterAttempt: hasLaterAttempt(after: selectedRun)
+                        hasLaterAttempt: hasLaterAttempt(after: selectedRun),
+                        macros: macros,
+                        onImportWorkflowFromDraftPreview: onImportWorkflowFromDraftPreview
                     )
                 }
 

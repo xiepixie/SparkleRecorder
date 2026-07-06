@@ -191,6 +191,7 @@ struct AutomationMainContentView: View {
                             onExportWorkflowDraft: exportWorkflowDraft,
                             onShareWorkflowPackage: shareWorkflowPackage,
                             onDeleteWorkflow: deleteWorkflow,
+                            onImportWorkflowFromDraftPreview: importWorkflowFromDraftPreview,
                             onAction: onAction,
                             onCancelLink: cancelDependency
                         )

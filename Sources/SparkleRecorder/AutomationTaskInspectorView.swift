@@ -11,6 +11,7 @@ struct AutomationTaskInspectorView: View {
     let taskRuns: [AutomationTaskRun]
     let activeRunID: UUID?
     let initialSelectedRunID: UUID?
+    let onImportWorkflowFromDraftPreview: (AutomationWorkflow, URL?) -> Void
     let onSelectTask: (UUID) -> Void
     let onSelectDependency: (UUID) -> Void
     let onAction: (AutomationAction) -> Void
@@ -81,7 +82,9 @@ struct AutomationTaskInspectorView: View {
                 dependencyEdges: dependencyEdges,
                 resourceRequirement: task.resourceRequirement,
                 retryPolicy: task.retryPolicy,
-                initialSelectedRunID: initialSelectedRunID
+                initialSelectedRunID: initialSelectedRunID,
+                macros: macros,
+                onImportWorkflowFromDraftPreview: onImportWorkflowFromDraftPreview
             )
             if let graphPosition {
                 AutomationTaskPositionControlView(

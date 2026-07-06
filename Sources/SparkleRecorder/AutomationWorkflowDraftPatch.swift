@@ -60,6 +60,9 @@ public struct AutomationWorkflowDraftPatchOperation: Codable, Equatable, Sendabl
     public var pixel: AutomationGraphPoint?
     public var colorHex: String?
     public var threshold: Double?
+    public var visualRegion: AutomationWorkflowDraftVisualRegion?
+    public var visualImage: AutomationWorkflowDraftVisualImageAsset?
+    public var visualBaseline: AutomationWorkflowDraftVisualImageAsset?
 
     public init(
         op: String,
@@ -103,7 +106,10 @@ public struct AutomationWorkflowDraftPatchOperation: Codable, Equatable, Sendabl
         baselineRef: String? = nil,
         pixel: AutomationGraphPoint? = nil,
         colorHex: String? = nil,
-        threshold: Double? = nil
+        threshold: Double? = nil,
+        visualRegion: AutomationWorkflowDraftVisualRegion? = nil,
+        visualImage: AutomationWorkflowDraftVisualImageAsset? = nil,
+        visualBaseline: AutomationWorkflowDraftVisualImageAsset? = nil
     ) {
         self.op = op
         self.key = key
@@ -147,6 +153,9 @@ public struct AutomationWorkflowDraftPatchOperation: Codable, Equatable, Sendabl
         self.pixel = pixel
         self.colorHex = colorHex
         self.threshold = threshold
+        self.visualRegion = visualRegion
+        self.visualImage = visualImage
+        self.visualBaseline = visualBaseline
     }
 }
 
@@ -231,6 +240,27 @@ public enum AutomationWorkflowDraftPatchApplier {
                 pollingSeconds: operation.pollingSeconds,
                 context: context
             )
+        case "upsertVisualRegion":
+            return try upsertVisualRegion(
+                from: operation,
+                at: index,
+                in: document,
+                context: context
+            )
+        case "upsertVisualImage":
+            return try upsertVisualImage(
+                from: operation,
+                at: index,
+                in: document,
+                context: context
+            )
+        case "upsertVisualBaseline":
+            return try upsertVisualBaseline(
+                from: operation,
+                at: index,
+                in: document,
+                context: context
+            )
         case "addDependency":
             return try AutomationWorkflowDraftEditor.addDependency(
                 try dependencyToAdd(from: operation, index: index),
@@ -264,6 +294,93 @@ public enum AutomationWorkflowDraftPatchApplier {
                 path: "$.ops[\(index)].op"
             )
         }
+    }
+
+    private static func upsertVisualRegion(
+        from operation: AutomationWorkflowDraftPatchOperation,
+        at index: Int,
+        in document: AutomationWorkflowDraftDocument,
+        context: AutomationWorkflowDraftValidationContext
+    ) throws -> AutomationWorkflowDraftEditResult {
+        guard let region = operation.visualRegion else {
+            throw missingPatchField("visualRegion", index: index)
+        }
+
+        var document = document
+        if document.visualAssets == nil {
+            document.visualAssets = AutomationWorkflowDraftVisualAssets()
+        }
+        if let existingIndex = document.visualAssets?.regions.firstIndex(where: {
+            $0.key.trimmedForPatchEditing == region.key.trimmedForPatchEditing
+        }) {
+            document.visualAssets?.regions[existingIndex] = region
+        } else {
+            document.visualAssets?.regions.append(region)
+        }
+
+        return AutomationWorkflowDraftEditResult(
+            operation: "draft visual region upsert",
+            document: document,
+            validation: AutomationWorkflowDraftValidator.validate(document, context: context)
+        )
+    }
+
+    private static func upsertVisualImage(
+        from operation: AutomationWorkflowDraftPatchOperation,
+        at index: Int,
+        in document: AutomationWorkflowDraftDocument,
+        context: AutomationWorkflowDraftValidationContext
+    ) throws -> AutomationWorkflowDraftEditResult {
+        guard let image = operation.visualImage else {
+            throw missingPatchField("visualImage", index: index)
+        }
+
+        var document = document
+        if document.visualAssets == nil {
+            document.visualAssets = AutomationWorkflowDraftVisualAssets()
+        }
+        if let existingIndex = document.visualAssets?.images.firstIndex(where: {
+            $0.key.trimmedForPatchEditing == image.key.trimmedForPatchEditing
+        }) {
+            document.visualAssets?.images[existingIndex] = image
+        } else {
+            document.visualAssets?.images.append(image)
+        }
+
+        return AutomationWorkflowDraftEditResult(
+            operation: "draft visual image upsert",
+            document: document,
+            validation: AutomationWorkflowDraftValidator.validate(document, context: context)
+        )
+    }
+
+    private static func upsertVisualBaseline(
+        from operation: AutomationWorkflowDraftPatchOperation,
+        at index: Int,
+        in document: AutomationWorkflowDraftDocument,
+        context: AutomationWorkflowDraftValidationContext
+    ) throws -> AutomationWorkflowDraftEditResult {
+        guard let baseline = operation.visualBaseline else {
+            throw missingPatchField("visualBaseline", index: index)
+        }
+
+        var document = document
+        if document.visualAssets == nil {
+            document.visualAssets = AutomationWorkflowDraftVisualAssets()
+        }
+        if let existingIndex = document.visualAssets?.baselines.firstIndex(where: {
+            $0.key.trimmedForPatchEditing == baseline.key.trimmedForPatchEditing
+        }) {
+            document.visualAssets?.baselines[existingIndex] = baseline
+        } else {
+            document.visualAssets?.baselines.append(baseline)
+        }
+
+        return AutomationWorkflowDraftEditResult(
+            operation: "draft visual baseline upsert",
+            document: document,
+            validation: AutomationWorkflowDraftValidator.validate(document, context: context)
+        )
     }
 
     private static func taskToAdd(
