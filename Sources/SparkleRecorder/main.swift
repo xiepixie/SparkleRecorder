@@ -47,6 +47,7 @@ private struct WorkflowProductEvidencePrepareLiveCapturePayload: Codable, Equata
 private enum SemanticRecordingDebugSmokeStatus: String, Codable, Equatable, Sendable {
     case blocked
     case finished
+    case preflightReady
 }
 
 private struct SemanticRecordingDebugSmokePayload: Codable, Equatable, Sendable {
@@ -942,6 +943,7 @@ private func runSemanticRecordingDebugSmoke(
     var recordingID = UUID()
     var rootDirectory: URL?
     var keyframesOnly = false
+    var preflightOnly = false
     var displayID: UInt32?
     var windowID: UInt32?
     var appBundleIdentifier: String?
@@ -970,6 +972,8 @@ private func runSemanticRecordingDebugSmoke(
             index += 1
         case "--keyframes-only":
             keyframesOnly = true
+        case "--preflight-only":
+            preflightOnly = true
         case "--display-id":
             guard index + 1 < arguments.count,
                   let parsedDisplayID = UInt32(arguments[index + 1]) else {
@@ -1017,6 +1021,7 @@ private func runSemanticRecordingDebugSmoke(
     let resolvedRecordingID = recordingID
     let resolvedDuration = duration
     let resolvedRootDirectory = rootDirectory
+    let resolvedPreflightOnly = preflightOnly
 
     let payload = try waitForWorkflowCLIAsync {
         try await semanticRecordingDebugSmokePayload(
@@ -1024,11 +1029,12 @@ private func runSemanticRecordingDebugSmoke(
             duration: resolvedDuration,
             capturePolicy: policy,
             captureTarget: target,
-            rootDirectory: resolvedRootDirectory
+            rootDirectory: resolvedRootDirectory,
+            preflightOnly: resolvedPreflightOnly
         )
     }
     let envelope = AutomationCLIResultEnvelope<SemanticRecordingDebugSmokePayload>(
-        ok: payload.status == .finished,
+        ok: payload.status != .blocked,
         command: command,
         data: payload,
         warnings: semanticRecordingDebugSmokeMessages(
@@ -1045,7 +1051,7 @@ private func runSemanticRecordingDebugSmoke(
     } else {
         writeSemanticRecordingDebugSmokeSummary(payload)
     }
-    return payload.status == .finished ? 0 : 2
+    return payload.status == .blocked ? 2 : 0
 }
 
 private func semanticRecordingDebugSmokePayload(
@@ -1053,8 +1059,30 @@ private func semanticRecordingDebugSmokePayload(
     duration: TimeInterval,
     capturePolicy: RecordingCapturePolicy,
     captureTarget: RecordingCaptureTarget,
-    rootDirectory: URL?
+    rootDirectory: URL?,
+    preflightOnly: Bool,
+    preflightClient: SemanticRecordingPreflightClient = .liveCommandLine
 ) async throws -> SemanticRecordingDebugSmokePayload {
+    let preflightPolicy = SemanticRecordingPreflightPolicy(capturePolicy: capturePolicy)
+    if preflightOnly {
+        let preflight = await preflightClient.evaluate(policy: preflightPolicy)
+        return SemanticRecordingDebugSmokePayload(
+            status: preflight.isReadyToStart ? .preflightReady : .blocked,
+            recordingID: recordingID,
+            capturePolicy: capturePolicy,
+            captureTarget: captureTarget,
+            preflight: preflight,
+            bundleDirectory: nil,
+            manifestPath: nil,
+            videoSegmentCount: 0,
+            frameCount: 0,
+            timelineEventCount: 0,
+            aiSafeEventCount: 0,
+            visualObservationCount: 0,
+            suppressionCount: 0
+        )
+    }
+
     let store = rootDirectory.map { RecordingBundleStore(rootDirectory: $0) } ?? RecordingBundleStore()
     let configuration = SemanticRecordingCaptureConfiguration(
         recordingID: recordingID,
@@ -1065,7 +1093,10 @@ private func semanticRecordingDebugSmokePayload(
     )
     let session = LiveSemanticRecordingSession(
         configuration: configuration,
-        dependencies: LiveSemanticRecordingSessionDependencies(store: store)
+        dependencies: LiveSemanticRecordingSessionDependencies(
+            store: store,
+            preflightClient: preflightClient
+        )
     )
 
     let start = try await session.start(recordingTime: 0)
@@ -1185,6 +1216,13 @@ private func semanticRecordingDebugSmokeNextActions(
                 reason: "This smoke path proves live S2 capture wrote a semantic recording bundle, but it is not product evidence by itself."
             )
         ]
+    case .preflightReady:
+        return [
+            AutomationCLINextAction(
+                command: "Rerun semantic-recording debug-smoke --json without --preflight-only when the screen is safe to capture.",
+                reason: "Preflight-only mode proves S2 capture readiness without creating a bundle or touching ScreenCaptureKit."
+            )
+        ]
     case .blocked:
         return [
             AutomationCLINextAction(
@@ -1208,6 +1246,17 @@ private func writeSemanticRecordingDebugSmokeSummary(
         - frames: \(payload.frameCount)
         - timeline events: \(payload.timelineEventCount)
         - AI-safe events: \(payload.aiSafeEventCount)
+
+        """.utf8))
+    case .preflightReady:
+        let degraded = payload.preflight.degradedIssues
+            .map { "- \($0.permission.rawValue): \($0.message)" }
+            .joined(separator: "\n")
+        let degradedText = degraded.isEmpty ? "- none" : degraded
+        FileHandle.standardOutput.write(Data("""
+        SparkleRecorder: semantic recording debug smoke preflight ready.
+        - degraded issues:
+        \(degradedText)
 
         """.utf8))
     case .blocked:
