@@ -126,6 +126,62 @@ public struct AutomationProductEvidenceSidecarTemplatePayload: Codable, Equatabl
     }
 }
 
+public struct AutomationProductEvidenceSidecarCompletion: Equatable, Sendable {
+    public var clipPath: String
+    public var captureDate: String
+    public var worktreeNote: String
+    public var appBuildRunSource: String
+    public var workflowPackage: String
+    public var userAction: String
+    public var knownGaps: String
+    public var evidenceSource: String
+
+    public init(
+        clipPath: String,
+        captureDate: String,
+        worktreeNote: String,
+        appBuildRunSource: String,
+        workflowPackage: String,
+        userAction: String,
+        knownGaps: String,
+        evidenceSource: String
+    ) {
+        self.clipPath = clipPath
+        self.captureDate = captureDate
+        self.worktreeNote = worktreeNote
+        self.appBuildRunSource = appBuildRunSource
+        self.workflowPackage = workflowPackage
+        self.userAction = userAction
+        self.knownGaps = knownGaps
+        self.evidenceSource = evidenceSource
+    }
+}
+
+public struct AutomationProductEvidenceCompletedSidecarPayload: Codable, Equatable, Sendable {
+    public var id: String
+    public var title: String
+    public var sidecarPath: String
+    public var clipPath: String
+    public var requiredLabels: [String]
+    public var content: String
+
+    public init(
+        id: String,
+        title: String,
+        sidecarPath: String,
+        clipPath: String,
+        requiredLabels: [String],
+        content: String
+    ) {
+        self.id = id
+        self.title = title
+        self.sidecarPath = sidecarPath
+        self.clipPath = clipPath
+        self.requiredLabels = requiredLabels
+        self.content = content
+    }
+}
+
 public struct AutomationProductEvidenceCapturePlanPayload: Codable, Equatable, Sendable {
     public var directory: String
     public var missingLiveCount: Int
@@ -441,6 +497,36 @@ public enum AutomationProductEvidenceAudit {
         )
     }
 
+    public static func completedLiveSidecar(
+        id: String,
+        sidecarPath requestedSidecarPath: String? = nil,
+        completion: AutomationProductEvidenceSidecarCompletion,
+        specs: [AutomationProductEvidenceAuditSpec] = defaultSpecs
+    ) -> AutomationProductEvidenceCompletedSidecarPayload? {
+        guard let template = liveSidecarTemplate(
+            id: id,
+            sidecarPath: requestedSidecarPath,
+            specs: specs
+        ), template.clipPathCandidates.contains(completion.clipPath) else {
+            return nil
+        }
+
+        let content = completedLiveSidecarText(
+            title: template.title,
+            id: template.id,
+            sidecarPath: template.sidecarPath,
+            completion: completion
+        )
+        return AutomationProductEvidenceCompletedSidecarPayload(
+            id: template.id,
+            title: template.title,
+            sidecarPath: template.sidecarPath,
+            clipPath: completion.clipPath,
+            requiredLabels: template.requiredLabels,
+            content: content
+        )
+    }
+
     public static func liveCapturePlan(
         directory: String,
         existingPaths: Set<String>,
@@ -603,6 +689,34 @@ public enum AutomationProductEvidenceAudit {
 
         - Keep this sidecar next to the clip in `docs/workflow-page-productization/product-evidence/`.
         - Do not leave angle-bracket placeholders in the final sidecar; strict audit treats placeholders as incomplete.
+        - Re-run `swift run SparkleRecorder workflow product-evidence audit --require-live --json` before marking S0 complete.
+        """
+    }
+
+    private static func completedLiveSidecarText(
+        title: String,
+        id: String,
+        sidecarPath: String,
+        completion: AutomationProductEvidenceSidecarCompletion
+    ) -> String {
+        """
+        # \(title)
+
+        - Capture date: \(completion.captureDate)
+        - Worktree note: \(completion.worktreeNote)
+        - App build/run source: \(completion.appBuildRunSource)
+        - Workflow/package: \(completion.workflowPackage)
+        - User action: \(completion.userAction)
+        - Checklist item: \(title) (`\(id)`)
+        - Evidence source: \(completion.evidenceSource)
+        - Clip file: `\(completion.clipPath)`
+        - Sidecar file: `\(sidecarPath)`
+        - Known gaps: \(completion.knownGaps)
+
+        ## Acceptance Notes
+
+        - This sidecar was completed from reviewed live capture metadata.
+        - Keep this sidecar next to the clip in `docs/workflow-page-productization/product-evidence/`.
         - Re-run `swift run SparkleRecorder workflow product-evidence audit --require-live --json` before marking S0 complete.
         """
     }

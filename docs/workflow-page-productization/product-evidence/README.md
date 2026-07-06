@@ -70,11 +70,20 @@ swift run SparkleRecorder workflow product-evidence capture-plan
 swift run SparkleRecorder workflow product-evidence capture-plan --json
 swift run SparkleRecorder workflow product-evidence prepare-live-capture
 swift run SparkleRecorder workflow product-evidence prepare-live-capture --json
+swift run SparkleRecorder workflow product-evidence complete-sidecar live-visual-diagnostics-open-reveal \
+  --clip live-visual-diagnostics-open-reveal.mov \
+  --capture-date 2026-07-06 \
+  --worktree-note "main at <commit>, dirty only live product evidence clip" \
+  --app-build "local swift run SparkleRecorder or installed app path" \
+  --workflow "workflow id/name and package source" \
+  --user-action "exact interaction captured in the clip" \
+  --known-gaps "none for this gate, or describe remaining limitation" \
+  --evidence-source "live App recording"
 swift run SparkleRecorder workflow product-evidence audit --json
 swift run SparkleRecorder workflow product-evidence audit --require-live --json
 ```
 
-`capture-plan` is the operator/agent checklist for closing S0: it lists missing live gates, accepted clip filenames, sidecar template commands and missing sidecar labels. `prepare-live-capture` materializes the missing sidecar drafts before recording; it preserves existing notes by default, supports `--overwrite` for regeneration, and intentionally leaves placeholders that strict audit rejects until the real clip is captured and reviewed. The normal audit reports fixture/live status and exits 0. The strict `--require-live` mode exits 1 until every S0 live-product artifact exists and the paired sidecar includes the required live capture labels: `Capture date:`, `App build/run source:`, `Workflow/package:`, `User action:`, `Checklist item:`, `Known gaps:`, and `Evidence source:`. Current smoke result is 9/13 required items present: all fixture artifacts are present; the five live sidecar drafts exist; the four S0 live gates still miss clips and completed sidecar fields. The pure audit, capture-plan and sidecar-draft selection semantics are covered by `AutomationProductEvidenceAuditTests`.
+`capture-plan` is the operator/agent checklist for closing S0: it lists missing live gates, accepted clip filenames, sidecar template commands and missing sidecar labels. `prepare-live-capture` materializes the missing sidecar drafts before recording; it preserves existing notes by default, supports `--overwrite` for regeneration, and intentionally leaves placeholders that strict audit rejects until the real clip is captured and reviewed. `complete-sidecar` fills one reviewed sidecar through typed CLI fields, validates that `--clip` is an accepted filename for that gate, and still reports the gate open when the clip file is absent. The normal audit reports fixture/live status and exits 0. The strict `--require-live` mode exits 1 until every S0 live-product artifact exists and the paired sidecar includes the required live capture labels: `Capture date:`, `App build/run source:`, `Workflow/package:`, `User action:`, `Checklist item:`, `Known gaps:`, and `Evidence source:`. Current smoke result is 9/13 required items present: all fixture artifacts are present; the five live sidecar drafts exist; the four S0 live gates still miss clips and completed sidecar fields. The pure audit, capture-plan, sidecar-draft and sidecar-completion semantics are covered by `AutomationProductEvidenceAuditTests`.
 
 Generate a live sidecar template before saving a capture:
 

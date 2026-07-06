@@ -140,6 +140,53 @@ struct AutomationProductEvidenceAuditTests {
         #expect(payload.template.contains("Do not leave angle-bracket placeholders"))
     }
 
+    @Test("Completed live sidecar satisfies audit when matching clip exists")
+    func completedLiveSidecarSatisfiesAuditWhenMatchingClipExists() throws {
+        let completed = try #require(AutomationProductEvidenceAudit.completedLiveSidecar(
+            id: "live-visual-diagnostics-open-reveal",
+            completion: Self.sidecarCompletion(clipPath: "live-visual-diagnostics-open-reveal.mov")
+        ))
+        let payload = AutomationProductEvidenceAudit.evaluate(
+            directory: "/tmp/product-evidence",
+            existingPaths: Self.fixtureFiles.union([
+                "live-visual-diagnostics-open-reveal.mov",
+                "live-visual-diagnostics-open-reveal.md"
+            ]),
+            sidecarContents: [
+                "live-visual-diagnostics-open-reveal.md": completed.content
+            ]
+        )
+
+        let item = try #require(payload.items.first { $0.id == "live-visual-diagnostics-open-reveal" })
+        #expect(item.satisfied)
+        #expect(completed.content.contains("- Clip file: `live-visual-diagnostics-open-reveal.mov`"))
+        #expect(!completed.content.contains("<YYYY-MM-DD>"))
+        #expect(!completed.content.contains("<live App recording"))
+    }
+
+    @Test("Completed live sidecar rejects unknown clip candidate")
+    func completedLiveSidecarRejectsUnknownClipCandidate() {
+        let completed = AutomationProductEvidenceAudit.completedLiveSidecar(
+            id: "live-visual-diagnostics-open-reveal",
+            completion: Self.sidecarCompletion(clipPath: "wrong-video.mov")
+        )
+
+        #expect(completed == nil)
+    }
+
+    @Test("Completed authoring sidecar respects selected authoring path")
+    func completedAuthoringSidecarRespectsSelectedAuthoringPath() throws {
+        let completed = try #require(AutomationProductEvidenceAudit.completedLiveSidecar(
+            id: "live-authoring-wysiwyg",
+            sidecarPath: "live-drag-link-wysiwyg.md",
+            completion: Self.sidecarCompletion(clipPath: "live-drag-link-wysiwyg.mp4")
+        ))
+
+        #expect(completed.sidecarPath == "live-drag-link-wysiwyg.md")
+        #expect(completed.clipPath == "live-drag-link-wysiwyg.mp4")
+        #expect(completed.content.contains("Live Authoring WYSIWYG (`live-authoring-wysiwyg`)"))
+    }
+
     @Test("Live capture plan lists missing S0 gates and sidecar commands")
     func liveCapturePlanListsMissingS0GatesAndSidecarCommands() {
         let payload = AutomationProductEvidenceAudit.liveCapturePlan(
@@ -366,5 +413,20 @@ struct AutomationProductEvidenceAuditTests {
         - Known gaps: none for this specific capture.
         - Evidence source: live App recording.
         """
+    }
+
+    private static func sidecarCompletion(
+        clipPath: String
+    ) -> AutomationProductEvidenceSidecarCompletion {
+        AutomationProductEvidenceSidecarCompletion(
+            clipPath: clipPath,
+            captureDate: "2026-07-06",
+            worktreeNote: "main at abc123, dirty only product evidence clip.",
+            appBuildRunSource: "local swift run SparkleRecorder",
+            workflowPackage: "fixture-owned live workflow package",
+            userAction: "opened the artifact preview and reveal action from Run Detail.",
+            knownGaps: "none for this specific capture.",
+            evidenceSource: "live App recording."
+        )
     }
 }

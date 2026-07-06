@@ -44,6 +44,18 @@ private struct WorkflowProductEvidencePrepareLiveCapturePayload: Codable, Equata
     var sidecars: [WorkflowProductEvidencePreparedSidecarPayload]
 }
 
+private struct WorkflowProductEvidenceCompleteSidecarPayload: Codable, Equatable, Sendable {
+    var directory: String
+    var id: String
+    var title: String
+    var sidecarPath: String
+    var clipPath: String
+    var clipExists: Bool
+    var action: String
+    var sidecarCompleteAfterWrite: Bool
+    var targetSatisfiedAfterWrite: Bool
+}
+
 private enum SemanticRecordingDebugSmokeStatus: String, Codable, Equatable, Sendable {
     case blocked
     case finished
@@ -172,6 +184,17 @@ private func runWorkflowCLI(_ args: [String]) -> Never {
             let exitCode = try runWorkflowProductEvidencePrepareLiveCapture(
                 Array(workflowArgs.dropFirst(2)),
                 command: "workflow product-evidence prepare-live-capture",
+                wantsJSON: wantsJSON
+            )
+            exit(Int32(exitCode))
+        }
+
+        if workflowArgs.count >= 2,
+           workflowArgs[0] == "product-evidence",
+           workflowArgs[1] == "complete-sidecar" {
+            let exitCode = try runWorkflowProductEvidenceCompleteSidecar(
+                Array(workflowArgs.dropFirst(2)),
+                command: "workflow product-evidence complete-sidecar",
                 wantsJSON: wantsJSON
             )
             exit(Int32(exitCode))
@@ -847,6 +870,197 @@ private func runWorkflowProductEvidencePrepareLiveCapture(
     return 0
 }
 
+private func runWorkflowProductEvidenceCompleteSidecar(
+    _ arguments: [String],
+    command: String,
+    wantsJSON: Bool
+) throws -> Int {
+    guard let id = arguments.first,
+          !id.hasPrefix("--") else {
+        throw WorkflowCLIError(
+            "missingArgument",
+            "Expected a live product evidence id, such as 'live-visual-diagnostics-open-reveal'."
+        )
+    }
+
+    var directoryURL = URL(fileURLWithPath: AutomationProductEvidenceAudit.defaultDirectory, isDirectory: true)
+    var sidecarPath: String?
+    var clipPath: String?
+    var captureDate: String?
+    var worktreeNote: String?
+    var appBuildRunSource: String?
+    var workflowPackage: String?
+    var userAction: String?
+    var knownGaps: String?
+    var evidenceSource: String?
+    var overwrite = false
+    var index = 1
+
+    while index < arguments.count {
+        let token = arguments[index]
+        switch token {
+        case "--json":
+            break
+        case "--overwrite":
+            overwrite = true
+        case "--directory":
+            directoryURL = URL(
+                fileURLWithPath: try workflowCLIValue(after: token, in: arguments, at: &index),
+                isDirectory: true
+            )
+        case "--sidecar":
+            sidecarPath = try workflowCLIValue(after: token, in: arguments, at: &index)
+        case "--clip":
+            clipPath = try workflowCLIValue(after: token, in: arguments, at: &index)
+        case "--capture-date":
+            captureDate = try workflowCLIValue(after: token, in: arguments, at: &index)
+        case "--worktree-note":
+            worktreeNote = try workflowCLIValue(after: token, in: arguments, at: &index)
+        case "--app-build":
+            appBuildRunSource = try workflowCLIValue(after: token, in: arguments, at: &index)
+        case "--workflow":
+            workflowPackage = try workflowCLIValue(after: token, in: arguments, at: &index)
+        case "--user-action":
+            userAction = try workflowCLIValue(after: token, in: arguments, at: &index)
+        case "--known-gaps":
+            knownGaps = try workflowCLIValue(after: token, in: arguments, at: &index)
+        case "--evidence-source":
+            evidenceSource = try workflowCLIValue(after: token, in: arguments, at: &index)
+        default:
+            if token.hasPrefix("--") {
+                throw WorkflowCLIError("unsupportedOption", "Unsupported option '\(token)'.", path: token)
+            }
+            throw WorkflowCLIError("unexpectedArgument", "Unexpected argument '\(token)'.", path: token)
+        }
+        index += 1
+    }
+
+    let completion = AutomationProductEvidenceSidecarCompletion(
+        clipPath: try productEvidenceRequiredCompletionValue(clipPath, option: "--clip"),
+        captureDate: try productEvidenceRequiredCompletionValue(captureDate, option: "--capture-date"),
+        worktreeNote: try productEvidenceRequiredCompletionValue(worktreeNote, option: "--worktree-note"),
+        appBuildRunSource: try productEvidenceRequiredCompletionValue(appBuildRunSource, option: "--app-build"),
+        workflowPackage: try productEvidenceRequiredCompletionValue(workflowPackage, option: "--workflow"),
+        userAction: try productEvidenceRequiredCompletionValue(userAction, option: "--user-action"),
+        knownGaps: try productEvidenceRequiredCompletionValue(knownGaps, option: "--known-gaps"),
+        evidenceSource: try productEvidenceRequiredCompletionValue(evidenceSource, option: "--evidence-source")
+    )
+
+    guard let completed = AutomationProductEvidenceAudit.completedLiveSidecar(
+        id: id,
+        sidecarPath: sidecarPath,
+        completion: completion
+    ) else {
+        throw WorkflowCLIError(
+            "unsupportedProductEvidence",
+            "No live sidecar completion is defined for '\(id)' with clip '\(completion.clipPath)'. Use capture-plan for accepted filenames.",
+            path: id
+        )
+    }
+
+    let resolvedDirectoryURL = directoryURL.standardizedFileURL
+    try FileManager.default.createDirectory(
+        at: resolvedDirectoryURL,
+        withIntermediateDirectories: true
+    )
+    let existingPaths = try productEvidenceExistingPaths(in: resolvedDirectoryURL)
+    let existingSidecarContents = try productEvidenceSidecarContents(
+        in: resolvedDirectoryURL,
+        existingPaths: existingPaths
+    )
+    let existingPlan = AutomationProductEvidenceAudit.liveCapturePlan(
+        directory: resolvedDirectoryURL.path,
+        existingPaths: existingPaths,
+        sidecarContents: existingSidecarContents
+    )
+    let existingOption = existingPlan.items
+        .first { $0.id == completed.id }?
+        .options
+        .first { $0.sidecarPath == completed.sidecarPath }
+    if existingPaths.contains(completed.sidecarPath),
+       existingOption?.incompleteSidecarLabels.isEmpty == true,
+       !overwrite {
+        throw WorkflowCLIError(
+            "sidecarAlreadyComplete",
+            "\(completed.sidecarPath) already has all required labels. Pass --overwrite to replace it.",
+            path: completed.sidecarPath
+        )
+    }
+
+    let sidecarURL = resolvedDirectoryURL.appendingPathComponent(
+        completed.sidecarPath,
+        isDirectory: false
+    )
+    let existedBeforeWrite = FileManager.default.fileExists(atPath: sidecarURL.path)
+    try completed.content.write(to: sidecarURL, atomically: true, encoding: .utf8)
+
+    let refreshedPaths = try productEvidenceExistingPaths(in: resolvedDirectoryURL)
+    let refreshedContents = try productEvidenceSidecarContents(
+        in: resolvedDirectoryURL,
+        existingPaths: refreshedPaths
+    )
+    let refreshedPlan = AutomationProductEvidenceAudit.liveCapturePlan(
+        directory: resolvedDirectoryURL.path,
+        existingPaths: refreshedPaths,
+        sidecarContents: refreshedContents
+    )
+    let refreshedItem = refreshedPlan.items.first { $0.id == completed.id }
+    let refreshedOption = refreshedItem?.options.first { $0.sidecarPath == completed.sidecarPath }
+    let clipExists = refreshedPaths.contains(completed.clipPath)
+    let action = existedBeforeWrite ? (overwrite ? "overwritten" : "completedDraft") : "written"
+    let payload = WorkflowProductEvidenceCompleteSidecarPayload(
+        directory: resolvedDirectoryURL.path,
+        id: completed.id,
+        title: completed.title,
+        sidecarPath: completed.sidecarPath,
+        clipPath: completed.clipPath,
+        clipExists: clipExists,
+        action: action,
+        sidecarCompleteAfterWrite: refreshedOption?.incompleteSidecarLabels.isEmpty == true,
+        targetSatisfiedAfterWrite: refreshedItem?.satisfied == true
+    )
+    let envelope = AutomationCLIResultEnvelope<WorkflowProductEvidenceCompleteSidecarPayload>(
+        ok: true,
+        command: command,
+        data: payload,
+        warnings: clipExists ? [] : [
+            AutomationCLIMessage(
+                code: "missingLiveClip",
+                message: "\(completed.clipPath) is not present yet; the sidecar is complete but the live gate remains open.",
+                path: completed.clipPath
+            )
+        ],
+        nextActions: payload.targetSatisfiedAfterWrite ? [
+            AutomationCLINextAction(
+                command: "SparkleRecorder workflow product-evidence audit --require-live --json",
+                reason: "This item now has a matching clip and completed sidecar; rerun the strict gate."
+            )
+        ] : [
+            AutomationCLINextAction(
+                command: "Save the live clip as \(completed.clipPath), then rerun capture-plan.",
+                reason: "S0 live evidence requires both the clip and completed sidecar."
+            ),
+            AutomationCLINextAction(
+                command: "SparkleRecorder workflow product-evidence audit --require-live --json",
+                reason: "Strict S0 audit must stay red until every live gate is satisfied."
+            )
+        ]
+    )
+
+    if wantsJSON {
+        writeWorkflowJSON(envelope)
+    } else {
+        FileHandle.standardOutput.write(Data("""
+        SparkleRecorder: completed sidecar \(payload.sidecarPath) [\(payload.action)].
+        - clip: \(payload.clipPath) \(payload.clipExists ? "present" : "missing")
+        - sidecar labels complete: \(payload.sidecarCompleteAfterWrite ? "yes" : "no")
+        - live gate satisfied: \(payload.targetSatisfiedAfterWrite ? "yes" : "no")
+
+        """.utf8))
+    }
+    return 0
+}
+
 private func runWorkflowProductEvidenceSidecarTemplate(
     _ arguments: [String],
     command: String,
@@ -932,6 +1146,20 @@ private func productEvidenceSidecarContents(
         contents[path] = try String(contentsOf: url, encoding: .utf8)
     }
     return contents
+}
+
+private func productEvidenceRequiredCompletionValue(
+    _ value: String?,
+    option: String
+) throws -> String {
+    let trimmed = value?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+    guard !trimmed.isEmpty else {
+        throw WorkflowCLIError("missingArgument", "\(option) requires a non-empty value.", path: option)
+    }
+    guard !trimmed.hasPrefix("<"), !trimmed.hasSuffix(">") else {
+        throw WorkflowCLIError("placeholderValue", "\(option) must not be an angle-bracket placeholder.", path: option)
+    }
+    return trimmed
 }
 
 private func runSemanticRecordingDebugSmoke(

@@ -137,11 +137,20 @@ swift run SparkleRecorder workflow product-evidence capture-plan
 swift run SparkleRecorder workflow product-evidence capture-plan --json
 swift run SparkleRecorder workflow product-evidence prepare-live-capture
 swift run SparkleRecorder workflow product-evidence prepare-live-capture --json
+swift run SparkleRecorder workflow product-evidence complete-sidecar live-visual-diagnostics-open-reveal \
+  --clip live-visual-diagnostics-open-reveal.mov \
+  --capture-date 2026-07-06 \
+  --worktree-note "main at <commit>, dirty only live product evidence clip" \
+  --app-build "local swift run SparkleRecorder or installed app path" \
+  --workflow "workflow id/name and package source" \
+  --user-action "exact interaction captured in the clip" \
+  --known-gaps "none for this gate, or describe remaining limitation" \
+  --evidence-source "live App recording"
 swift run SparkleRecorder workflow product-evidence audit --json
 swift run SparkleRecorder workflow product-evidence audit --require-live --json
 ```
 
-`capture-plan` is the operator/agent checklist: it lists every live gate, accepted clip filenames, sidecar template command and currently missing files or labels. `prepare-live-capture` writes missing sidecar drafts into the evidence directory without overwriting existing notes unless `--overwrite` is passed; the drafts intentionally contain placeholders and do not satisfy strict audit. The normal audit reports current status without failing the shell. The strict audit is the S0 closure gate and must fail until live artifacts are present.
+`capture-plan` is the operator/agent checklist: it lists every live gate, accepted clip filenames, sidecar template command and currently missing files or labels. `prepare-live-capture` writes missing sidecar drafts into the evidence directory without overwriting existing notes unless `--overwrite` is passed; the drafts intentionally contain placeholders and do not satisfy strict audit. `complete-sidecar` is the post-recording path: it fills one sidecar with reviewed live metadata, rejects unknown clip filenames, and still leaves the gate open if the matching `.mov` / `.mp4` is absent. The normal audit reports current status without failing the shell. The strict audit is the S0 closure gate and must fail until live artifacts are present.
 
 Live sidecar template, before recording or immediately after naming the clip:
 
@@ -192,3 +201,4 @@ Current status: not complete. The fixture foundation is strong, S1 preview-ref a
 - 2026-07-06: Added `workflow product-evidence capture-plan` so S0 operators and agents can read the exact missing live gates, filename options, sidecar template commands and missing labels before recording. This does not satisfy any live evidence gate by itself.
 - 2026-07-06: Added `workflow product-evidence prepare-live-capture` so S0 operators and agents can materialize missing sidecar drafts before recording. Existing sidecars are preserved by default, and placeholder drafts remain incomplete until the live clip is captured and reviewed.
 - 2026-07-06: Ran `workflow product-evidence prepare-live-capture` against the real product-evidence directory. The five live sidecar drafts now exist, but `capture-plan` still reports four missing live gates because clips are absent and placeholder fields remain unfilled.
+- 2026-07-06: Added `workflow product-evidence complete-sidecar` so S0 operators and AI assistants can fill a reviewed live sidecar through typed CLI fields after recording. The command validates clip filenames against the audit spec and does not satisfy a gate while the clip is absent.
