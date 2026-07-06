@@ -26,8 +26,79 @@ private struct WorkflowProductEvidenceSnapshotPayload: Codable, Equatable, Senda
     var scale: Double
 }
 
+private enum SemanticRecordingDebugSmokeStatus: String, Codable, Equatable, Sendable {
+    case blocked
+    case finished
+}
+
+private struct SemanticRecordingDebugSmokePayload: Codable, Equatable, Sendable {
+    var status: SemanticRecordingDebugSmokeStatus
+    var recordingID: UUID
+    var capturePolicy: RecordingCapturePolicy
+    var captureTarget: RecordingCaptureTarget
+    var preflight: SemanticRecordingPreflightResult
+    var bundleDirectory: String?
+    var manifestPath: String?
+    var videoSegmentCount: Int
+    var frameCount: Int
+    var timelineEventCount: Int
+    var aiSafeEventCount: Int
+    var visualObservationCount: Int
+    var suppressionCount: Int
+}
+
 if args.count >= 2, args[1] == "workflow" {
     runWorkflowCLI(args)
+}
+
+if args.count >= 2, args[1] == "semantic-recording" {
+    runSemanticRecordingDebugCLI(args)
+}
+
+private func runSemanticRecordingDebugCLI(_ args: [String]) -> Never {
+    let semanticArgs = Array(args.dropFirst(2))
+    let wantsJSON = semanticArgs.contains("--json")
+    let command = semanticRecordingCommandName(semanticArgs)
+
+    do {
+        guard !semanticArgs.isEmpty else {
+            throw WorkflowCLIError(
+                "unsupportedCommand",
+                "Expected a semantic-recording command, such as 'semantic-recording debug-smoke --json'."
+            )
+        }
+
+        if semanticArgs[0] == "debug-smoke" {
+            let exitCode = try runSemanticRecordingDebugSmoke(
+                Array(semanticArgs.dropFirst()),
+                command: "semantic-recording debug-smoke",
+                wantsJSON: wantsJSON
+            )
+            exit(Int32(exitCode))
+        }
+
+        throw WorkflowCLIError(
+            "unsupportedCommand",
+            "Unsupported semantic-recording command '\(semanticArgs.joined(separator: " "))'."
+        )
+    } catch {
+        let cliError = error as? WorkflowCLIError ?? WorkflowCLIError(
+            "commandFailed",
+            String(describing: error)
+        )
+        let envelope = AutomationCLIResultEnvelope<AutomationCLIEmptyPayload>.failure(
+            command: command,
+            code: cliError.code,
+            message: cliError.message,
+            path: cliError.path
+        )
+        if wantsJSON {
+            writeWorkflowJSON(envelope)
+        } else {
+            writeWorkflowError("SparkleRecorder: \(cliError.message)")
+        }
+        exit(1)
+    }
 }
 
 private func runWorkflowCLI(_ args: [String]) -> Never {
@@ -696,6 +767,295 @@ private func productEvidenceSidecarContents(
         contents[path] = try String(contentsOf: url, encoding: .utf8)
     }
     return contents
+}
+
+private func runSemanticRecordingDebugSmoke(
+    _ arguments: [String],
+    command: String,
+    wantsJSON: Bool
+) throws -> Int {
+    var duration: TimeInterval = 1.0
+    var recordingID = UUID()
+    var rootDirectory: URL?
+    var keyframesOnly = false
+    var displayID: UInt32?
+    var windowID: UInt32?
+    var appBundleIdentifier: String?
+    var windowTitle: String?
+    var index = 0
+
+    while index < arguments.count {
+        let token = arguments[index]
+        switch token {
+        case "--json":
+            break
+        case "--duration":
+            duration = try parsePositiveDoubleOption(arguments, index: index, option: token)
+            index += 1
+        case "--recording-id":
+            guard index + 1 < arguments.count else {
+                throw WorkflowCLIError("missingArgument", "--recording-id requires a UUID.", path: token)
+            }
+            recordingID = try parseWorkflowCLIUUID(arguments[index + 1], path: token)
+            index += 1
+        case "--root-directory":
+            guard index + 1 < arguments.count else {
+                throw WorkflowCLIError("missingArgument", "--root-directory requires a path.", path: token)
+            }
+            rootDirectory = URL(fileURLWithPath: arguments[index + 1], isDirectory: true)
+            index += 1
+        case "--keyframes-only":
+            keyframesOnly = true
+        case "--display-id":
+            guard index + 1 < arguments.count,
+                  let parsedDisplayID = UInt32(arguments[index + 1]) else {
+                throw WorkflowCLIError("invalidArgument", "--display-id requires a UInt32 display ID.", path: token)
+            }
+            displayID = parsedDisplayID
+            index += 1
+        case "--window-id":
+            guard index + 1 < arguments.count,
+                  let parsedWindowID = UInt32(arguments[index + 1]) else {
+                throw WorkflowCLIError("invalidArgument", "--window-id requires a UInt32 window ID.", path: token)
+            }
+            windowID = parsedWindowID
+            index += 1
+        case "--app-bundle-id":
+            guard index + 1 < arguments.count else {
+                throw WorkflowCLIError("missingArgument", "--app-bundle-id requires a bundle identifier.", path: token)
+            }
+            appBundleIdentifier = arguments[index + 1]
+            index += 1
+        case "--window-title":
+            guard index + 1 < arguments.count else {
+                throw WorkflowCLIError("missingArgument", "--window-title requires a title.", path: token)
+            }
+            windowTitle = arguments[index + 1]
+            index += 1
+        default:
+            if token.hasPrefix("--") {
+                throw WorkflowCLIError("unsupportedOption", "Unsupported option '\(token)'.", path: token)
+            }
+            throw WorkflowCLIError("unexpectedArgument", "Unexpected argument '\(token)'.", path: token)
+        }
+        index += 1
+    }
+
+    let target = semanticRecordingDebugSmokeTarget(
+        displayID: displayID,
+        windowID: windowID,
+        appBundleIdentifier: appBundleIdentifier,
+        windowTitle: windowTitle
+    )
+    let policy = RecordingCapturePolicy(
+        mode: keyframesOnly ? .keyframesOnly : .videoAndKeyframes
+    )
+    let resolvedRecordingID = recordingID
+    let resolvedDuration = duration
+    let resolvedRootDirectory = rootDirectory
+
+    let payload = try waitForWorkflowCLIAsync {
+        try await semanticRecordingDebugSmokePayload(
+            recordingID: resolvedRecordingID,
+            duration: resolvedDuration,
+            capturePolicy: policy,
+            captureTarget: target,
+            rootDirectory: resolvedRootDirectory
+        )
+    }
+    let envelope = AutomationCLIResultEnvelope<SemanticRecordingDebugSmokePayload>(
+        ok: payload.status == .finished,
+        command: command,
+        data: payload,
+        warnings: semanticRecordingDebugSmokeMessages(
+            from: payload.preflight.degradedIssues
+        ),
+        errors: payload.status == .blocked
+            ? semanticRecordingDebugSmokeMessages(from: payload.preflight.blockingIssues)
+            : [],
+        nextActions: semanticRecordingDebugSmokeNextActions(payload)
+    )
+
+    if wantsJSON {
+        writeWorkflowJSON(envelope)
+    } else {
+        writeSemanticRecordingDebugSmokeSummary(payload)
+    }
+    return payload.status == .finished ? 0 : 2
+}
+
+private func semanticRecordingDebugSmokePayload(
+    recordingID: UUID,
+    duration: TimeInterval,
+    capturePolicy: RecordingCapturePolicy,
+    captureTarget: RecordingCaptureTarget,
+    rootDirectory: URL?
+) async throws -> SemanticRecordingDebugSmokePayload {
+    let store = rootDirectory.map { RecordingBundleStore(rootDirectory: $0) } ?? RecordingBundleStore()
+    let configuration = SemanticRecordingCaptureConfiguration(
+        recordingID: recordingID,
+        createdAt: Date.now,
+        capturePolicy: capturePolicy,
+        captureTarget: captureTarget,
+        defaultSurfaceID: captureTarget.surfaceID ?? "semantic-debug-smoke"
+    )
+    let session = LiveSemanticRecordingSession(
+        configuration: configuration,
+        dependencies: LiveSemanticRecordingSessionDependencies(store: store)
+    )
+
+    let start = try await session.start(recordingTime: 0)
+    guard case .started(let preflight, _) = start else {
+        return SemanticRecordingDebugSmokePayload(
+            status: .blocked,
+            recordingID: recordingID,
+            capturePolicy: capturePolicy,
+            captureTarget: captureTarget,
+            preflight: start.preflight,
+            bundleDirectory: nil,
+            manifestPath: nil,
+            videoSegmentCount: 0,
+            frameCount: 0,
+            timelineEventCount: 0,
+            aiSafeEventCount: 0,
+            visualObservationCount: 0,
+            suppressionCount: 0
+        )
+    }
+
+    let eventTime = max(0.05, min(duration * 0.5, duration))
+    try await semanticRecordingDebugSmokeSleep(seconds: eventTime)
+    try await session.record(
+        semanticRecordingDebugSmokeEvent(
+            time: eventTime,
+            captureTarget: captureTarget
+        ),
+        index: 0
+    )
+    try await semanticRecordingDebugSmokeSleep(seconds: max(0, duration - eventTime))
+
+    let finish = try await session.finish(recordingTime: duration)
+    return SemanticRecordingDebugSmokePayload(
+        status: .finished,
+        recordingID: recordingID,
+        capturePolicy: capturePolicy,
+        captureTarget: captureTarget,
+        preflight: preflight,
+        bundleDirectory: finish.bundleDirectory.path,
+        manifestPath: finish.bundleDirectory
+            .appendingPathComponent(SemanticRecordingSchema.manifestFileName)
+            .path,
+        videoSegmentCount: finish.bundle.videoSegments.count,
+        frameCount: finish.bundle.frames.count,
+        timelineEventCount: finish.bundle.timelineEvents.count,
+        aiSafeEventCount: finish.bundle.aiSafeEvents.count,
+        visualObservationCount: finish.bundle.visualObservations.count,
+        suppressionCount: finish.bundle.suppressions.count
+    )
+}
+
+private func semanticRecordingDebugSmokeTarget(
+    displayID: UInt32?,
+    windowID: UInt32?,
+    appBundleIdentifier: String?,
+    windowTitle: String?
+) -> RecordingCaptureTarget {
+    let isWindowTarget = windowID != nil ||
+        appBundleIdentifier?.isEmpty == false ||
+        windowTitle?.isEmpty == false
+    return RecordingCaptureTarget(
+        kind: isWindowTarget ? .window : .display,
+        surfaceID: isWindowTarget ? "semantic-debug-window" : "semantic-debug-display",
+        displayID: displayID,
+        windowID: windowID,
+        appBundleIdentifier: appBundleIdentifier,
+        windowTitle: windowTitle
+    )
+}
+
+private func semanticRecordingDebugSmokeEvent(
+    time: TimeInterval,
+    captureTarget: RecordingCaptureTarget
+) -> RecordedEvent {
+    RecordedEvent(
+        kind: .leftMouseUp,
+        time: time,
+        x: 1,
+        y: 1,
+        keyCode: 0,
+        flags: 0,
+        mouseButton: 0,
+        clickCount: 1,
+        scrollDeltaY: 0,
+        scrollDeltaX: 0,
+        surfaceId: captureTarget.surfaceID ?? "semantic-debug-smoke"
+    )
+}
+
+private func semanticRecordingDebugSmokeSleep(seconds: TimeInterval) async throws {
+    let nanoseconds = UInt64(max(0, seconds) * 1_000_000_000)
+    guard nanoseconds > 0 else { return }
+    try await Task.sleep(nanoseconds: nanoseconds)
+}
+
+private func semanticRecordingDebugSmokeMessages(
+    from issues: [SemanticRecordingPreflightIssue]
+) -> [AutomationCLIMessage] {
+    issues.map { issue in
+        AutomationCLIMessage(
+            code: issue.severity.rawValue,
+            message: issue.message,
+            path: issue.permission.rawValue
+        )
+    }
+}
+
+private func semanticRecordingDebugSmokeNextActions(
+    _ payload: SemanticRecordingDebugSmokePayload
+) -> [AutomationCLINextAction] {
+    switch payload.status {
+    case .finished:
+        return [
+            AutomationCLINextAction(
+                command: "Open the manifest path printed by this command and inspect video/segments.json plus frames/index.jsonl.",
+                reason: "This smoke path proves live S2 capture wrote a semantic recording bundle, but it is not product evidence by itself."
+            )
+        ]
+    case .blocked:
+        return [
+            AutomationCLINextAction(
+                command: "Grant Input Monitoring and Screen Recording permissions, then rerun semantic-recording debug-smoke --json.",
+                reason: "S2 capture is blocked before bundle creation when required permissions are missing."
+            )
+        ]
+    }
+}
+
+private func writeSemanticRecordingDebugSmokeSummary(
+    _ payload: SemanticRecordingDebugSmokePayload
+) {
+    switch payload.status {
+    case .finished:
+        FileHandle.standardOutput.write(Data("""
+        SparkleRecorder: semantic recording debug smoke finished.
+        - bundle: \(payload.bundleDirectory ?? "(missing)")
+        - manifest: \(payload.manifestPath ?? "(missing)")
+        - video segments: \(payload.videoSegmentCount)
+        - frames: \(payload.frameCount)
+        - timeline events: \(payload.timelineEventCount)
+        - AI-safe events: \(payload.aiSafeEventCount)
+
+        """.utf8))
+    case .blocked:
+        let issues = payload.preflight.blockingIssues
+            .map { "- \($0.permission.rawValue): \($0.message)" }
+            .joined(separator: "\n")
+        FileHandle.standardOutput.write(Data("""
+        SparkleRecorder: semantic recording debug smoke blocked by preflight.
+        \(issues)
+
+        """.utf8))
+    }
 }
 
 private func parsePositiveDoubleOption(
@@ -3158,6 +3518,13 @@ private func workflowCommandName(_ workflowArgs: [String]) -> String {
         return "workflow"
     }
     return "workflow " + workflowArgs.prefix(3).joined(separator: " ")
+}
+
+private func semanticRecordingCommandName(_ semanticArgs: [String]) -> String {
+    guard !semanticArgs.isEmpty else {
+        return "semantic-recording"
+    }
+    return "semantic-recording " + semanticArgs.prefix(1).joined(separator: " ")
 }
 
 private func readWorkflowCLIFile(at path: String) throws -> Data {
