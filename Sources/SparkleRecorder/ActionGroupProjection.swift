@@ -571,6 +571,61 @@ public struct ActionGroupPassiveWaitDuplicationPlan: Equatable, Sendable {
     }
 }
 
+public struct ActionGroupPassiveWaitDurationEditPlan: Equatable, Sendable {
+    public var eventTimeShifts: [ActionGroupEventTimeShift]
+    public var liveDurationAfterEdit: TimeInterval?
+    public var editedWaitStartTime: TimeInterval?
+    public var editedWaitEndTime: TimeInterval?
+
+    public init(
+        eventTimeShifts: [ActionGroupEventTimeShift] = [],
+        liveDurationAfterEdit: TimeInterval? = nil,
+        editedWaitStartTime: TimeInterval? = nil,
+        editedWaitEndTime: TimeInterval? = nil
+    ) {
+        self.eventTimeShifts = eventTimeShifts
+        self.liveDurationAfterEdit = liveDurationAfterEdit
+        self.editedWaitStartTime = editedWaitStartTime
+        self.editedWaitEndTime = editedWaitEndTime
+    }
+
+    public var isEmpty: Bool {
+        eventTimeShifts.isEmpty && liveDurationAfterEdit == nil
+    }
+}
+
+public enum ActionGroupPassiveWaitDurationEditPlanner {
+    public static func plan(
+        for group: ActionGroup,
+        events: [RecordedEvent],
+        liveDuration: TimeInterval,
+        newDuration: TimeInterval
+    ) -> ActionGroupPassiveWaitDurationEditPlan {
+        guard group.kind == .wait, newDuration.isFinite else {
+            return ActionGroupPassiveWaitDurationEditPlan()
+        }
+
+        let currentDuration = max(0, group.endTime - group.startTime)
+        let clampedDuration = max(0, newDuration)
+        let delta = clampedDuration - currentDuration
+        guard delta != 0 else {
+            return ActionGroupPassiveWaitDurationEditPlan()
+        }
+
+        let affectedIndices = events.indices.filter { events[$0].time >= group.endTime }
+        let eventTimeShifts = affectedIndices.isEmpty
+            ? []
+            : [ActionGroupEventTimeShift(eventIndices: Array(affectedIndices), delta: delta)]
+
+        return ActionGroupPassiveWaitDurationEditPlan(
+            eventTimeShifts: eventTimeShifts,
+            liveDurationAfterEdit: max(0, liveDuration + delta),
+            editedWaitStartTime: group.startTime,
+            editedWaitEndTime: group.startTime + clampedDuration
+        )
+    }
+}
+
 public enum ActionGroupPassiveWaitDuplicationPlanner {
     public static func plan(
         for groups: [ActionGroup],

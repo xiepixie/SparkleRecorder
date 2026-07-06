@@ -1078,13 +1078,9 @@ struct EditorSidebar: View {
                     abs(group.endTime - target.end) <= 0.02
                 }
             }
-            if !matched.isEmpty {
-                self.selection = Set(matched.map(\.id))
-                DispatchQueue.main.async {
-                    self.onLoadInspector()
-                    self.onUpdatePreview()
-                }
-            }
+            self.selection = Set(matched.map(\.id))
+            self.onLoadInspector()
+            self.onUpdatePreview()
         }
     }
 
@@ -1356,11 +1352,20 @@ struct EditorSidebar: View {
         }
     }
 
-	    func applyStretch() {
+    func applyStretch() {
+        let factor = stretchFactor
         withUndo(NSLocalizedString("Time Stretch", comment: "")) {
-            recorder.events.scaleTime(by: stretchFactor)
+            let liveDuration = recorder.events.liveDurationAfterStretching(
+                recorder.liveDuration,
+                by: factor
+            )
+            recorder.events.scaleTime(by: factor)
+            recorder.liveDuration = liveDuration
         }
         stretchFactor = 1.0
+        _ = onRefreshRows()
+        onLoadInspector()
+        onUpdatePreview()
     }
 
     func shiftSelection(by delta: TimeInterval) {
@@ -1380,20 +1385,24 @@ struct EditorSidebar: View {
         guard selection.count == 1, let selectId = selection.first,
               let row = rows.first(where: { $0.id == selectId }) else { return }
         let grp = row.group
+        var editedWaitTargets: [(start: TimeInterval, end: TimeInterval)] = []
         
         withUndo(NSLocalizedString("Edit Action", comment: "")) {
             if grp.kind.isPassiveWait {
                 if let t = TimeInterval(inspTime) {
-                    let oldDuration = grp.duration
-                    let newDuration = max(0.0, t)
-                    let delta = newDuration - oldDuration
-                    
-                    let startIndex = recorder.events.firstIndex(where: { $0.time >= grp.endTime }) ?? recorder.events.count
-                    if startIndex == recorder.events.count {
-                        recorder.liveDuration = (recorder.liveDuration + delta)
-                    } else {
-                        let affectedIndices = IndexSet(startIndex..<recorder.events.count)
-                        recorder.events.shiftTime(of: affectedIndices, by: delta)
+                    let plan = ActionGroupPassiveWaitDurationEditPlanner.plan(
+                        for: grp,
+                        events: recorder.events,
+                        liveDuration: recorder.liveDuration,
+                        newDuration: t
+                    )
+                    recorder.events.applyPassiveWaitDurationEditPlan(plan)
+                    if let liveDuration = plan.liveDurationAfterEdit {
+                        recorder.liveDuration = liveDuration
+                    }
+                    if let start = plan.editedWaitStartTime,
+                       let end = plan.editedWaitEndTime {
+                        editedWaitTargets = [(start: start, end: end)]
                     }
                 }
             } else {
@@ -1446,8 +1455,12 @@ struct EditorSidebar: View {
                 recorder.events.updateKeyStroke(at: grp.eventIndices, keyCode: k, flags: inspFlags)
             }
         }
-        onLoadInspector()
-        onUpdatePreview()
+        if !editedWaitTargets.isEmpty {
+            selectWaits(matching: editedWaitTargets)
+        } else {
+            onLoadInspector()
+            onUpdatePreview()
+        }
     }
 
     func updatedAnchor(for group: ActionGroup, text: String) -> TextAnchor {

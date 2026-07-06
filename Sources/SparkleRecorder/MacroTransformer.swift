@@ -273,6 +273,13 @@ extension Array where Element == RecordedEvent {
 
     }
 
+    public func liveDurationAfterStretching(_ liveDuration: TimeInterval, by factor: Double) -> TimeInterval {
+        let f = Swift.max(0.01, factor)
+        let stretchedDuration = Swift.max(0, liveDuration * f)
+        let lastEventTime = (self.map(\.time).max() ?? 0) * f
+        return Swift.max(stretchedDuration, lastEventTime)
+    }
+
     /// Add or subtract a constant from the timestamps of selected events.
     public mutating func shiftTime(of indices: IndexSet, by delta: TimeInterval) {
         for i in indices where self.indices.contains(i) {
@@ -316,6 +323,17 @@ extension Array where Element == RecordedEvent {
     }
 
     public mutating func applyPassiveWaitDuplicationPlan(_ plan: ActionGroupPassiveWaitDuplicationPlan) {
+        guard !plan.eventTimeShifts.isEmpty else { return }
+
+        for shift in plan.eventTimeShifts {
+            for index in shift.eventIndices where self.indices.contains(index) {
+                self[index].time = Swift.max(0, self[index].time + shift.delta)
+            }
+        }
+        self.sortByTimePreservingOrder()
+    }
+
+    public mutating func applyPassiveWaitDurationEditPlan(_ plan: ActionGroupPassiveWaitDurationEditPlan) {
         guard !plan.eventTimeShifts.isEmpty else { return }
 
         for shift in plan.eventTimeShifts {

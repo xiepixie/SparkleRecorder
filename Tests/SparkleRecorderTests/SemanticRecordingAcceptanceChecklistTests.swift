@@ -87,6 +87,35 @@ struct SemanticRecordingAcceptanceChecklistTests {
         }
     }
 
+    @Test("Final gap alignment preserves S3 closeout and S0 S1 to S2 handoff")
+    func finalGapAlignmentPreservesS3CloseoutAndS0S1ToS2Handoff() throws {
+        let finalGap = try String(
+            contentsOf: semanticRecordingURL("14-s0-s4-final-gap-alignment.md"),
+            encoding: .utf8
+        )
+        let closeoutSection = try #require(Self.section(
+            named: "1.3 S3 Closeout Modification Ledger",
+            in: finalGap
+        ))
+        let s2GapSection = try #require(Self.section(
+            named: "3. Remaining Gaps From S0/S1 To S2",
+            in: finalGap
+        ))
+
+        for phrase in Self.requiredS3CloseoutLedgerPhrases {
+            #expect(
+                closeoutSection.contains(phrase),
+                "S3 closeout ledger no longer contains required phrase: \(phrase)"
+            )
+        }
+        for phrase in Self.requiredS0S1ToS2HandoffPhrases {
+            #expect(
+                s2GapSection.contains(phrase),
+                "S0/S1 -> S2 handoff section no longer contains required phrase: \(phrase)"
+            )
+        }
+    }
+
     @Test("Checked checklist items carry direct evidence anchors")
     func checkedChecklistItemsCarryDirectEvidenceAnchors() throws {
         let checklist = try String(
@@ -331,6 +360,40 @@ struct SemanticRecordingAcceptanceChecklistTests {
             "S4 product-ready live query",
             "S4 product-ready live query"
         )
+    ]
+
+    private static let requiredS3CloseoutLedgerPhrases: [String] = [
+        "product-shaping maintenance changes, not new live semantic-recording acceptance",
+        "Macro Editor text-target repair",
+        "Action preview affordance",
+        "Passive wait maintenance",
+        "Time Stretch",
+        "MacroTransformerTimingTests",
+        "Draft Preview loop explanation",
+        "Review action contract",
+        "S2 bundle-store first pass",
+        "Live evidence intake guard",
+        "Does not close installed-app preview/grouping product evidence",
+        "It is not semantic video evidence",
+        "Does not create new S4 live suggestions",
+        "It does not close any live gate by itself",
+        "proving that the ordinary recorder can produce the live bundle"
+    ]
+
+    private static let requiredS0S1ToS2HandoffPhrases: [String] = [
+        "S2 should not start by designing new Review UI or new AI surfaces",
+        "S0/S1 -> S2 Handoff Checklist",
+        "S0 live-evidence discipline",
+        "S0 Open/Reveal pattern",
+        "S1 safe artifact refs",
+        "S1 event/frame/timeline ids",
+        "S1 query/suggestion ids",
+        "Existing Recorder truth",
+        "Experimental bridge",
+        "Privacy/safety policy",
+        "The playable `RecordedEvent` macro remains the execution truth",
+        "Normal stop attaches `SavedMacro.semanticRecording`",
+        "sensitive visual capture is suppressed before a bundle is attached"
     ]
 
     private static let acceptedCheckedEvidenceMarkers: [String] = [

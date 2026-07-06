@@ -599,6 +599,175 @@ struct ActionGroupProjectionTests {
         #expect(!plan.isEmpty)
     }
 
+    @Test("Passive wait duration edit planner extends middle wait by shifting later events")
+    func passiveWaitDurationEditPlannerExtendsMiddleWaitByShiftingLaterEvents() {
+        let events = [
+            RecordedEvent.make(.leftMouseDown, time: 0.0, x: 10, y: 10),
+            RecordedEvent.make(.leftMouseUp, time: 0.1, x: 10, y: 10),
+            RecordedEvent.make(.leftMouseDown, time: 1.1, x: 20, y: 20),
+            RecordedEvent.make(.leftMouseUp, time: 1.2, x: 20, y: 20)
+        ]
+        let wait = ActionGroup(
+            kind: .wait,
+            eventIndices: [],
+            startTime: 0.1,
+            endTime: 1.1,
+            summary: "Wait"
+        )
+
+        let plan = ActionGroupPassiveWaitDurationEditPlanner.plan(
+            for: wait,
+            events: events,
+            liveDuration: 1.2,
+            newDuration: 2.0
+        )
+
+        #expect(plan.eventTimeShifts == [
+            ActionGroupEventTimeShift(eventIndices: [2, 3], delta: 1.0)
+        ])
+        #expect(abs((plan.liveDurationAfterEdit ?? 0) - 2.2) < 0.000_001)
+        #expect(plan.editedWaitStartTime == 0.1)
+        #expect(plan.editedWaitEndTime == 2.1)
+        #expect(!plan.isEmpty)
+    }
+
+    @Test("Passive wait duration edit planner shrinks middle wait without leaving tail wait")
+    func passiveWaitDurationEditPlannerShrinksMiddleWaitWithoutLeavingTailWait() {
+        let events = [
+            RecordedEvent.make(.leftMouseDown, time: 0.0, x: 10, y: 10),
+            RecordedEvent.make(.leftMouseUp, time: 0.1, x: 10, y: 10),
+            RecordedEvent.make(.leftMouseDown, time: 1.1, x: 20, y: 20),
+            RecordedEvent.make(.leftMouseUp, time: 1.2, x: 20, y: 20)
+        ]
+        let wait = ActionGroup(
+            kind: .wait,
+            eventIndices: [],
+            startTime: 0.1,
+            endTime: 1.1,
+            summary: "Wait"
+        )
+
+        let plan = ActionGroupPassiveWaitDurationEditPlanner.plan(
+            for: wait,
+            events: events,
+            liveDuration: 1.2,
+            newDuration: 0.25
+        )
+
+        #expect(plan.eventTimeShifts == [
+            ActionGroupEventTimeShift(eventIndices: [2, 3], delta: -0.75)
+        ])
+        #expect(abs((plan.liveDurationAfterEdit ?? 0) - 0.45) < 0.000_001)
+        #expect(plan.editedWaitStartTime == 0.1)
+        #expect(plan.editedWaitEndTime == 0.35)
+        #expect(!plan.isEmpty)
+    }
+
+    @Test("Passive wait duration edit planner updates trailing wait live duration")
+    func passiveWaitDurationEditPlannerUpdatesTrailingWaitLiveDuration() {
+        let events = [
+            RecordedEvent.make(.leftMouseDown, time: 0.0, x: 10, y: 10),
+            RecordedEvent.make(.leftMouseUp, time: 0.1, x: 10, y: 10)
+        ]
+        let trailingWait = ActionGroup(
+            kind: .wait,
+            eventIndices: [],
+            startTime: 0.1,
+            endTime: 2.1,
+            summary: "Wait"
+        )
+
+        let plan = ActionGroupPassiveWaitDurationEditPlanner.plan(
+            for: trailingWait,
+            events: events,
+            liveDuration: 2.1,
+            newDuration: 3.0
+        )
+
+        #expect(plan.eventTimeShifts.isEmpty)
+        #expect(abs((plan.liveDurationAfterEdit ?? 0) - 3.1) < 0.000_001)
+        #expect(plan.editedWaitStartTime == 0.1)
+        #expect(plan.editedWaitEndTime == 3.1)
+        #expect(!plan.isEmpty)
+    }
+
+    @Test("Passive wait duration edit planner clamps negative duration to zero")
+    func passiveWaitDurationEditPlannerClampsNegativeDurationToZero() {
+        let events = [
+            RecordedEvent.make(.leftMouseDown, time: 0.0, x: 10, y: 10),
+            RecordedEvent.make(.leftMouseUp, time: 0.1, x: 10, y: 10),
+            RecordedEvent.make(.leftMouseDown, time: 1.1, x: 20, y: 20),
+            RecordedEvent.make(.leftMouseUp, time: 1.2, x: 20, y: 20)
+        ]
+        let wait = ActionGroup(
+            kind: .wait,
+            eventIndices: [],
+            startTime: 0.1,
+            endTime: 1.1,
+            summary: "Wait"
+        )
+
+        let plan = ActionGroupPassiveWaitDurationEditPlanner.plan(
+            for: wait,
+            events: events,
+            liveDuration: 1.2,
+            newDuration: -4.0
+        )
+
+        #expect(plan.eventTimeShifts == [
+            ActionGroupEventTimeShift(eventIndices: [2, 3], delta: -1.0)
+        ])
+        #expect(abs((plan.liveDurationAfterEdit ?? 0) - 0.2) < 0.000_001)
+        #expect(plan.editedWaitStartTime == 0.1)
+        #expect(plan.editedWaitEndTime == 0.1)
+        #expect(!plan.isEmpty)
+    }
+
+    @Test("Passive wait duration edit planner ignores unchanged and invalid edits")
+    func passiveWaitDurationEditPlannerIgnoresUnchangedAndInvalidEdits() {
+        let events = [
+            RecordedEvent.make(.leftMouseDown, time: 0.0, x: 10, y: 10),
+            RecordedEvent.make(.leftMouseUp, time: 0.1, x: 10, y: 10)
+        ]
+        let wait = ActionGroup(
+            kind: .wait,
+            eventIndices: [],
+            startTime: 0.1,
+            endTime: 2.1,
+            summary: "Wait"
+        )
+        let click = ActionGroup(
+            kind: .click,
+            eventIndices: [0, 1],
+            startTime: 0.0,
+            endTime: 0.1,
+            summary: "Click"
+        )
+
+        let unchanged = ActionGroupPassiveWaitDurationEditPlanner.plan(
+            for: wait,
+            events: events,
+            liveDuration: 2.1,
+            newDuration: 2.0
+        )
+        let invalid = ActionGroupPassiveWaitDurationEditPlanner.plan(
+            for: wait,
+            events: events,
+            liveDuration: 2.1,
+            newDuration: .infinity
+        )
+        let nonWait = ActionGroupPassiveWaitDurationEditPlanner.plan(
+            for: click,
+            events: events,
+            liveDuration: 2.1,
+            newDuration: 3.0
+        )
+
+        #expect(unchanged.isEmpty)
+        #expect(invalid.isEmpty)
+        #expect(nonWait.isEmpty)
+    }
+
     @Test("Deletion planner removes middle wait by shifting later events")
     func deletionPlannerRemovesMiddleWaitByShiftingLaterEvents() {
         let events = [
