@@ -103,6 +103,8 @@ All local artifact pointers use `RecordingArtifactRef`, which accepts only safe 
 
 `SemanticRecordingFixture.checkoutBundle()` is the deterministic S1 fixture bundle for S2 API spikes, S3 Review UI prototypes and S4 CLI fixtures. It includes one `.mov` segment, event-aligned frames, semantic events, OCR/template observations, source/runtime preview refs, one comparison and one suppression record.
 
+S2 first pass exists in core and app-edge code: fake movie/frame/index clients can drive `SemanticRecordingCaptureSession` and return a validating `SemanticRecordingBundle`; app-edge skeletons exist for `SCRecordingOutput` movie capture, `SCScreenshotManager` keyframe PNGs, `RecordingBundleStore` persistence, Vision OCR indexing and permission preflight snapshots. This is not product-complete semantic recording yet. Recorder lifecycle wiring, live product evidence, preflight UI/gating, AX/suppression production and retention/deletion behavior remain open.
+
 ## Video Capture Policy
 
 Default capture should be useful without exploding storage:

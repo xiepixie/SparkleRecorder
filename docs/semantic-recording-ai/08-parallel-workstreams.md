@@ -23,8 +23,10 @@ Owner：Semantic Recording program coordination
 | `07-apple-api-implementation-path.md` | API feasibility | macOS 15+ `SCRecordingOutput` 默认视频路径、Vision/AX 路线 |
 | `08-parallel-workstreams.md` | Work split | 本文件，并行 owner 和接口边界 |
 | `09-template-baseline-preview-refs.md` | Accepted interface contract | S0 对 S1 的 source-frame/runtime-sample preview refs 需求；S1 已接受 first-pass core contract |
+| `10-next-stage-reality-check.md` | Direction guard | 用户行为逻辑、剩余任务 P0-P4、过度设计审计、可行性和可维护性规则 |
 | `workstreams/s0-workflow-evidence.md` | Active workstream | S0 当前任务、证据缺口、S1 接口请求和实施日志 |
 | `workstreams/s1-contract-core.md` | Active workstream | S1 core schema v0、safe refs、timeline/events/suppression 和 preview comparison 合同 |
+| `workstreams/s2-app-capture-visual-index.md` | Active workstream | S2 core session + app-edge ScreenCaptureKit/Vision/store/preflight skeleton first pass、录制生命周期接线、AX/suppression、retention 和产品证据剩余任务 |
 | `acceptance-checklist.md` | Acceptance | 只记录可验收事实，不把规划当完成 |
 
 已接受的产品基线：
@@ -55,7 +57,7 @@ S4 CLI AI And App Knowledge
   -> exposes low-token queries, suggestions, draft generation and later app knowledge
 ```
 
-S1 core schema v0 has a first pass; S2 may now spike live capture against that contract. S3 should begin with fixtures from S1 before depending on live capture. S4 should wait for bundle fixtures and stable query contracts before implementing user-facing commands.
+S1 core schema v0 has a first pass. S2 core session/client spine and app-edge ScreenCaptureKit/Vision/store/preflight skeletons also have a first pass, so the next S2 work is recorder lifecycle wiring, failure handling, permission/degraded UX surfacing, AX/suppression and live product evidence, not more schema invention. S3 should begin with fixtures from S1 before depending on live capture. S4 should wait for bundle fixtures and stable query contracts before implementing user-facing commands.
 
 ## S0 Workflow Evidence Closure
 
@@ -139,8 +141,11 @@ Does not own:
 
 Deliverables:
 
-- API spike proving `.mov` plus event-aligned keyframes on macOS 15+
-- fake capture clients for tests
+- pure `SemanticRecordingCaptureSession` and fake-client tests: first pass done in `SemanticRecordingCapture.swift` / `SemanticRecordingCaptureTests`
+- app-edge ScreenCaptureKit/Vision/store skeletons: first pass done in `ScreenCaptureKitSemanticCapture.swift`, `VisionRecordingIndexer.swift`, `RecordingBundleStore.swift` and `RecordingArtifactURL.swift`
+- semantic recording preflight contract and live PermissionCenter bridge: first pass done in `SemanticRecordingPreflight.swift` / `LiveSemanticRecordingPreflight.swift`
+- live smoke proving `.mov` plus event-aligned keyframes from the installed App on macOS 15+: adapter compiles; ordinary recording lifecycle wiring and live product evidence still open
+- fake-client tests for alignment/indexing, storage and failure paths
 - live app-edge smoke/product evidence
 - updated `PermissionCenter`/capture docs if permissions or degraded modes change
 
@@ -225,7 +230,7 @@ Recommended order:
 - S4 consumes the same services as UI; it must not create a second private understanding of bundles.
 - Every AI suggestion must cite frame/event/evidence IDs, confidence, risk and fallback.
 - Every live capability needs fake-client tests first and product evidence before being marked complete.
-- If a task cannot improve “录完能看懂、失败能解释、修正有证据、组合前可审阅”, it is not next-phase priority.
+- If a task cannot improve “录完能看懂、失败能解释、修正有证据、组合前可审阅”, it is not next-phase priority. Use [10-next-stage-reality-check.md](10-next-stage-reality-check.md) when a proposed task feels like MCP/App Knowledge/AI-agent overreach.
 
 ## Next Target
 

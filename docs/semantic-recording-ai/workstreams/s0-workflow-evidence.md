@@ -3,7 +3,7 @@
 更新时间：2026-07-06
 状态：Active workstream
 Owner：S0, Workflow Evidence Closure
-并行对象：S1 Contract And Core Schema
+并行对象：S1 Contract And Core Schema, S2 App Capture And Visual Index
 
 S0 的任务是先证明现有 Workflow 证据链可信。Semantic recording 后续会把录制帧、视觉资产、运行样本和 AI 建议都接到这条证据链上；如果现在的 Run Detail、Open/Reveal、branch decision、drag/reorder 证据不能被用户信任，后面的 AI/视频能力只会放大混乱。
 
@@ -76,6 +76,20 @@ S1 accepted the first-pass core contract in [s1-contract-core.md](s1-contract-co
 
 This closes the S0 -> S1 contract wait. It does not close the UI/product evidence requirement: S0 still needs a future artifact showing source reference, runtime sample and decision/comparison rendered together without SwiftUI constructing raw paths.
 
+## 4.1 Coordination With S2
+
+S0 and S2 now run in parallel:
+
+- S0 owns Workflow product trust: live visual diagnostics Open/Reveal, macro evidence Open/Reveal, branch evidence consistency, and authoring WYSIWYG evidence.
+- S2 owns semantic capture production: `.mov`, event-aligned keyframes, Vision OCR observations, bundle storage and future suppression.
+
+Shared boundary:
+
+- S0 live sidecar labels and `workflow product-evidence sidecar-template` are reusable as the capture-note pattern for S2 semantic recording product evidence.
+- S2 `SemanticRecordingBundle` output can later feed S0/S3 source/runtime comparison UI, but it does not satisfy S0 live Workflow gates by itself.
+- S0 should not claim semantic capture completion; S2 should not claim product trust while S0 live Workflow evidence gates remain open.
+- If S2 adds fields needed to show recorded source frame, runtime sample, OCR observation or capture target in Run Detail, S0 records the UI need here and S2 records the producer/field state in [s2-app-capture-visual-index.md](s2-app-capture-visual-index.md).
+
 ## 5. Product Evidence Capture Rules
 
 Every S0 live artifact sidecar must include commit/worktree context plus these exact labels. `workflow product-evidence audit --require-live` validates the labels when the paired live clip exists:
@@ -125,6 +139,18 @@ swift run SparkleRecorder workflow product-evidence audit --require-live --json
 
 The first command reports current status without failing the shell. The second is the strict S0 closure gate and must fail until live artifacts are present.
 
+Live sidecar template, before recording or immediately after naming the clip:
+
+```bash
+swift run SparkleRecorder workflow product-evidence sidecar-template live-visual-diagnostics-open-reveal
+swift run SparkleRecorder workflow product-evidence sidecar-template live-macro-evidence-open-reveal
+swift run SparkleRecorder workflow product-evidence sidecar-template live-branch-evidence-consistency
+swift run SparkleRecorder workflow product-evidence sidecar-template live-authoring-wysiwyg --sidecar live-drag-link-wysiwyg.md
+swift run SparkleRecorder workflow product-evidence sidecar-template live-authoring-wysiwyg --sidecar live-task-reorder-wysiwyg.md
+```
+
+The template intentionally contains angle-bracket placeholders. Fill them before saving the sidecar; strict audit treats placeholders as incomplete.
+
 Live capture, when closing S0 gates:
 
 1. Build or launch the same App binary being reviewed.
@@ -132,7 +158,7 @@ Live capture, when closing S0 gates:
 3. Trigger the relevant workflow or authoring action.
 4. Capture the full App surface and the external Open/Reveal result when relevant.
 5. Save the video under `docs/workflow-page-productization/product-evidence/`.
-6. Add a same-name `.md` sidecar using the capture rules above.
+6. Generate a same-name `.md` sidecar template with `workflow product-evidence sidecar-template`, fill every placeholder, and keep it beside the clip.
 7. Update this workstream, `06-current-work-and-next-tasks.md`, product evidence README and `acceptance-checklist.md`.
 
 S0 should prefer short clips over long demos: the artifact only needs to prove the exact gate.
@@ -158,3 +184,4 @@ Current status: not complete. The fixture foundation is strong, S1 preview-ref a
 - 2026-07-06: Moved product-evidence audit semantics into pure core `AutomationProductEvidenceAudit` and added `AutomationProductEvidenceAuditTests` for fixture-only gaps, authoring OR semantics, missing sidecars and Codable round-trip.
 - 2026-07-06: Added `template-baseline-preview-refs.png` / `.md` product-evidence fixture rendered from `SemanticRecordingFixture.checkoutBundle`, and added it to the product-evidence audit gate. This closes the fixture rendering proof for Source / Runtime / Decision, not the final S3 Review UI or live evidence gates.
 - 2026-07-06: Strengthened `workflow product-evidence audit` for S0 live evidence: live clips may be `.mov` or `.mp4`, but the paired `.md` sidecar must contain the required capture labels before the item can satisfy the strict gate.
+- 2026-07-06: Added `workflow product-evidence sidecar-template` so each live S0 gate can generate the exact sidecar labels expected by strict audit; placeholders still fail audit until filled.

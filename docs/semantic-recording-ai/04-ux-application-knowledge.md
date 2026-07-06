@@ -35,6 +35,24 @@
 - 标记变量输入，例如订单号、日期、搜索关键词。
 - 接受或拒绝 AI 提议。
 
+## Visual Wait UX
+
+等待和验证类动作应该让用户感觉“系统在观察这里”，而不是“系统要点击这里”。
+
+第一版需要把这些动作作为用户语言明确区分：
+
+| User Intent | UI Meaning | Visual Treatment |
+| --- | --- | --- |
+| 等待文字出现 | 观察一块区域直到 OCR 命中 | region box + label |
+| 验证文本存在 | 检查一块区域是否符合预期 | region box + label |
+| 等待图标出现 | 在搜索范围内匹配 template | search region + template thumbnail |
+| 等待图标消失 | 观察 template 不再命中 | search region + disappearance state |
+| 等待区域变化 | 比较 recorded baseline 和 runtime sample | baseline region + change threshold |
+| 等待像素状态 | 等待某点颜色进入目标范围 | pixel marker + sampled color |
+| 点击位置/文字/图像 | 执行实际输入动作 | click circle/pulse + target label |
+
+只有点击类动作使用圆点、光圈或脉冲。等待文本、验证文本、区域变化和 baseline comparison 默认只显示框、编号和状态，避免暗示系统会点击。
+
 ## Fixing Human Recording Imperfections
 
 人工录制天然有瑕疵，系统应帮助优化：

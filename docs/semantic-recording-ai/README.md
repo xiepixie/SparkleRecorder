@@ -61,7 +61,8 @@ SparkleRecorder 不应把 OpenAI 官方 Record & Replay 插件作为产品内依
 - [07-apple-api-implementation-path.md](07-apple-api-implementation-path.md)：2026 Apple API 可行性调研、macOS 15+ ScreenCaptureKit/Vision/AX 路线和 `SCRecordingOutput` 默认视频路径。
 - [08-parallel-workstreams.md](08-parallel-workstreams.md)：下一阶段并行工作人物、Owner 范围、交付物和跨线接口规则。
 - [09-template-baseline-preview-refs.md](09-template-baseline-preview-refs.md)：S0 提给 S1 的 template/baseline source-frame/runtime-sample preview refs 合同；S1 已接受 first-pass core contract。
-- [workstreams/](workstreams/README.md)：S0/S1/S2/S3/S4 owner 工作台；当前已建立 S0 Workflow Evidence Closure 和 S1 Contract/Core 文件，S1 提供 `SemanticRecordingFixture.checkoutBundle()` 给 S2/S3/S4 原型复用。
+- [10-next-stage-reality-check.md](10-next-stage-reality-check.md)：下一阶段现实校准；按用户行为逻辑整理剩余任务、过度设计风险、可行性和可维护性规则。
+- [workstreams/](workstreams/README.md)：S0/S1/S2/S3/S4 owner 工作台；当前已建立 S0 Workflow Evidence Closure、S1 Contract/Core 和 S2 App Capture/Visual Index 文件，S1 提供 `SemanticRecordingFixture.checkoutBundle()` 给 S2/S3/S4 原型复用，S2 core session 与 app-edge ScreenCaptureKit/Vision/store/preflight skeleton first pass 已有但录制生命周期接线和产品证据未完成。
 - [acceptance-checklist.md](acceptance-checklist.md)：验收边界和后续切片。
 
 ## Current Workflow Bridge
@@ -76,7 +77,7 @@ SparkleRecorder 不应把 OpenAI 官方 Record & Replay 插件作为产品内依
 
 下一阶段优先级是：先关掉 Workflow 产品证据缺口，再冻结最小 recording bundle 合同和 macOS 15+ Apple API 策略，然后做 frame-to-condition，而不是先做大型 App Knowledge 或 MCP。
 
-当前执行账本维护在 [06-current-work-and-next-tasks.md](06-current-work-and-next-tasks.md)，并行 owner 边界维护在 [08-parallel-workstreams.md](08-parallel-workstreams.md)，S0/S1 具体工作台维护在 [workstreams/](workstreams/README.md)。任何把 Workflow evidence、semantic recording schema、Recording CLI 或 App Knowledge 状态向前推进的工作，都应该同步更新相关 workstream、执行账本和验收清单；不要把规划描述当成已完成实现。
+当前执行账本维护在 [06-current-work-and-next-tasks.md](06-current-work-and-next-tasks.md)，并行 owner 边界维护在 [08-parallel-workstreams.md](08-parallel-workstreams.md)，方向现实校准维护在 [10-next-stage-reality-check.md](10-next-stage-reality-check.md)，S0/S1 具体工作台维护在 [workstreams/](workstreams/README.md)。任何把 Workflow evidence、semantic recording schema、Recording CLI 或 App Knowledge 状态向前推进的工作，都应该同步更新相关 workstream、执行账本和验收清单；不要把规划描述当成已完成实现。
 
 ## Relationship To Existing Docs
 

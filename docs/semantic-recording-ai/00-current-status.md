@@ -13,6 +13,8 @@ Recording 已经有可继续扩展的底座：
 - `RecordingEventPipeline` 负责 mouse move 过滤、ignored key、drag sampling、scroll payload、surface binding 和 `RecordedEvent` 生成。
 - `RecordingSessionProcessor` 用锁保护 pipeline，并把输出存进 `RecordingEventBuffer`。
 - `RecordedEvent` 已有 screen/window/content 坐标、surfaceId、scrollPayload、unicodeString、TextAnchor 等字段。
+- `SemanticRecordingCaptureSession` / `SemanticRecordingCaptureClient` 已有 pure first pass，可用 fake movie/frame/index clients 生成 validating bundle、video segment、event-aligned keyframes、semantic events 和 observations。
+- `LiveSemanticCaptureClient`、`ScreenCaptureKitMovieRecorder`、`ScreenCaptureKitFrameSource`、`RecordingBundleStore`、`VisionRecordingIndexer`、`SemanticRecordingPreflightClient.live` 已有 app-edge skeleton first pass，并通过 Swift 6 build。
 
 Workflow / Vision / Evidence 侧也已有 first pass：
 
@@ -27,7 +29,7 @@ Workflow / Vision / Evidence 侧也已有 first pass：
 
 当前还没有“语义录制资产”：
 
-- 没有录制期间的视频母带或关键帧时间线。
+- 没有把 semantic capture 接入普通宏录制生命周期；当前 app-edge capture/store/indexer/preflight 只是 first pass skeleton。
 - 没有把每个 `RecordedEvent` 和同一时间附近的帧、OCR、AX 元素、窗口元数据绑定。
 - 没有可搜索的 visual index。
 - 没有 recording bundle 层面的 `timeline.jsonl` / `events.jsonl` / `suppressed.jsonl` 分流。
@@ -44,7 +46,7 @@ Workflow / Vision / Evidence 侧也已有 first pass：
 
 这些缺口说明 semantic recording 的第一价值不是生成更炫的 AI，而是把宏从坐标脚本升级成有来源、有证据、可修正、可组合的自动化资产。
 
-当前剩余任务、优先级和过度设计审计维护在 [06-current-work-and-next-tasks.md](06-current-work-and-next-tasks.md)。本文件只记录快照，不单独作为执行队列。
+当前剩余任务、优先级和过度设计审计维护在 [06-current-work-and-next-tasks.md](06-current-work-and-next-tasks.md) 和 [10-next-stage-reality-check.md](10-next-stage-reality-check.md)。本文件只记录快照，不单独作为执行队列。
 
 ## Target Architecture
 

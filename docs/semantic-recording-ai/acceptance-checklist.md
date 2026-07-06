@@ -16,6 +16,7 @@
 - [x] Accept template/baseline preview refs as source-frame/runtime-sample evidence, not just string fields. Accepted contract: [09-template-baseline-preview-refs.md](09-template-baseline-preview-refs.md), [workstreams/s1-contract-core.md](workstreams/s1-contract-core.md).
 - [x] Render template/baseline source-frame/runtime-sample/decision evidence in a fixture artifact before claiming the fixture-level preview-ref handoff complete. Evidence: `docs/workflow-page-productization/product-evidence/template-baseline-preview-refs.png` and `.md`.
 - [ ] Render the same source-frame/runtime-sample/decision evidence inside the real Macro Review or Run Detail UI before claiming the user-facing preview-ref experience complete.
+- [ ] OCR/visual region picker renders wait/verify targets as region boxes with clear labels, and reserves click circles/pulses for actual click actions.
 - [ ] Capture real drag/reorder or drag-link clip proving indicator and reducer mutation match.
 - [ ] Keep fixture evidence sidecars explicit about what is fixture-proven versus live-product-proven.
 - [ ] Keep `06-current-work-and-next-tasks.md` updated whenever evidence status, owner boundary, accepted contract, or immediate next slice changes.
@@ -38,14 +39,20 @@
 
 ## Phase 1: Video And Keyframes
 
+- [x] Pure semantic capture session can build a validating bundle from fake movie/frame/index clients and `RecordedEvent` inputs.
+- [x] Semantic recording preflight evaluator distinguishes blocking and degraded capabilities for Input Monitoring, Screen Recording and Accessibility. Evidence: `SemanticRecordingPreflightTests` covers authorized, missing Screen Recording, missing Accessibility, keyframe-only and missing Input Monitoring paths.
+- [ ] App UI surfaces semantic recording preflight/degraded-mode guidance before starting semantic capture.
 - [ ] Record target-window `.mov` during macro recording through `SCRecordingOutput`.
 - [ ] Record target-window keyframes during macro recording.
 - [ ] Persist video segment metadata with start/end time, capture target and codec/file info.
+- [ ] Persist semantic recording bundle files and artifacts through an app-edge bundle store.
 - [ ] Provide keyframe-only light mode only after default video path is safe and reviewable.
 - [ ] Persist frame index with event time alignment.
 - [ ] Show recorded video/keyframes in Macro Review.
 - [ ] Click an event row and jump to before/after frame.
-- [ ] Unit-test timestamp/frame/event alignment with fake clocks and fixtures.
+- [x] Unit-test timestamp/frame/event alignment with fake clocks and fixtures. Evidence: `SemanticRecordingCaptureTests` covers movie segment + start/event/stop keyframes, keyframe-only mode, OCR observation attachment and lifecycle ordering.
+
+First-pass note: `SemanticRecordingCaptureSession` can assemble fake-client video/keyframe bundles, `SemanticRecordingPreflight` can classify blocking/degraded readiness, and app-edge `ScreenCaptureKitMovieRecorder` / `ScreenCaptureKitFrameSource` / `RecordingBundleStore` / `LiveSemanticRecordingPreflight` compile. The live macro recording lifecycle, user-visible preflight guidance and product evidence gates above remain open.
 
 ## Phase 2: Visual Index
 
@@ -57,6 +64,8 @@
 - [ ] Store source frame ID, surface ID, crop bounds, search region and threshold for every extracted visual asset.
 - [ ] Preview template/baseline refs in UI with thumbnail/diff/source-frame evidence.
 - [ ] Add fixture tests for path safety, coordinate transforms, OCR observation parsing and asset references.
+
+First-pass note: `VisionRecordingIndexer` can turn stored frame PNGs into `RecordingVisualObservation.ocrText` payloads, and `SemanticRecordingCaptureTests` proves observations can attach to bundle frames. User-facing OCR indexing and persisted live bundle evidence are still open.
 
 ## Phase 3: Editing UX
 

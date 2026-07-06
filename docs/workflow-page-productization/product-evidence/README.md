@@ -72,6 +72,18 @@ swift run SparkleRecorder workflow product-evidence audit --require-live --json
 
 The normal audit reports fixture/live status and exits 0. The strict `--require-live` mode exits 1 until every S0 live-product artifact exists and the paired sidecar includes the required live capture labels: `Capture date:`, `App build/run source:`, `Workflow/package:`, `User action:`, `Checklist item:`, `Known gaps:`, and `Evidence source:`. Current smoke result is 9/13 required items present: all fixture artifacts are present, and the four S0 live artifacts above are missing. The pure audit semantics are covered by `AutomationProductEvidenceAuditTests`.
 
+Generate a live sidecar template before saving a capture:
+
+```bash
+swift run SparkleRecorder workflow product-evidence sidecar-template live-visual-diagnostics-open-reveal
+swift run SparkleRecorder workflow product-evidence sidecar-template live-macro-evidence-open-reveal
+swift run SparkleRecorder workflow product-evidence sidecar-template live-branch-evidence-consistency
+swift run SparkleRecorder workflow product-evidence sidecar-template live-authoring-wysiwyg --sidecar live-drag-link-wysiwyg.md
+swift run SparkleRecorder workflow product-evidence sidecar-template live-authoring-wysiwyg --sidecar live-task-reorder-wysiwyg.md
+```
+
+Fill every angle-bracket placeholder before running strict audit; placeholders are treated as incomplete sidecar content.
+
 ## Acceptance Boundary
 
 `AutomationTaskRun.branchEvidence` is now the durable source for branch decisions created by the reducer and persisted in run history. `AutomationDependencyEdgeProjection.branchDecision` may still provide fallback for older runs. Product completion now has a fixture screenshot proving that selected Run Detail explains why a dependency fired or skipped.
