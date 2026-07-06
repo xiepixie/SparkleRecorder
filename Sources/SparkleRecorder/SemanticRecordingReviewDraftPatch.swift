@@ -598,6 +598,7 @@ public struct SemanticRecordingReviewDraftPatchRequest: Equatable, Sendable {
     public var pollingSeconds: TimeInterval
     public var requireVisible: Bool?
     public var pixelColorHex: String?
+    public var sourceSuggestionID: UUID?
 
     public init(
         candidate: SemanticRecordingReviewProjection.ConditionCandidateRow,
@@ -610,7 +611,8 @@ public struct SemanticRecordingReviewDraftPatchRequest: Equatable, Sendable {
         timeoutSeconds: TimeInterval = 15,
         pollingSeconds: TimeInterval = 0.25,
         requireVisible: Bool? = nil,
-        pixelColorHex: String? = nil
+        pixelColorHex: String? = nil,
+        sourceSuggestionID: UUID? = nil
     ) {
         self.candidate = candidate
         self.targetTaskKey = targetTaskKey?.trimmedForSemanticReviewPatch.nilIfEmptyForSemanticReviewPatch
@@ -623,6 +625,7 @@ public struct SemanticRecordingReviewDraftPatchRequest: Equatable, Sendable {
         self.pollingSeconds = max(0, pollingSeconds)
         self.requireVisible = requireVisible
         self.pixelColorHex = pixelColorHex?.trimmedForSemanticReviewPatch.nilIfEmptyForSemanticReviewPatch
+        self.sourceSuggestionID = sourceSuggestionID
     }
 }
 
@@ -830,13 +833,25 @@ public enum SemanticRecordingReviewDraftPatchBuilder {
             imageAsset: imageAsset,
             baselineAsset: baselineAsset,
             assetExtractions: assetExtractions,
-            actionEvidence: SemanticRecordingReviewActionSemantics.evidenceAlignment(
-                candidate,
-                frame: frame,
-                regionSelection: request.regionSelection
+            actionEvidence: actionEvidence(
+                request: request,
+                frame: frame
             ),
             appliesToExistingTask: appliesToExistingTask
         )
+    }
+
+    private static func actionEvidence(
+        request: SemanticRecordingReviewDraftPatchRequest,
+        frame: RecordingFrameReference
+    ) -> SemanticRecordingReviewActionSemantics.EvidenceAlignment {
+        var evidence = SemanticRecordingReviewActionSemantics.evidenceAlignment(
+            request.candidate,
+            frame: frame,
+            regionSelection: request.regionSelection
+        )
+        evidence.suggestionID = request.sourceSuggestionID
+        return evidence
     }
 
     private static func assetExtraction(

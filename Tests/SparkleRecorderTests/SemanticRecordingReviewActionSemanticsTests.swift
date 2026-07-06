@@ -116,7 +116,8 @@ struct SemanticRecordingReviewActionSemanticsTests {
             bundle: bundle,
             request: SemanticRecordingReviewDraftPatchRequest(
                 candidate: candidate,
-                newTaskKey: "wait_checkout_button"
+                newTaskKey: "wait_checkout_button",
+                sourceSuggestionID: SemanticRecordingFixture.suggestionID
             )
         )
 
@@ -124,6 +125,7 @@ struct SemanticRecordingReviewActionSemanticsTests {
         let importAction = SemanticRecordingReviewActionSemantics.importDraft(result)
 
         #expect(result.actionEvidence.frameID == SemanticRecordingFixture.beforeClickFrameID)
+        #expect(result.actionEvidence.suggestionID == SemanticRecordingFixture.suggestionID)
         #expect(result.actionEvidence.eventIDs == [SemanticRecordingFixture.clickEventID])
         #expect(result.actionEvidence.sourcePreviewRefID == SemanticRecordingFixture.sourceTemplateRefID)
         #expect(result.actionEvidence.observationIDs.isEmpty)
