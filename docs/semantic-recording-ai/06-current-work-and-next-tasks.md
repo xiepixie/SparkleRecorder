@@ -42,8 +42,8 @@ Owner：Recording / Workflow Evidence / AI CLI shared planning
 - 已新增 [13-direction-decision-and-remaining-slices.md](13-direction-decision-and-remaining-slices.md)，记录本轮方向纠偏结论：当前路线正确但必须围绕证据链、Review 教学和 CLI 可审阅协作收束；剩余任务按 Slice A-E 组织为 Workflow trust、Review and Teach、live capture、CLI/AI collaboration 和 workflow packaging/import boundaries。
 - 已新增 [workstreams/s4-cli-ai-app-knowledge.md](workstreams/s4-cli-ai-app-knowledge.md)，冻结 S4 CLI-first / MCP-deferred 边界和 fixture-first MVP。S4 已实现 fixture-backed `recording list/show/explain/frames/frame show/events-near/ocr search/visual search/asset extract/asset baseline/suggest waits/conditions`、fixture/review-only `workflow draft from-recording`，也已实现 explicit stored-bundle read-only `recording list/show/explain/frames/frame show/events-near/ocr search/visual search` 和 explicit-source frame-region asset extraction，均返回 `sparkle.cli.result.v1`、fixture/source 状态、S1 evidence ids 和 safe artifact refs；OCR payload 现在显式区分 `deterministicFixture` 与 `persistedBundle`，suggestion payload 显式暴露 `query.allowedKinds`、availability 和 unavailable reason，stored/live suggestion synthesis 仍返回 unavailable；product-ready default/live catalog、stored suggestion synthesis、image-byte visual similarity、product-ready stored/live `workflow draft from-recording` 和 App Knowledge 仍未实现。
 - 2026-07-07 S4 维护补齐低 token CLI 证据和安全门：`semantic-recording-cli-low-token-transcript.md` 记录 fixture `recording explain`、OCR/visual query、suggestion、`workflow draft from-recording`、validate、simulate 和 import dry-run 全链路均只返回 compact ids / safe refs，不输出图片或完整视频 bytes；`SemanticRecordingCLISuggestionSummary` 现在把缺少 evidence refs 的 suggestion summary 压到低置信度并追加 missing-evidence risk。Product-ready default/live catalog/search/suggestion synthesis、image-byte similarity 和 stored/live draft synthesis 仍保持 open。
-- 已新增 [14-s0-s4-final-gap-alignment.md](14-s0-s4-final-gap-alignment.md)，把 S3 暂停后的 S0-S4 最终差距收敛为 live evidence、live producer completeness、ordinary Recorder bridge、bundle identity/default root、privacy safety、S4 product-ready live AI collaboration 六组，并明确 S0 closed、S1 first pass closed、S2 active blocker、S3/S4 paused。尚未把 S2 的普通宏录制 lifecycle 做成用户可见默认路径；尚未产出 live `.mov` 产品证据、AX/window observation live evidence、installed-app linked Macro Review evidence、product-ready default/live Recording CLI、redacted frame/video consumption 产品证据、reviewed text-anchor mutation 或 live cleanup product evidence。
-- 2026-07-07 UI owner checkpoint：Macro Editor action list 开始消费 text-target readiness。locator-only click / wait text / wait text gone / verify text 在缺 anchor 或缺 non-empty target text 时优先显示 `No target text`，并由 tests 覆盖 `.missingAnchor`、`.missingText` 和 `.ready`。后续同轮 code polish 新增 `ActionPreviewAffordance`，把 wait/verify condition region、text click target、ordinary input point、multipoint 和 drag path 的预览语义放到 projection 层；incomplete text click 也不再合并进 ordinary coordinate multi-click。`editor-preview-affordances.png` fixture screenshot 已证明 `TargetCrosshairView` 渲染这些 affordance；installed-app/editor 录屏验收仍 open。这是 S3 暂停后的 UI 打磨方向样例：把已有后端/projection 状态变成用户可理解的修正入口，不把缺失 live evidence 的能力伪装成完成。
+- 已新增 [14-s0-s4-final-gap-alignment.md](14-s0-s4-final-gap-alignment.md)，把 S3 暂停后的 S0-S4 最终差距收敛为 live evidence、live producer completeness、ordinary Recorder bridge、bundle identity/default root、privacy safety、S4 product-ready live AI collaboration 六组，并明确 S0 closed、S1 first pass closed、S2 active blocker、S3/S4 paused。已新增 [15-s2-live-evidence-playbook.md](15-s2-live-evidence-playbook.md)，把 S2 授权 live capture、ordinary Recorder bridge、安全/cleanup 和 S3/S4 handoff 证据路径写成可执行 checklist，但不关闭任何 live gate。尚未把 S2 的普通宏录制 lifecycle 做成用户可见默认路径；尚未产出 live `.mov` 产品证据、AX/window observation live evidence、installed-app linked Macro Review evidence、product-ready default/live Recording CLI、redacted frame/video consumption 产品证据、reviewed text-anchor mutation 或 live cleanup product evidence。
+- 2026-07-07 UI owner checkpoint：Macro Editor action list 开始消费 text-target readiness。locator-only click / wait text / wait text gone / verify text 在缺 anchor 或缺 non-empty target text 时优先显示 `No target text`，并由 tests 覆盖 `.missingAnchor`、`.missingText` 和 `.ready`。后续同轮 code polish 新增 `TextClickEventFactory` 和 Wait Text 行内 `Add Click Text`：用户可以复用等待目标的 anchor/timeout/fallback，在等待之后插入 locator-backed text click，并同时选中等待和新点击行继续共享 Teach/Pick target。`MacroEditorLocalizationTests` 现在守护 Macro Editor 所有 `NSLocalizedString` key 都具备 `en` 和 `zh-Hans` 条目，并拦截新增的硬编码静态可见 `Text` / `Button` / `Label` / `TextField` 文案。`ActionPreviewAffordance` 把 wait/verify condition region、text click target、ordinary input point、multipoint 和 drag path 的预览语义放到 projection 层；incomplete text click 也不再合并进 ordinary coordinate multi-click。`editor-preview-affordances.png` fixture screenshot 已证明 `TargetCrosshairView` 渲染这些 affordance；installed-app/editor 录屏验收仍 open。这是 S3 暂停后的 UI 打磨方向样例：把已有后端/projection 状态变成用户可理解的修正入口，不把缺失 live evidence 的能力伪装成完成。
 
 ## 2. Direction Decision
 
@@ -121,11 +121,11 @@ First implementation should prove full video and keyframes together, while still
 | Task | Owner | Acceptance |
 | --- | --- | --- |
 | Pure capture session | Core | first pass done: fake clients build a validating `SemanticRecordingBundle` with video segment, keyframes, semantic events and observations |
-| Capture `.mov` recording | App | first pass adapter compiles; accepted when ordinary recording lifecycle can write a real video segment through `SCRecordingOutput` with start/end metadata |
-| Capture event-aligned keyframes | App | first pass adapter compiles; accepted when ordinary recording lifecycle writes frame refs and PNG artifacts around start/click/text/wait/stop |
-| Persist frame index | App + Core | frame IDs, event IDs, time, surface ID, bounds round-trip |
-| Macro Review frame strip | UI | fixture projection first pass done; real Macro Review selecting event row still needs to jump to before/after frame |
-| OCR on selected frames | App | Vision runs app-edge; core stores observation fixtures |
+| Capture `.mov` recording | App | first pass adapter compiles; accepted only when ordinary recording lifecycle writes a real `SCRecordingOutput` video segment with start/end metadata and preserved live evidence |
+| Capture event-aligned keyframes | App | first pass adapter compiles; accepted only when ordinary recording lifecycle writes frame refs and PNG artifacts around start/click/text/wait/stop in the persisted live bundle |
+| Persist frame index | App + Core | first pass done in pure capture/bundle contract: frame IDs, event IDs, video segment IDs, time, surface ID and related-event lookup round-trip. Live bundle evidence remains open |
+| Macro Review frame strip | UI | fixture/stored projection first pass done; installed-app Macro Review from `SavedMacro.semanticRecording` remains blocked on S2 ordinary Recorder bridge evidence |
+| OCR on selected frames | App | first pass bundle values and Vision adapter compile exist; accepted only when live Vision OCR observations persist and reload from an authorized bundle |
 | Tests | Core/App | fake clock/frame fixtures prove alignment; no real ScreenCapture in unit tests |
 
 Full `.mov` capture is part of semantic recording on macOS 15+. Keyframe-only can remain a user-facing light mode, but no macOS 14 fallback is planned.
@@ -136,24 +136,24 @@ This is the product vertical slice that makes semantic recording valuable.
 
 | User Action | System Output | Acceptance |
 | --- | --- | --- |
-| Select text area on recorded frame | OCR wait condition draft | Draft validates and imports into existing workflow visual/OCR condition model |
-| Select icon/button crop | `imageRef` template asset | Asset stores source frame, crop bounds, suggested search region, threshold |
-| Select result panel | `baselineRef` region-changed asset | Runtime can compare baseline to last sample |
-| Pick a status pixel | `pixelMatched` condition | Pixel stores source frame coordinate and target color |
-| Accept suggestion | Draft patch or workflow draft | Suggestion includes evidence refs, confidence, risk, fallback |
-| Reject suggestion | No mutation | User can keep playable macro unchanged |
+| Select text area on recorded frame | OCR wait condition draft | fixture Review first pass done: draft patch validates against existing OCR condition model. Live installed-app evidence remains open |
+| Select icon/button crop | `imageRef` template asset | fixture/manual frame crop materialization first pass done. Live package-local asset materialization from a saved-macro-linked bundle remains open |
+| Select result panel | `baselineRef` region-changed asset | fixture/CLI baseline extraction first pass done. Live region-changed condition creation and runtime comparison evidence remain open |
+| Pick a status pixel | `pixelMatched` condition | Review color picker first pass done. Live pixel sampling from recorded frames and product evidence remain open |
+| Accept suggestion | Draft patch or workflow draft | fixture/review-only suggestions include evidence refs, confidence, risk and fallback. Stored/live suggestion synthesis remains open |
+| Reject suggestion | No mutation | first pass done: Review/S4 action semantics keep rejection local and preserve playable macro/workflow storage |
 
 ### Phase 3: Recording CLI
 
 CLI comes after bundle fixtures exist.
 
-| Command Group | First Commands | Blocked By |
+| Command Group | First Commands | Current Acceptance / Blocker |
 | --- | --- | --- |
-| Catalog | `recording list/show/explain --json` | Bundle schema |
-| Frame query | `recording frames/frame show/events-near --json` | Frame refs |
-| OCR/search | `recording ocr search --json` | OCR observations |
-| Asset extraction | `recording asset extract/baseline --json` | Frame-to-asset mapping |
-| Suggestions | `recording suggest waits/locators/conditions/cleanup --json` | deterministic local heuristics |
+| Catalog | `recording list/show/explain --json` | fixture and explicit stored-bundle reads are done; product-ready default/live catalog is blocked by S2 root/id policy and accepted live bundles |
+| Frame query | `recording frames/frame show/events-near --json` | fixture and explicit stored-bundle reads are done; product-ready default/live reads are blocked by S2 live bundle/root policy |
+| OCR/search | `recording ocr search --json` | fixture and explicit persisted-bundle OCR filtering are done; product-ready live OCR search is blocked by live Vision observations in accepted S2 bundles |
+| Asset extraction | `recording asset extract/baseline --json` | explicit-source extraction is done; product flow is blocked by Review/Draft Preview alignment over saved-macro-linked live bundles |
+| Suggestions | `recording suggest waits/locators/conditions/cleanup --json` | deterministic fixture suggestions are done; stored/live synthesis is intentionally unavailable until S2 live evidence and Review mutation boundaries are accepted |
 | Draft | `workflow draft from-recording --json` | Fixture/review-only first pass done; product-ready stored/live suggestion synthesis + draft compiler open |
 
 MCP remains deferred. When needed, MCP should wrap this service/CLI semantic contract, not create a separate product logic path.
@@ -200,7 +200,7 @@ If the answer is no, the implementation probably belongs in a later phase or beh
 Recommended order from here:
 
 1. Product UX closure: text-target readiness and preview-affordance code polish are in place, with fixture `editor-preview-affordances.png`; next evidence step is installed-app editor recording showing wait/verify region labels and click-only pulse affordances in the real overlay.
-2. API spike: target-window/display `.mov` capture through `SCRecordingOutput` plus event-aligned keyframes, with fake capture clients for tests. First pass now has fake-client session tests, app-edge ScreenCaptureKit/Vision/store skeletons, strict sidecar-aware bundle loading and explicit tolerant load diagnostics; next step is wiring a real smoke path into recording lifecycle.
+2. API spike: target-window/display `.mov` capture through `SCRecordingOutput` plus event-aligned keyframes, with fake capture clients for tests. First pass now has fake-client session tests, app-edge ScreenCaptureKit/Vision/store skeletons, strict sidecar-aware bundle loading and explicit tolerant load diagnostics; next step is following `15-s2-live-evidence-playbook.md` on an authorized macOS 15+ machine to capture the real smoke path and ordinary Recorder bridge evidence.
 3. S3 is paused except for fixture/action-semantics maintenance. Resume S3 only after S2 produces an accepted live bundle through the ordinary Recorder bridge and `SavedMacro.semanticRecording`; then capture installed-app linked Review -> Draft Preview -> confirm import.
 4. CLI follow-up: S4 fixture OCR/visual query, deterministic suggestion query/result availability contract, fixture/review-only draft-from-recording and explicit stored-bundle read-only catalog/query are done; S2 stored bundle root/id policy now has a first pass, and product-ready default/live catalog/search/suggestions plus stored/live draft synthesis are next blocked by authorized live bundle evidence, default root selection, stored suggestion synthesis and Review/Draft Preview alignment rather than by manifest-only loading.
 5. Asset materialization: define and implement frame crop file copy/package-local refs for generated image/baseline assets before shipping frame-to-condition broadly.

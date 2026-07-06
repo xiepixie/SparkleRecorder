@@ -286,3 +286,65 @@ public enum ActionGroupProjection {
         }
     }
 }
+
+public enum TextClickEventFactory {
+    public static func makeEvents(
+        startTime: TimeInterval,
+        textAnchor: TextAnchor,
+        timeout: TimeInterval = 10.0,
+        fallbackPolicy: LocatorFallbackPolicy = .fail,
+        surfaceId: String? = nil
+    ) -> [RecordedEvent] {
+        let point = clickPoint(for: textAnchor)
+        let down = RecordedEvent(
+            kind: .leftMouseDown,
+            time: startTime,
+            x: point.x,
+            y: point.y,
+            keyCode: 0,
+            flags: 0,
+            mouseButton: 0,
+            clickCount: 1,
+            scrollDeltaY: 0,
+            scrollDeltaX: 0,
+            coordinateBinding: .targetWindow,
+            coordinateStrategy: .locatorOnly,
+            locatorFallbackPolicy: fallbackPolicy,
+            surfaceId: surfaceId,
+            textAnchor: textAnchor,
+            textTimeout: timeout
+        )
+        let up = RecordedEvent(
+            kind: .leftMouseUp,
+            time: startTime + 0.1,
+            x: point.x,
+            y: point.y,
+            keyCode: 0,
+            flags: 0,
+            mouseButton: 0,
+            clickCount: 1,
+            scrollDeltaY: 0,
+            scrollDeltaX: 0,
+            coordinateBinding: .targetWindow,
+            coordinateStrategy: .locatorOnly,
+            locatorFallbackPolicy: fallbackPolicy,
+            surfaceId: surfaceId,
+            textAnchor: textAnchor,
+            textTimeout: timeout
+        )
+        return [down, up]
+    }
+
+    private static func clickPoint(for anchor: TextAnchor) -> PointValue {
+        if let fallback = anchor.coordinateFallback {
+            return fallback
+        }
+        if anchor.observedFrame.width > 0, anchor.observedFrame.height > 0 {
+            return PointValue(
+                x: anchor.observedFrame.x + anchor.observedFrame.width / 2,
+                y: anchor.observedFrame.y + anchor.observedFrame.height / 2
+            )
+        }
+        return PointValue(x: 100, y: 100)
+    }
+}

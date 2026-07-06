@@ -22,3 +22,4 @@
 - 当任务看起来要提前进入 MCP、App Knowledge、全自动 AI agent 或全局视觉资产库时，先回到 [../10-next-stage-reality-check.md](../10-next-stage-reality-check.md) 做用户价值和过度设计检查，再写 owner workstream。
 - S4 的任何 CLI 输出必须引用 S1 evidence refs，并和 S3 Review 的接受/拒绝语义保持一致；MCP 只能在 CLI/shared service 稳定后包装同一套逻辑。
 - S3 first pass 暂停期间，新增能力优先落到 S2 live bundle 生产和证据捕获；如果要恢复 S3 或 S4 product-ready live work，先对照 [../14-s0-s4-final-gap-alignment.md](../14-s0-s4-final-gap-alignment.md) 确认 live input、root policy 和验收证据是否已经存在。
+- S2 live evidence capture 使用 [../15-s2-live-evidence-playbook.md](../15-s2-live-evidence-playbook.md)；该文档只定义操作路径和 handoff 包，不把 debug-smoke、blocked preflight、synthetic rehearsal 或 explicit temp bundle 自动视为 product-ready。

@@ -322,4 +322,50 @@ struct ActionGroupProjectionTests {
         #expect(ActionGroupProjection.previewAffordance(for: .multiPointClick) == .pointSequence)
         #expect(ActionGroupProjection.previewAffordance(for: .drag) == .inputPath)
     }
+
+    @Test("Text click factory creates locator backed click events from wait anchor")
+    func textClickFactoryCreatesLocatorBackedClickEventsFromWaitAnchor() throws {
+        let anchor = TextAnchor(
+            text: "Confirm",
+            observedFrame: RectValue(x: 90, y: 90, width: 80, height: 24),
+            searchRegion: RectValue(x: 70, y: 70, width: 140, height: 80),
+            coordinateFallback: PointValue(x: 130, y: 102)
+        )
+
+        let events = TextClickEventFactory.makeEvents(
+            startTime: 1.25,
+            textAnchor: anchor,
+            timeout: 8.0,
+            fallbackPolicy: .allowCoordinateFallback,
+            surfaceId: "checkout"
+        )
+
+        #expect(events.map(\.kind) == [.leftMouseDown, .leftMouseUp])
+        #expect(events.map(\.coordinateStrategy) == [.locatorOnly, .locatorOnly])
+        #expect(events.map(\.coordinateBinding) == [.targetWindow, .targetWindow])
+        #expect(events.allSatisfy { $0.textAnchor == anchor })
+        #expect(events.allSatisfy { $0.textTimeout == 8.0 })
+        #expect(events.allSatisfy { $0.locatorFallbackPolicy == .allowCoordinateFallback })
+        #expect(events.allSatisfy { $0.surfaceId == "checkout" })
+        #expect(events[0].x == 130)
+        #expect(events[0].y == 102)
+
+        let group = try #require(EventGrouper().group(events).first)
+        #expect(group.kind == .click)
+        #expect(group.summary == "Click text: Confirm")
+        #expect(group.textTargetReadiness == .ready)
+    }
+
+    @Test("Text click factory uses observed frame center when fallback is missing")
+    func textClickFactoryUsesObservedFrameCenterWhenFallbackIsMissing() {
+        let anchor = TextAnchor(
+            text: "Confirm",
+            observedFrame: RectValue(x: 90, y: 90, width: 80, height: 24)
+        )
+
+        let events = TextClickEventFactory.makeEvents(startTime: 1.25, textAnchor: anchor)
+
+        #expect(events.map(\.x) == [130, 130])
+        #expect(events.map(\.y) == [102, 102])
+    }
 }

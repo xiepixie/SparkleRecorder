@@ -4,7 +4,7 @@
 Owner：App-edge capture / Vision index / recording bundle storage
 并行对象：S0 Workflow Evidence Closure, S1 Contract/Core, S3 Review UX
 
-S2 的任务是把一次用户录制生产成 `SemanticRecordingBundle` 可消费的真实证据：`.mov` 视频、event-aligned keyframes、OCR/视觉/AX observations、suppression 和本地 bundle storage。S2 不负责 Review UI，也不负责 CLI/AI 命令命名；这些分别属于 S3/S4。
+S2 的任务是把一次用户录制生产成 `SemanticRecordingBundle` 可消费的真实证据：`.mov` 视频、event-aligned keyframes、OCR/视觉/AX observations、suppression 和本地 bundle storage。S2 不负责 Review UI，也不负责 CLI/AI 命令命名；这些分别属于 S3/S4。授权机器上的 live evidence capture 顺序维护在 [../15-s2-live-evidence-playbook.md](../15-s2-live-evidence-playbook.md)。
 
 ## Current First Pass
 
@@ -334,6 +334,8 @@ Observed status on 2026-07-06:
 - whole-worktree `swift build -Xswiftc -swift-version -Xswiftc 6`: passed after wiring playback-preserving playable macro sanitization through save/export/status paths.
 
 ## Next Tasks
+
+Follow [../15-s2-live-evidence-playbook.md](../15-s2-live-evidence-playbook.md) for accepted filenames, sidecar content, non-accepted substitutes and S3/S4 handoff fields. Short form:
 
 1. Run `semantic-recording debug-smoke --preflight-only --json --evidence-sidecar <sidecar.md>` locally before live capture to verify permissions and preserve blocked/degraded preflight evidence. Add `--synthetic-redaction` when you need the sidecar to record the requested safe redaction rehearsal reason.
 2. Run `semantic-recording debug-smoke --json --require-ocr --require-window-or-ax --evidence-sidecar <sidecar.md>` on an authorized macOS 15+ machine and capture the resulting bundle directory plus sidecar as S2 live evidence. For safe-window redaction-pipeline rehearsal, add `--synthetic-redaction` or `--synthetic-redaction-reason <reason>`; this can prove the renderer path on non-sensitive content but does not replace password/Secure Input/excluded-context product evidence.

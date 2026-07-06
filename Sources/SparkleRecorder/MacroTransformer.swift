@@ -354,47 +354,27 @@ extension Array where Element == RecordedEvent {
         self.sortByTimePreservingOrder()
     }
     
-    public mutating func insertTextClick(at index: Int) {
+    @discardableResult
+    public mutating func insertTextClick(
+        at index: Int,
+        textAnchor: TextAnchor = TextAnchor(text: "", observedFrame: RectValue(x: 0, y: 0, width: 0, height: 0)),
+        textTimeout: TimeInterval = 10.0,
+        fallbackPolicy: LocatorFallbackPolicy = .fail,
+        surfaceId: String? = nil
+    ) -> Range<Int> {
         let t = self.isEmpty ? 0 : (index > 0 && index <= self.count ? self[index - 1].time + 0.1 : self.last!.time + 0.1)
         let clamped = Swift.max(0, Swift.min(index, self.count))
-        let anchor = TextAnchor(text: "", observedFrame: RectValue(x: 0, y: 0, width: 0, height: 0))
-        let down = RecordedEvent(
-            kind: .leftMouseDown,
-            time: t,
-            x: 100,
-            y: 100,
-            keyCode: 0,
-            flags: 0,
-            mouseButton: 0,
-            clickCount: 1,
-            scrollDeltaY: 0,
-            scrollDeltaX: 0,
-            coordinateBinding: .targetWindow,
-            coordinateStrategy: .locatorOnly,
-            locatorFallbackPolicy: .fail,
-            textAnchor: anchor,
-            textTimeout: 10.0
-        )
-        let up = RecordedEvent(
-            kind: .leftMouseUp,
-            time: t + 0.1,
-            x: 100,
-            y: 100,
-            keyCode: 0,
-            flags: 0,
-            mouseButton: 0,
-            clickCount: 1,
-            scrollDeltaY: 0,
-            scrollDeltaX: 0,
-            coordinateBinding: .targetWindow,
-            coordinateStrategy: .locatorOnly,
-            locatorFallbackPolicy: .fail,
-            textAnchor: anchor,
-            textTimeout: 10.0
+        let inserted = TextClickEventFactory.makeEvents(
+            startTime: t,
+            textAnchor: textAnchor,
+            timeout: textTimeout,
+            fallbackPolicy: fallbackPolicy,
+            surfaceId: surfaceId
         )
         for i in clamped..<self.count { self[i].time += 0.2 }
-        self.insert(contentsOf: [down, up], at: clamped)
+        self.insert(contentsOf: inserted, at: clamped)
         self.sortByTimePreservingOrder()
+        return clamped..<(clamped + inserted.count)
     }
     
     public mutating func insertDrag(at index: Int) {
@@ -545,41 +525,14 @@ extension Array where Element == RecordedEvent {
         let revealDown = RecordedEvent(kind: .leftMouseDown, time: revealDownTime, x: 100, y: 100, keyCode: 0, flags: 0, mouseButton: 0, clickCount: 1, scrollDeltaY: 0, scrollDeltaX: 0)
         let revealUp = RecordedEvent(kind: .leftMouseUp, time: revealDownTime + 0.08, x: 100, y: 100, keyCode: 0, flags: 0, mouseButton: 0, clickCount: 1, scrollDeltaY: 0, scrollDeltaX: 0)
         let waitText = RecordedEvent(kind: .waitForText, time: revealDownTime + 0.18, x: 0, y: 0, keyCode: 0, flags: 0, mouseButton: 0, clickCount: 0, scrollDeltaY: 0, scrollDeltaX: 0, textAnchor: anchor, textTimeout: 10.0, verifyMustExist: true)
-        let textDown = RecordedEvent(
-            kind: .leftMouseDown,
-            time: revealDownTime + 0.30,
-            x: 100,
-            y: 100,
-            keyCode: 0,
-            flags: 0,
-            mouseButton: 0,
-            clickCount: 1,
-            scrollDeltaY: 0,
-            scrollDeltaX: 0,
-            coordinateBinding: .targetWindow,
-            coordinateStrategy: .locatorOnly,
-            locatorFallbackPolicy: .fail,
-            textAnchor: anchor,
-            textTimeout: 10.0
+        var textClick = TextClickEventFactory.makeEvents(
+            startTime: revealDownTime + 0.30,
+            textAnchor: anchor
         )
-        let textUp = RecordedEvent(
-            kind: .leftMouseUp,
-            time: revealDownTime + 0.38,
-            x: 100,
-            y: 100,
-            keyCode: 0,
-            flags: 0,
-            mouseButton: 0,
-            clickCount: 1,
-            scrollDeltaY: 0,
-            scrollDeltaX: 0,
-            coordinateBinding: .targetWindow,
-            coordinateStrategy: .locatorOnly,
-            locatorFallbackPolicy: .fail,
-            textAnchor: anchor,
-            textTimeout: 10.0
-        )
-        let inserted = [revealDown, revealUp, waitText, textDown, textUp]
+        if textClick.indices.contains(1) {
+            textClick[1].time = revealDownTime + 0.38
+        }
+        let inserted = [revealDown, revealUp, waitText] + textClick
         let shift = (inserted.last?.time ?? revealDownTime) - previousTime + 0.08
         for i in clamped..<self.count { self[i].time += shift }
         self.insert(contentsOf: inserted, at: clamped)

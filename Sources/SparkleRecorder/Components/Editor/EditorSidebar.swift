@@ -176,6 +176,18 @@ struct EditorSidebar: View {
 		                                visionEmptyState(readiness: textReadiness)
 		                            }
 		                        }
+
+                                if grp.kind == .waitForText {
+                                    Button {
+                                        insertClickTextAfterSelectedWait(grp)
+                                    } label: {
+                                        Label(NSLocalizedString("Add Click Text", comment: ""), systemImage: "cursorarrow.click")
+                                            .frame(maxWidth: .infinity)
+                                    }
+                                    .buttonStyle(.bordered)
+                                    .controlSize(.small)
+                                    .help(NSLocalizedString("Reuse this wait target for the next text click.", comment: ""))
+                                }
                     } else if selection.count > 1 {
                         VStack(alignment: .leading, spacing: 14) {
                             Text(String(format: NSLocalizedString("Batch edit %d actions", comment: ""), selection.count))
@@ -1167,6 +1179,59 @@ struct EditorSidebar: View {
         }
         
         selectInsertedEvents(in: clampedIndex..<(clampedIndex + 2))
+    }
+
+    func insertClickTextAfterSelectedWait(_ group: ActionGroup) {
+        guard group.kind == .waitForText,
+              let sourceEventIndex = group.eventIndices.last,
+              recorder.events.indices.contains(sourceEventIndex) else {
+            return
+        }
+
+        let sourceEvent = recorder.events[sourceEventIndex]
+        let insertionIndex = min(sourceEventIndex + 1, recorder.events.count)
+        let trimmedInspectorText = inspOCRText.trimmingCharacters(in: .whitespacesAndNewlines)
+        let anchor = !trimmedInspectorText.isEmpty
+            ? updatedAnchor(for: group, text: inspOCRText)
+            : (sourceEvent.textAnchor
+               ?? group.textAnchor
+               ?? TextAnchor(text: "", observedFrame: RectValue(x: 0, y: 0, width: 0, height: 0)))
+        let timeout = sourceEvent.textTimeout ?? group.textTimeout ?? inspTimeout
+        let fallbackPolicy = sourceEvent.locatorFallbackPolicy ?? inspFallbackPolicy
+        var insertedRange = insertionIndex..<insertionIndex
+
+        withUndo(NSLocalizedString("Add Click Text After Wait", comment: "")) {
+            insertedRange = recorder.events.insertTextClick(
+                at: insertionIndex,
+                textAnchor: anchor,
+                textTimeout: timeout,
+                fallbackPolicy: fallbackPolicy,
+                surfaceId: sourceEvent.surfaceId
+            )
+        }
+
+        selectWaitAndInsertedTextClick(waitEventIndices: group.eventIndices, insertedRange: insertedRange)
+    }
+
+    func selectWaitAndInsertedTextClick(waitEventIndices: [Int], insertedRange: Range<Int>) {
+        DispatchQueue.main.async {
+            let waitIndexSet = Set(waitEventIndices)
+            let groups = self.onRefreshRows().map(\.group)
+            let targets = groups.filter { group in
+                let isSourceWait = group.eventIndices.contains { waitIndexSet.contains($0) }
+                let isInsertedClick = group.eventIndices.contains { insertedRange.contains($0) }
+                return (isSourceWait || isInsertedClick) && self.isTextTargetGroup(group)
+            }
+            if !targets.isEmpty {
+                self.selection = Set(targets.map(\.id))
+                DispatchQueue.main.async {
+                    self.onLoadInspector()
+                    self.onUpdatePreview()
+                }
+            } else {
+                self.selectInsertedEvents(in: insertedRange)
+            }
+        }
     }
 
     func insertRevealAndClickTextFlow() {

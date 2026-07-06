@@ -10439,6 +10439,40 @@
         }
       }
     },
+    "Add Click Text": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Add Click Text"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "添加点击文本"
+          }
+        }
+      }
+    },
+    "Add Click Text After Wait": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Add Click Text After Wait"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "等待后添加点击文本"
+          }
+        }
+      }
+    },
     "Click Text": {
       "extractionState": "manual",
       "localizations": {
@@ -10452,6 +10486,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "点击文本"
+          }
+        }
+      }
+    },
+    "Reuse this wait target for the next text click.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reuse this wait target for the next text click."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "复用这个等待目标作为后续文本点击。"
           }
         }
       }
@@ -13876,10 +13927,16 @@
     "Reveal & Click": {
       "extractionState": "manual",
       "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reveal & Click"
+          }
+        },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "悬浮点击"
+            "value": "显示并点击"
           }
         }
       }
@@ -13887,10 +13944,16 @@
     "Vision flow": {
       "extractionState": "manual",
       "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vision flow"
+          }
+        },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "视觉流"
+            "value": "视觉流程"
           }
         }
       }
