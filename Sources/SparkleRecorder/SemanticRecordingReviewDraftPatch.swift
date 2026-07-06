@@ -599,6 +599,7 @@ public struct SemanticRecordingReviewDraftPatchRequest: Equatable, Sendable {
     public var requireVisible: Bool?
     public var pixelColorHex: String?
     public var sourceSuggestionID: UUID?
+    public var sourceEvidence: SemanticRecordingReviewActionSemantics.EvidenceAlignment?
 
     public init(
         candidate: SemanticRecordingReviewProjection.ConditionCandidateRow,
@@ -612,7 +613,8 @@ public struct SemanticRecordingReviewDraftPatchRequest: Equatable, Sendable {
         pollingSeconds: TimeInterval = 0.25,
         requireVisible: Bool? = nil,
         pixelColorHex: String? = nil,
-        sourceSuggestionID: UUID? = nil
+        sourceSuggestionID: UUID? = nil,
+        sourceEvidence: SemanticRecordingReviewActionSemantics.EvidenceAlignment? = nil
     ) {
         self.candidate = candidate
         self.targetTaskKey = targetTaskKey?.trimmedForSemanticReviewPatch.nilIfEmptyForSemanticReviewPatch
@@ -626,6 +628,7 @@ public struct SemanticRecordingReviewDraftPatchRequest: Equatable, Sendable {
         self.requireVisible = requireVisible
         self.pixelColorHex = pixelColorHex?.trimmedForSemanticReviewPatch.nilIfEmptyForSemanticReviewPatch
         self.sourceSuggestionID = sourceSuggestionID
+        self.sourceEvidence = sourceEvidence
     }
 }
 
@@ -660,6 +663,86 @@ public struct SemanticRecordingReviewDraftPatchResult: Equatable, Sendable {
         self.assetExtractions = assetExtractions
         self.actionEvidence = actionEvidence
         self.appliesToExistingTask = appliesToExistingTask
+    }
+}
+
+public struct SemanticRecordingReviewSuggestionPatchMatch: Equatable, Sendable {
+    public var candidate: SemanticRecordingReviewProjection.ConditionCandidateRow
+    public var frameID: UUID
+    public var eventID: UUID?
+    public var request: SemanticRecordingReviewDraftPatchRequest
+
+    public init(
+        candidate: SemanticRecordingReviewProjection.ConditionCandidateRow,
+        frameID: UUID,
+        eventID: UUID?,
+        request: SemanticRecordingReviewDraftPatchRequest
+    ) {
+        self.candidate = candidate
+        self.frameID = frameID
+        self.eventID = eventID
+        self.request = request
+    }
+}
+
+public enum SemanticRecordingReviewSuggestionPatchResolver {
+    public static func makeRequest(
+        suggestion: SemanticRecordingReviewProjection.SuggestionRow,
+        bundle: SemanticRecordingBundle,
+        regionSelection: SemanticRecordingFrameRegionSelection? = nil,
+        pixelColorHex: String? = nil
+    ) -> SemanticRecordingReviewSuggestionPatchMatch? {
+        for evidence in suggestion.evidence {
+            let reviewProjection = SemanticRecordingReviewProjection(
+                bundle: bundle,
+                selectedEventID: evidence.eventIDs.first,
+                selectedFrameID: evidence.frameID
+            )
+            guard let frame = reviewProjection.selectedFrame else {
+                continue
+            }
+            let candidate = frame.conditionCandidates.first { candidate in
+                candidateMatches(candidate, evidence: evidence)
+            } ?? frame.conditionCandidates.first
+            guard let candidate else {
+                continue
+            }
+
+            let effectiveSelection = regionSelection?.frameID == candidate.sourceFrameID
+                ? regionSelection
+                : nil
+            let request = SemanticRecordingReviewDraftPatchRequest(
+                candidate: candidate,
+                regionSelection: effectiveSelection,
+                pixelColorHex: pixelColorHex,
+                sourceSuggestionID: suggestion.id,
+                sourceEvidence: SemanticRecordingReviewActionSemantics
+                    .acceptSuggestion(suggestion)
+                    .evidence
+            )
+            return SemanticRecordingReviewSuggestionPatchMatch(
+                candidate: candidate,
+                frameID: frame.id,
+                eventID: evidence.eventIDs.first,
+                request: request
+            )
+        }
+        return nil
+    }
+
+    private static func candidateMatches(
+        _ candidate: SemanticRecordingReviewProjection.ConditionCandidateRow,
+        evidence: SemanticRecordingReviewProjection.EvidenceRow
+    ) -> Bool {
+        if let artifactPath = evidence.artifactPath,
+           candidate.artifactPath == artifactPath {
+            return true
+        }
+        if let observationID = candidate.observationID,
+           evidence.observationIDs.contains(observationID) {
+            return true
+        }
+        return evidence.frameID == candidate.sourceFrameID
     }
 }
 
@@ -845,12 +928,24 @@ public enum SemanticRecordingReviewDraftPatchBuilder {
         request: SemanticRecordingReviewDraftPatchRequest,
         frame: RecordingFrameReference
     ) -> SemanticRecordingReviewActionSemantics.EvidenceAlignment {
-        var evidence = SemanticRecordingReviewActionSemantics.evidenceAlignment(
+        let candidateEvidence = SemanticRecordingReviewActionSemantics.evidenceAlignment(
             request.candidate,
             frame: frame,
             regionSelection: request.regionSelection
         )
-        evidence.suggestionID = request.sourceSuggestionID
+        var evidence = request.sourceEvidence ?? candidateEvidence
+        evidence.suggestionID = request.sourceSuggestionID ?? evidence.suggestionID
+        evidence.frameID = evidence.frameID ?? candidateEvidence.frameID
+        if evidence.eventIDs.isEmpty {
+            evidence.eventIDs = candidateEvidence.eventIDs
+        }
+        if evidence.observationIDs.isEmpty {
+            evidence.observationIDs = candidateEvidence.observationIDs
+        }
+        evidence.sourcePreviewRefID = evidence.sourcePreviewRefID ?? candidateEvidence.sourcePreviewRefID
+        evidence.artifactPath = evidence.artifactPath ?? candidateEvidence.artifactPath
+        evidence.bounds = evidence.bounds ?? candidateEvidence.bounds
+        evidence.summary = evidence.summary ?? candidateEvidence.summary
         return evidence
     }
 

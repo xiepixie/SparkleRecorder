@@ -102,6 +102,44 @@ struct SemanticRecordingReviewActionSemanticsTests {
         #expect(clear.evidence == accept.evidence)
     }
 
+    @Test("Suggestion patch resolver carries suggestion id into draft request")
+    func suggestionPatchResolverCarriesSuggestionIDIntoDraftRequest() throws {
+        let bundle = SemanticRecordingFixture.checkoutBundle()
+        let suggestions = SemanticRecordingFixture.checkoutSuggestions(bundle: bundle)
+        let projection = SemanticRecordingReviewProjection(
+            bundle: bundle,
+            suggestions: suggestions,
+            selectedEventID: SemanticRecordingFixture.waitEventID
+        )
+        let reviewSuggestion = try #require(projection.suggestionRows.first)
+
+        let match = try #require(
+            SemanticRecordingReviewSuggestionPatchResolver.makeRequest(
+                suggestion: reviewSuggestion,
+                bundle: bundle
+            )
+        )
+        let result = try SemanticRecordingReviewDraftPatchBuilder.makePatch(
+            bundle: bundle,
+            request: match.request
+        )
+        let preview = SemanticRecordingReviewActionSemantics.previewDraft(result)
+
+        #expect(match.candidate.kind == .ocrWait)
+        #expect(match.frameID == SemanticRecordingFixture.afterClickFrameID)
+        #expect(match.eventID == SemanticRecordingFixture.clickEventID)
+        #expect(match.request.sourceSuggestionID == SemanticRecordingFixture.suggestionID)
+        #expect(result.actionEvidence.suggestionID == SemanticRecordingFixture.suggestionID)
+        #expect(result.actionEvidence.frameID == SemanticRecordingFixture.afterClickFrameID)
+        #expect(result.actionEvidence.eventIDs == [
+            SemanticRecordingFixture.clickEventID,
+            SemanticRecordingFixture.waitEventID
+        ])
+        #expect(result.actionEvidence.observationIDs == [SemanticRecordingFixture.ocrObservationID])
+        #expect(result.actionEvidence.artifactPath == "visual-index/ocr/confirmation-region.png")
+        #expect(preview.evidence == result.actionEvidence)
+    }
+
     @Test("Preview and import draft actions preserve staged patch evidence")
     func previewAndImportDraftActionsPreserveStagedPatchEvidence() throws {
         let bundle = SemanticRecordingFixture.checkoutBundle()
