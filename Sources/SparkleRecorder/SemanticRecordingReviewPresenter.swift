@@ -44,6 +44,17 @@ enum SemanticRecordingReviewArtifactActionFeedback: Equatable {
     case failed(SemanticRecordingReviewArtifactAction, String)
 }
 
+enum SemanticRecordingReviewPresenterError: LocalizedError {
+    case applicationSupportDirectoryUnavailable
+
+    var errorDescription: String? {
+        switch self {
+        case .applicationSupportDirectoryUnavailable:
+            return NSLocalizedString("Application Support directory is unavailable.", comment: "")
+        }
+    }
+}
+
 @MainActor
 enum SemanticRecordingReviewPresenter {
     static func openBundle(
@@ -93,6 +104,32 @@ enum SemanticRecordingReviewPresenter {
 
         return SemanticRecordingReviewState(
             sourceName: directory.lastPathComponent,
+            bundleDirectory: directory,
+            loadedAt: Date(),
+            bundle: bundle,
+            suggestions: suggestions,
+            validationIssues: validationIssues,
+            artifactStatuses: artifactStatuses
+        )
+    }
+
+    static func reviewState(
+        from reference: MacroSemanticRecordingReference,
+        sourceName: String? = nil,
+        suggestions: [RecordingSuggestion] = []
+    ) async throws -> SemanticRecordingReviewState {
+        let bundleRef = try RecordingArtifactRef(reference.bundleRelativePath)
+        guard let appSupportRootURL else {
+            throw SemanticRecordingReviewPresenterError.applicationSupportDirectoryUnavailable
+        }
+        let directory = appSupportRootURL.appendingRecordingArtifactRef(bundleRef)
+        let store = RecordingBundleStore(rootDirectory: directory.deletingLastPathComponent())
+        let bundle = try await store.loadManifest(from: directory)
+        let validationIssues = bundle.validate()
+        let artifactStatuses = artifactStatuses(for: bundle, directory: directory)
+
+        return SemanticRecordingReviewState(
+            sourceName: sourceName ?? directory.lastPathComponent,
             bundleDirectory: directory,
             loadedAt: Date(),
             bundle: bundle,
@@ -204,11 +241,15 @@ enum SemanticRecordingReviewPresenter {
     }
 
     private static var defaultBundleRootURL: URL? {
+        appSupportRootURL?
+            .appendingPathComponent("SemanticRecordings", isDirectory: true)
+    }
+
+    private static var appSupportRootURL: URL? {
         FileManager.default
             .urls(for: .applicationSupportDirectory, in: .userDomainMask)
             .first?
             .appendingPathComponent("SparkleRecorder", isDirectory: true)
-            .appendingPathComponent("SemanticRecordings", isDirectory: true)
     }
 
     private static func bundleDirectory(from selectedURL: URL) -> URL {

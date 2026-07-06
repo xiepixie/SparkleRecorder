@@ -1,11 +1,11 @@
 # S3 Review UX And Evidence Editing
 
 更新时间：2026-07-06
-状态：Macro Review integration + Draft Preview handoff + pixel color picking + suggestion review first pass; live product evidence open
+状态：Macro Review integration + linked Run Detail opener + Draft Preview handoff + pixel color picking + suggestion review first pass; live product evidence open
 Owner：S3, Review UX / Evidence Editing
 并行对象：S0 Workflow Evidence Closure, S1 Contract/Core, S2 App Capture/Visual Index, S4 CLI/AI
 
-S3 的任务是把 semantic recording bundle 变成用户能审阅、修正和教学的界面。第一版不能等待 live capture 完成；必须先用 S1 fixture 证明 Review UX 的投影、事件导航、overlay、source/runtime comparison 和 suggestion review 逻辑成立。第二版已经把 Review 从 fixture 推到真实 Run Detail 入口和 live bundle presenter：用户可以从 Run Detail 打开一个 semantic recording bundle directory，审阅 frame timeline，框选 frame region，把候选生成 review-only workflow draft patch，并从 Review 直接进入 Draft Preview 走 existing confirm import。
+S3 的任务是把 semantic recording bundle 变成用户能审阅、修正和教学的界面。第一版不能等待 live capture 完成；必须先用 S1 fixture 证明 Review UX 的投影、事件导航、overlay、source/runtime comparison 和 suggestion review 逻辑成立。第二版已经把 Review 从 fixture 推到真实 Run Detail 入口和 live bundle presenter：Run Detail 会优先从 `SavedMacro.semanticRecording` 打开 linked Macro Review，缺少绑定时仍保留手动 bundle picker fallback。用户可以审阅 frame timeline，框选 frame region，把候选生成 review-only workflow draft patch，并从 Review 直接进入 Draft Preview 走 existing confirm import。
 
 ## Scope
 
@@ -56,16 +56,16 @@ S3 does not own:
 - Review UI 的候选 patch 现在可以打开 `AutomationWorkflowDraftPreviewSheet`。用户确认前不会修改原 workflow；确认时复用既有 Draft Preview import path，并在已有 workflow 上覆盖 compiled id/createdAt，避免生成重复 workflow。
 - Pixel candidates now expose `AutomationVisualColorPickerView` inside Review, and the selected hex is passed into `SemanticRecordingReviewDraftPatchRequest.pixelColorHex` so `pixelMatched` patches no longer require metadata-provided `colorHex` when the user supplies a reviewed target color.
 - Suggestion rows now show evidence refs and explicit `Accept Patch` / `Reject` actions. `Accept Patch` jumps to the cited frame/event, resolves the matching condition candidate, and generates the same review-only draft patch path; `Reject` records local review state only and does not mutate the workflow.
-- Run Detail 已提供 Macro Review 入口；由于 `AutomationTaskRun` 还没有 semantic recording id，当前入口是用户选择真实 bundle directory / `manifest.json`，不是自动绑定某一次 run。
+- Run Detail 已提供 Macro Review 入口；如果当前 run 或 task 能解析到带 `SavedMacro.semanticRecording` 的 macro，`AutomationTaskRunDetailView` 会直接通过 `SemanticRecordingReviewPresenter.reviewState(from:)` 打开 linked bundle。缺少该 metadata 或打开失败时，用户仍可以手动选择真实 bundle directory / `manifest.json`。
 - SwiftUI Review 只消费 presenter 解析好的 artifact statuses，不在 view body 内运行 Vision/AX/ScreenCaptureKit，也不自己拼 raw bundle paths。
 
 尚未完成：
 
-- 自动 run/macro -> semantic recording bundle id 绑定；这需要 S2/Recorder 把 recording id 写入可查询元数据。
+- 完整 run/session -> semantic recording evidence drill-in；当前已支持 `SavedMacro.semanticRecording` 的 macro 级 linked opener，但还没有每次 workflow run 的独立 semantic recording id / run evidence id。
 - frame crop file copy / package materialization semantics；当前 patch 登记 safe refs，真实文件复制仍属于 app-edge presenter/package import 层。
 - frame-to-condition live clip and real product evidence.
 - image/baseline crop extraction UI still needs package-local file materialization before broad shipping.
-- installed-app product evidence for suggestion accept/reject and Review -> Draft Preview remains open; current proof is fixture product evidence.
+- installed-app product evidence for linked Run Detail opener, suggestion accept/reject and Review -> Draft Preview remains open; current proof is fixture product evidence plus compiled product wiring.
 
 ## Accepted S1 Contract Usage
 
@@ -97,9 +97,9 @@ Potential future request:
 
 ### To S2
 
-S3 can keep developing against fixtures, and the first app-edge presenter is now in place. S2 still needs to provide the automatic association from ordinary macro recording / run detail back to a semantic bundle:
+S3 can keep developing against fixtures, and the first app-edge presenter is now in place. S2 has provided the first ordinary macro association through `SavedMacro.semanticRecording`; S3 now consumes it from Run Detail. S2 still needs to provide stronger run/session association and live acceptance evidence:
 
-- recording id or bundle directory metadata that can be reached from `AutomationTaskRun`, `SavedMacro`, or a macro package manifest
+- recording id or bundle directory metadata that can be reached from each `AutomationTaskRun`, not only the saved macro
 - lifecycle timing that proves the bundle was written before Run Detail opens review
 - product evidence for a live `.mov` / keyframe bundle opened through the installed app
 
@@ -127,10 +127,11 @@ Observed status on 2026-07-06:
 
 ## Next Tasks
 
-1. Add S2 automatic run/macro -> semantic bundle association so Run Detail can open the correct Review without an open panel.
+1. Capture installed-app product evidence for linked Run Detail -> Macro Review opening from a `SavedMacro.semanticRecording` bundle, including Open/Reveal artifact actions.
 2. Define frame crop file copy/package materialization semantics for package-local image/baseline refs.
-3. Capture live product evidence for frame-to-condition creation once a live bundle can be opened from the installed app.
-4. Add product evidence for pixel color picking, suggestion accept/reject and the Review -> Draft Preview -> confirm import handoff from an installed-app bundle once automatic binding lands.
+3. Add per-run/session semantic recording evidence drill-in once S2 exposes run-level metadata beyond the saved macro reference.
+4. Capture live product evidence for frame-to-condition creation once a live bundle can be opened from the installed app.
+5. Add product evidence for pixel color picking, suggestion accept/reject and the Review -> Draft Preview -> confirm import handoff from an installed-app bundle.
 
 ## Implementation Log
 
@@ -140,3 +141,4 @@ Observed status on 2026-07-06:
 - 2026-07-06: Connected Review-generated frame-to-condition patches to `AutomationWorkflowDraftPreviewSheet` and the existing confirmed import callback, preserving review-only behavior until the user explicitly imports.
 - 2026-07-06: Added Review-side pixel color picking for `pixelMatched` candidates and a pure test proving user-picked color can generate and apply a valid pixel condition patch without metadata color evidence.
 - 2026-07-06: Added suggestion review actions. Suggestions now expose cited evidence rows, `Accept Patch` to create a review-only patch from matching evidence, and `Reject` as a local non-mutating review decision.
+- 2026-07-06: Connected Run Detail Macro Review to `SavedMacro.semanticRecording`. The primary button now opens the linked bundle through `SemanticRecordingReviewPresenter.reviewState(from:)` when macro metadata exists, keeps a manual bundle fallback, and guards async open results so a stale request cannot present Review for a different selected run.

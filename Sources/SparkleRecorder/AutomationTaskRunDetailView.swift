@@ -18,6 +18,7 @@ struct AutomationTaskRunDetailView: View {
     @State private var semanticReviewState: SemanticRecordingReviewState?
     @State private var semanticReviewErrorMessage = ""
     @State private var isOpeningSemanticReview = false
+    @State private var semanticReviewRequestRunID: UUID?
     @Environment(\.automationTaskRunEvidenceMacroPackageBaseURL) private var macroPackageBaseURL
     @Environment(\.automationTaskRunEvidenceAutoload) private var shouldAutoloadEvidence
     @Environment(\.automationTaskRunEvidenceInitialActionFeedback) private var initialEvidenceActionFeedback
@@ -184,9 +185,20 @@ struct AutomationTaskRunDetailView: View {
                 .buttonStyle(.bordered)
                 .controlSize(.small)
                 .disabled(isOpeningSemanticReview)
+
+                if linkedSemanticRecording != nil {
+                    Button("", systemImage: "folder") {
+                        chooseSemanticReviewBundle()
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                    .disabled(isOpeningSemanticReview)
+                    .help(NSLocalizedString("Choose a different Macro Review bundle", comment: ""))
+                    .accessibilityLabel(NSLocalizedString("Choose a different Macro Review bundle", comment: ""))
+                }
             }
 
-            Text(NSLocalizedString("Open a semantic recording bundle for frame timeline, visual evidence, region selection, and review-only draft patch generation.", comment: ""))
+            Text(macroReviewSummary)
                 .font(.caption)
                 .foregroundStyle(.tertiary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -218,9 +230,35 @@ struct AutomationTaskRunDetailView: View {
     }
 
     private var reviewButtonTitle: String {
-        isOpeningSemanticReview
-            ? NSLocalizedString("Opening", comment: "")
-            : NSLocalizedString("Open Review", comment: "")
+        if isOpeningSemanticReview {
+            return NSLocalizedString("Opening", comment: "")
+        }
+        return linkedSemanticRecording == nil
+            ? NSLocalizedString("Open Review", comment: "")
+            : NSLocalizedString("Open Linked Review", comment: "")
+    }
+
+    private var macroReviewSummary: String {
+        if let linkedSemanticRecording {
+            return String(
+                format: NSLocalizedString("Open the semantic recording captured with %@. It includes %d timeline events and can still be replaced with a manual bundle.", comment: ""),
+                linkedSemanticRecording.macro.name,
+                linkedSemanticRecording.reference.eventCount
+            )
+        }
+        return NSLocalizedString("Open a semantic recording bundle for frame timeline, visual evidence, region selection, and review-only draft patch generation.", comment: "")
+    }
+
+    private var linkedSemanticRecording: (
+        macro: SavedMacro,
+        reference: MacroSemanticRecordingReference
+    )? {
+        guard let macroID = run.macroID ?? workflow.tasks.first(where: { $0.id == run.taskID })?.kind.macroID,
+              let macro = macros.first(where: { $0.id == macroID }),
+              let reference = macro.semanticRecording else {
+            return nil
+        }
+        return (macro, reference)
     }
 
     private var attemptSummary: String {
@@ -364,9 +402,22 @@ struct AutomationTaskRunDetailView: View {
     }
 
     private func openSemanticReview() {
+        if let linkedSemanticRecording {
+            openLinkedSemanticReview(linkedSemanticRecording)
+        } else {
+            chooseSemanticReviewBundle()
+        }
+    }
+
+    private func chooseSemanticReviewBundle() {
+        let requestedRunID = run.id
+        semanticReviewRequestRunID = requestedRunID
         isOpeningSemanticReview = true
         semanticReviewErrorMessage = ""
         SemanticRecordingReviewPresenter.openBundle { result in
+            guard semanticReviewRequestRunID == requestedRunID else {
+                return
+            }
             isOpeningSemanticReview = false
             switch result {
             case .success(let state):
@@ -377,6 +428,42 @@ struct AutomationTaskRunDetailView: View {
                     format: NSLocalizedString("Could not open Macro Review: %@", comment: ""),
                     String(describing: error)
                 )
+            }
+        }
+    }
+
+    private func openLinkedSemanticReview(
+        _ linked: (macro: SavedMacro, reference: MacroSemanticRecordingReference)
+    ) {
+        let requestedRunID = run.id
+        semanticReviewRequestRunID = requestedRunID
+        isOpeningSemanticReview = true
+        semanticReviewErrorMessage = ""
+        Task {
+            do {
+                let state = try await SemanticRecordingReviewPresenter.reviewState(
+                    from: linked.reference,
+                    sourceName: linked.macro.name
+                )
+                await MainActor.run {
+                    guard semanticReviewRequestRunID == requestedRunID else {
+                        return
+                    }
+                    isOpeningSemanticReview = false
+                    semanticReviewState = state
+                }
+            } catch {
+                await MainActor.run {
+                    guard semanticReviewRequestRunID == requestedRunID else {
+                        return
+                    }
+                    isOpeningSemanticReview = false
+                    semanticReviewState = nil
+                    semanticReviewErrorMessage = String(
+                        format: NSLocalizedString("Could not open linked Macro Review: %@", comment: ""),
+                        String(describing: error)
+                    )
+                }
             }
         }
     }
@@ -399,6 +486,7 @@ struct AutomationTaskRunDetailView: View {
         semanticReviewState = nil
         semanticReviewErrorMessage = ""
         isOpeningSemanticReview = false
+        semanticReviewRequestRunID = nil
     }
 }
 
