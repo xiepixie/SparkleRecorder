@@ -82,6 +82,27 @@ recording/
 
 `timeline.jsonl` is internal and complete. `events.jsonl` is filtered and safe for AI/CLI. `suppressed.jsonl` records withheld evidence counts/reasons, such as secure input, password fields, excluded apps, excluded domains, or over-size artifacts.
 
+## Core Contract v0
+
+S1 first pass exists in `Sources/SparkleRecorder/SemanticRecordingBundle.swift`.
+
+Current mapping:
+
+- `manifest.json` -> `SemanticRecordingBundle`
+- `video/segments.json` -> `RecordingVideoSegment`
+- `frames/index.jsonl` -> `RecordingFrameReference`
+- `timeline.jsonl` -> `RecordingTimelineEvent`
+- `events.jsonl` -> `RecordingSemanticEvent`
+- `ocr/observations.jsonl`, future AX/window/pattern observations -> `RecordingVisualObservation`
+- `suppressed.jsonl` -> `RecordingSuppressionRecord`
+- source template/baseline/OCR/pixel previews -> `RecordingSourcePreviewReference`
+- runtime last-sample/watched-region previews -> `RecordingRuntimeSampleReference`
+- source/runtime decision evidence -> `RecordingPreviewComparison`
+
+All local artifact pointers use `RecordingArtifactRef`, which accepts only safe relative paths. The core contract does not create files, run Vision, run ScreenCaptureKit, open previews, or copy visual assets; those stay in app-edge S2/S3 work.
+
+`SemanticRecordingFixture.checkoutBundle()` is the deterministic S1 fixture bundle for S2 API spikes, S3 Review UI prototypes and S4 CLI fixtures. It includes one `.mov` segment, event-aligned frames, semantic events, OCR/template observations, source/runtime preview refs, one comparison and one suppression record.
+
 ## Video Capture Policy
 
 Default capture should be useful without exploding storage:

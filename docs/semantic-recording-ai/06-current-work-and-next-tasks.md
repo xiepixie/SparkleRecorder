@@ -15,7 +15,7 @@ Owner：Recording / Workflow Evidence / AI CLI shared planning
 | Low-level recording | `RawInputEvent`、`RecordingEventPipeline`、`RecordingSessionProcessor` 已把 CGEvent 边界和纯 pipeline 分开 | Swift Testing 覆盖 pipeline/buffer/sampler/session processor | 还没有 event-aligned keyframe/video bundle |
 | Workflow runtime | reducer/effect/runtime/resource/player/condition/run history 已有 first pass | `AutomationReducerTests`、`AutomationOwnerBClientTests`、runtime/session tests | 还缺真实产品录屏证明 branch/evidence/UI 状态一致 |
 | Workflow AI draft | `sparkle.workflow.draft.v1` validate/simulate/dry-run/import/edit/patch 已有 first pass | Draft/import/runtime CLI tests | 还不能从 recording evidence 自动生成 draft |
-| Visual conditions | OCR/visual condition、visual assets、package-root retention、condition diagnostics payload 已有 first pass | Contract/reducer/view projection/OwnerB tests | template/baseline preview refs 还只是字符串/fixture，不是完整 source-frame 对照 |
+| Visual conditions | OCR/visual condition、visual assets、package-root retention、condition diagnostics payload 已有 first pass | Contract/reducer/view projection/OwnerB tests; `template-baseline-preview-refs.png` fixture renders source/runtime/decision from `SemanticRecordingBundle` | 最终 Review UI 仍需把录制帧、运行样本、score/diff 接进真实用户流程 |
 | Run evidence | Macro evidence presenter、condition artifact presenter、branch evidence first pass 已有 | Product fixture PNG + tests | live Open/Reveal、live visual capture、branch real-run consistency 还缺录屏 |
 | Context-only condition evidence | `previousOutcome`、external signal、manual approval 已通过 `AutomationConditionEvaluationEvidence.contextual` 生成 durable diagnostics | `AutomationOwnerBClientTests.contextualConditionEvaluatorUsesContextAndProviders` | UI 可展示，但还没有产品证据截图/录屏专门覆盖 |
 
@@ -26,8 +26,10 @@ Owner：Recording / Workflow Evidence / AI CLI shared planning
 - 已把 `AutomationConditionEvaluationEvidence` 的 context-only diagnostics 纳入 current status，避免未来只把 diagnostics 理解成 OCR/visual 截图。
 - 已完成 2026 Apple API 可行性核对并接受 macOS 15+ 产品基线：`SCRecordingOutput` 是默认完整 `.mov` 路径；同一录制生成 event-aligned keyframes 作为视觉索引；不规划 macOS 14 `AVAssetWriter` fallback；Vision 可提供 OCR/feature print/tracking primitives，但 pattern search 需要自有评分和 deterministic matcher。
 - 已新增 [08-parallel-workstreams.md](08-parallel-workstreams.md)，把下一阶段拆成 S0 Workflow Evidence、S1 Contract/Core、S2 App Capture/Visual Index、S3 Review UX、S4 CLI/AI/App Knowledge。
-- 已新增 [workstreams/s0-workflow-evidence.md](workstreams/s0-workflow-evidence.md) 作为 S0 工作台，并把 S0 对 S1 的 template/baseline preview refs 请求写入 [09-template-baseline-preview-refs.md](09-template-baseline-preview-refs.md)。
-- 尚未实现 semantic recording 代码；本轮是规划维护。
+- 已新增 [workstreams/s0-workflow-evidence.md](workstreams/s0-workflow-evidence.md) 作为 S0 工作台，并确认 S1 已接受 [09-template-baseline-preview-refs.md](09-template-baseline-preview-refs.md) 的 first-pass core contract；source/runtime/decision fixture 渲染证据已补，真实 Review UI 接线仍待补。
+- 已新增 `workflow product-evidence audit` 作为 S0 证据门禁；当前 smoke 为 9/13 required present，缺 4 个 live-product artifacts；live artifact 可用 `.mov` 或 `.mp4`，但严格门禁会校验同名 sidecar 的必填 capture labels。
+- 已新增 S1 core schema v0 first pass：`SemanticRecordingBundle`、video/keyframe/timeline/AI-safe event/visual observation/suppression/source preview/runtime sample/comparison/query/suggestion value types，以及 `SemanticRecordingFixture.checkoutBundle()` / query result / suggestion fixtures；测试覆盖 path safety、schema validation、fixture validation 和 preview comparison round trip。
+- 尚未实现 live ScreenCaptureKit capture、Vision/AX observation production、Review UI、Recording CLI command、retention/deletion policy 或 frame-to-`AutomationWorkflowDraftVisualAssets` asset copy。
 
 ## 2. Direction Decision
 
@@ -81,7 +83,7 @@ SparkleRecorder 的优势是本地确定性：录制事件、窗口/视觉证据
 | Branch evidence real-run recording | Core + UI | 用户需要相信 FlowGraph 走线和 Run Detail 原因一致 | 同一次 success/failure/timeout run 中，edge 状态、selected run、branchEvidence drill-in 一致 |
 | Macro evidence file-action recording | App + UI | 失败后用户第一件事是打开报告或截图 | Reveal Report / Open Screenshot 真实交互有 inline feedback |
 | Drag/reorder WYSIWYG recording | UI | 编排页面必须可用，preview 不能骗用户 | macro drag、task reorder、connector link 的 indicator 与 reducer mutation 一致 |
-| Template/baseline preview contract | S0 + S1 + App + UI | 字符串 refs 不够，用户要知道 ref 指向什么 | S0 已起草 [09-template-baseline-preview-refs.md](09-template-baseline-preview-refs.md)；S1 接受后 Run Detail 应可展示 recorded template/baseline、runtime sample、score/diff/fallback |
+| Template/baseline preview contract | S0 + S1 + App + UI | 字符串 refs 不够，用户要知道 ref 指向什么 | S1 已接受 first-pass core contract；S0 fixture artifact 已展示 source/runtime/decision；下一步需要真实 Run Detail/Review UI artifact 展示 recorded template/baseline、runtime sample、score/diff/fallback |
 | Resource/runtime product evidence | Core + UI | 等待资源、重试、超时要能被用户解释 | 多 workflow resource queue、max wait、handoff status readback 有产品证据 |
 
 Do not start video bundle implementation before Bridge A has at least live evidence clips for visual diagnostics and branch evidence. Otherwise semantic recording will inherit an untrusted evidence UI.
@@ -184,12 +186,12 @@ Recommended order from here:
 
 1. Product evidence: live visual diagnostics Open/Reveal recording.
 2. Product evidence: real branch evidence consistency recording.
-3. S0/S1 contract note: finish acceptance of [09-template-baseline-preview-refs.md](09-template-baseline-preview-refs.md) for template/baseline source-frame/runtime-sample comparison.
-4. API spike: target-window/display `.mov` capture through `SCRecordingOutput` plus event-aligned keyframes, with fake capture clients for tests.
-5. Core schema draft: `SemanticRecordingBundle` v0 with video segments, keyframe refs and macOS 15+ product baseline.
-6. Tests: fake event-frame alignment and safe ref normalization.
+3. API spike: target-window/display `.mov` capture through `SCRecordingOutput` plus event-aligned keyframes, with fake capture clients for tests.
+4. Fixture Review UI: open a `SemanticRecordingBundle` fixture and render frame/source/runtime/comparison states without live capture.
+5. CLI prototype: `recording show` and `recording frames` against a fixture bundle.
+6. Asset mapping note: define frame crop -> `AutomationWorkflowDraftVisualAssets` copy semantics before implementing frame-to-condition.
 7. UI prototype: Macro Review frame strip for existing macro package fixtures.
-8. CLI prototype: `recording show` and `recording frames` against fixture bundle.
+8. Frame-to-condition design note: define the first user-reviewed conversion flow for OCR wait, image appeared/disappeared, region changed and pixel matched.
 
 This sequence keeps the project grounded: every new AI-facing capability starts from evidence a user can see.
 

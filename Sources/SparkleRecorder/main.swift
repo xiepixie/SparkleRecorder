@@ -54,6 +54,28 @@ private func runWorkflowCLI(_ args: [String]) -> Never {
             exit(Int32(exitCode))
         }
 
+        if workflowArgs.count >= 2,
+           workflowArgs[0] == "product-evidence",
+           workflowArgs[1] == "audit" {
+            let exitCode = try runWorkflowProductEvidenceAudit(
+                Array(workflowArgs.dropFirst(2)),
+                command: "workflow product-evidence audit",
+                wantsJSON: wantsJSON
+            )
+            exit(Int32(exitCode))
+        }
+
+        if workflowArgs.count >= 2,
+           workflowArgs[0] == "product-evidence",
+           workflowArgs[1] == "sidecar-template" {
+            let exitCode = try runWorkflowProductEvidenceSidecarTemplate(
+                Array(workflowArgs.dropFirst(2)),
+                command: "workflow product-evidence sidecar-template",
+                wantsJSON: wantsJSON
+            )
+            exit(Int32(exitCode))
+        }
+
         if workflowArgs[0] == "macros" {
             let exitCode = try runWorkflowMacros(
                 Array(workflowArgs.dropFirst()),
@@ -317,7 +339,7 @@ private func runWorkflowProductEvidenceSnapshot(
           !scenarioArgument.hasPrefix("--") else {
         throw WorkflowCLIError(
             "missingArgument",
-                "Expected a snapshot scenario: idle, drag-link-authoring, task-reorder-authoring, running, failed-run-detail, failed-run-preview-unavailable, visual-diagnostics-drill-in, or branch-evidence."
+                "Expected a snapshot scenario: idle, drag-link-authoring, task-reorder-authoring, running, failed-run-detail, failed-run-preview-unavailable, visual-diagnostics-drill-in, branch-evidence, or template-baseline-preview-refs."
         )
     }
 
@@ -397,6 +419,176 @@ private func runWorkflowProductEvidenceSnapshot(
         ))
     }
     return 0
+}
+
+private func runWorkflowProductEvidenceAudit(
+    _ arguments: [String],
+    command: String,
+    wantsJSON: Bool
+) throws -> Int {
+    var directoryURL = URL(fileURLWithPath: AutomationProductEvidenceAudit.defaultDirectory, isDirectory: true)
+    var requireLive = false
+    var index = 0
+
+    while index < arguments.count {
+        let token = arguments[index]
+        switch token {
+        case "--json":
+            break
+        case "--require-live":
+            requireLive = true
+        case "--directory":
+            guard index + 1 < arguments.count else {
+                throw WorkflowCLIError("missingArgument", "--directory requires a path.", path: token)
+            }
+            directoryURL = URL(fileURLWithPath: arguments[index + 1], isDirectory: true)
+            index += 1
+        default:
+            if token.hasPrefix("--") {
+                throw WorkflowCLIError("unsupportedOption", "Unsupported option '\(token)'.", path: token)
+            }
+            throw WorkflowCLIError("unexpectedArgument", "Unexpected argument '\(token)'.", path: token)
+        }
+        index += 1
+    }
+
+    let resolvedDirectoryURL = directoryURL.standardizedFileURL
+    let existingPaths = try productEvidenceExistingPaths(in: resolvedDirectoryURL)
+    let sidecarContents = try productEvidenceSidecarContents(
+        in: resolvedDirectoryURL,
+        existingPaths: existingPaths
+    )
+    let payload = AutomationProductEvidenceAudit.evaluate(
+        directory: resolvedDirectoryURL.path,
+        existingPaths: existingPaths,
+        sidecarContents: sidecarContents
+    )
+    let missingMessages = payload.items
+        .filter { $0.required && !$0.satisfied }
+        .map { item in
+            AutomationCLIMessage(
+                code: "missingProductEvidence",
+                message: "\(item.title) is not yet backed by the expected product-evidence files and sidecar content.",
+                path: item.id
+            )
+        }
+    let nextActions = [
+        AutomationCLINextAction(
+            command: "Record missing live artifacts and add same-name .md sidecars under docs/workflow-page-productization/product-evidence/",
+            reason: "S0 live-product checklist items stay unchecked until real App evidence exists."
+        ),
+        AutomationCLINextAction(
+            command: "SparkleRecorder workflow product-evidence audit --require-live --json",
+            reason: "Use the strict audit gate before claiming S0 Workflow Evidence Closure."
+        )
+    ]
+    let envelope = AutomationCLIResultEnvelope<AutomationProductEvidenceAuditPayload>(
+        ok: !requireLive || payload.allRequiredPresent,
+        command: command,
+        data: payload,
+        warnings: requireLive ? [] : missingMessages,
+        errors: requireLive ? missingMessages : [],
+        nextActions: payload.allRequiredPresent ? [] : nextActions
+    )
+
+    if wantsJSON {
+        writeWorkflowJSON(envelope)
+    } else {
+        let summary = "SparkleRecorder: product evidence audit \(payload.satisfiedRequiredCount)/\(payload.requiredCount) required items present."
+        FileHandle.standardOutput.write(Data((summary + "\n").utf8))
+        if !payload.missingRequiredIDs.isEmpty {
+            FileHandle.standardOutput.write(Data(("Missing required evidence: \(payload.missingRequiredIDs.joined(separator: ", "))\n").utf8))
+        }
+    }
+
+    return requireLive && !payload.allRequiredPresent ? 1 : 0
+}
+
+private func runWorkflowProductEvidenceSidecarTemplate(
+    _ arguments: [String],
+    command: String,
+    wantsJSON: Bool
+) throws -> Int {
+    guard let id = arguments.first,
+          !id.hasPrefix("--") else {
+        throw WorkflowCLIError(
+            "missingArgument",
+            "Expected a live product evidence id, such as 'live-visual-diagnostics-open-reveal'."
+        )
+    }
+
+    var sidecarPath: String?
+    var index = 1
+    while index < arguments.count {
+        let token = arguments[index]
+        switch token {
+        case "--json":
+            break
+        case "--sidecar":
+            guard index + 1 < arguments.count else {
+                throw WorkflowCLIError("missingArgument", "--sidecar requires a .md filename.", path: token)
+            }
+            sidecarPath = arguments[index + 1]
+            index += 1
+        default:
+            if token.hasPrefix("--") {
+                throw WorkflowCLIError("unsupportedOption", "Unsupported option '\(token)'.", path: token)
+            }
+            throw WorkflowCLIError("unexpectedArgument", "Unexpected argument '\(token)'.", path: token)
+        }
+        index += 1
+    }
+
+    guard let payload = AutomationProductEvidenceAudit.liveSidecarTemplate(
+        id: id,
+        sidecarPath: sidecarPath
+    ) else {
+        throw WorkflowCLIError(
+            "unsupportedProductEvidence",
+            "No live sidecar template is defined for '\(id)'.",
+            path: id
+        )
+    }
+
+    let envelope = AutomationCLIResultEnvelope<AutomationProductEvidenceSidecarTemplatePayload>(
+        ok: true,
+        command: command,
+        data: payload,
+        nextActions: [
+            AutomationCLINextAction(
+                command: "Save the filled sidecar next to the live clip, then run workflow product-evidence audit --require-live --json",
+                reason: "Strict S0 audit requires the clip and sidecar fields before the gate can close."
+            )
+        ]
+    )
+
+    if wantsJSON {
+        writeWorkflowJSON(envelope)
+    } else {
+        FileHandle.standardOutput.write(Data((payload.template + "\n").utf8))
+    }
+    return 0
+}
+
+private func productEvidenceExistingPaths(in directoryURL: URL) throws -> Set<String> {
+    var isDirectory: ObjCBool = false
+    guard FileManager.default.fileExists(atPath: directoryURL.path, isDirectory: &isDirectory),
+          isDirectory.boolValue else {
+        return []
+    }
+    return Set(try FileManager.default.contentsOfDirectory(atPath: directoryURL.path))
+}
+
+private func productEvidenceSidecarContents(
+    in directoryURL: URL,
+    existingPaths: Set<String>
+) throws -> [String: String] {
+    var contents: [String: String] = [:]
+    for path in existingPaths where path.hasSuffix(".md") {
+        let url = directoryURL.appendingPathComponent(path, isDirectory: false)
+        contents[path] = try String(contentsOf: url, encoding: .utf8)
+    }
+    return contents
 }
 
 private func parsePositiveDoubleOption(

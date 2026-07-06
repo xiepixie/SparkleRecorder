@@ -142,6 +142,20 @@ Evidence references should be stable, relative, and safe:
 }
 ```
 
+S1 first pass gives S4 these shared value types before command implementation:
+
+- `RecordingQueryResult`
+- `RecordingSuggestion`
+- `RecordingEvidenceReference`
+- `RecordingArtifactRef`
+- `RecordingFrameReference`
+- `RecordingVisualObservation`
+- `RecordingPreviewComparison`
+
+S4 should wrap these in the existing `sparkle.cli.result.v1` envelope pattern rather than inventing a recording-only result schema. CLI outputs should cite ids and safe artifact refs by default; exporting image bytes or frame crops should remain an explicit command.
+
+S1 also provides `SemanticRecordingFixture.checkoutQueryResults()` and `SemanticRecordingFixture.checkoutSuggestions()` so first CLI fixtures can validate envelope shape and evidence citation before live recording storage exists.
+
 ## Token Strategy
 
 The local CLI should do the heavy lifting:

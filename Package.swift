@@ -184,6 +184,7 @@ let package = Package(
                 "WindowContextClient.swift",
                 "EventPosterClient.swift",
                 "AutomationCLIResult.swift",
+                "AutomationProductEvidenceAudit.swift",
                 "AutomationContract.swift",
                 "AutomationScheduleOccurrence.swift",
                 "AutomationWorkflowDraft.swift",
@@ -234,6 +235,8 @@ let package = Package(
                 "CoordinateMapper.swift",
                 "SurfaceMatcher.swift",
                 "RecordingSurfaceRegistry.swift",
+                "SemanticRecordingBundle.swift",
+                "SemanticRecordingFixture.swift",
                 "RunEvidence.swift"
             ],
             resources: [
@@ -268,6 +271,7 @@ let package = Package(
                 "WindowContextClient.swift",
                 "EventPosterClient.swift",
                 "AutomationCLIResult.swift",
+                "AutomationProductEvidenceAudit.swift",
                 "AutomationContract.swift",
                 "AutomationScheduleOccurrence.swift",
                 "AutomationWorkflowDraft.swift",
@@ -318,6 +322,8 @@ let package = Package(
                 "CoordinateMapper.swift",
                 "SurfaceMatcher.swift",
                 "RecordingSurfaceRegistry.swift",
+                "SemanticRecordingBundle.swift",
+                "SemanticRecordingFixture.swift",
                 "RunEvidence.swift"
             ],
             resources: [

@@ -1,7 +1,7 @@
 # Template And Baseline Preview Refs
 
 更新时间：2026-07-06
-状态：S0 -> S1 interface request draft
+状态：S1 accepted first-pass core contract
 Requesting owner：S0 Workflow Evidence Closure
 Target owner：S1 Contract And Core Schema
 
@@ -122,7 +122,7 @@ The contract is accepted when S1 can provide fixture values proving:
 - missing/unreadable/unsafe refs have explicit states, not silent empty UI
 - the same refs can be cited by CLI/AI suggestions without embedding image bytes by default
 
-S0 will keep the semantic checklist item unchecked until S1 accepts this contract and at least one fixture or product evidence artifact renders the source-reference/runtime-sample/decision shape.
+S0 marked the fixture-level semantic checklist item complete after S1 accepted this contract and `docs/workflow-page-productization/product-evidence/template-baseline-preview-refs.png` rendered the source-reference/runtime-sample/decision shape. The user-facing Review/Run Detail integration remains open for S3.
 
 ## 6. Open Questions For S1
 
@@ -130,3 +130,24 @@ S0 will keep the semantic checklist item unchecked until S1 accepts this contrac
 - Should `contentDigest` be required for all image artifacts, or only for package-local assets?
 - Should matcher version be a string owned by S1 or a provider-specific field owned by S2?
 - How should privacy/suppression records hide source previews while still keeping the condition understandable?
+
+## 7. S1 Response
+
+Accepted in first-pass core schema v0:
+
+- source preview refs map to `RecordingSourcePreviewReference`
+- runtime sample refs map to `RecordingRuntimeSampleReference`
+- decision payloads map to `RecordingPreviewComparison`
+- matcher identity maps to `RecordingMatcherDescriptor`
+- outcomes map to `RecordingPreviewComparisonOutcome`
+- safe paths map to `RecordingArtifactRef`
+- missing/unreadable/deferred states are explicit validation or comparison outcomes
+
+Open-question answers for v0:
+
+- Source preview refs live in `SemanticRecordingBundle` first. Workflow packages may later persist copied source previews, but they should preserve the same stable ids and safe relative artifact refs instead of creating UI-only ids.
+- `contentDigest` is optional in v0. S2/S3 should provide it when copying package-local image assets or when stale/missing diagnostics need content identity.
+- Matcher version is a S1 value field (`RecordingMatcherDescriptor.kind/version/provider`). S2 owns the actual matcher implementation and version values.
+- Suppressed evidence should keep a `RecordingSuppressionRecord` with reason/count/redacted ref when available. UI/CLI should render “withheld because ...” rather than silently dropping the source preview.
+
+Verification: `SemanticRecordingBundleTests.previewRefsRoundTripSourceRuntimeSampleAndComparisonSemantics` proves the requested source/runtime/comparison shape round-trips through a bundle fixture.

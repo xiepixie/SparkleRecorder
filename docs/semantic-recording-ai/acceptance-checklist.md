@@ -13,23 +13,28 @@
 - [ ] Capture real Open/Reveal interactions for visual diagnostic artifacts through the app-edge presenter.
 - [ ] Capture real Reveal Report / Open Screenshot interactions for macro run evidence.
 - [ ] Capture real branch evidence drill-in consistency: FlowGraph edge state, selected run row, and Run Detail durable branch evidence agree.
-- [ ] Accept template/baseline preview refs as source-frame/runtime-sample evidence, not just string fields. Draft request: [09-template-baseline-preview-refs.md](09-template-baseline-preview-refs.md).
+- [x] Accept template/baseline preview refs as source-frame/runtime-sample evidence, not just string fields. Accepted contract: [09-template-baseline-preview-refs.md](09-template-baseline-preview-refs.md), [workstreams/s1-contract-core.md](workstreams/s1-contract-core.md).
+- [x] Render template/baseline source-frame/runtime-sample/decision evidence in a fixture artifact before claiming the fixture-level preview-ref handoff complete. Evidence: `docs/workflow-page-productization/product-evidence/template-baseline-preview-refs.png` and `.md`.
+- [ ] Render the same source-frame/runtime-sample/decision evidence inside the real Macro Review or Run Detail UI before claiming the user-facing preview-ref experience complete.
 - [ ] Capture real drag/reorder or drag-link clip proving indicator and reducer mutation match.
 - [ ] Keep fixture evidence sidecars explicit about what is fixture-proven versus live-product-proven.
 - [ ] Keep `06-current-work-and-next-tasks.md` updated whenever evidence status, owner boundary, accepted contract, or immediate next slice changes.
 - [ ] Keep [workstreams/s0-workflow-evidence.md](workstreams/s0-workflow-evidence.md) updated while S0 is active.
+- [ ] `workflow product-evidence audit --require-live --json` passes before S0 Workflow Evidence Closure is claimed.
 
 ## Phase 0: Contract Freeze
 
-- [ ] Confirm S1/S2/S3/S4 owner boundaries from `08-parallel-workstreams.md` before implementation PRs split.
-- [ ] Define `SemanticRecordingBundle` schema.
-- [ ] Define `RecordingFrameReference`, `RecordingVisualObservation`, `RecordingSemanticEvent`.
-- [ ] Define private `timeline.jsonl`, AI-safe `events.jsonl`, and `suppressed.jsonl` boundaries.
-- [ ] Define Apple API policy: macOS 15+ baseline, default `SCRecordingOutput` video, event-aligned keyframes, no macOS 14 fallback.
+- [x] Confirm S1/S2/S3/S4 owner boundaries from `08-parallel-workstreams.md` before implementation PRs split.
+- [x] Define `SemanticRecordingBundle` schema.
+- [x] Define `RecordingFrameReference`, `RecordingVisualObservation`, `RecordingSemanticEvent`.
+- [x] Define private `timeline.jsonl`, AI-safe `events.jsonl`, and `suppressed.jsonl` boundaries.
+- [x] Define Apple API policy: macOS 15+ baseline, default `SCRecordingOutput` video, event-aligned keyframes, no macOS 14 fallback.
+- [x] Provide deterministic semantic recording fixture bundle/query/suggestion shape for S2/S3/S4 prototypes.
 - [ ] Define recording retention and deletion policy.
-- [ ] Update format/versioning docs when schema is accepted.
+- [x] Update format/versioning docs when schema is accepted.
 - [ ] Define how frame-derived image/baseline/OCR/pixel assets map into existing `AutomationWorkflowDraftVisualAssets`.
-- [ ] Define safe relative artifact refs and presenter boundaries shared with Workflow run evidence.
+- [x] Define safe relative artifact refs shared with Workflow run evidence.
+- [ ] Define app-edge presenter integration for semantic recording preview refs.
 
 ## Phase 1: Video And Keyframes
 

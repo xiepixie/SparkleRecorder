@@ -8,6 +8,7 @@
 ## Files
 
 - [s0-workflow-evidence.md](s0-workflow-evidence.md)：S0 Workflow Evidence Closure，负责把现有 Workflow 证据闭环补到可被用户信任，并向 S1 提供 preview/ref 合同需求。
+- [s1-contract-core.md](s1-contract-core.md)：S1 Contract And Core Schema，负责 semantic recording bundle、safe refs、timeline/events/suppression、S0 preview comparison 合同和 S2/S3/S4 fixture bundle。
 
 ## Collaboration Rules
 

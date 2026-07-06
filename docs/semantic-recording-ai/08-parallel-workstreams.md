@@ -22,8 +22,9 @@ Owner：Semantic Recording program coordination
 | `06-current-work-and-next-tasks.md` | Execution ledger | 当前任务账本、立即顺序、过度设计审计 |
 | `07-apple-api-implementation-path.md` | API feasibility | macOS 15+ `SCRecordingOutput` 默认视频路径、Vision/AX 路线 |
 | `08-parallel-workstreams.md` | Work split | 本文件，并行 owner 和接口边界 |
-| `09-template-baseline-preview-refs.md` | Interface request draft | S0 对 S1 的 source-frame/runtime-sample preview refs 需求 |
+| `09-template-baseline-preview-refs.md` | Accepted interface contract | S0 对 S1 的 source-frame/runtime-sample preview refs 需求；S1 已接受 first-pass core contract |
 | `workstreams/s0-workflow-evidence.md` | Active workstream | S0 当前任务、证据缺口、S1 接口请求和实施日志 |
+| `workstreams/s1-contract-core.md` | Active workstream | S1 core schema v0、safe refs、timeline/events/suppression 和 preview comparison 合同 |
 | `acceptance-checklist.md` | Acceptance | 只记录可验收事实，不把规划当完成 |
 
 已接受的产品基线：
@@ -54,7 +55,7 @@ S4 CLI AI And App Knowledge
   -> exposes low-token queries, suggestions, draft generation and later app knowledge
 ```
 
-S1 and S2 may spike in parallel after this planning commit. S3 should begin with fixtures from S1 before depending on live capture. S4 should wait for bundle fixtures and stable query contracts before implementing user-facing commands.
+S1 core schema v0 has a first pass; S2 may now spike live capture against that contract. S3 should begin with fixtures from S1 before depending on live capture. S4 should wait for bundle fixtures and stable query contracts before implementing user-facing commands.
 
 ## S0 Workflow Evidence Closure
 
@@ -109,9 +110,9 @@ Does not own:
 
 Deliverables:
 
-- core value types and Codable fixtures
-- tests for ID stability, path safety, schema versioning and event/frame/video alignment
-- contract notes in `01-video-recording-bundle.md`, `03-cli-ai-contract.md` and `acceptance-checklist.md`
+- core value types and Codable fixtures: first pass implemented in `Sources/SparkleRecorder/SemanticRecordingBundle.swift` and `Sources/SparkleRecorder/SemanticRecordingFixture.swift`
+- tests for ID stability, path safety, schema versioning and event/frame/video alignment: first pass in `SemanticRecordingBundleTests`
+- contract notes in `01-video-recording-bundle.md`, `03-cli-ai-contract.md`, [workstreams/s1-contract-core.md](workstreams/s1-contract-core.md) and `acceptance-checklist.md`
 
 ## S2 App Capture And Visual Index
 
@@ -236,7 +237,7 @@ Phase 0 semantic recording contract + macOS 15 ScreenCaptureKit API spike
 
 Minimum accepted result:
 
-- S1 defines bundle v0 and fixtures.
+- S1 bundle v0 contract remains green and fixture-backed through `SemanticRecordingFixture.checkoutBundle()`.
 - S2 proves one `.mov` plus event-aligned keyframes.
 - S3 can open a fixture review timeline.
 - S4 can run `recording show` / `recording frames` against a fixture bundle.

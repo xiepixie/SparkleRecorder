@@ -11,6 +11,7 @@ enum AutomationProductEvidenceSnapshotScenario: String, CaseIterable {
     case failedRunPreviewUnavailable = "failed-run-preview-unavailable"
     case visualDiagnostics = "visual-diagnostics-drill-in"
     case branchEvidence = "branch-evidence"
+    case templateBaselinePreviewRefs = "template-baseline-preview-refs"
 
     init?(argument: String) {
         switch argument {
@@ -30,6 +31,8 @@ enum AutomationProductEvidenceSnapshotScenario: String, CaseIterable {
             self = .visualDiagnostics
         case "branch", "branch-evidence", "branch-evidence-drill-in":
             self = .branchEvidence
+        case "template-baseline-preview-refs", "preview-refs", "semantic-preview-refs":
+            self = .templateBaselinePreviewRefs
         default:
             return nil
         }
@@ -53,6 +56,8 @@ enum AutomationProductEvidenceSnapshotScenario: String, CaseIterable {
             return "visual-diagnostics-drill-in.png"
         case .branchEvidence:
             return "branch-evidence-drill-in.png"
+        case .templateBaselinePreviewRefs:
+            return "template-baseline-preview-refs.png"
         }
     }
 
@@ -62,6 +67,8 @@ enum AutomationProductEvidenceSnapshotScenario: String, CaseIterable {
             return 1_560
         case .branchEvidence:
             return 1_120
+        case .templateBaselinePreviewRefs:
+            return 980
         case .idle, .dragLinkAuthoring, .taskReorderAuthoring, .running:
             return 940
         }
@@ -81,6 +88,8 @@ enum AutomationProductEvidenceSnapshotScenario: String, CaseIterable {
             return Self.fixedUUID("00000000-0000-0000-0000-00000000c20b")
         case .branchEvidence:
             return Self.fixedUUID("00000000-0000-0000-0000-00000000c206")
+        case .templateBaselinePreviewRefs:
+            return nil
         }
     }
 
@@ -92,7 +101,7 @@ enum AutomationProductEvidenceSnapshotScenario: String, CaseIterable {
             return Self.fixedUUID("00000000-0000-0000-0000-00000000c40c")
         case .branchEvidence:
             return Self.fixedUUID("00000000-0000-0000-0000-00000000c406")
-        case .idle, .dragLinkAuthoring, .taskReorderAuthoring, .running:
+        case .idle, .dragLinkAuthoring, .taskReorderAuthoring, .running, .templateBaselinePreviewRefs:
             return nil
         }
     }
@@ -103,6 +112,8 @@ enum AutomationProductEvidenceSnapshotScenario: String, CaseIterable {
             return Self.fixedUUID("00000000-0000-0000-0000-00000000c202")
         case .idle, .taskReorderAuthoring, .running, .failedRunDetail, .failedRunPreviewUnavailable, .visualDiagnostics, .branchEvidence:
             return nil
+        case .templateBaselinePreviewRefs:
+            return nil
         }
     }
 
@@ -112,6 +123,8 @@ enum AutomationProductEvidenceSnapshotScenario: String, CaseIterable {
             return .onConditionMatched
         case .idle, .taskReorderAuthoring, .running, .failedRunDetail, .failedRunPreviewUnavailable, .visualDiagnostics, .branchEvidence:
             return .onSuccess
+        case .templateBaselinePreviewRefs:
+            return .onSuccess
         }
     }
 
@@ -119,7 +132,8 @@ enum AutomationProductEvidenceSnapshotScenario: String, CaseIterable {
         switch self {
         case .failedRunDetail, .failedRunPreviewUnavailable:
             return true
-        case .idle, .dragLinkAuthoring, .taskReorderAuthoring, .running, .visualDiagnostics, .branchEvidence:
+        case .idle, .dragLinkAuthoring, .taskReorderAuthoring, .running, .visualDiagnostics, .branchEvidence,
+             .templateBaselinePreviewRefs:
             return false
         }
     }
@@ -128,7 +142,8 @@ enum AutomationProductEvidenceSnapshotScenario: String, CaseIterable {
         switch self {
         case .failedRunPreviewUnavailable:
             return "fixture-macros-preview-unavailable"
-        case .idle, .dragLinkAuthoring, .taskReorderAuthoring, .running, .failedRunDetail, .visualDiagnostics, .branchEvidence:
+        case .idle, .dragLinkAuthoring, .taskReorderAuthoring, .running, .failedRunDetail, .visualDiagnostics,
+             .branchEvidence, .templateBaselinePreviewRefs:
             return "fixture-macros"
         }
     }
@@ -141,7 +156,7 @@ enum AutomationProductEvidenceSnapshotScenario: String, CaseIterable {
                 insertionIndex: 1
             )
         case .idle, .dragLinkAuthoring, .running, .failedRunDetail,
-             .failedRunPreviewUnavailable, .visualDiagnostics, .branchEvidence:
+             .failedRunPreviewUnavailable, .visualDiagnostics, .branchEvidence, .templateBaselinePreviewRefs:
             return nil
         }
     }
@@ -155,7 +170,7 @@ enum AutomationProductEvidenceSnapshotScenario: String, CaseIterable {
         case .failedRunDetail:
             return .succeeded(.revealReport)
         case .idle, .dragLinkAuthoring, .taskReorderAuthoring, .running,
-             .failedRunPreviewUnavailable, .visualDiagnostics, .branchEvidence:
+             .failedRunPreviewUnavailable, .visualDiagnostics, .branchEvidence, .templateBaselinePreviewRefs:
             return nil
         }
     }
@@ -165,7 +180,7 @@ enum AutomationProductEvidenceSnapshotScenario: String, CaseIterable {
         case .visualDiagnostics:
             return ["regionSampleImage": .succeeded(.reveal)]
         case .idle, .dragLinkAuthoring, .taskReorderAuthoring, .running,
-             .failedRunDetail, .failedRunPreviewUnavailable, .branchEvidence:
+             .failedRunDetail, .failedRunPreviewUnavailable, .branchEvidence, .templateBaselinePreviewRefs:
             return [:]
         }
     }
@@ -197,6 +212,326 @@ enum AutomationProductEvidenceSnapshotScenario: String, CaseIterable {
     }
 }
 
+private struct SemanticRecordingPreviewRefsEvidenceView: View {
+    let bundle: SemanticRecordingBundle
+
+    private var source: RecordingSourcePreviewReference? {
+        bundle.sourcePreviews.first { $0.id == SemanticRecordingFixture.sourceOCRRefID } ??
+            bundle.sourcePreviews.first
+    }
+
+    private var template: RecordingSourcePreviewReference? {
+        bundle.sourcePreviews.first { $0.kind == .imageTemplate }
+    }
+
+    private var runtimeSample: RecordingRuntimeSampleReference? {
+        bundle.runtimeSamples.first
+    }
+
+    private var comparison: RecordingPreviewComparison? {
+        bundle.previewComparisons.first
+    }
+
+    var body: some View {
+        ZStack {
+            Color(red: 0.10, green: 0.12, blue: 0.13)
+                .ignoresSafeArea()
+
+            VStack(alignment: .leading, spacing: 24) {
+                header
+
+                if let source, let runtimeSample, let comparison {
+                    HStack(alignment: .top, spacing: 18) {
+                        previewCard(
+                            title: "Source Reference",
+                            subtitle: source.label ?? source.kind.rawValue,
+                            accent: Color(red: 0.34, green: 0.72, blue: 0.95),
+                            previewTitle: "Recorded frame crop",
+                            previewDetail: source.artifactRef?.path ?? "No source artifact",
+                            rows: [
+                                ("Kind", source.kind.rawValue),
+                                ("Frame", shortID(source.frameID)),
+                                ("Event", shortID(source.eventID)),
+                                ("Bounds", formattedBounds(source.bounds)),
+                                ("Image", formattedImageSize(source.imageSize)),
+                                ("Digest", source.contentDigest?.value ?? "not set")
+                            ]
+                        )
+
+                        previewCard(
+                            title: "Runtime Sample",
+                            subtitle: runtimeSample.kind.rawValue,
+                            accent: Color(red: 0.48, green: 0.76, blue: 0.52),
+                            previewTitle: "Last watched region",
+                            previewDetail: runtimeSample.artifactRef.path,
+                            rows: [
+                                ("Run", shortID(runtimeSample.runID)),
+                                ("Task", shortID(runtimeSample.taskID)),
+                                ("Condition", shortID(runtimeSample.conditionID)),
+                                ("Bounds", formattedBounds(runtimeSample.bounds)),
+                                ("Image", formattedImageSize(runtimeSample.imageSize)),
+                                ("Digest", runtimeSample.contentDigest?.value ?? "not set")
+                            ]
+                        )
+
+                        decisionCard(comparison)
+                    }
+
+                    lowerRail(source: source, runtimeSample: runtimeSample, comparison: comparison)
+                } else {
+                    missingFixture
+                }
+            }
+            .padding(42)
+        }
+    }
+
+    private var header: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Template / Baseline Preview References")
+                .font(.system(size: 34, weight: .semibold))
+                .foregroundStyle(.white)
+            Text("Fixture evidence for the accepted S0 -> S1 contract: source reference, runtime sample, and comparison decision render together from a SemanticRecordingBundle value model.")
+                .font(.system(size: 15, weight: .medium))
+                .foregroundStyle(Color.white.opacity(0.64))
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    private var missingFixture: some View {
+        Text("Semantic recording fixture is missing source, runtime, or comparison references.")
+            .font(.system(size: 17, weight: .semibold))
+            .foregroundStyle(Color(red: 1.00, green: 0.50, blue: 0.58))
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(18)
+            .background(Color.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 8))
+    }
+
+    private func decisionCard(_ comparison: RecordingPreviewComparison) -> some View {
+        VStack(alignment: .leading, spacing: 18) {
+            cardHeader(
+                title: "Decision",
+                subtitle: comparison.outcome.rawValue,
+                accent: Color(red: 1.00, green: 0.72, blue: 0.30)
+            )
+
+            VStack(alignment: .leading, spacing: 8) {
+                HStack(alignment: .lastTextBaseline) {
+                    Text(formattedPercent(comparison.score))
+                        .font(.system(size: 36, weight: .semibold))
+                        .foregroundStyle(.white)
+                    Text("score")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(Color.white.opacity(0.56))
+                    Spacer()
+                    Text("threshold \(formattedPercent(comparison.threshold))")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(Color.white.opacity(0.70))
+                }
+
+                GeometryReader { proxy in
+                    ZStack(alignment: .leading) {
+                        Capsule().fill(Color.white.opacity(0.10))
+                        Capsule()
+                            .fill(Color(red: 1.00, green: 0.72, blue: 0.30).opacity(0.85))
+                            .frame(width: proxy.size.width * CGFloat(clampedScore(comparison.score)))
+                    }
+                }
+                .frame(height: 8)
+            }
+
+            detailRows([
+                ("Matcher", "\(comparison.matcher.kind) \(comparison.matcher.version)"),
+                ("Provider", comparison.matcher.provider ?? "not set"),
+                ("Source ref", shortID(comparison.sourcePreviewRefID)),
+                ("Runtime ref", shortID(comparison.runtimeSampleRefID)),
+                ("Diff", comparison.diffArtifactRef?.path ?? "not set"),
+                ("Reason", comparison.reason ?? "not set")
+            ])
+        }
+        .padding(20)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .background(Color.white.opacity(0.055), in: RoundedRectangle(cornerRadius: 8))
+        .overlay(
+            RoundedRectangle(cornerRadius: 8)
+                .stroke(Color.white.opacity(0.09), lineWidth: 1)
+        )
+    }
+
+    private func previewCard(
+        title: String,
+        subtitle: String,
+        accent: Color,
+        previewTitle: String,
+        previewDetail: String,
+        rows: [(String, String)]
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 18) {
+            cardHeader(title: title, subtitle: subtitle, accent: accent)
+            previewBox(title: previewTitle, detail: previewDetail, accent: accent)
+            detailRows(rows)
+        }
+        .padding(20)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .background(Color.white.opacity(0.055), in: RoundedRectangle(cornerRadius: 8))
+        .overlay(
+            RoundedRectangle(cornerRadius: 8)
+                .stroke(Color.white.opacity(0.09), lineWidth: 1)
+        )
+    }
+
+    private func cardHeader(title: String, subtitle: String, accent: Color) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 10) {
+            Circle()
+                .fill(accent)
+                .frame(width: 9, height: 9)
+            VStack(alignment: .leading, spacing: 4) {
+                Text(title)
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundStyle(.white)
+                Text(subtitle)
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(Color.white.opacity(0.58))
+            }
+        }
+    }
+
+    private func previewBox(title: String, detail: String, accent: Color) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Text(title)
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(.white)
+                Spacer()
+                Text("safe ref")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(accent)
+            }
+
+            ZStack(alignment: .bottomLeading) {
+                RoundedRectangle(cornerRadius: 7)
+                    .fill(
+                        LinearGradient(
+                            colors: [Color.white.opacity(0.08), Color.white.opacity(0.035)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                RoundedRectangle(cornerRadius: 7)
+                    .stroke(accent.opacity(0.42), lineWidth: 1)
+                Text(detail)
+                    .font(.system(size: 12, weight: .medium, design: .monospaced))
+                    .foregroundStyle(Color.white.opacity(0.68))
+                    .lineLimit(2)
+                    .padding(12)
+            }
+            .frame(height: 148)
+        }
+    }
+
+    private func detailRows(_ rows: [(String, String)]) -> some View {
+        VStack(alignment: .leading, spacing: 9) {
+            ForEach(rows, id: \.0) { row in
+                HStack(alignment: .firstTextBaseline, spacing: 12) {
+                    Text(row.0)
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(Color.white.opacity(0.48))
+                        .frame(width: 74, alignment: .leading)
+                    Text(row.1)
+                        .font(.system(size: 12, weight: .medium, design: .monospaced))
+                        .foregroundStyle(Color.white.opacity(0.76))
+                        .lineLimit(2)
+                    Spacer(minLength: 0)
+                }
+            }
+        }
+    }
+
+    private func lowerRail(
+        source: RecordingSourcePreviewReference,
+        runtimeSample: RecordingRuntimeSampleReference,
+        comparison: RecordingPreviewComparison
+    ) -> some View {
+        HStack(alignment: .top, spacing: 18) {
+            if let template {
+                railItem(
+                    title: "Related Template",
+                    value: template.artifactRef?.path ?? "not set",
+                    detail: "Image template ref \(shortID(template.id)) from frame \(shortID(template.frameID))."
+                )
+            }
+            railItem(
+                title: "Bundle",
+                value: "schema \(bundle.schemaVersion.major).\(bundle.schemaVersion.minor)",
+                detail: "Recording \(shortID(bundle.id)); \(bundle.frames.count) frames, \(bundle.visualObservations.count) observations."
+            )
+            railItem(
+                title: "Safety",
+                value: "safe relative artifact refs",
+                detail: "SwiftUI renders ids and presenter-ready refs; app-edge code remains responsible for opening files."
+            )
+            railItem(
+                title: "Trace",
+                value: "\(shortID(source.id)) -> \(shortID(runtimeSample.id)) -> \(shortID(comparison.id))",
+                detail: "The same ids can be cited by CLI and AI suggestions without embedding image bytes."
+            )
+        }
+    }
+
+    private func railItem(title: String, value: String, detail: String) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(title)
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(Color.white.opacity(0.48))
+            Text(value)
+                .font(.system(size: 13, weight: .semibold, design: .monospaced))
+                .foregroundStyle(.white)
+                .lineLimit(2)
+            Text(detail)
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(Color.white.opacity(0.58))
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .topLeading)
+        .background(Color.white.opacity(0.04), in: RoundedRectangle(cornerRadius: 8))
+        .overlay(
+            RoundedRectangle(cornerRadius: 8)
+                .stroke(Color.white.opacity(0.08), lineWidth: 1)
+        )
+    }
+
+    private func formattedBounds(_ bounds: RecordingBounds?) -> String {
+        guard let rect = bounds?.rect else { return "not set" }
+        return String(
+            format: "%.0f, %.0f  %.0fx%.0f",
+            rect.x,
+            rect.y,
+            rect.width,
+            rect.height
+        )
+    }
+
+    private func formattedImageSize(_ imageSize: RecordingImageSize?) -> String {
+        guard let imageSize else { return "not set" }
+        return "\(imageSize.width)x\(imageSize.height)"
+    }
+
+    private func formattedPercent(_ value: Double?) -> String {
+        guard let value else { return "--" }
+        return String(format: "%.0f%%", value * 100)
+    }
+
+    private func clampedScore(_ value: Double?) -> Double {
+        min(1, max(0, value ?? 0))
+    }
+
+    private func shortID(_ id: UUID?) -> String {
+        guard let id else { return "not set" }
+        return String(id.uuidString.prefix(8))
+    }
+}
+
 @MainActor
 enum AutomationProductEvidenceSnapshotRenderer {
     static func render(
@@ -207,6 +542,25 @@ enum AutomationProductEvidenceSnapshotRenderer {
         scale: CGFloat
     ) throws {
         let now = Date(timeIntervalSince1970: 1_800_000_000)
+        if scenario == .templateBaselinePreviewRefs {
+            let view = SemanticRecordingPreviewRefsEvidenceView(
+                bundle: SemanticRecordingFixture.checkoutBundle(createdAt: now)
+            )
+            .frame(width: width, height: height)
+            .environment(\.colorScheme, .dark)
+            .environment(\.locale, Locale(identifier: "en_US_POSIX"))
+            .background(Color(red: 0.10, green: 0.12, blue: 0.13))
+
+            try writeSwiftUISnapshot(
+                view,
+                outputURL: outputURL,
+                width: width,
+                height: height,
+                scale: scale
+            )
+            return
+        }
+
         let state = state(for: scenario, now: now)
         let projection = AutomationViewProjection.overview(from: state)
         let snapshot = AutomationRepositorySnapshot(
@@ -257,6 +611,22 @@ enum AutomationProductEvidenceSnapshotRenderer {
         .environment(\.automationTaskRunEvidenceInitialActionFeedback, scenario.initialEvidenceActionFeedback)
         .background(Color(red: 0.10, green: 0.12, blue: 0.13))
 
+        try writeSwiftUISnapshot(
+            view,
+            outputURL: outputURL,
+            width: width,
+            height: height,
+            scale: scale
+        )
+    }
+
+    private static func writeSwiftUISnapshot<Content: View>(
+        _ view: Content,
+        outputURL: URL,
+        width: CGFloat,
+        height: CGFloat,
+        scale: CGFloat
+    ) throws {
         let hostingView = NSHostingView(rootView: view)
         hostingView.frame = CGRect(x: 0, y: 0, width: width, height: height)
         let darkAppearance = NSAppearance(named: .darkAqua)
