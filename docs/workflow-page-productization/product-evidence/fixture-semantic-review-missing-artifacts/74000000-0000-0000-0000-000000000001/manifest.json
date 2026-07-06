@@ -1,0 +1,405 @@
+{
+  "capturePolicy" : {
+    "allowsAIFrameExport" : false,
+    "localOnly" : true,
+    "mode" : "videoAndKeyframes",
+    "recordsKeyframes" : true,
+    "recordsVideo" : true
+  },
+  "captureTarget" : {
+    "appBundleIdentifier" : "com.example.Checkout",
+    "appName" : "Checkout Demo",
+    "displayID" : 1,
+    "kind" : "window",
+    "surfaceID" : "checkout-window",
+    "windowID" : 42,
+    "windowTitle" : "Checkout"
+  },
+  "createdAt" : "2027-01-15T08:00:00Z",
+  "frames" : [
+    {
+      "displayScale" : 2,
+      "id" : "74000000-0000-0000-0000-000000000003",
+      "imageRef" : "frames\/000001-start.png",
+      "imageSize" : {
+        "height" : 900,
+        "width" : 1440
+      },
+      "recordingTime" : 0.2,
+      "relatedEventIDs" : [
+        "74000000-0000-0000-0000-000000000006"
+      ],
+      "source" : "recordingStart",
+      "surfaceID" : "checkout-window",
+      "videoSegmentID" : "74000000-0000-0000-0000-000000000002",
+      "videoTime" : 0.2
+    },
+    {
+      "displayScale" : 2,
+      "id" : "74000000-0000-0000-0000-000000000004",
+      "imageRef" : "frames\/000014-before-click.png",
+      "imageSize" : {
+        "height" : 900,
+        "width" : 1440
+      },
+      "recordingTime" : 2.1,
+      "relatedEventIDs" : [
+        "74000000-0000-0000-0000-000000000007"
+      ],
+      "source" : "mouseDown",
+      "surfaceID" : "checkout-window",
+      "videoSegmentID" : "74000000-0000-0000-0000-000000000002",
+      "videoTime" : 2.1,
+      "windowBounds" : {
+        "coordinateSpace" : "windowPixels",
+        "rect" : {
+          "height" : 48,
+          "width" : 180,
+          "x" : 880,
+          "y" : 620
+        }
+      }
+    },
+    {
+      "displayScale" : 2,
+      "id" : "74000000-0000-0000-0000-000000000005",
+      "imageRef" : "frames\/000016-after-click.png",
+      "imageSize" : {
+        "height" : 900,
+        "width" : 1440
+      },
+      "recordingTime" : 2.45,
+      "relatedEventIDs" : [
+        "74000000-0000-0000-0000-000000000007",
+        "74000000-0000-0000-0000-000000000008"
+      ],
+      "source" : "mouseUp",
+      "surfaceID" : "checkout-window",
+      "videoSegmentID" : "74000000-0000-0000-0000-000000000002",
+      "videoTime" : 2.45,
+      "windowBounds" : {
+        "coordinateSpace" : "windowPixels",
+        "rect" : {
+          "height" : 42,
+          "width" : 260,
+          "x" : 700,
+          "y" : 210
+        }
+      }
+    }
+  ],
+  "id" : "74000000-0000-0000-0000-000000000001",
+  "previewComparisons" : [
+    {
+      "comparedAt" : "2027-01-15T08:01:31Z",
+      "diffArtifactRef" : "runs\/run-001\/condition-confirmation\/diff.png",
+      "id" : "74000000-0000-0000-0000-000000000011",
+      "matcher" : {
+        "kind" : "ocr-text-exact",
+        "provider" : "SparkleRecorder.fixture",
+        "version" : "0.1"
+      },
+      "outcome" : "matched",
+      "reason" : "Runtime OCR matched the recorded confirmation text.",
+      "runtimeSampleRefID" : "74000000-0000-0000-0000-000000000010",
+      "score" : 0.96,
+      "sourcePreviewRefID" : "74000000-0000-0000-0000-00000000000E",
+      "threshold" : 0.9
+    }
+  ],
+  "redactedFrames" : [
+
+  ],
+  "redactedVideos" : [
+
+  ],
+  "runtimeSamples" : [
+    {
+      "artifactRef" : "runs\/run-001\/condition-confirmation\/watched-region.png",
+      "bounds" : {
+        "coordinateSpace" : "windowPixels",
+        "rect" : {
+          "height" : 42,
+          "width" : 260,
+          "x" : 700,
+          "y" : 210
+        }
+      },
+      "capturedAt" : "2027-01-15T08:01:30Z",
+      "conditionID" : "74000000-0000-0000-0000-000000000017",
+      "contentDigest" : {
+        "algorithm" : "sha256",
+        "value" : "fixture-runtime-sample-digest"
+      },
+      "id" : "74000000-0000-0000-0000-000000000010",
+      "imageSize" : {
+        "height" : 42,
+        "width" : 260
+      },
+      "kind" : "watchedRegionCrop",
+      "runID" : "74000000-0000-0000-0000-000000000015",
+      "taskID" : "74000000-0000-0000-0000-000000000016"
+    }
+  ],
+  "schemaVersion" : {
+    "major" : 0,
+    "minor" : 1
+  },
+  "semanticEvents" : [
+    {
+      "evidenceFrameIDs" : [
+        "74000000-0000-0000-0000-000000000003",
+        "74000000-0000-0000-0000-000000000004",
+        "74000000-0000-0000-0000-000000000005"
+      ],
+      "frameID" : "74000000-0000-0000-0000-000000000003",
+      "id" : "74000000-0000-0000-0000-000000000009",
+      "kind" : "summary",
+      "observationIDs" : [
+        "74000000-0000-0000-0000-00000000000D",
+        "74000000-0000-0000-0000-00000000000C"
+      ],
+      "recordingTime" : 0.2,
+      "summary" : "Open the checkout window, click Checkout, and wait for confirmation.",
+      "title" : "Checkout flow"
+    },
+    {
+      "evidenceFrameIDs" : [
+        "74000000-0000-0000-0000-000000000004",
+        "74000000-0000-0000-0000-000000000005"
+      ],
+      "frameID" : "74000000-0000-0000-0000-000000000004",
+      "id" : "74000000-0000-0000-0000-00000000000A",
+      "kind" : "click",
+      "observationIDs" : [
+        "74000000-0000-0000-0000-00000000000D"
+      ],
+      "recordingTime" : 2.3,
+      "risk" : "Coordinate click should become an image or AX locator before reuse.",
+      "summary" : "The user clicked the primary checkout button.",
+      "timelineEventID" : "74000000-0000-0000-0000-000000000007",
+      "title" : "Click Checkout"
+    },
+    {
+      "evidenceFrameIDs" : [
+        "74000000-0000-0000-0000-000000000005"
+      ],
+      "frameID" : "74000000-0000-0000-0000-000000000005",
+      "id" : "74000000-0000-0000-0000-00000000000B",
+      "kind" : "conditionCandidate",
+      "observationIDs" : [
+        "74000000-0000-0000-0000-00000000000C"
+      ],
+      "recordingTime" : 3.1,
+      "summary" : "The wait can become an OCR condition for 'Order confirmed'.",
+      "timelineEventID" : "74000000-0000-0000-0000-000000000008",
+      "title" : "Wait for confirmation text"
+    }
+  ],
+  "sourcePreviews" : [
+    {
+      "artifactRef" : "visual-index\/templates\/checkout-button.png",
+      "bounds" : {
+        "coordinateSpace" : "windowPixels",
+        "rect" : {
+          "height" : 48,
+          "width" : 180,
+          "x" : 880,
+          "y" : 620
+        }
+      },
+      "contentDigest" : {
+        "algorithm" : "sha256",
+        "value" : "fixture-template-digest"
+      },
+      "createdAt" : "2027-01-15T08:00:00Z",
+      "eventID" : "74000000-0000-0000-0000-000000000007",
+      "frameID" : "74000000-0000-0000-0000-000000000004",
+      "id" : "74000000-0000-0000-0000-00000000000F",
+      "imageSize" : {
+        "height" : 48,
+        "width" : 180
+      },
+      "kind" : "imageTemplate",
+      "label" : "Checkout button",
+      "recordingID" : "74000000-0000-0000-0000-000000000001",
+      "recordingTime" : 2.1,
+      "surfaceID" : "checkout-window"
+    },
+    {
+      "artifactRef" : "visual-index\/ocr\/confirmation-region.png",
+      "bounds" : {
+        "coordinateSpace" : "windowPixels",
+        "rect" : {
+          "height" : 42,
+          "width" : 260,
+          "x" : 700,
+          "y" : 210
+        }
+      },
+      "contentDigest" : {
+        "algorithm" : "sha256",
+        "value" : "fixture-ocr-region-digest"
+      },
+      "createdAt" : "2027-01-15T08:00:00Z",
+      "eventID" : "74000000-0000-0000-0000-000000000008",
+      "frameID" : "74000000-0000-0000-0000-000000000005",
+      "id" : "74000000-0000-0000-0000-00000000000E",
+      "imageSize" : {
+        "height" : 42,
+        "width" : 260
+      },
+      "kind" : "ocrRegion",
+      "label" : "Confirmation text",
+      "recordingID" : "74000000-0000-0000-0000-000000000001",
+      "recordingTime" : 2.45,
+      "surfaceID" : "checkout-window"
+    }
+  ],
+  "suppressions" : [
+    {
+      "count" : 1,
+      "createdAt" : "2027-01-15T08:00:00Z",
+      "detail" : "A credential field was visible before the checkout click.",
+      "eventID" : "74000000-0000-0000-0000-000000000006",
+      "frameID" : "74000000-0000-0000-0000-000000000003",
+      "id" : "74000000-0000-0000-0000-000000000012",
+      "reason" : "passwordField",
+      "recordingTime" : 1.2,
+      "target" : {
+        "appBundleIdentifier" : "com.example.Checkout",
+        "appName" : "Checkout Demo",
+        "displayID" : 1,
+        "kind" : "window",
+        "surfaceID" : "checkout-window",
+        "windowID" : 42,
+        "windowTitle" : "Checkout"
+      },
+      "timeRange" : {
+        "duration" : 0.4,
+        "startTime" : 1.1
+      }
+    }
+  ],
+  "timelineEvents" : [
+    {
+      "frameID" : "74000000-0000-0000-0000-000000000003",
+      "id" : "74000000-0000-0000-0000-000000000006",
+      "kind" : "focusChange",
+      "recordingTime" : 0.2,
+      "relatedEventIDs" : [
+
+      ],
+      "summary" : "Checkout window became active",
+      "surfaceID" : "checkout-window",
+      "videoSegmentID" : "74000000-0000-0000-0000-000000000002"
+    },
+    {
+      "frameID" : "74000000-0000-0000-0000-000000000004",
+      "id" : "74000000-0000-0000-0000-000000000007",
+      "kind" : "recordedEvent",
+      "recordedEventIndex" : 4,
+      "recordingTime" : 2.3,
+      "relatedEventIDs" : [
+
+      ],
+      "summary" : "Clicked the checkout button",
+      "surfaceID" : "checkout-window",
+      "videoSegmentID" : "74000000-0000-0000-0000-000000000002"
+    },
+    {
+      "frameID" : "74000000-0000-0000-0000-000000000005",
+      "id" : "74000000-0000-0000-0000-000000000008",
+      "kind" : "waitEnd",
+      "recordingTime" : 3.1,
+      "relatedEventIDs" : [
+        "74000000-0000-0000-0000-000000000007"
+      ],
+      "summary" : "Confirmation text appeared",
+      "surfaceID" : "checkout-window",
+      "videoSegmentID" : "74000000-0000-0000-0000-000000000002"
+    }
+  ],
+  "videoSegments" : [
+    {
+      "artifactRef" : "video\/recording.mov",
+      "codec" : "SCRecordingOutput",
+      "duration" : 7.5,
+      "fileType" : "mov",
+      "frameSize" : {
+        "height" : 900,
+        "width" : 1440
+      },
+      "id" : "74000000-0000-0000-0000-000000000002",
+      "startTime" : 0,
+      "target" : {
+        "appBundleIdentifier" : "com.example.Checkout",
+        "appName" : "Checkout Demo",
+        "displayID" : 1,
+        "kind" : "window",
+        "surfaceID" : "checkout-window",
+        "windowID" : 42,
+        "windowTitle" : "Checkout"
+      }
+    }
+  ],
+  "visualObservations" : [
+    {
+      "artifactRef" : "visual-index\/templates\/checkout-button.png",
+      "bounds" : {
+        "coordinateSpace" : "windowPixels",
+        "rect" : {
+          "height" : 48,
+          "width" : 180,
+          "x" : 880,
+          "y" : 620
+        }
+      },
+      "confidence" : 0.92,
+      "createdAt" : "2027-01-15T08:00:00Z",
+      "frameID" : "74000000-0000-0000-0000-000000000004",
+      "id" : "74000000-0000-0000-0000-00000000000D",
+      "kind" : "imageTemplateCandidate",
+      "labels" : [
+        "button",
+        "primaryAction"
+      ],
+      "metadata" : {
+
+      },
+      "provider" : "SparkleRecorder.fixture",
+      "providerVersion" : "0.1",
+      "recordingTime" : 2.1,
+      "score" : 0.91,
+      "sourcePreviewRefID" : "74000000-0000-0000-0000-00000000000F"
+    },
+    {
+      "artifactRef" : "visual-index\/ocr\/confirmation-region.png",
+      "bounds" : {
+        "coordinateSpace" : "windowPixels",
+        "rect" : {
+          "height" : 42,
+          "width" : 260,
+          "x" : 700,
+          "y" : 210
+        }
+      },
+      "confidence" : 0.97,
+      "createdAt" : "2027-01-15T08:00:00Z",
+      "frameID" : "74000000-0000-0000-0000-000000000005",
+      "id" : "74000000-0000-0000-0000-00000000000C",
+      "kind" : "ocrText",
+      "labels" : [
+        "confirmation"
+      ],
+      "metadata" : {
+
+      },
+      "provider" : "Vision.fixture",
+      "providerVersion" : "0.1",
+      "recordingTime" : 2.45,
+      "sourcePreviewRefID" : "74000000-0000-0000-0000-00000000000E",
+      "text" : "Order confirmed"
+    }
+  ]
+}

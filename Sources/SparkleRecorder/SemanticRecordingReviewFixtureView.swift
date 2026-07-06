@@ -570,6 +570,7 @@ struct SemanticRecordingReviewFixtureView: View {
                             detail: candidate.artifactPath ?? "frame \(shortID(candidate.sourceFrameID))",
                             accent: Color(red: 0.48, green: 0.76, blue: 0.52)
                         )
+                        artifactAvailabilityLine(path: candidate.artifactPath)
 
                         HStack(spacing: 8) {
                             Button(NSLocalizedString("Draft Patch", comment: ""), systemImage: "doc.badge.gearshape") {
@@ -1195,14 +1196,56 @@ struct SemanticRecordingReviewFixtureView: View {
                 .font(.system(size: 9, weight: .medium, design: .monospaced))
                 .foregroundStyle(Color.white.opacity(0.38))
                 .lineLimit(1)
+
+            if let detail = comparisonArtifactStatusDetail(path: path) {
+                Text(detail)
+                    .font(.system(size: 9, weight: .medium))
+                    .foregroundStyle(Color.white.opacity(0.42))
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
         }
         .padding(8)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Color.black.opacity(0.12), in: RoundedRectangle(cornerRadius: 7))
         .overlay(
             RoundedRectangle(cornerRadius: 7)
-                .stroke(Color.white.opacity(0.065), lineWidth: 1)
+                .stroke(comparisonArtifactStatusTint(path: path).opacity(0.22), lineWidth: 1)
         )
+    }
+
+    @ViewBuilder
+    private func artifactAvailabilityLine(path: String?) -> some View {
+        if path != nil || reviewState != nil {
+            HStack(alignment: .firstTextBaseline, spacing: 6) {
+                Image(systemName: comparisonArtifactPlaceholderImage(path: path))
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(comparisonArtifactStatusTint(path: path))
+                Text(comparisonArtifactStatus(path: path))
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(comparisonArtifactStatusTint(path: path))
+                    .lineLimit(1)
+                Text(path.map(compactPath) ?? NSLocalizedString("No artifact ref", comment: ""))
+                    .font(.system(size: 10, weight: .medium, design: .monospaced))
+                    .foregroundStyle(Color.white.opacity(0.46))
+                    .lineLimit(1)
+                if let detail = comparisonArtifactStatusDetail(path: path) {
+                    Text(detail)
+                        .font(.system(size: 10, weight: .medium))
+                        .foregroundStyle(Color.white.opacity(0.42))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.82)
+                }
+                Spacer(minLength: 0)
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 7)
+            .background(Color.black.opacity(0.12), in: RoundedRectangle(cornerRadius: 7))
+            .overlay(
+                RoundedRectangle(cornerRadius: 7)
+                    .stroke(comparisonArtifactStatusTint(path: path).opacity(0.20), lineWidth: 1)
+            )
+        }
     }
 
     private func sectionTitle(_ value: String) -> some View {
@@ -1667,7 +1710,22 @@ struct SemanticRecordingReviewFixtureView: View {
         }
         return status.exists
             ? NSLocalizedString("Available", comment: "")
-            : NSLocalizedString("Missing", comment: "")
+            : NSLocalizedString("Missing file", comment: "")
+    }
+
+    private func comparisonArtifactStatusDetail(path: String?) -> String? {
+        guard path != nil else {
+            return NSLocalizedString("No artifact reference was recorded for this evidence slot.", comment: "")
+        }
+        guard let reviewState else {
+            return NSLocalizedString("Open a stored or live bundle to verify file availability.", comment: "")
+        }
+        guard let status = reviewState.artifactStatus(for: path) else {
+            return NSLocalizedString("This ref is not in the loaded bundle artifact index.", comment: "")
+        }
+        return status.exists
+            ? NSLocalizedString("Open/Reveal is available from this bundle.", comment: "")
+            : NSLocalizedString("Open/Reveal is unavailable; the file may have been pruned, not written yet, or omitted by sidecars.", comment: "")
     }
 
     private func comparisonArtifactStatusTint(path: String?) -> Color {
