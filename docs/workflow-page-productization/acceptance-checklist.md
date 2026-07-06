@@ -113,6 +113,7 @@
 - [ ] OCR/视觉条件等待反馈由 projection 驱动，Graph/Timeline/Inspector 不拆 condition enum 或重复计算 polling/timeout。
   - First pass: [x] `AutomationTaskNodeProjection.conditionProgress` and `AutomationResourceTimelineItem.conditionProgress` expose condition kind labels, target/detail copy, polling interval, active polling state, timeout countdown, and visual refs. Running and visual diagnostics fixture screenshots are present; live screenshot/clip evidence remains open.
 - [ ] FlowGraph 拖拽稳定，不丢节点、不丢线、不需要刷新后才显示。
+  - First pass: [x] FlowGraph node movement is parent-owned in `AutomationFlowGraphView`; dragged nodes, dependency curves, and edge labels share dynamic positions while dragging, tiny drags select the task card, and drop commits through `.moveTask`. Macro Library drops to the graph canvas now create tasks at the cursor-centered graph position, and existing task drops move the task there. Real interaction recording remains open.
 - [ ] 资源时间轴能解释 running/waiting/conflict/completed。
   - First pass: [x] Resource Timeline shows the next scheduled occurrence from workflow projection before run history exists, and OwnerC fixture covers foreground-input resource waiting with user-facing `resourceWaiting` reason data. Resource waiting projection can also expose max-wait deadline/remaining/fraction when the task sets `maxResourceWaitSeconds`.
 - [ ] Inspector 能编辑 schedule、timeout、retry、join policy、condition、dependency trigger。

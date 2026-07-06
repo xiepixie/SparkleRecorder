@@ -26,6 +26,7 @@ Owner：Recording / Workflow Evidence / AI CLI shared planning
 - 已把 `AutomationConditionEvaluationEvidence` 的 context-only diagnostics 纳入 current status，避免未来只把 diagnostics 理解成 OCR/visual 截图。
 - 已完成 2026 Apple API 可行性核对并接受 macOS 15+ 产品基线：`SCRecordingOutput` 是默认完整 `.mov` 路径；同一录制生成 event-aligned keyframes 作为视觉索引；不规划 macOS 14 `AVAssetWriter` fallback；Vision 可提供 OCR/feature print/tracking primitives，但 pattern search 需要自有评分和 deterministic matcher。
 - 已新增 [08-parallel-workstreams.md](08-parallel-workstreams.md)，把下一阶段拆成 S0 Workflow Evidence、S1 Contract/Core、S2 App Capture/Visual Index、S3 Review UX、S4 CLI/AI/App Knowledge。
+- 已新增 [workstreams/s0-workflow-evidence.md](workstreams/s0-workflow-evidence.md) 作为 S0 工作台，并把 S0 对 S1 的 template/baseline preview refs 请求写入 [09-template-baseline-preview-refs.md](09-template-baseline-preview-refs.md)。
 - 尚未实现 semantic recording 代码；本轮是规划维护。
 
 ## 2. Direction Decision
@@ -80,7 +81,7 @@ SparkleRecorder 的优势是本地确定性：录制事件、窗口/视觉证据
 | Branch evidence real-run recording | Core + UI | 用户需要相信 FlowGraph 走线和 Run Detail 原因一致 | 同一次 success/failure/timeout run 中，edge 状态、selected run、branchEvidence drill-in 一致 |
 | Macro evidence file-action recording | App + UI | 失败后用户第一件事是打开报告或截图 | Reveal Report / Open Screenshot 真实交互有 inline feedback |
 | Drag/reorder WYSIWYG recording | UI | 编排页面必须可用，preview 不能骗用户 | macro drag、task reorder、connector link 的 indicator 与 reducer mutation 一致 |
-| Template/baseline preview contract | Core + App + UI | 字符串 refs 不够，用户要知道 ref 指向什么 | Run Detail 可展示 recorded template/baseline、runtime sample、score/diff/fallback |
+| Template/baseline preview contract | S0 + S1 + App + UI | 字符串 refs 不够，用户要知道 ref 指向什么 | S0 已起草 [09-template-baseline-preview-refs.md](09-template-baseline-preview-refs.md)；S1 接受后 Run Detail 应可展示 recorded template/baseline、runtime sample、score/diff/fallback |
 | Resource/runtime product evidence | Core + UI | 等待资源、重试、超时要能被用户解释 | 多 workflow resource queue、max wait、handoff status readback 有产品证据 |
 
 Do not start video bundle implementation before Bridge A has at least live evidence clips for visual diagnostics and branch evidence. Otherwise semantic recording will inherit an untrusted evidence UI.
@@ -183,7 +184,7 @@ Recommended order from here:
 
 1. Product evidence: live visual diagnostics Open/Reveal recording.
 2. Product evidence: real branch evidence consistency recording.
-3. Contract note: template/baseline preview refs and source-frame/runtime-sample comparison.
+3. S0/S1 contract note: finish acceptance of [09-template-baseline-preview-refs.md](09-template-baseline-preview-refs.md) for template/baseline source-frame/runtime-sample comparison.
 4. API spike: target-window/display `.mov` capture through `SCRecordingOutput` plus event-aligned keyframes, with fake capture clients for tests.
 5. Core schema draft: `SemanticRecordingBundle` v0 with video segments, keyframe refs and macOS 15+ product baseline.
 6. Tests: fake event-frame alignment and safe ref normalization.
@@ -192,4 +193,4 @@ Recommended order from here:
 
 This sequence keeps the project grounded: every new AI-facing capability starts from evidence a user can see.
 
-并行执行边界见 [08-parallel-workstreams.md](08-parallel-workstreams.md)。下一轮实现时不要把 S1/S2/S3/S4 的职责混到一个 PR 里；至少先冻结 S1 合同和 S2 API spike 的接口。
+并行执行边界见 [08-parallel-workstreams.md](08-parallel-workstreams.md)。S0 进展维护在 [workstreams/s0-workflow-evidence.md](workstreams/s0-workflow-evidence.md)。下一轮实现时不要把 S1/S2/S3/S4 的职责混到一个 PR 里；至少先冻结 S1 合同和 S2 API spike 的接口。

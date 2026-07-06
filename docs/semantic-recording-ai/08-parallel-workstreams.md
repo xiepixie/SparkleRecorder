@@ -22,6 +22,8 @@ Owner：Semantic Recording program coordination
 | `06-current-work-and-next-tasks.md` | Execution ledger | 当前任务账本、立即顺序、过度设计审计 |
 | `07-apple-api-implementation-path.md` | API feasibility | macOS 15+ `SCRecordingOutput` 默认视频路径、Vision/AX 路线 |
 | `08-parallel-workstreams.md` | Work split | 本文件，并行 owner 和接口边界 |
+| `09-template-baseline-preview-refs.md` | Interface request draft | S0 对 S1 的 source-frame/runtime-sample preview refs 需求 |
+| `workstreams/s0-workflow-evidence.md` | Active workstream | S0 当前任务、证据缺口、S1 接口请求和实施日志 |
 | `acceptance-checklist.md` | Acceptance | 只记录可验收事实，不把规划当完成 |
 
 已接受的产品基线：
@@ -76,6 +78,8 @@ Deliverables:
 
 - product evidence clips/screenshots linked from `workflow-page-productization/product-evidence/`
 - updated `06-current-work-and-next-tasks.md` status
+- S0 workstream updates in [workstreams/s0-workflow-evidence.md](workstreams/s0-workflow-evidence.md)
+- S1-facing template/baseline preview-ref request in [09-template-baseline-preview-refs.md](09-template-baseline-preview-refs.md)
 - checklist updates when a live-product item is truly proven
 
 ## S1 Contract And Core Schema

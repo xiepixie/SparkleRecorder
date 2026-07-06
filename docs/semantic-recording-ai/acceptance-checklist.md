@@ -13,10 +13,11 @@
 - [ ] Capture real Open/Reveal interactions for visual diagnostic artifacts through the app-edge presenter.
 - [ ] Capture real Reveal Report / Open Screenshot interactions for macro run evidence.
 - [ ] Capture real branch evidence drill-in consistency: FlowGraph edge state, selected run row, and Run Detail durable branch evidence agree.
-- [ ] Design template/baseline preview refs as source-frame/runtime-sample evidence, not just string fields.
+- [ ] Accept template/baseline preview refs as source-frame/runtime-sample evidence, not just string fields. Draft request: [09-template-baseline-preview-refs.md](09-template-baseline-preview-refs.md).
 - [ ] Capture real drag/reorder or drag-link clip proving indicator and reducer mutation match.
 - [ ] Keep fixture evidence sidecars explicit about what is fixture-proven versus live-product-proven.
 - [ ] Keep `06-current-work-and-next-tasks.md` updated whenever evidence status, owner boundary, accepted contract, or immediate next slice changes.
+- [ ] Keep [workstreams/s0-workflow-evidence.md](workstreams/s0-workflow-evidence.md) updated while S0 is active.
 
 ## Phase 0: Contract Freeze
 

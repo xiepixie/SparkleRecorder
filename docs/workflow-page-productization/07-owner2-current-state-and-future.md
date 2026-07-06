@@ -228,6 +228,10 @@ App/Adapter 层可以做文件 IO、NSOpenPanel/NSSavePanel、NSWorkspace reveal
 
 - 节点显示状态 hairline/chip。
 - 边显示 trigger/delay label。
+- 节点本体点击可选择 task。
+- 节点可在 FlowGraph 中直接拖动位置，松手通过 `.moveTask` 提交。
+- 拖动时相关 dependency curves 和 edge labels 跟随动态位置。
+- Macro Library 可拖到 FlowGraph canvas 并按落点创建 task；已有 task payload drop 到 canvas 会移动该 task。
 - 节点右侧 connector handle 可拉线。
 - trigger chooser 可选择 success/failure/timeout/condition/always。
 - drop 到目标节点后通过 `.upsertDependency` 创建 dependency。
@@ -239,7 +243,7 @@ App/Adapter 层可以做文件 IO、NSOpenPanel/NSSavePanel、NSWorkspace reveal
 
 - runtime triggered edge evidence。
 - branch runtime evidence。
-- screenshot/clip 证明用户不打开 Inspector 也能表达基本依赖。
+- screenshot/clip 证明用户不打开 Inspector 也能表达基本依赖和移动节点。
 - 更强的 If/Then/Else 中心图视觉分组。
 
 ### 5.3 Resource Timeline Explains Runtime

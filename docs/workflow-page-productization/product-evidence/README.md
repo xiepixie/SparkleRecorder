@@ -3,6 +3,8 @@
 状态：验收目录；idle/running/drag-link/task-reorder/failed-run/preview-unavailable/branch/visual diagnostics fixture PNG 已补齐，完整真实 drag/reorder 和 live capture 录屏仍缺。
 Owner：Owner 2, Product UI And Workflow UX
 
+Semantic recording S0 现在使用本目录作为 Workflow Evidence Closure 的产品证据落点。S0 当前工作台在 `docs/semantic-recording-ai/workstreams/s0-workflow-evidence.md`；live-product 条目未录到真实 App 截图/录屏前不能在 semantic checklist 中打勾。
+
 本目录用于收集 Workflow 页面产品验收截图和短录屏。它不是设计稿目录，也不是展示用素材目录；它是 checklist 能不能打勾的证据目录。
 
 ## Required Artifact Set
@@ -48,6 +50,13 @@ Owner：Owner 2, Product UI And Workflow UX
 - visual diagnostics drill-in artifact: present as `visual-diagnostics-drill-in.png` with `visual-diagnostics-drill-in.md`. Runtime now persists `AutomationTaskRun.conditionEvidence` for OCR/visual condition runs, including observed summary, sample count, watched region, score/threshold when available, diagnostic fields, and optional last-sample / watched-region image artifact refs. The fixture screenshot proves last-sample and watched-region image preview loading through `AutomationConditionEvidenceArtifactPresenter`, plus Open/Reveal artifact affordances and inline action feedback; live capture recording and real Open/Reveal interaction recording remain future evidence.
 - branch evidence drill-in artifact: present as `branch-evidence-drill-in.png` with `branch-evidence-drill-in.md`.
 - in-app readiness: Run Detail can show condition diagnostics directly from `AutomationTaskRun.conditionEvidence`; evidence readiness marks visual diagnostics durable when present. Branch evidence is shown as durable when `AutomationTaskRun.branchEvidence` exists, including trigger, target run, delay, join policy, dependency ID, and reason; older runs can still use projection fallback.
+
+S0 live-product evidence still expected:
+
+- `live-visual-diagnostics-open-reveal.mov` with sidecar `.md`
+- `live-macro-evidence-open-reveal.mov` with sidecar `.md`
+- `live-branch-evidence-consistency.mov` with sidecar `.md`
+- `live-task-reorder-wysiwyg.mov` or `live-drag-link-wysiwyg.mov` with sidecar `.md`
 
 ## Acceptance Boundary
 
