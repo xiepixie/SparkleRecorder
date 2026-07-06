@@ -40,6 +40,7 @@ S3 does not own:
 - Review visual asset materialization: `SemanticRecordingReviewAssetMaterializer`
 - Review manual frame-crop extraction for image/template and baseline candidates
 - Draft Preview visual asset provenance badges for Review-generated crops
+- Review source/runtime/diff evidence drill-in tiles
 - Run Detail Macro Review entry: `AutomationTaskRunDetailView`
 - Run Detail linked Macro Review metadata and bundle Reveal action
 - Review patch -> Draft Preview -> confirm import handoff through the existing draft import path
@@ -59,6 +60,7 @@ S3 does not own:
 - Frame-to-condition 现在可以生成 `AutomationWorkflowDraftPatchDocument`：OCR region -> `ocrText`；image template -> `imageAppeared` / `imageDisappeared`；region baseline -> `regionChanged`；pixel sample -> `pixelMatched` when color evidence is supplied。
 - Draft patch 先 upsert `AutomationWorkflowDraftVisualAssets` region/image/baseline refs，再 `addTask` 或 `setCondition`。测试会把 patch apply 到真实 `AutomationWorkflowDraftDocument`，不是只检查 UI 字符串。
 - Review UI 可以从 app-edge presenter 加载 live bundle manifest，显示存在的 frame image artifact，Open/Reveal source/runtime/diff artifacts，并允许用户在 frame canvas 上拖拽生成 region selection。
+- Source / Runtime comparison rows now render Source / Runtime / Diff evidence tiles. In fixture mode they expose the safe refs inline; when opened from a real bundle state they show available/missing status and image thumbnails from presenter-resolved artifact URLs before the user opens or reveals files.
 - Review UI 的候选 patch 现在可以打开 `AutomationWorkflowDraftPreviewSheet`。用户确认前不会修改原 workflow；确认时复用既有 Draft Preview import path，并在已有 workflow 上覆盖 compiled id/createdAt，避免生成重复 workflow。
 - Pixel candidates now expose `AutomationVisualColorPickerView` inside Review, and the selected hex is passed into `SemanticRecordingReviewDraftPatchRequest.pixelColorHex` so `pixelMatched` patches no longer require metadata-provided `colorHex` when the user supplies a reviewed target color.
 - Suggestion rows now show evidence refs and explicit `Accept` / `Reject` actions. `Accept` jumps to the cited frame/event, resolves the matching condition candidate, and generates the same review-only draft patch path; `Reject` records local review state only and does not mutate the workflow. Review decisions now show accepted/rejected status, a short mutation summary and an Undo control; rejecting or undoing the accepted suggestion clears the staged draft patch if that patch came from the same suggestion.
@@ -135,7 +137,7 @@ Observed status on 2026-07-06:
 
 - `SemanticRecordingReviewProjectionTests`: 9 tests passed; coverage includes OCR wait patch, image appeared patch, visual asset upsert operations, package-local materialization path rewriting, manual frame region override, manual frame crop extraction data flow and user-picked pixel color -> `pixelMatched` patch.
 - Swift 6 build: passed.
-- Product evidence snapshot: generated `docs/workflow-page-productization/product-evidence/semantic-review-timeline.png` with sidecar `semantic-review-timeline.md`; current artifact includes suggestion evidence refs, `Accept` / `Reject` controls, accepted status, staged patch state and an Undo review-decision control.
+- Product evidence snapshot: generated `docs/workflow-page-productization/product-evidence/semantic-review-timeline.png` with sidecar `semantic-review-timeline.md`; current artifact includes source/runtime/diff evidence tiles, suggestion evidence refs, `Accept` / `Reject` controls, accepted status, staged patch state and an Undo review-decision control.
 - Run Detail product evidence snapshot: generated `docs/workflow-page-productization/product-evidence/semantic-review-run-detail.png` with sidecar `semantic-review-run-detail.md`; current artifact shows linked Macro Review metadata and Open/Reveal/manual bundle controls from the Workflow inspector.
 - Draft Preview product evidence snapshot: generated `docs/workflow-page-productization/product-evidence/semantic-review-draft-preview.png` with sidecar `semantic-review-draft-preview.md`; current artifact shows Review-generated package-local image asset provenance before confirmed import.
 
@@ -162,3 +164,4 @@ Observed status on 2026-07-06:
 - 2026-07-06: Added manual frame-crop extraction for Review-generated image/template and baseline assets. Manual region selections now travel as `SemanticRecordingReviewAssetExtraction` plans, Draft Preview materialization reads the selected frame artifact, crops it to PNG, writes package-local assets, and stores visual asset provenance fields for source frame, surface and crop bounds.
 - 2026-07-06: Added Draft Preview provenance badges for Review-generated visual assets, so frame id, crop bounds, source artifact, surface and hash are visible before confirmed import.
 - 2026-07-06: Added `semantic-review-draft-preview` product evidence snapshot. The snapshot command builds a Review-generated image condition patch from the checkout fixture, applies it to a real draft document, and renders `AutomationWorkflowDraftPreviewSheet` with provenance badges visible in Draft Visual Assets.
+- 2026-07-06: Added Review source/runtime evidence drill-in tiles. The Macro Review inspector now renders Source, Runtime and Diff artifact slots with safe refs in fixture mode and available/missing/thumbnail states for real bundles loaded through `SemanticRecordingReviewPresenter`; `semantic-review-timeline.png` was regenerated to show the drill-in slots in the S3 fixture surface.

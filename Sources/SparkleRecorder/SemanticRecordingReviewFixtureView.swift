@@ -594,6 +594,7 @@ struct SemanticRecordingReviewFixtureView: View {
                             detail: comparison.reason ?? comparison.runtimeArtifactPath,
                             accent: Color(red: 1.00, green: 0.72, blue: 0.30)
                         )
+                        comparisonArtifactStrip(comparison)
                         artifactButtons(paths: [
                             comparison.sourceArtifactPath,
                             comparison.runtimeArtifactPath,
@@ -769,6 +770,84 @@ struct SemanticRecordingReviewFixtureView: View {
                 }
             }
         }
+    }
+
+    private func comparisonArtifactStrip(
+        _ comparison: SemanticRecordingReviewProjection.ComparisonRow
+    ) -> some View {
+        HStack(spacing: 8) {
+            comparisonArtifactTile(
+                title: NSLocalizedString("Source", comment: ""),
+                path: comparison.sourceArtifactPath,
+                systemImage: "record.circle"
+            )
+            comparisonArtifactTile(
+                title: NSLocalizedString("Runtime", comment: ""),
+                path: comparison.runtimeArtifactPath,
+                systemImage: "play.circle"
+            )
+            comparisonArtifactTile(
+                title: NSLocalizedString("Diff", comment: ""),
+                path: comparison.diffArtifactPath,
+                systemImage: "square.split.2x1"
+            )
+        }
+    }
+
+    private func comparisonArtifactTile(
+        title: String,
+        path: String?,
+        systemImage: String
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 7) {
+            HStack(spacing: 5) {
+                Image(systemName: systemImage)
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(Color.white.opacity(0.48))
+                Text(title)
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(Color.white.opacity(0.56))
+                    .lineLimit(1)
+                Spacer(minLength: 0)
+            }
+
+            ZStack {
+                RoundedRectangle(cornerRadius: 5)
+                    .fill(Color.black.opacity(0.18))
+                if let image = artifactImage(path: path) {
+                    Image(nsImage: image)
+                        .resizable()
+                        .scaledToFill()
+                } else {
+                    Image(systemName: comparisonArtifactPlaceholderImage(path: path))
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(Color.white.opacity(0.30))
+                }
+            }
+            .frame(height: 46)
+            .clipShape(RoundedRectangle(cornerRadius: 5))
+            .overlay(
+                RoundedRectangle(cornerRadius: 5)
+                    .stroke(Color.white.opacity(0.07), lineWidth: 1)
+            )
+
+            Text(comparisonArtifactStatus(path: path))
+                .font(.system(size: 9, weight: .semibold))
+                .foregroundStyle(comparisonArtifactStatusTint(path: path))
+                .lineLimit(1)
+
+            Text(path.map(compactPath) ?? NSLocalizedString("No artifact ref", comment: ""))
+                .font(.system(size: 9, weight: .medium, design: .monospaced))
+                .foregroundStyle(Color.white.opacity(0.38))
+                .lineLimit(1)
+        }
+        .padding(8)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.black.opacity(0.12), in: RoundedRectangle(cornerRadius: 7))
+        .overlay(
+            RoundedRectangle(cornerRadius: 7)
+                .stroke(Color.white.opacity(0.065), lineWidth: 1)
+        )
     }
 
     private func sectionTitle(_ value: String) -> some View {
@@ -1176,6 +1255,53 @@ struct SemanticRecordingReviewFixtureView: View {
             return nil
         }
         return NSImage(contentsOf: status.url)
+    }
+
+    private func comparisonArtifactStatus(path: String?) -> String {
+        guard let path else {
+            return NSLocalizedString("No ref", comment: "")
+        }
+        guard let reviewState else {
+            return NSLocalizedString("Safe ref", comment: "")
+        }
+        guard let status = reviewState.artifactStatus(for: path) else {
+            return NSLocalizedString("Untracked", comment: "")
+        }
+        return status.exists
+            ? NSLocalizedString("Available", comment: "")
+            : NSLocalizedString("Missing", comment: "")
+    }
+
+    private func comparisonArtifactStatusTint(path: String?) -> Color {
+        guard let path else {
+            return Color.white.opacity(0.30)
+        }
+        guard let reviewState,
+              let status = reviewState.artifactStatus(for: path) else {
+            return Color.white.opacity(0.42)
+        }
+        return status.exists
+            ? Color(red: 0.48, green: 0.76, blue: 0.52)
+            : Color(red: 1.00, green: 0.72, blue: 0.30)
+    }
+
+    private func comparisonArtifactPlaceholderImage(path: String?) -> String {
+        guard let path else {
+            return "minus.circle"
+        }
+        guard let reviewState,
+              let status = reviewState.artifactStatus(for: path) else {
+            return "link"
+        }
+        return status.exists ? "photo" : "exclamationmark.triangle"
+    }
+
+    private func compactPath(_ path: String) -> String {
+        let parts = path.split(separator: "/").map(String.init)
+        guard parts.count > 2 else {
+            return path
+        }
+        return parts.suffix(2).joined(separator: "/")
     }
 
     private func artifactFeedbackMessage(
