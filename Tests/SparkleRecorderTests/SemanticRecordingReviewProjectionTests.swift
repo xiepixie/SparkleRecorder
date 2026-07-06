@@ -545,4 +545,65 @@ struct SemanticRecordingReviewProjectionTests {
             .init(title: "Evidence", value: "Run outcome")
         ])
     }
+
+    @Test("Run target evidence is codable provenance, not a mutation action")
+    func runTargetEvidenceIsCodableProvenanceNotMutationAction() throws {
+        let target = SemanticRecordingReviewRunTarget(
+            selectedEventID: SemanticRecordingFixture.clickEventID,
+            selectedFrameID: SemanticRecordingFixture.beforeClickFrameID,
+            reason: .failedRecordedEventIndex(4)
+        )
+        let evidence = SemanticRecordingReviewRunTargetEvidence.make(target: target)
+        let presentation = SemanticRecordingReviewRunTargetPresentation.make(target: target)
+
+        #expect(evidence.provenanceName.rawValue == "semanticReview.runTarget")
+        #expect(evidence.title == presentation.title)
+        #expect(evidence.detail == presentation.detail)
+        #expect(evidence.reason == .failedRecordedEventIndex)
+        #expect(evidence.selectedEventID == SemanticRecordingFixture.clickEventID)
+        #expect(evidence.selectedFrameID == SemanticRecordingFixture.beforeClickFrameID)
+        #expect(evidence.requestedRecordedEventIndex == 4)
+        #expect(evidence.matchedRecordedEventIndex == 4)
+        #expect(evidence.boundary == .provenanceOnly)
+        #expect(!evidence.createsDraftPatch)
+        #expect(!evidence.mutatesWorkflow)
+        #expect(evidence.rows.contains {
+            $0.kind == .provenance && $0.value == "semanticReview.runTarget"
+        })
+        #expect(evidence.rows.contains {
+            $0.kind == .boundary && $0.value == "provenanceOnly"
+        })
+        #expect(evidence.rows.contains {
+            $0.kind == .effect && $0.value == "No workflow mutation"
+        })
+
+        let encoded = try JSONEncoder().encode(evidence)
+        let decoded = try JSONDecoder().decode(
+            SemanticRecordingReviewRunTargetEvidence.self,
+            from: encoded
+        )
+
+        #expect(decoded == evidence)
+    }
+
+    @Test("Run target evidence preserves nearest fallback indexes")
+    func runTargetEvidencePreservesNearestFallbackIndexes() {
+        let evidence = SemanticRecordingReviewRunTargetEvidence.make(
+            target: SemanticRecordingReviewRunTarget(
+                selectedEventID: SemanticRecordingFixture.clickEventID,
+                selectedFrameID: SemanticRecordingFixture.beforeClickFrameID,
+                reason: .nearestRecordedEventIndex(requested: 8, matched: 4)
+            )
+        )
+
+        #expect(evidence.reason == .nearestRecordedEventIndex)
+        #expect(evidence.requestedRecordedEventIndex == 8)
+        #expect(evidence.matchedRecordedEventIndex == 4)
+        #expect(evidence.rows.contains {
+            $0.kind == .requestedEventIndex && $0.value == "Event #9"
+        })
+        #expect(evidence.rows.contains {
+            $0.kind == .matchedEventIndex && $0.value == "Event #5"
+        })
+    }
 }

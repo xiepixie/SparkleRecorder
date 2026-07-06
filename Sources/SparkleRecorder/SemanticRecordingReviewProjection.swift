@@ -238,6 +238,190 @@ public struct SemanticRecordingReviewRunTargetPresentation: Equatable, Sendable 
     }
 }
 
+public struct SemanticRecordingReviewRunTargetEvidence: Codable, Equatable, Sendable {
+    public enum ProvenanceName: String, Codable, Equatable, Sendable {
+        case runTarget = "semanticReview.runTarget"
+    }
+
+    public enum Boundary: String, Codable, Equatable, Sendable {
+        case provenanceOnly = "provenanceOnly"
+    }
+
+    public enum Reason: String, Codable, Equatable, Sendable {
+        case failedRecordedEventIndex = "failedRecordedEventIndex"
+        case nearestRecordedEventIndex = "nearestRecordedEventIndex"
+        case conditionCandidate = "conditionCandidate"
+        case firstRecordedEvent = "firstRecordedEvent"
+        case defaultTimeline = "defaultTimeline"
+    }
+
+    public struct Row: Codable, Equatable, Sendable, Identifiable {
+        public enum Kind: String, Codable, Equatable, Sendable {
+            case provenance
+            case boundary
+            case effect
+            case selectedEvent
+            case selectedFrame
+            case requestedEventIndex
+            case matchedEventIndex
+            case target
+            case evidence
+            case summary
+        }
+
+        public var id: String { "\(kind.rawValue):\(value)" }
+        public var kind: Kind
+        public var label: String
+        public var value: String
+
+        public init(kind: Kind, label: String, value: String) {
+            self.kind = kind
+            self.label = label
+            self.value = value
+        }
+    }
+
+    public var provenanceName: ProvenanceName
+    public var title: String
+    public var detail: String
+    public var reason: Reason
+    public var selectedEventID: UUID?
+    public var selectedFrameID: UUID?
+    public var requestedRecordedEventIndex: Int?
+    public var matchedRecordedEventIndex: Int?
+    public var boundary: Boundary
+    public var createsDraftPatch: Bool
+    public var mutatesWorkflow: Bool
+    public var rows: [Row]
+
+    public init(
+        provenanceName: ProvenanceName = .runTarget,
+        title: String,
+        detail: String,
+        reason: Reason,
+        selectedEventID: UUID?,
+        selectedFrameID: UUID?,
+        requestedRecordedEventIndex: Int? = nil,
+        matchedRecordedEventIndex: Int? = nil,
+        boundary: Boundary = .provenanceOnly,
+        createsDraftPatch: Bool = false,
+        mutatesWorkflow: Bool = false,
+        rows: [Row]
+    ) {
+        self.provenanceName = provenanceName
+        self.title = title
+        self.detail = detail
+        self.reason = reason
+        self.selectedEventID = selectedEventID
+        self.selectedFrameID = selectedFrameID
+        self.requestedRecordedEventIndex = requestedRecordedEventIndex
+        self.matchedRecordedEventIndex = matchedRecordedEventIndex
+        self.boundary = boundary
+        self.createsDraftPatch = createsDraftPatch
+        self.mutatesWorkflow = mutatesWorkflow
+        self.rows = rows
+    }
+
+    public static func make(
+        target: SemanticRecordingReviewRunTarget
+    ) -> SemanticRecordingReviewRunTargetEvidence {
+        let presentation = SemanticRecordingReviewRunTargetPresentation.make(target: target)
+        let reason = Reason(target.reason)
+        let indexes = recordedEventIndexes(target.reason)
+        return SemanticRecordingReviewRunTargetEvidence(
+            title: presentation.title,
+            detail: presentation.detail,
+            reason: reason,
+            selectedEventID: target.selectedEventID,
+            selectedFrameID: target.selectedFrameID,
+            requestedRecordedEventIndex: indexes.requested,
+            matchedRecordedEventIndex: indexes.matched,
+            rows: rows(
+                target: target,
+                presentation: presentation,
+                reason: reason,
+                requestedRecordedEventIndex: indexes.requested,
+                matchedRecordedEventIndex: indexes.matched
+            )
+        )
+    }
+
+    private static func rows(
+        target: SemanticRecordingReviewRunTarget,
+        presentation: SemanticRecordingReviewRunTargetPresentation,
+        reason: Reason,
+        requestedRecordedEventIndex: Int?,
+        matchedRecordedEventIndex: Int?
+    ) -> [Row] {
+        var rows: [Row] = [
+            Row(kind: .provenance, label: "Provenance", value: ProvenanceName.runTarget.rawValue),
+            Row(kind: .boundary, label: "Boundary", value: Boundary.provenanceOnly.rawValue),
+            Row(kind: .effect, label: "Effect", value: "No workflow mutation"),
+            Row(kind: .summary, label: "Summary", value: presentation.title),
+            Row(kind: .evidence, label: "Reason", value: reason.rawValue)
+        ]
+
+        if let selectedEventID = target.selectedEventID {
+            rows.append(Row(kind: .selectedEvent, label: "Selected event", value: shortID(selectedEventID)))
+        }
+        if let selectedFrameID = target.selectedFrameID {
+            rows.append(Row(kind: .selectedFrame, label: "Selected frame", value: shortID(selectedFrameID)))
+        }
+        if let requestedRecordedEventIndex {
+            rows.append(Row(
+                kind: .requestedEventIndex,
+                label: "Requested event",
+                value: "Event #\(requestedRecordedEventIndex + 1)"
+            ))
+        }
+        if let matchedRecordedEventIndex {
+            rows.append(Row(
+                kind: .matchedEventIndex,
+                label: "Matched event",
+                value: "Event #\(matchedRecordedEventIndex + 1)"
+            ))
+        }
+        rows.append(contentsOf: presentation.badges.map { badge in
+            Row(kind: badge.title == "Evidence" ? .evidence : .target, label: badge.title, value: badge.value)
+        })
+        return rows
+    }
+
+    private static func recordedEventIndexes(
+        _ reason: SemanticRecordingReviewRunTarget.Reason
+    ) -> (requested: Int?, matched: Int?) {
+        switch reason {
+        case .failedRecordedEventIndex(let index):
+            return (requested: index, matched: index)
+        case .nearestRecordedEventIndex(let requested, let matched):
+            return (requested: requested, matched: matched)
+        case .conditionCandidate, .firstRecordedEvent, .defaultTimeline:
+            return (requested: nil, matched: nil)
+        }
+    }
+
+    private static func shortID(_ id: UUID) -> String {
+        String(id.uuidString.suffix(8)).lowercased()
+    }
+}
+
+private extension SemanticRecordingReviewRunTargetEvidence.Reason {
+    init(_ reason: SemanticRecordingReviewRunTarget.Reason) {
+        switch reason {
+        case .failedRecordedEventIndex:
+            self = .failedRecordedEventIndex
+        case .nearestRecordedEventIndex:
+            self = .nearestRecordedEventIndex
+        case .conditionCandidate:
+            self = .conditionCandidate
+        case .firstRecordedEvent:
+            self = .firstRecordedEvent
+        case .defaultTimeline:
+            self = .defaultTimeline
+        }
+    }
+}
+
 private extension AutomationTaskRun {
     var failedEventIndex: Int? {
         guard case .failed(let report) = outcome else {
