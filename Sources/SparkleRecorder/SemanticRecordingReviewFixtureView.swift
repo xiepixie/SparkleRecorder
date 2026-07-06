@@ -18,6 +18,7 @@ struct SemanticRecordingReviewFixtureView: View {
     @State private var pixelColorHexes: [String: String] = [:]
     @State private var suggestionReviewDecisions: [UUID: SuggestionReviewDecision] = [:]
     @State private var draftPatchResult: SemanticRecordingReviewDraftPatchResult?
+    @State private var draftPatchSourceSuggestionID: UUID?
     @State private var draftPatchErrorMessage = ""
     @State private var draftPreviewState: AutomationWorkflowDraftPreviewState?
     @State private var patchSaveMessage = ""
@@ -41,7 +42,9 @@ struct SemanticRecordingReviewFixtureView: View {
         suggestions: [RecordingSuggestion] = [],
         selectedEventID: UUID? = nil,
         selectedFrameID: UUID? = nil,
-        initialDraftPatchCandidateID: String? = nil
+        initialDraftPatchCandidateID: String? = nil,
+        initialAcceptedSuggestionID: UUID? = nil,
+        initialRejectedSuggestionID: UUID? = nil
     ) {
         let projection = SemanticRecordingReviewProjection(
             bundle: bundle,
@@ -63,6 +66,11 @@ struct SemanticRecordingReviewFixtureView: View {
             bundle: bundle,
             projection: projection,
             candidateID: initialDraftPatchCandidateID
+        ))
+        _draftPatchSourceSuggestionID = State(initialValue: initialAcceptedSuggestionID)
+        _suggestionReviewDecisions = State(initialValue: Self.initialSuggestionReviewDecisions(
+            acceptedID: initialAcceptedSuggestionID,
+            rejectedID: initialRejectedSuggestionID
         ))
     }
 
@@ -106,6 +114,20 @@ struct SemanticRecordingReviewFixtureView: View {
             bundle: bundle,
             request: SemanticRecordingReviewDraftPatchRequest(candidate: candidate)
         )
+    }
+
+    private static func initialSuggestionReviewDecisions(
+        acceptedID: UUID?,
+        rejectedID: UUID?
+    ) -> [UUID: SuggestionReviewDecision] {
+        var decisions: [UUID: SuggestionReviewDecision] = [:]
+        if let acceptedID {
+            decisions[acceptedID] = .accepted
+        }
+        if let rejectedID {
+            decisions[rejectedID] = .rejected
+        }
+        return decisions
     }
 
     private var projection: SemanticRecordingReviewProjection {
@@ -601,7 +623,7 @@ struct SemanticRecordingReviewFixtureView: View {
                         suggestionEvidenceSummary(suggestion)
 
                         HStack(spacing: 8) {
-                            Button(NSLocalizedString("Accept Patch", comment: ""), systemImage: "checkmark.circle") {
+                            Button(NSLocalizedString("Accept", comment: ""), systemImage: "checkmark.circle") {
                                 acceptSuggestion(suggestion)
                             }
                             .buttonStyle(.bordered)
@@ -618,6 +640,19 @@ struct SemanticRecordingReviewFixtureView: View {
                                 Label(decision.title, systemImage: decision.systemImage)
                                     .font(.system(size: 11, weight: .semibold))
                                     .foregroundStyle(decision.tint)
+
+                                Text(decision.detail)
+                                    .font(.system(size: 11, weight: .medium))
+                                    .foregroundStyle(Color.white.opacity(0.46))
+                                    .lineLimit(1)
+
+                                Button("", systemImage: "arrow.uturn.backward.circle") {
+                                    clearSuggestionDecision(suggestion)
+                                }
+                                .buttonStyle(.bordered)
+                                .controlSize(.small)
+                                .help(NSLocalizedString("Undo suggestion review decision", comment: ""))
+                                .accessibilityLabel(NSLocalizedString("Undo suggestion review decision", comment: ""))
                             }
 
                             Spacer(minLength: 0)
@@ -893,6 +928,7 @@ struct SemanticRecordingReviewFixtureView: View {
         selectedCandidateID = nil
         regionSelection = nil
         draftPatchResult = nil
+        draftPatchSourceSuggestionID = nil
         draftPatchErrorMessage = ""
         patchSaveMessage = ""
     }
@@ -906,6 +942,7 @@ struct SemanticRecordingReviewFixtureView: View {
         selectedCandidateID = nil
         regionSelection = nil
         draftPatchResult = nil
+        draftPatchSourceSuggestionID = nil
         draftPatchErrorMessage = ""
         patchSaveMessage = ""
     }
@@ -915,6 +952,7 @@ struct SemanticRecordingReviewFixtureView: View {
         selectedCandidateID = nil
         regionSelection = nil
         draftPatchResult = nil
+        draftPatchSourceSuggestionID = nil
         draftPatchErrorMessage = ""
         patchSaveMessage = ""
     }
@@ -948,10 +986,12 @@ struct SemanticRecordingReviewFixtureView: View {
                     pixelColorHex: pixelColorHex(for: candidate)
                 )
             )
+            draftPatchSourceSuggestionID = nil
             draftPatchErrorMessage = ""
             patchSaveMessage = ""
         } catch {
             draftPatchResult = nil
+            draftPatchSourceSuggestionID = nil
             draftPatchErrorMessage = String(describing: error)
         }
     }
@@ -985,9 +1025,11 @@ struct SemanticRecordingReviewFixtureView: View {
             )
             draftPatchErrorMessage = ""
             patchSaveMessage = ""
+            draftPatchSourceSuggestionID = suggestion.id
             suggestionReviewDecisions[suggestion.id] = .accepted
         } catch {
             draftPatchResult = nil
+            draftPatchSourceSuggestionID = nil
             draftPatchErrorMessage = String(describing: error)
         }
     }
@@ -996,6 +1038,22 @@ struct SemanticRecordingReviewFixtureView: View {
         _ suggestion: SemanticRecordingReviewProjection.SuggestionRow
     ) {
         suggestionReviewDecisions[suggestion.id] = .rejected
+        if draftPatchSourceSuggestionID == suggestion.id {
+            draftPatchResult = nil
+            draftPatchSourceSuggestionID = nil
+        }
+        draftPatchErrorMessage = ""
+        patchSaveMessage = ""
+    }
+
+    private func clearSuggestionDecision(
+        _ suggestion: SemanticRecordingReviewProjection.SuggestionRow
+    ) {
+        suggestionReviewDecisions.removeValue(forKey: suggestion.id)
+        if draftPatchSourceSuggestionID == suggestion.id {
+            draftPatchResult = nil
+            draftPatchSourceSuggestionID = nil
+        }
         draftPatchErrorMessage = ""
         patchSaveMessage = ""
     }
@@ -1052,6 +1110,7 @@ struct SemanticRecordingReviewFixtureView: View {
                 pixelColorHexes[candidate.id] = newValue
                 if selectedCandidateID == candidate.id {
                     draftPatchResult = nil
+                    draftPatchSourceSuggestionID = nil
                     draftPatchErrorMessage = ""
                     patchSaveMessage = ""
                 }
@@ -1207,6 +1266,15 @@ private enum SuggestionReviewDecision {
             return "checkmark.circle.fill"
         case .rejected:
             return "xmark.circle.fill"
+        }
+    }
+
+    var detail: String {
+        switch self {
+        case .accepted:
+            return NSLocalizedString("Patch staged", comment: "")
+        case .rejected:
+            return NSLocalizedString("No workflow change", comment: "")
         }
     }
 

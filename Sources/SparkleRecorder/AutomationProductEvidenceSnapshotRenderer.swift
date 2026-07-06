@@ -599,7 +599,8 @@ enum AutomationProductEvidenceSnapshotRenderer {
                 bundle: bundle,
                 suggestions: suggestions,
                 selectedEventID: SemanticRecordingFixture.waitEventID,
-                initialDraftPatchCandidateID: candidateID
+                initialDraftPatchCandidateID: candidateID,
+                initialAcceptedSuggestionID: suggestions.first?.id
             )
             .frame(width: width, height: height)
             .environment(\.colorScheme, .dark)
