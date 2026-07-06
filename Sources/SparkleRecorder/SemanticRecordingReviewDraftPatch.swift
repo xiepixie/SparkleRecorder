@@ -27,6 +27,8 @@ public struct SemanticRecordingReviewActionSemantics: Codable, Equatable, Sendab
         public var observationIDs: [UUID]
         public var sourcePreviewRefID: UUID?
         public var artifactPath: String?
+        public var materializedArtifactPath: String?
+        public var materializedSHA256: String?
         public var bounds: RecordingBounds?
         public var summary: String?
 
@@ -37,6 +39,8 @@ public struct SemanticRecordingReviewActionSemantics: Codable, Equatable, Sendab
             observationIDs: [UUID] = [],
             sourcePreviewRefID: UUID? = nil,
             artifactPath: String? = nil,
+            materializedArtifactPath: String? = nil,
+            materializedSHA256: String? = nil,
             bounds: RecordingBounds? = nil,
             summary: String? = nil
         ) {
@@ -46,6 +50,8 @@ public struct SemanticRecordingReviewActionSemantics: Codable, Equatable, Sendab
             self.observationIDs = observationIDs
             self.sourcePreviewRefID = sourcePreviewRefID
             self.artifactPath = artifactPath
+            self.materializedArtifactPath = materializedArtifactPath
+            self.materializedSHA256 = materializedSHA256
             self.bounds = bounds
             self.summary = summary
         }
@@ -189,6 +195,20 @@ public struct SemanticRecordingReviewActionSemantics: Codable, Equatable, Sendab
         )
     }
 
+    public static func previewDraft(
+        _ result: SemanticRecordingReviewDraftPatchResult,
+        materializedAssets: [SemanticRecordingReviewMaterializedAsset]
+    ) -> SemanticRecordingReviewActionSemantics {
+        SemanticRecordingReviewActionSemantics(
+            actionName: .previewDraft,
+            title: "Preview draft",
+            mutationBoundary: .draftPreviewRequired,
+            createsDraftPatch: false,
+            mutatesWorkflow: false,
+            evidence: evidenceAlignment(result, materializedAssets: materializedAssets)
+        )
+    }
+
     public static func previewDraft() -> SemanticRecordingReviewActionSemantics {
         SemanticRecordingReviewActionSemantics(
             actionName: .previewDraft,
@@ -210,6 +230,20 @@ public struct SemanticRecordingReviewActionSemantics: Codable, Equatable, Sendab
             createsDraftPatch: false,
             mutatesWorkflow: true,
             evidence: result.actionEvidence
+        )
+    }
+
+    public static func importDraft(
+        _ result: SemanticRecordingReviewDraftPatchResult,
+        materializedAssets: [SemanticRecordingReviewMaterializedAsset]
+    ) -> SemanticRecordingReviewActionSemantics {
+        SemanticRecordingReviewActionSemantics(
+            actionName: .importDraft,
+            title: "Import reviewed draft",
+            mutationBoundary: .confirmedImport,
+            createsDraftPatch: false,
+            mutatesWorkflow: true,
+            evidence: evidenceAlignment(result, materializedAssets: materializedAssets)
         )
     }
 
@@ -277,6 +311,33 @@ public struct SemanticRecordingReviewActionSemantics: Codable, Equatable, Sendab
         var evidence = evidenceAlignment(candidate, regionSelection: regionSelection)
         evidence.eventIDs = frame.relatedEventIDs
         return evidence
+    }
+
+    private static func evidenceAlignment(
+        _ result: SemanticRecordingReviewDraftPatchResult,
+        materializedAssets: [SemanticRecordingReviewMaterializedAsset]
+    ) -> EvidenceAlignment {
+        var evidence = result.actionEvidence
+        guard let materializedAsset = materializedAsset(
+            for: evidence,
+            in: materializedAssets
+        ) else {
+            return evidence
+        }
+        evidence.materializedArtifactPath = materializedAsset.destinationPath
+        evidence.materializedSHA256 = materializedAsset.sha256
+        return evidence
+    }
+
+    private static func materializedAsset(
+        for evidence: EvidenceAlignment,
+        in materializedAssets: [SemanticRecordingReviewMaterializedAsset]
+    ) -> SemanticRecordingReviewMaterializedAsset? {
+        if let artifactPath = evidence.artifactPath,
+           let exact = materializedAssets.first(where: { $0.sourcePath == artifactPath }) {
+            return exact
+        }
+        return materializedAssets.first
     }
 }
 
