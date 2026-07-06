@@ -431,3 +431,130 @@ public enum TextTargetAnchorFactory {
         }
     }
 }
+
+public struct ActionGroupDeletionPlan: Equatable, Sendable {
+    public var eventTimeShifts: [ActionGroupEventTimeShift]
+    public var eventIndices: [Int]
+    public var subsequentShiftCutoffTime: TimeInterval?
+    public var subsequentShift: TimeInterval
+    public var liveDurationAfterDeletion: TimeInterval?
+
+    public init(
+        eventTimeShifts: [ActionGroupEventTimeShift] = [],
+        eventIndices: [Int] = [],
+        subsequentShiftCutoffTime: TimeInterval? = nil,
+        subsequentShift: TimeInterval = 0,
+        liveDurationAfterDeletion: TimeInterval? = nil
+    ) {
+        self.eventTimeShifts = eventTimeShifts
+        self.eventIndices = eventIndices
+        self.subsequentShiftCutoffTime = subsequentShiftCutoffTime
+        self.subsequentShift = subsequentShift
+        self.liveDurationAfterDeletion = liveDurationAfterDeletion
+    }
+
+    public var isEmpty: Bool {
+        eventTimeShifts.isEmpty &&
+            eventIndices.isEmpty &&
+            subsequentShiftCutoffTime == nil &&
+            liveDurationAfterDeletion == nil
+    }
+}
+
+public struct ActionGroupEventTimeShift: Equatable, Sendable {
+    public var eventIndices: [Int]
+    public var delta: TimeInterval
+
+    public init(eventIndices: [Int], delta: TimeInterval) {
+        self.eventIndices = eventIndices
+        self.delta = delta
+    }
+}
+
+public enum ActionGroupDeletionPlanner {
+    public static func plan(
+        for groups: [ActionGroup],
+        events: [RecordedEvent],
+        liveDuration: TimeInterval
+    ) -> ActionGroupDeletionPlan {
+        var eventIndices = Set<Int>()
+        var waitShifts: [(endTime: TimeInterval, duration: TimeInterval)] = []
+        var trailingWaitDelta: TimeInterval = 0
+
+        for group in groups {
+            if group.kind == .wait {
+                let waitDuration = max(0, group.endTime - group.startTime)
+                guard waitDuration > 0 else { continue }
+
+                let hasEventsAfter = events.contains { $0.time >= group.endTime }
+                if hasEventsAfter {
+                    waitShifts.append((endTime: group.endTime, duration: waitDuration))
+                } else {
+                    trailingWaitDelta += waitDuration
+                }
+            } else {
+                for index in group.eventIndices where events.indices.contains(index) {
+                    eventIndices.insert(index)
+                }
+            }
+        }
+
+        let eventTimeShifts = makeEventTimeShifts(
+            waitShifts: waitShifts,
+            deletedEventIndices: eventIndices,
+            events: events
+        )
+        let totalWaitDelta = waitShifts.reduce(trailingWaitDelta) { $0 + $1.duration }
+
+        let shiftCutoff: TimeInterval?
+        let shift: TimeInterval
+        if let firstShift = waitShifts.map(\.endTime).min() {
+            shiftCutoff = firstShift
+            shift = -waitShifts.reduce(0) { $0 + $1.duration }
+        } else {
+            shiftCutoff = nil
+            shift = 0
+        }
+
+        let liveDurationAfterDeletion = totalWaitDelta > 0
+            ? max(0, liveDuration - totalWaitDelta)
+            : nil
+
+        return ActionGroupDeletionPlan(
+            eventTimeShifts: eventTimeShifts,
+            eventIndices: eventIndices.sorted(),
+            subsequentShiftCutoffTime: shiftCutoff,
+            subsequentShift: shift,
+            liveDurationAfterDeletion: liveDurationAfterDeletion
+        )
+    }
+
+    private static func makeEventTimeShifts(
+        waitShifts: [(endTime: TimeInterval, duration: TimeInterval)],
+        deletedEventIndices: Set<Int>,
+        events: [RecordedEvent]
+    ) -> [ActionGroupEventTimeShift] {
+        guard !waitShifts.isEmpty else { return [] }
+
+        let indexedDeltas = events.enumerated().compactMap { index, event -> (index: Int, delta: TimeInterval)? in
+            guard !deletedEventIndices.contains(index) else { return nil }
+            let delta = waitShifts.reduce(TimeInterval(0)) { partial, wait in
+                event.time >= wait.endTime ? partial - wait.duration : partial
+            }
+            guard delta != 0 else { return nil }
+            return (index, delta)
+        }
+
+        let grouped = Dictionary(grouping: indexedDeltas, by: \.delta)
+        return grouped
+            .map { delta, rows in
+                ActionGroupEventTimeShift(
+                    eventIndices: rows.map(\.index).sorted(),
+                    delta: delta
+                )
+            }
+            .sorted {
+                ($0.eventIndices.first ?? Int.max) < ($1.eventIndices.first ?? Int.max)
+            }
+    }
+}

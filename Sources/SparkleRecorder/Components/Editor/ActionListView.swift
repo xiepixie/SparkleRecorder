@@ -508,7 +508,7 @@ struct ActionListView: View {
         } label: {
             Label(NSLocalizedString("Delete Actions", comment: ""), systemImage: "trash")
         }
-        .disabled(snapshot.eventIndices.isEmpty)
+        .disabled(deletionPlan(anchor: row).isEmpty)
         
         Divider()
         
@@ -548,6 +548,14 @@ struct ActionListView: View {
     func contextContainsBehavior(anchor row: ActionRow) -> Bool {
         contextSnapshot(anchor: row).containsBehavior
     }
+
+    func deletionPlan(anchor row: ActionRow) -> ActionGroupDeletionPlan {
+        ActionGroupDeletionPlanner.plan(
+            for: contextRows(anchor: row).map(\.group),
+            events: recorder.events,
+            liveDuration: recorder.liveDuration
+        )
+    }
     
     func duplicateRows(anchor row: ActionRow) {
         let indices = contextSnapshot(anchor: row).eventIndices
@@ -571,11 +579,14 @@ struct ActionListView: View {
     
     func deleteRows(anchor row: ActionRow) {
         let snapshot = contextSnapshot(anchor: row)
-        let indices = snapshot.eventIndices
-        guard !indices.isEmpty else { return }
+        let plan = deletionPlan(anchor: row)
+        guard !plan.isEmpty else { return }
         selection.subtract(snapshot.groupIDs)
         withUndo(NSLocalizedString("Delete Actions", comment: "")) {
-            recorder.events.deleteEvents(at: IndexSet(indices))
+            recorder.events.applyActionGroupDeletionPlan(plan)
+            if let liveDuration = plan.liveDurationAfterDeletion {
+                recorder.liveDuration = liveDuration
+            }
         }
     }
     

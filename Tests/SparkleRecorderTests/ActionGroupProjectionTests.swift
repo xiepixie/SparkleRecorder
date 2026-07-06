@@ -410,4 +410,130 @@ struct ActionGroupProjectionTests {
         #expect(anchor.coordinateFallback == nil)
         #expect(anchor.coordinateFallbackContentNormalized == nil)
     }
+
+    @Test("Deletion planner removes middle wait by shifting later events")
+    func deletionPlannerRemovesMiddleWaitByShiftingLaterEvents() {
+        let events = [
+            RecordedEvent.make(.leftMouseDown, time: 0.0, x: 10, y: 10),
+            RecordedEvent.make(.leftMouseUp, time: 0.1, x: 10, y: 10),
+            RecordedEvent.make(.leftMouseDown, time: 1.1, x: 20, y: 20),
+            RecordedEvent.make(.leftMouseUp, time: 1.2, x: 20, y: 20)
+        ]
+        let wait = ActionGroup(
+            kind: .wait,
+            eventIndices: [],
+            startTime: 0.1,
+            endTime: 1.1,
+            summary: "Wait"
+        )
+
+        let plan = ActionGroupDeletionPlanner.plan(
+            for: [wait],
+            events: events,
+            liveDuration: 1.2
+        )
+
+        #expect(plan.eventIndices.isEmpty)
+        #expect(plan.eventTimeShifts == [
+            ActionGroupEventTimeShift(eventIndices: [2, 3], delta: -1.0)
+        ])
+        #expect(plan.subsequentShiftCutoffTime == 1.1)
+        #expect(plan.subsequentShift == -1.0)
+        #expect(abs((plan.liveDurationAfterDeletion ?? 0) - 0.2) < 0.000_001)
+        #expect(!plan.isEmpty)
+    }
+
+    @Test("Deletion planner applies cumulative shifts for multiple waits")
+    func deletionPlannerAppliesCumulativeShiftsForMultipleWaits() {
+        let events = [
+            RecordedEvent.make(.leftMouseDown, time: 0.2, x: 10, y: 10),
+            RecordedEvent.make(.leftMouseDown, time: 2.2, x: 20, y: 20),
+            RecordedEvent.make(.leftMouseDown, time: 5.2, x: 30, y: 30)
+        ]
+        let firstWait = ActionGroup(
+            kind: .wait,
+            eventIndices: [],
+            startTime: 0.2,
+            endTime: 2.2,
+            summary: "Wait"
+        )
+        let secondWait = ActionGroup(
+            kind: .wait,
+            eventIndices: [],
+            startTime: 2.2,
+            endTime: 5.2,
+            summary: "Wait"
+        )
+
+        let plan = ActionGroupDeletionPlanner.plan(
+            for: [firstWait, secondWait],
+            events: events,
+            liveDuration: 5.2
+        )
+
+        #expect(plan.eventIndices.isEmpty)
+        #expect(plan.eventTimeShifts == [
+            ActionGroupEventTimeShift(eventIndices: [1], delta: -2.0),
+            ActionGroupEventTimeShift(eventIndices: [2], delta: -5.0)
+        ])
+        #expect(plan.subsequentShiftCutoffTime == 2.2)
+        #expect(plan.subsequentShift == -5.0)
+        #expect(abs((plan.liveDurationAfterDeletion ?? 0) - 0.2) < 0.000_001)
+        #expect(!plan.isEmpty)
+    }
+
+    @Test("Deletion planner removes trailing wait by shortening live duration")
+    func deletionPlannerRemovesTrailingWaitByShorteningLiveDuration() {
+        let events = [
+            RecordedEvent.make(.leftMouseDown, time: 0.0, x: 10, y: 10),
+            RecordedEvent.make(.leftMouseUp, time: 0.1, x: 10, y: 10)
+        ]
+        let trailingWait = ActionGroup(
+            kind: .wait,
+            eventIndices: [],
+            startTime: 0.1,
+            endTime: 2.1,
+            summary: "Wait"
+        )
+
+        let plan = ActionGroupDeletionPlanner.plan(
+            for: [trailingWait],
+            events: events,
+            liveDuration: 2.1
+        )
+
+        #expect(plan.eventIndices.isEmpty)
+        #expect(plan.eventTimeShifts.isEmpty)
+        #expect(plan.subsequentShiftCutoffTime == nil)
+        #expect(plan.subsequentShift == 0)
+        #expect(abs((plan.liveDurationAfterDeletion ?? 0) - 0.1) < 0.000_001)
+        #expect(!plan.isEmpty)
+    }
+
+    @Test("Deletion planner deletes event backed actions directly")
+    func deletionPlannerDeletesEventBackedActionsDirectly() {
+        let events = [
+            RecordedEvent.make(.leftMouseDown, time: 0.0, x: 10, y: 10),
+            RecordedEvent.make(.leftMouseUp, time: 0.1, x: 10, y: 10)
+        ]
+        let click = ActionGroup(
+            kind: .click,
+            eventIndices: [0, 1],
+            startTime: 0.0,
+            endTime: 0.1,
+            summary: "Click"
+        )
+
+        let plan = ActionGroupDeletionPlanner.plan(
+            for: [click],
+            events: events,
+            liveDuration: 0.1
+        )
+
+        #expect(plan.eventIndices == [0, 1])
+        #expect(plan.eventTimeShifts.isEmpty)
+        #expect(plan.subsequentShiftCutoffTime == nil)
+        #expect(plan.liveDurationAfterDeletion == nil)
+        #expect(!plan.isEmpty)
+    }
 }

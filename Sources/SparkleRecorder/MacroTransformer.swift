@@ -282,6 +282,20 @@ extension Array where Element == RecordedEvent {
 
     }
 
+    public mutating func applyActionGroupDeletionPlan(_ plan: ActionGroupDeletionPlan) {
+        for shift in plan.eventTimeShifts {
+            for index in shift.eventIndices where self.indices.contains(index) {
+                self[index].time = Swift.max(0, self[index].time + shift.delta)
+            }
+        }
+        if !plan.eventIndices.isEmpty {
+            deleteEvents(at: IndexSet(plan.eventIndices))
+        }
+        if !plan.eventTimeShifts.isEmpty {
+            sortByTimePreservingOrder()
+        }
+    }
+
     /// Drop everything before `index` and rebase remaining timestamps to start at 0.
     public mutating func trimBefore(index: Int) {
         guard self.indices.contains(index), index > 0 else { return }

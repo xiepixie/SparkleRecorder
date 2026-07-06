@@ -376,7 +376,7 @@ let package = Package(
         ),
         .testTarget(
             name: "SparkleRecorderTests",
-            dependencies: ["SparkleRecorderCore"],
+            dependencies: ["SparkleRecorderCore", "SparkleRecorder"],
             path: "Tests/SparkleRecorderTests",
             swiftSettings: [
                 .swiftLanguageMode(.v6),

@@ -1020,52 +1020,18 @@ struct EditorSidebar: View {
         let selectedGroups = selection.compactMap { groupID -> ActionGroup? in
             rows.first(where: { $0.id == groupID })?.group
         }
-        var allIndices: [Int] = []
-        var totalWaitDelta: TimeInterval = 0
-        var trailingWaitDelta: TimeInterval = 0
-        var waitCutoffTime: TimeInterval = .greatestFiniteMagnitude
-        
-        for grp in selectedGroups {
-            if grp.kind.isPassiveWait {
-                let waitDuration = grp.endTime - grp.startTime
-                if waitDuration > 0 {
-                    // Wait rows are derived from gaps, so deleting one means
-                    // pulling later events earlier or shortening trailing duration.
-                    let hasEventsAfter = recorder.events.contains(where: { $0.time >= grp.endTime })
-                    if hasEventsAfter {
-                        totalWaitDelta += waitDuration
-                        if grp.endTime < waitCutoffTime {
-                            waitCutoffTime = grp.endTime
-                        }
-                    } else {
-                        trailingWaitDelta += waitDuration
-                    }
-                }
-            } else {
-                allIndices.append(contentsOf: grp.eventIndices)
-            }
-        }
-        
-        guard !allIndices.isEmpty || totalWaitDelta > 0 || trailingWaitDelta > 0 else { return }
+        let plan = ActionGroupDeletionPlanner.plan(
+            for: selectedGroups,
+            events: recorder.events,
+            liveDuration: recorder.liveDuration
+        )
+        guard !plan.isEmpty else { return }
         
         selection.removeAll()
         withUndo(NSLocalizedString("Delete Actions", comment: "")) {
-            if !allIndices.isEmpty {
-                recorder.events.deleteEvents(at: IndexSet(allIndices))
-            }
-            if totalWaitDelta > 0 {
-                var subsequentIndices = IndexSet()
-                for (idx, ev) in recorder.events.enumerated() {
-                    if ev.time >= waitCutoffTime {
-                        subsequentIndices.insert(idx)
-                    }
-                }
-                if !subsequentIndices.isEmpty {
-                    recorder.events.shiftTime(of: subsequentIndices, by: -totalWaitDelta)
-                }
-            }
-            if trailingWaitDelta > 0 {
-                recorder.liveDuration = (recorder.liveDuration - trailingWaitDelta)
+            recorder.events.applyActionGroupDeletionPlan(plan)
+            if let liveDuration = plan.liveDurationAfterDeletion {
+                recorder.liveDuration = liveDuration
             }
         }
     }
