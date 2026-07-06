@@ -147,12 +147,49 @@ struct AutomationOwnerBClientTests {
             scheduledStartTime: Date(timeIntervalSince1970: 610),
             createdAt: Date(timeIntervalSince1970: 610)
         )
-        let secondRun = task.makeRun(
+        var secondRun = task.makeRun(
             workflowID: workflowID,
             runID: UUID(),
             scheduledStartTime: Date(timeIntervalSince1970: 620),
             createdAt: Date(timeIntervalSince1970: 620)
         )
+        let branchEvidence = AutomationBranchDecisionEvidence(
+            sourceRunID: secondRun.id,
+            sourceTaskID: task.id,
+            dependencyID: UUID(),
+            trigger: .always,
+            status: .triggered,
+            targetTaskID: task.id,
+            targetRunID: nil,
+            executionID: secondRun.executionID,
+            sourceOutcome: .succeeded(report: nil),
+            decidedAt: Date(timeIntervalSince1970: 625),
+            delay: 0,
+            targetJoinPolicy: .all,
+            reason: "Repository round trip"
+        )
+        let conditionEvidence = AutomationConditionEvaluationEvidence(
+            runID: secondRun.id,
+            workflowID: workflowID,
+            taskID: task.id,
+            conditionID: UUID(),
+            kind: .pixelMatched,
+            outcome: .conditionMatched,
+            evaluatedAt: Date(timeIntervalSince1970: 625),
+            sampleCount: 2,
+            displayBounds: RectValue(x: 0, y: 0, width: 1_000, height: 800),
+            resolvedSearchRegion: RectValue(x: 50, y: 60, width: 70, height: 80),
+            searchRegionSpace: .displayAbsolute,
+            targetDescription: "#FFCC00",
+            observedSummary: "Pixel similarity 0.98",
+            score: 0.98,
+            threshold: 0.95,
+            fields: [
+                AutomationConditionDiagnosticField(id: "currentColor", title: "Current color", value: "#FFCD00")
+            ]
+        )
+        secondRun.conditionEvidence = conditionEvidence
+        secondRun.branchEvidence = [branchEvidence]
 
         try await client.saveWorkflows([workflow])
         try await client.appendRun(firstRun)
@@ -166,6 +203,8 @@ struct AutomationOwnerBClientTests {
         #expect(loadedWorkflows == [workflow])
         #expect(runHistory.map(\.id) == [firstRun.id, secondRun.id])
         #expect(Set(runHistory.map(\.macroID)) == [macroID])
+        #expect(runHistory.last?.conditionEvidence == conditionEvidence)
+        #expect(runHistory.last?.branchEvidence == [branchEvidence])
         #expect(document.workflows == [workflow])
         #expect(document.runHistory == [firstRun, secondRun])
     }
@@ -179,10 +218,25 @@ struct AutomationOwnerBClientTests {
             kind: .macro(macroID: UUID()),
             schedule: .manual
         )
+        let visualAssets = AutomationWorkflowDraftVisualAssets(
+            images: [
+                AutomationWorkflowDraftVisualImageAsset(
+                    key: "leave_button",
+                    path: "assets/leave-button.png"
+                )
+            ],
+            baselines: [
+                AutomationWorkflowDraftVisualImageAsset(
+                    key: "battle_start",
+                    path: "baselines/battle-start.png"
+                )
+            ]
+        )
         let workflow = AutomationWorkflow(
             id: workflowID,
             name: "Exportable workflow",
             tasks: [task],
+            visualAssets: visualAssets,
             createdAt: exportedAt,
             modifiedAt: exportedAt
         )
@@ -209,8 +263,104 @@ struct AutomationOwnerBClientTests {
             exportedAt: exportedAt,
             workflows: [workflow]
         ))
+        #expect(decoded.workflows.first?.visualAssets == visualAssets)
         #expect(!packageText.contains("runHistory"))
         #expect(!packageText.contains(run.id.uuidString))
+    }
+
+    @Test("Visual asset package roots track workflows with package file assets")
+    func visualAssetPackageRootsTrackWorkflowsWithPackageFileAssets() async throws {
+        let directoryURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("SparkleRecorderVisualAssetRoots-\(UUID().uuidString)", isDirectory: true)
+        defer {
+            try? FileManager.default.removeItem(at: directoryURL)
+        }
+
+        let packageDirectoryURL = directoryURL
+            .appendingPathComponent("BattleDraft", isDirectory: true)
+        let replacementDirectoryURL = directoryURL
+            .appendingPathComponent("ReplacementDraft", isDirectory: true)
+        let associatedAt = Date(timeIntervalSince1970: 650)
+        let replacementAt = Date(timeIntervalSince1970: 660)
+        let workflowID = UUID()
+        let workflow = AutomationWorkflow(
+            id: workflowID,
+            name: "Battle loop",
+            tasks: [
+                AutomationTask(
+                    name: "Wait icon",
+                    kind: .condition(AutomationConditionSpec(
+                        name: "Spinner gone",
+                        kind: .visual(AutomationVisualCondition(
+                            type: .imageDisappeared,
+                            imageRef: "spinner"
+                        ))
+                    ))
+                )
+            ],
+            visualAssets: AutomationWorkflowDraftVisualAssets(
+                images: [
+                    AutomationWorkflowDraftVisualImageAsset(
+                        key: "spinner",
+                        path: "assets/spinner.png"
+                    )
+                ]
+            ),
+            createdAt: associatedAt,
+            modifiedAt: associatedAt
+        )
+        let regionOnlyWorkflow = AutomationWorkflow(
+            id: UUID(),
+            name: "Region only",
+            tasks: [],
+            visualAssets: AutomationWorkflowDraftVisualAssets(
+                regions: [
+                    AutomationWorkflowDraftVisualRegion(
+                        key: "arena",
+                        bounds: RectValue(x: 0, y: 0, width: 10, height: 10),
+                        space: .displayAbsolute
+                    )
+                ]
+            ),
+            createdAt: associatedAt,
+            modifiedAt: associatedAt
+        )
+
+        let roots = AutomationVisualAssetPackageRoot.roots(
+            for: [workflow, regionOnlyWorkflow],
+            packageDirectoryURL: packageDirectoryURL,
+            source: .aiDraftImport,
+            associatedAt: associatedAt
+        )
+
+        #expect(roots == [
+            AutomationVisualAssetPackageRoot(
+                workflowID: workflowID,
+                packageDirectoryPath: packageDirectoryURL.standardizedFileURL.path,
+                source: .aiDraftImport,
+                associatedAt: associatedAt
+            )
+        ])
+
+        let client = AutomationVisualAssetPackageRootClient.fileBacked(directoryURL: directoryURL)
+        try await client.upsertRoots(roots)
+        #expect(try await client.loadRoots() == roots)
+
+        let replacementRoot = AutomationVisualAssetPackageRoot.roots(
+            for: [workflow],
+            packageDirectoryURL: replacementDirectoryURL,
+            source: .workflowPackageImport,
+            associatedAt: replacementAt
+        )
+        try await client.upsertRoots(replacementRoot)
+        #expect(try await client.loadRoots() == replacementRoot)
+
+        try await client.removeRoots(Set([workflowID]))
+        #expect(try await client.loadRoots().isEmpty)
+
+        let rootData = try Data(contentsOf: AutomationVisualAssetPackageRoots.fileURL(in: directoryURL))
+        let document = try JSONDecoder().decode(AutomationVisualAssetPackageRootDocument.self, from: rootData)
+        #expect(document.version == AutomationVisualAssetPackageRoots.currentVersion)
     }
 
     @Test("Workflow package import validates version, duplicate IDs, and workflow DAG")
@@ -703,6 +853,7 @@ struct AutomationOwnerBClientTests {
 
     @Test("Contextual condition evaluator resolves previous outcomes and injected providers")
     func contextualConditionEvaluatorUsesContextAndProviders() async {
+        let evaluatedAt = Date(timeIntervalSince1970: 1_095)
         let evaluator = AutomationConditionEvaluatorClient.contextual(
             externalSignal: AutomationExternalSignalClient { signalName in
                 signalName == "ready"
@@ -712,7 +863,11 @@ struct AutomationOwnerBClientTests {
             },
             ocrText: { _, condition in
                 condition.text == "Done" ? .conditionMatched : .conditionNotMatched
-            }
+            },
+            visual: { _, condition in
+                condition.type == .regionChanged ? .conditionMatched : .conditionNotMatched
+            },
+            now: { evaluatedAt }
         )
         let matchedPrevious = AutomationConditionEvaluationRequest(
             runID: UUID(),
@@ -761,12 +916,67 @@ struct AutomationOwnerBClientTests {
                 kind: .ocrText(AutomationOCRCondition(text: "Done"))
             )
         )
+        let visual = AutomationConditionEvaluationRequest(
+            runID: UUID(),
+            workflowID: UUID(),
+            taskID: UUID(),
+            condition: AutomationConditionSpec(
+                name: "Region changed",
+                kind: .visual(AutomationVisualCondition(type: .regionChanged, regionRef: "battle_result_area"))
+            )
+        )
 
         #expect(await evaluator.evaluate(matchedPrevious) == .conditionMatched)
         #expect(await evaluator.evaluate(missingPrevious) == .conditionNotMatched)
         #expect(await evaluator.evaluate(readySignal) == .conditionMatched)
         #expect(await evaluator.evaluate(approved) == .conditionMatched)
         #expect(await evaluator.evaluate(ocr) == .conditionMatched)
+        #expect(await evaluator.evaluate(visual) == .conditionMatched)
+
+        let matchedPreviousResult = await evaluator.evaluateResult(matchedPrevious)
+        let missingPreviousResult = await evaluator.evaluateResult(missingPrevious)
+        let readySignalResult = await evaluator.evaluateResult(readySignal)
+        let approvedResult = await evaluator.evaluateResult(approved)
+        let ocrResult = await evaluator.evaluateResult(ocr)
+        let visualResult = await evaluator.evaluateResult(visual)
+
+        let matchedPreviousEvidence = matchedPreviousResult.evidence
+        let missingPreviousEvidence = missingPreviousResult.evidence
+        let readySignalEvidence = readySignalResult.evidence
+        let approvedEvidence = approvedResult.evidence
+
+        #expect(matchedPreviousResult.outcome == .conditionMatched)
+        #expect(matchedPreviousEvidence != nil)
+        #expect(matchedPreviousEvidence?.kind == .previousOutcome)
+        #expect(matchedPreviousEvidence?.outcome == .conditionMatched)
+        #expect(matchedPreviousEvidence?.evaluatedAt == evaluatedAt)
+        #expect(matchedPreviousEvidence?.sampleCount == 2)
+        #expect(matchedPreviousEvidence?.fields.contains {
+            $0.id == "previousOutcomes" && $0.value.contains("success")
+        } == true)
+
+        #expect(missingPreviousResult.outcome == .conditionNotMatched)
+        #expect(missingPreviousEvidence != nil)
+        #expect(missingPreviousEvidence?.kind == .previousOutcome)
+        #expect(missingPreviousEvidence?.outcome == .conditionNotMatched)
+        #expect(missingPreviousEvidence?.observedSummary.contains("No upstream outcome") == true)
+
+        #expect(readySignalResult.outcome == .conditionMatched)
+        #expect(readySignalEvidence != nil)
+        #expect(readySignalEvidence?.kind == .externalSignal)
+        #expect(readySignalEvidence?.targetDescription == "ready")
+        #expect(readySignalEvidence?.fields.contains {
+            $0.id == "signalState" && $0.value == "active"
+        } == true)
+
+        #expect(approvedResult.outcome == .conditionMatched)
+        #expect(approvedEvidence != nil)
+        #expect(approvedEvidence?.kind == .manualApproval)
+        #expect(approvedEvidence?.fields.contains {
+            $0.id == "approval" && $0.value == "granted"
+        } == true)
+        #expect(ocrResult.evidence == nil)
+        #expect(visualResult.evidence == nil)
     }
 
     @Test("Effect runner handles wait and condition effects as actions")
@@ -802,7 +1012,11 @@ struct AutomationOwnerBClientTests {
 
         #expect(await sleeper.durations == [3])
         #expect(waitActions == [.taskFinished(runID: runID, outcome: .succeeded(report: nil), at: completedAt)])
-        #expect(conditionActions == [.conditionEvaluated(runID: conditionRunID, outcome: .conditionMatched, at: completedAt)])
+        #expect(conditionActions == [.conditionEvaluationCompleted(
+            runID: conditionRunID,
+            result: AutomationConditionEvaluationResult(outcome: .conditionMatched),
+            at: completedAt
+        )])
     }
 
     @Test("Effect runner forwards previous outcomes to condition evaluator")
@@ -837,7 +1051,133 @@ struct AutomationOwnerBClientTests {
         ))
 
         #expect(await recorder.previousOutcomes == [previousOutcomes])
-        #expect(actions == [.conditionEvaluated(runID: runID, outcome: .conditionNotMatched, at: completedAt)])
+        #expect(actions == [.conditionEvaluationCompleted(
+            runID: runID,
+            result: AutomationConditionEvaluationResult(outcome: .conditionNotMatched),
+            at: completedAt
+        )])
+    }
+
+    @Test("Effect runner forwards condition diagnostics through completed result")
+    func effectRunnerForwardsConditionDiagnosticsThroughCompletedResult() async {
+        let runID = UUID()
+        let workflowID = UUID()
+        let taskID = UUID()
+        let conditionID = UUID()
+        let completedAt = Date(timeIntervalSince1970: 1_130)
+        let condition = AutomationConditionSpec(
+            id: conditionID,
+            name: "Pixel",
+            kind: .visual(AutomationVisualCondition(type: .pixelMatched, targetColorHex: "#FFCC00"))
+        )
+        let evidence = AutomationConditionEvaluationEvidence(
+            runID: runID,
+            workflowID: workflowID,
+            taskID: taskID,
+            conditionID: conditionID,
+            kind: .pixelMatched,
+            outcome: .conditionMatched,
+            evaluatedAt: completedAt,
+            sampleCount: 1,
+            targetDescription: "#FFCC00",
+            observedSummary: "Pixel similarity 0.99",
+            score: 0.99,
+            threshold: 0.95
+        )
+        let result = AutomationConditionEvaluationResult(
+            outcome: .conditionMatched,
+            evidence: evidence
+        )
+        let runner = AutomationEffectRunner(
+            resourceArbiter: .live(),
+            conditionEvaluator: AutomationConditionEvaluatorClient(evaluateResult: { _ in result }),
+            now: { completedAt },
+            sleep: { _ in }
+        )
+
+        let actions = await runner.run(.evaluateCondition(
+            runID: runID,
+            workflowID: workflowID,
+            taskID: taskID,
+            condition: condition,
+            previousOutcomes: []
+        ))
+
+        #expect(actions == [.conditionEvaluationCompleted(runID: runID, result: result, at: completedAt)])
+    }
+
+    @Test("Runtime handoff commands map to reducer actions")
+    func runtimeHandoffCommandsMapToReducerActions() {
+        let workflowID = UUID()
+        let taskID = UUID()
+        let runID = UUID()
+        let requestedAt = Date(timeIntervalSince1970: 2_300)
+
+        let startCommand = AutomationRuntimeHandoffCommand(
+            kind: .manualStart(workflowID: workflowID, taskID: taskID),
+            requestedAt: requestedAt,
+            source: "test"
+        )
+        let cancelCommand = AutomationRuntimeHandoffCommand(
+            kind: .cancelRun(runID: runID),
+            requestedAt: requestedAt,
+            source: "test"
+        )
+
+        #expect(startCommand.action == .manualStart(
+            workflowID: workflowID,
+            taskID: taskID,
+            requestedAt: requestedAt
+        ))
+        #expect(cancelCommand.action == .cancelRun(runID: runID, at: requestedAt))
+    }
+
+    @Test("Runtime handoff mailbox queues, sorts, and removes commands")
+    func runtimeHandoffMailboxQueuesSortsAndRemovesCommands() async throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("SparkleRecorderTests-\(UUID().uuidString)", isDirectory: true)
+        defer {
+            try? FileManager.default.removeItem(at: directory)
+        }
+
+        let store = AutomationRuntimeHandoffStore(directoryURL: directory)
+        let client = AutomationRuntimeHandoffClient.fileBacked(directoryURL: directory)
+        let later = AutomationRuntimeHandoffCommand(
+            id: UUID(uuidString: "70000000-0000-0000-0000-000000000002")!,
+            kind: .cancelRun(runID: UUID()),
+            requestedAt: Date(timeIntervalSince1970: 2_401)
+        )
+        let earlier = AutomationRuntimeHandoffCommand(
+            id: UUID(uuidString: "70000000-0000-0000-0000-000000000001")!,
+            kind: .manualStart(workflowID: UUID(), taskID: UUID()),
+            requestedAt: Date(timeIntervalSince1970: 2_400)
+        )
+
+        _ = try await client.enqueue(later)
+        _ = try await client.enqueue(earlier)
+        _ = try await client.enqueue(later)
+
+        let loaded = try await client.loadCommands()
+        let document = try await store.loadDocument()
+
+        #expect(loaded.map(\.id) == [earlier.id, later.id])
+        #expect(document.version == AutomationRuntimeHandoffMailbox.currentVersion)
+        #expect(document.commands == loaded)
+
+        let runID = UUID(uuidString: "70000000-0000-0000-0000-000000000003")!
+        let receipt = AutomationRuntimeHandoffReceipt(
+            command: earlier,
+            handledAt: Date(timeIntervalSince1970: 2_402),
+            status: .dispatched,
+            runIDs: [runID],
+            message: "ok"
+        )
+
+        try await client.completeCommand(receipt)
+
+        #expect(try await client.loadCommands() == [later])
+        #expect(try await client.loadReceipts() == [receipt])
+        #expect(try await client.receipt(earlier.id) == receipt)
     }
 }
 

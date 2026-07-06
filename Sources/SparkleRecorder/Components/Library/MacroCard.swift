@@ -85,7 +85,7 @@ struct MacroCard: View {
             }
             // Keyboard + assistive access: the card is one focusable element with
             // every action exposed; Delete key removes, Escape commits a rename.
-            .focusable()
+            .focusable(!isRenaming)
             .focused($cardFocused)
             .disableFocusEffect()
             .onDeleteCommand { onDelete() }
@@ -251,8 +251,11 @@ struct MacroCard: View {
                         )
                         .focused($renameFocused)
                         .onAppear {
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
                                 renameFocused = true
+                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                                    NSApp.sendAction(#selector(NSText.selectAll(_:)), to: nil, from: nil)
+                                }
                             }
                         }
                 } else {

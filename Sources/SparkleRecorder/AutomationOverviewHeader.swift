@@ -4,6 +4,7 @@ import SparkleRecorderCore
 struct AutomationOverviewHeader: View {
     let projection: AutomationOverviewProjection
     let refreshState: AutomationRepositoryRefreshState
+    let onOpenAIDraftPreview: () -> Void
     let onRefresh: () -> Void
 
     var body: some View {
@@ -27,11 +28,19 @@ struct AutomationOverviewHeader: View {
                 }
             }
 
+            Button("AI Draft", systemImage: "sparkles", action: onOpenAIDraftPreview)
+                .buttonStyle(.borderless)
+                .help(NSLocalizedString("Open AI workflow draft", comment: ""))
+                .accessibilityLabel(NSLocalizedString("Open AI workflow draft", comment: ""))
+
             Button("Refresh", systemImage: "arrow.clockwise", action: onRefresh)
                 .labelStyle(.iconOnly)
                 .buttonStyle(.borderless)
                 .frame(width: 28, height: 28)
-                .controlSurface(cornerRadius: 8, tint: Brand.libraryBlue, isActive: refreshState.isLoading)
+                .background(
+                    RoundedRectangle(cornerRadius: 8)
+                        .fill(refreshState.isLoading ? Brand.libraryBlue.opacity(0.12) : Color.clear)
+                )
                 .disabled(refreshState.isLoading)
                 .help(NSLocalizedString("Refresh automation projection", comment: ""))
                 .accessibilityLabel(NSLocalizedString("Refresh automation projection", comment: ""))

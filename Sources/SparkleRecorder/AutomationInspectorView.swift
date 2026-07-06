@@ -3,16 +3,24 @@ import SparkleRecorderCore
 
 struct AutomationInspectorView: View {
     let workflow: AutomationWorkflow?
+    let workflowProjection: AutomationWorkflowProjection?
     let selection: AutomationAuthoringSelection
+    let selectedTaskPosition: AutomationGraphPoint?
+    let selectedTaskProjection: AutomationTaskNodeProjection?
     let pendingDependencySourceID: UUID?
     let macros: [SavedMacro]
     let runs: [AutomationTaskRun]
+    var initialSelectedRunID: UUID?
+    var taskListPreviewState: AutomationWorkflowTaskListPreviewState?
     let onSelectTask: (UUID) -> Void
     let onSelectDependency: (UUID) -> Void
     let onAddConditionTask: (AutomationConditionKind) -> Void
+    let onInsertMacroTask: (UUID, Int) -> Void
     let onImportWorkflowPackage: () -> Void
     let onExportWorkflowPackage: (AutomationWorkflow) -> Void
+    let onExportWorkflowDraft: (AutomationWorkflow) -> Void
     let onShareWorkflowPackage: (AutomationWorkflow) -> Void
+    let onDeleteWorkflow: (UUID) -> Void
     let onAction: (AutomationAction) -> Void
     let onCancelLink: () -> Void
 
@@ -28,14 +36,23 @@ struct AutomationInspectorView: View {
                     case .workflow:
                         AutomationWorkflowInspectorView(
                             workflow: workflow,
+                            status: workflowProjection?.status ?? .scheduled,
+                            statusDetail: workflowProjection?.statusDetail ?? NSLocalizedString("No run has started yet", comment: ""),
+                            nextScheduledOccurrence: workflowProjection?.nextScheduledOccurrence,
+                            nextScheduledTaskName: nextScheduledTaskName,
+                            workflowProjection: workflowProjection,
                             pendingDependencySourceID: pendingDependencySourceID,
+                            taskListPreviewState: taskListPreviewState,
                             onAddConditionTask: onAddConditionTask,
+                            onInsertMacroTask: onInsertMacroTask,
                             onSelectTask: onSelectTask,
                             onSelectDependency: onSelectDependency,
                             onCancelLink: onCancelLink,
                             onImportWorkflowPackage: onImportWorkflowPackage,
                             onExportWorkflowPackage: onExportWorkflowPackage,
+                            onExportWorkflowDraft: onExportWorkflowDraft,
                             onShareWorkflowPackage: onShareWorkflowPackage,
+                            onDeleteWorkflow: onDeleteWorkflow,
                             onAction: onAction
                         )
                     case .task(let taskID):
@@ -43,22 +60,37 @@ struct AutomationInspectorView: View {
                             AutomationTaskInspectorView(
                                 workflow: workflow,
                                 task: task,
+                                dependencyEdges: workflowProjection?.edges ?? [],
+                                graphPosition: selectedTaskPosition,
+                                taskProjection: selectedTaskProjection,
                                 macros: macros,
                                 taskRuns: taskRuns(for: task.id),
                                 activeRunID: activeRunID(for: task.id),
+                                initialSelectedRunID: initialSelectedRunID,
+                                onSelectTask: onSelectTask,
+                                onSelectDependency: onSelectDependency,
                                 onAction: onAction
                             )
                         } else {
                             AutomationWorkflowInspectorView(
                                 workflow: workflow,
+                                status: workflowProjection?.status ?? .scheduled,
+                                statusDetail: workflowProjection?.statusDetail ?? NSLocalizedString("No run has started yet", comment: ""),
+                                nextScheduledOccurrence: workflowProjection?.nextScheduledOccurrence,
+                                nextScheduledTaskName: nextScheduledTaskName,
+                                workflowProjection: workflowProjection,
                                 pendingDependencySourceID: pendingDependencySourceID,
+                                taskListPreviewState: taskListPreviewState,
                                 onAddConditionTask: onAddConditionTask,
+                                onInsertMacroTask: onInsertMacroTask,
                                 onSelectTask: onSelectTask,
                                 onSelectDependency: onSelectDependency,
                                 onCancelLink: onCancelLink,
                                 onImportWorkflowPackage: onImportWorkflowPackage,
                                 onExportWorkflowPackage: onExportWorkflowPackage,
+                                onExportWorkflowDraft: onExportWorkflowDraft,
                                 onShareWorkflowPackage: onShareWorkflowPackage,
+                                onDeleteWorkflow: onDeleteWorkflow,
                                 onAction: onAction
                             )
                         }
@@ -73,14 +105,23 @@ struct AutomationInspectorView: View {
                         } else {
                             AutomationWorkflowInspectorView(
                                 workflow: workflow,
+                                status: workflowProjection?.status ?? .scheduled,
+                                statusDetail: workflowProjection?.statusDetail ?? NSLocalizedString("No run has started yet", comment: ""),
+                                nextScheduledOccurrence: workflowProjection?.nextScheduledOccurrence,
+                                nextScheduledTaskName: nextScheduledTaskName,
+                                workflowProjection: workflowProjection,
                                 pendingDependencySourceID: pendingDependencySourceID,
+                                taskListPreviewState: taskListPreviewState,
                                 onAddConditionTask: onAddConditionTask,
+                                onInsertMacroTask: onInsertMacroTask,
                                 onSelectTask: onSelectTask,
                                 onSelectDependency: onSelectDependency,
                                 onCancelLink: onCancelLink,
                                 onImportWorkflowPackage: onImportWorkflowPackage,
                                 onExportWorkflowPackage: onExportWorkflowPackage,
+                                onExportWorkflowDraft: onExportWorkflowDraft,
                                 onShareWorkflowPackage: onShareWorkflowPackage,
+                                onDeleteWorkflow: onDeleteWorkflow,
                                 onAction: onAction
                             )
                         }
@@ -108,6 +149,13 @@ struct AutomationInspectorView: View {
             .filter { $0.workflowID == workflowID && $0.taskID == taskID && !$0.isTerminal }
             .max { latestActivityDate(for: $0) < latestActivityDate(for: $1) }?
             .id
+    }
+
+    private var nextScheduledTaskName: String? {
+        guard let taskID = workflowProjection?.nextScheduledTaskID else {
+            return nil
+        }
+        return workflow?.task(id: taskID)?.name
     }
 
     private func taskRuns(for taskID: UUID) -> [AutomationTaskRun] {

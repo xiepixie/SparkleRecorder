@@ -12,6 +12,21 @@ struct AutomationContractTests {
         let conditionTaskID = UUID(uuidString: "00000000-0000-0000-0000-000000000004")!
         let dependencyID = UUID(uuidString: "00000000-0000-0000-0000-000000000005")!
         let startsAt = Date(timeIntervalSince1970: 2_000)
+        let visualAssets = AutomationWorkflowDraftVisualAssets(
+            images: [
+                AutomationWorkflowDraftVisualImageAsset(
+                    key: "success_badge",
+                    label: "Success badge",
+                    path: "assets/success-badge.png"
+                )
+            ],
+            baselines: [
+                AutomationWorkflowDraftVisualImageAsset(
+                    key: "checkout_start",
+                    path: "baselines/checkout-start.png"
+                )
+            ]
+        )
 
         let macroTask = AutomationTask(
             id: macroTaskID,
@@ -50,6 +65,7 @@ struct AutomationContractTests {
                     delay: 1.5
                 )
             ],
+            visualAssets: visualAssets,
             createdAt: startsAt,
             modifiedAt: startsAt
         )
@@ -61,6 +77,7 @@ struct AutomationContractTests {
         #expect(decoded.validationIssues().isEmpty)
         #expect(decoded.task(id: macroTaskID)?.kind.macroID == macroID)
         #expect(decoded.dependencies(from: macroTaskID).map(\.id) == [dependencyID])
+        #expect(decoded.visualAssets == visualAssets)
     }
 
     @Test("OCR condition keeps legacy JSON compatible")
@@ -88,6 +105,33 @@ struct AutomationContractTests {
         #expect(decoded.requireVisible)
     }
 
+    @Test("Visual condition round trips through Codable")
+    func visualConditionRoundTripsThroughCodable() throws {
+        let condition = AutomationVisualCondition(
+            type: .pixelMatched,
+            regionRef: "battle_button",
+            imageRef: "leave_button_template",
+            baselineRef: "battle_result_baseline",
+            pixel: AutomationGraphPoint(x: 0.5, y: 0.75),
+            targetColorHex: "#FFCC00",
+            threshold: 0.82,
+            requireVisible: true
+        )
+        let spec = AutomationConditionSpec(
+            name: "Wait for button color",
+            kind: .visual(condition),
+            timeout: 30,
+            pollingInterval: 0.5
+        )
+
+        let decoded = try JSONDecoder().decode(
+            AutomationConditionSpec.self,
+            from: try JSONEncoder().encode(spec)
+        )
+
+        #expect(decoded == spec)
+    }
+
     @Test("OCR search region resolves display, window, and content spaces")
     func ocrSearchRegionResolvesCoordinateSpaces() {
         let context = AutomationOCRSearchRegionContext(
@@ -112,6 +156,48 @@ struct AutomationContractTests {
         )
         let missingWindow = AutomationOCRCondition(
             text: "Ready",
+            searchRegion: RectValue(x: 10, y: 20, width: 30, height: 40),
+            searchRegionSpace: .windowLocal
+        )
+
+        #expect(automatic.searchRegionResolution(in: context) == .resolved(
+            RectValue(x: 100, y: 160, width: 300, height: 320)
+        ))
+        #expect(windowLocal.searchRegionResolution(in: context) == .resolved(
+            RectValue(x: 110, y: 140, width: 30, height: 40)
+        ))
+        #expect(contentNormalized.searchRegionResolution(in: context) == .resolved(
+            RectValue(x: 200, y: 250, width: 200, height: 180)
+        ))
+        #expect(missingWindow.searchRegionResolution(in: AutomationOCRSearchRegionContext(
+            displayBounds: context.displayBounds
+        )) == .unavailable)
+    }
+
+    @Test("Visual condition search region resolves using OCR coordinate spaces")
+    func visualConditionSearchRegionResolvesCoordinateSpaces() {
+        let context = AutomationOCRSearchRegionContext(
+            displayBounds: RectValue(x: 0, y: 0, width: 1_000, height: 800),
+            windowFrame: RectValue(x: 100, y: 120, width: 500, height: 400),
+            contentFrame: RectValue(x: 100, y: 160, width: 500, height: 360)
+        )
+
+        let automatic = AutomationVisualCondition(
+            type: .imageAppeared,
+            searchRegion: RectValue(x: 0.1, y: 0.2, width: 0.3, height: 0.4)
+        )
+        let windowLocal = AutomationVisualCondition(
+            type: .regionChanged,
+            searchRegion: RectValue(x: 10, y: 20, width: 30, height: 40),
+            searchRegionSpace: .windowLocal
+        )
+        let contentNormalized = AutomationVisualCondition(
+            type: .pixelMatched,
+            searchRegion: RectValue(x: 0.2, y: 0.25, width: 0.4, height: 0.5),
+            searchRegionSpace: .contentNormalized
+        )
+        let missingWindow = AutomationVisualCondition(
+            type: .imageDisappeared,
             searchRegion: RectValue(x: 10, y: 20, width: 30, height: 40),
             searchRegionSpace: .windowLocal
         )
@@ -271,6 +357,141 @@ struct AutomationContractTests {
         #expect(decoded == effect)
     }
 
+    @Test("Condition evaluation action round trips diagnostics through Codable")
+    func conditionEvaluationActionRoundTripsDiagnostics() throws {
+        let runID = UUID()
+        let action = AutomationAction.conditionEvaluationCompleted(
+            runID: runID,
+            result: AutomationConditionEvaluationResult(
+                outcome: .conditionNotMatched,
+                evidence: AutomationConditionEvaluationEvidence(
+                    runID: runID,
+                    workflowID: UUID(),
+                    taskID: UUID(),
+                    conditionID: UUID(),
+                    kind: .ocrText,
+                    outcome: .conditionNotMatched,
+                    evaluatedAt: Date(timeIntervalSince1970: 1_200),
+                    sampleCount: 5,
+                    displayBounds: RectValue(x: 0, y: 0, width: 800, height: 600),
+                    resolvedSearchRegion: RectValue(x: 10, y: 20, width: 100, height: 50),
+                    searchRegionSpace: .displayAbsolute,
+                    targetDescription: "Leave",
+                    observedSummary: "Detected text: Battle Complete",
+                    fields: [
+                        AutomationConditionDiagnosticField(id: "lastTexts", title: "Last texts", value: "Battle Complete")
+                    ],
+                    artifacts: [
+                        AutomationConditionDiagnosticArtifact(
+                            id: "regionSampleImage",
+                            title: "Watched region",
+                            kind: .regionSampleImage,
+                            relativePath: "AutomationEvidence/\(runID.uuidString)/condition-region-sample.png",
+                            pixelBounds: RectValue(x: 10, y: 20, width: 100, height: 50),
+                            createdAt: Date(timeIntervalSince1970: 1_200)
+                        )
+                    ]
+                )
+            ),
+            at: Date(timeIntervalSince1970: 1_205)
+        )
+
+        let encoded = try JSONEncoder().encode(action)
+        let decoded = try JSONDecoder().decode(AutomationAction.self, from: encoded)
+
+        #expect(decoded == action)
+    }
+
+    @Test("Condition diagnostics decode old payloads without artifact references")
+    func conditionDiagnosticsDecodeOldPayloadsWithoutArtifacts() throws {
+        let runID = UUID()
+        let workflowID = UUID()
+        let taskID = UUID()
+        let conditionID = UUID()
+        let json = """
+        {
+          "runID": "\(runID.uuidString)",
+          "workflowID": "\(workflowID.uuidString)",
+          "taskID": "\(taskID.uuidString)",
+          "conditionID": "\(conditionID.uuidString)",
+          "kind": "ocrText",
+          "outcome": {
+            "conditionNotMatched": {}
+          },
+          "evaluatedAt": 1200,
+          "sampleCount": 2,
+          "targetDescription": "Leave",
+          "observedSummary": "Detected text: Battle Complete",
+          "fields": []
+        }
+        """
+
+        let decoded = try JSONDecoder().decode(
+            AutomationConditionEvaluationEvidence.self,
+            from: Data(json.utf8)
+        )
+
+        #expect(decoded.runID == runID)
+        #expect(decoded.artifacts.isEmpty)
+        #expect(decoded.sampleCount == 2)
+        #expect(decoded.targetDescription == "Leave")
+    }
+
+    @Test("Condition diagnostic artifact paths stay relative to the evidence directory")
+    func conditionDiagnosticArtifactPathsStayRelative() {
+        let artifact = AutomationConditionDiagnosticArtifact(
+            id: "sample",
+            title: "Last sample",
+            kind: .displaySampleImage,
+            relativePath: "AutomationEvidence//run-id/condition-last-sample.png"
+        )
+        let baseURL = URL(fileURLWithPath: "/tmp/SparkleRecorder", isDirectory: true)
+
+        #expect(artifact.normalizedRelativePath == "AutomationEvidence/run-id/condition-last-sample.png")
+        #expect(artifact.resolvedURL(relativeTo: baseURL)?.path == "/tmp/SparkleRecorder/AutomationEvidence/run-id/condition-last-sample.png")
+        #expect(AutomationConditionDiagnosticArtifact.normalizedRelativePath("../outside.png") == nil)
+        #expect(AutomationConditionDiagnosticArtifact.normalizedRelativePath("/tmp/outside.png") == nil)
+        #expect(AutomationConditionDiagnosticArtifact.normalizedRelativePath("~/outside.png") == nil)
+        #expect(AutomationConditionDiagnosticArtifact.normalizedRelativePath("file:/tmp/outside.png") == nil)
+        #expect(AutomationConditionDiagnosticArtifact.normalizedRelativePath("AutomationEvidence\\sample.png") == nil)
+        #expect(AutomationConditionDiagnosticArtifact.normalizedRelativePath("AutomationEvidence/./sample.png") == nil)
+    }
+
+    @Test("Resource requirement max wait stays Codable compatible")
+    func resourceRequirementMaxWaitStaysCodableCompatible() throws {
+        let json = """
+        {
+          "resources": [
+            "foregroundInput"
+          ],
+          "priority": "high",
+          "leaseTimeout": 10
+        }
+        """
+        let decoded = try JSONDecoder().decode(
+            AutomationResourceRequirement.self,
+            from: Data(json.utf8)
+        )
+        let requirement = AutomationResourceRequirement(
+            resources: [.foregroundInput],
+            priority: .high,
+            leaseTimeout: -2,
+            maxWaitDuration: -5
+        )
+
+        let roundTripped = try JSONDecoder().decode(
+            AutomationResourceRequirement.self,
+            from: JSONEncoder().encode(requirement)
+        )
+
+        #expect(decoded.resources == [.foregroundInput])
+        #expect(decoded.priority == .high)
+        #expect(decoded.leaseTimeout == 10)
+        #expect(decoded.maxWaitDuration == nil)
+        #expect(roundTripped.leaseTimeout == 0)
+        #expect(roundTripped.maxWaitDuration == 0)
+    }
+
     @Test("View intent round trips task movement through Codable")
     func viewIntentRoundTripsTaskMovement() throws {
         let workflowID = UUID()
@@ -370,6 +591,35 @@ struct AutomationContractTests {
         let runID = UUID()
         let leaseID = UUID()
         let evidenceID = UUID()
+        let conditionEvidence = AutomationConditionEvaluationEvidence(
+            runID: runID,
+            workflowID: UUID(),
+            taskID: UUID(),
+            conditionID: UUID(),
+            kind: .imageAppeared,
+            outcome: .conditionNotMatched,
+            evaluatedAt: Date(timeIntervalSince1970: 54),
+            sampleCount: 3,
+            displayBounds: RectValue(x: 0, y: 0, width: 1_440, height: 900),
+            resolvedSearchRegion: RectValue(x: 100, y: 120, width: 240, height: 160),
+            searchRegionSpace: .displayAbsolute,
+            targetDescription: "leave_button_template",
+            observedSummary: "Template similarity 0.61",
+            score: 0.61,
+            threshold: 0.92,
+            fields: [
+                AutomationConditionDiagnosticField(id: "score", title: "Best similarity", value: "0.61")
+            ],
+            artifacts: [
+                AutomationConditionDiagnosticArtifact(
+                    id: "lastSampleImage",
+                    title: "Last sample",
+                    kind: .displaySampleImage,
+                    relativePath: "AutomationEvidence/\(runID.uuidString)/condition-last-sample.png",
+                    pixelBounds: RectValue(x: 0, y: 0, width: 1_440, height: 900)
+                )
+            ]
+        )
         let task = AutomationTask(name: "Macro", kind: .macro(macroID: UUID()))
         let run = task.makeRun(workflowID: UUID(), runID: runID)
         let started = run.started(at: Date(timeIntervalSince1970: 50), leaseID: leaseID)
@@ -383,7 +633,12 @@ struct AutomationContractTests {
                 errorMessage: "OCR did not find success text"
             )),
             at: Date(timeIntervalSince1970: 54),
-            evidenceID: evidenceID
+            evidenceID: evidenceID,
+            conditionEvidence: conditionEvidence
+        )
+        let decoded = try? JSONDecoder().decode(
+            AutomationTaskRun.self,
+            from: JSONEncoder().encode(completed)
         )
 
         #expect(started.status == .running)
@@ -391,6 +646,8 @@ struct AutomationContractTests {
         #expect(completed.status == .completed)
         #expect(completed.isTerminal)
         #expect(completed.evidenceID == evidenceID)
+        #expect(completed.conditionEvidence == conditionEvidence)
         #expect(completed.outcome != nil)
+        #expect(decoded?.conditionEvidence == conditionEvidence)
     }
 }

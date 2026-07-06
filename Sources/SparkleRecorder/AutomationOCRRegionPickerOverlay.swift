@@ -109,13 +109,15 @@ private final class OCRRegionCaptureView: NSView {
 }
 
 private struct OCRRegionPickerInstructionView: View {
+    var title: String
+
     var body: some View {
         HStack(spacing: 12) {
             Image(systemName: "viewfinder.rectangular")
                 .font(.headline)
                 .foregroundStyle(.white)
             VStack(alignment: .leading, spacing: 2) {
-                Text(NSLocalizedString("Drag to select OCR region", comment: ""))
+                Text(title)
                     .font(.caption)
                     .bold()
                     .foregroundStyle(.white)
@@ -148,7 +150,9 @@ final class AutomationOCRRegionPickerOverlay {
     var onPicked: ((AutomationOCRSearchRegionSelection) -> Void)?
     var onCancelled: (() -> Void)?
 
-    func start() {
+    func start(
+        instructionTitle: String = NSLocalizedString("Drag to select OCR region", comment: "")
+    ) {
         stop()
 
         guard let screen = NSScreen.main ?? NSScreen.screens.first else {
@@ -193,7 +197,7 @@ final class AutomationOCRRegionPickerOverlay {
         win.orderFrontRegardless()
         win.makeKey()
         win.makeFirstResponder(captureView)
-        showInstructionPanel(on: screen)
+        showInstructionPanel(on: screen, title: instructionTitle)
     }
 
     func stop() {
@@ -203,7 +207,7 @@ final class AutomationOCRRegionPickerOverlay {
         instructionPanel = nil
     }
 
-    private func showInstructionPanel(on screen: NSScreen) {
+    private func showInstructionPanel(on screen: NSScreen, title: String) {
         let panelWidth: CGFloat = 320
         let panelHeight: CGFloat = 64
         let panelFrame = NSRect(
@@ -226,7 +230,7 @@ final class AutomationOCRRegionPickerOverlay {
         panel.hasShadow = true
         panel.ignoresMouseEvents = true
 
-        let host = NSHostingView(rootView: OCRRegionPickerInstructionView())
+        let host = NSHostingView(rootView: OCRRegionPickerInstructionView(title: title))
         host.frame = NSRect(origin: .zero, size: panelFrame.size)
         host.autoresizingMask = [.width, .height]
         panel.contentView = host

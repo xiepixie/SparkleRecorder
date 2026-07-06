@@ -68,6 +68,13 @@ cp -R "${lproj_dirs[@]}" "${CONTENTS}/Resources/"
 BUILD_NUM=$(git -C "$ROOT" rev-list --count HEAD 2>/dev/null || echo 1)
 /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $BUILD_NUM" "${CONTENTS}/Info.plist"
 
+if pgrep -f "${APP_BUNDLE}/Contents/MacOS/${APP_NAME}" >/dev/null 2>&1; then
+    echo "✗ ${APP_NAME} is still running from ${APP_BUNDLE}." >&2
+    echo "  Quit it before installing; replacing a running bundle leaves a stale process" >&2
+    echo "  whose TCC permission identity can disagree with the newly installed app." >&2
+    exit 1
+fi
+
 echo "→ Installing to ${INSTALL_DIR}..."
 rm -rf "$APP_BUNDLE"
 mkdir -p "$INSTALL_DIR"
@@ -161,3 +168,7 @@ echo
 echo "✅ Installed: ${APP_BUNDLE}"
 echo "   Signed:   ${SIGNED_WITH}"
 echo "   Run:  open \"${APP_BUNDLE}\""
+
+# Keep the build directory from looking like a second runnable copy of the app.
+# Launching this unsigned staging bundle would create a separate TCC identity.
+rm -rf "$STAGE"

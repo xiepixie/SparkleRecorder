@@ -6,6 +6,3361 @@ import SparkleRecorderCore
 // it never touches the library.
 let args = CommandLine.arguments
 
+private struct WorkflowCLIError: Error {
+    var code: String
+    var message: String
+    var path: String?
+
+    init(_ code: String, _ message: String, path: String? = nil) {
+        self.code = code
+        self.message = message
+        self.path = path
+    }
+}
+
+private struct WorkflowProductEvidenceSnapshotPayload: Codable, Equatable, Sendable {
+    var scenario: String
+    var outputPath: String
+    var width: Double
+    var height: Double
+    var scale: Double
+}
+
+if args.count >= 2, args[1] == "workflow" {
+    runWorkflowCLI(args)
+}
+
+private func runWorkflowCLI(_ args: [String]) -> Never {
+    let workflowArgs = Array(args.dropFirst(2))
+    let wantsJSON = workflowArgs.contains("--json")
+    let command = workflowCommandName(workflowArgs)
+
+    do {
+        guard !workflowArgs.isEmpty else {
+            throw WorkflowCLIError(
+                "unsupportedCommand",
+                "Expected a workflow command, such as 'workflow draft validate <draft.json> --json'."
+            )
+        }
+
+        if workflowArgs.count >= 2,
+           workflowArgs[0] == "product-evidence",
+           workflowArgs[1] == "snapshot" {
+            let exitCode = try runWorkflowProductEvidenceSnapshot(
+                Array(workflowArgs.dropFirst(2)),
+                command: "workflow product-evidence snapshot",
+                wantsJSON: wantsJSON
+            )
+            exit(Int32(exitCode))
+        }
+
+        if workflowArgs[0] == "macros" {
+            let exitCode = try runWorkflowMacros(
+                Array(workflowArgs.dropFirst()),
+                command: "workflow macros",
+                wantsJSON: wantsJSON
+            )
+            exit(Int32(exitCode))
+        }
+
+        if workflowArgs[0] == "list" {
+            let exitCode = try runWorkflowList(
+                Array(workflowArgs.dropFirst()),
+                command: "workflow list",
+                wantsJSON: wantsJSON
+            )
+            exit(Int32(exitCode))
+        }
+
+        if workflowArgs[0] == "status" {
+            let exitCode = try runWorkflowStatus(
+                Array(workflowArgs.dropFirst()),
+                command: "workflow status",
+                wantsJSON: wantsJSON
+            )
+            exit(Int32(exitCode))
+        }
+
+        if workflowArgs[0] == "run" {
+            let exitCode = try runWorkflowRun(
+                Array(workflowArgs.dropFirst()),
+                command: "workflow run",
+                wantsJSON: wantsJSON
+            )
+            exit(Int32(exitCode))
+        }
+
+        if workflowArgs[0] == "cancel" {
+            let exitCode = try runWorkflowCancel(
+                Array(workflowArgs.dropFirst()),
+                command: "workflow cancel",
+                wantsJSON: wantsJSON
+            )
+            exit(Int32(exitCode))
+        }
+
+        if workflowArgs[0] == "runs" || workflowArgs[0] == "history" {
+            let exitCode = try runWorkflowRuns(
+                Array(workflowArgs.dropFirst()),
+                command: workflowArgs[0] == "history" ? "workflow history" : "workflow runs",
+                wantsJSON: wantsJSON
+            )
+            exit(Int32(exitCode))
+        }
+
+        if workflowArgs.count >= 2, workflowArgs[0] == "handoff", workflowArgs[1] == "status" {
+            let exitCode = try runWorkflowHandoffStatus(
+                Array(workflowArgs.dropFirst(2)),
+                command: "workflow handoff status",
+                wantsJSON: wantsJSON
+            )
+            exit(Int32(exitCode))
+        }
+
+        if workflowArgs[0] == "show" {
+            let exitCode = try runWorkflowShow(
+                Array(workflowArgs.dropFirst()),
+                command: "workflow show",
+                wantsJSON: wantsJSON
+            )
+            exit(Int32(exitCode))
+        }
+
+        if workflowArgs[0] == "export" {
+            let exitCode = try runWorkflowExport(
+                Array(workflowArgs.dropFirst()),
+                command: "workflow export",
+                wantsJSON: wantsJSON
+            )
+            exit(Int32(exitCode))
+        }
+
+        guard workflowArgs.count >= 2 else {
+            throw WorkflowCLIError(
+                "unsupportedCommand",
+                "Unsupported workflow command '\(workflowArgs.joined(separator: " "))'."
+            )
+        }
+
+        if workflowArgs[0] == "draft", workflowArgs[1] == "validate" {
+            let exitCode = try runWorkflowDraftValidate(
+                Array(workflowArgs.dropFirst(2)),
+                command: "workflow draft validate",
+                wantsJSON: wantsJSON
+            )
+            exit(Int32(exitCode))
+        }
+
+        if workflowArgs[0] == "draft", workflowArgs[1] == "simulate" {
+            let exitCode = try runWorkflowDraftSimulate(
+                Array(workflowArgs.dropFirst(2)),
+                command: "workflow draft simulate",
+                wantsJSON: wantsJSON
+            )
+            exit(Int32(exitCode))
+        }
+
+        if workflowArgs[0] == "draft", workflowArgs[1] == "init" {
+            let exitCode = try runWorkflowDraftInit(
+                Array(workflowArgs.dropFirst(2)),
+                command: "workflow draft init",
+                wantsJSON: wantsJSON
+            )
+            exit(Int32(exitCode))
+        }
+
+        if workflowArgs[0] == "draft", workflowArgs[1] == "inspect" {
+            let exitCode = try runWorkflowDraftInspect(
+                Array(workflowArgs.dropFirst(2)),
+                command: "workflow draft inspect",
+                wantsJSON: wantsJSON
+            )
+            exit(Int32(exitCode))
+        }
+
+        if workflowArgs[0] == "draft", workflowArgs[1] == "normalize" {
+            let exitCode = try runWorkflowDraftNormalize(
+                Array(workflowArgs.dropFirst(2)),
+                command: "workflow draft normalize",
+                wantsJSON: wantsJSON
+            )
+            exit(Int32(exitCode))
+        }
+
+        if workflowArgs[0] == "draft", workflowArgs[1] == "patch" {
+            let exitCode = try runWorkflowDraftPatch(
+                Array(workflowArgs.dropFirst(2)),
+                command: "workflow draft patch",
+                wantsJSON: wantsJSON
+            )
+            exit(Int32(exitCode))
+        }
+
+        if workflowArgs.count >= 4, workflowArgs[0] == "draft", workflowArgs[1] == "task", workflowArgs[2] == "add" {
+            let exitCode = try runWorkflowDraftTaskAdd(
+                Array(workflowArgs.dropFirst(3)),
+                command: "workflow draft task add",
+                wantsJSON: wantsJSON
+            )
+            exit(Int32(exitCode))
+        }
+
+        if workflowArgs.count >= 4, workflowArgs[0] == "draft", workflowArgs[1] == "task", workflowArgs[2] == "set" {
+            let exitCode = try runWorkflowDraftTaskSet(
+                Array(workflowArgs.dropFirst(3)),
+                command: "workflow draft task set",
+                wantsJSON: wantsJSON
+            )
+            exit(Int32(exitCode))
+        }
+
+        if workflowArgs.count >= 4, workflowArgs[0] == "draft", workflowArgs[1] == "task", workflowArgs[2] == "remove" {
+            let exitCode = try runWorkflowDraftTaskRemove(
+                Array(workflowArgs.dropFirst(3)),
+                command: "workflow draft task remove",
+                wantsJSON: wantsJSON
+            )
+            exit(Int32(exitCode))
+        }
+
+        if workflowArgs.count >= 4, workflowArgs[0] == "draft", workflowArgs[1] == "schedule", workflowArgs[2] == "set" {
+            let exitCode = try runWorkflowDraftScheduleSet(
+                Array(workflowArgs.dropFirst(3)),
+                command: "workflow draft schedule set",
+                wantsJSON: wantsJSON
+            )
+            exit(Int32(exitCode))
+        }
+
+        if workflowArgs.count >= 4, workflowArgs[0] == "draft", workflowArgs[1] == "condition", workflowArgs[2] == "set" {
+            let exitCode = try runWorkflowDraftConditionSet(
+                Array(workflowArgs.dropFirst(3)),
+                command: "workflow draft condition set",
+                wantsJSON: wantsJSON
+            )
+            exit(Int32(exitCode))
+        }
+
+        if workflowArgs.count >= 4, workflowArgs[0] == "draft", workflowArgs[1] == "dependency", workflowArgs[2] == "add" {
+            let exitCode = try runWorkflowDraftDependencyAdd(
+                Array(workflowArgs.dropFirst(3)),
+                command: "workflow draft dependency add",
+                wantsJSON: wantsJSON
+            )
+            exit(Int32(exitCode))
+        }
+
+        if workflowArgs.count >= 4, workflowArgs[0] == "draft", workflowArgs[1] == "dependency", workflowArgs[2] == "set" {
+            let exitCode = try runWorkflowDraftDependencySet(
+                Array(workflowArgs.dropFirst(3)),
+                command: "workflow draft dependency set",
+                wantsJSON: wantsJSON
+            )
+            exit(Int32(exitCode))
+        }
+
+        if workflowArgs.count >= 4, workflowArgs[0] == "draft", workflowArgs[1] == "dependency", workflowArgs[2] == "remove" {
+            let exitCode = try runWorkflowDraftDependencyRemove(
+                Array(workflowArgs.dropFirst(3)),
+                command: "workflow draft dependency remove",
+                wantsJSON: wantsJSON
+            )
+            exit(Int32(exitCode))
+        }
+
+        if workflowArgs[0] == "import" {
+            let exitCode = try runWorkflowImport(
+                Array(workflowArgs.dropFirst()),
+                command: "workflow import",
+                wantsJSON: wantsJSON
+            )
+            exit(Int32(exitCode))
+        }
+
+        throw WorkflowCLIError(
+            "unsupportedCommand",
+            "Unsupported workflow command '\(workflowArgs.joined(separator: " "))'."
+        )
+    } catch {
+        let cliError: WorkflowCLIError
+        if let workflowError = error as? WorkflowCLIError {
+            cliError = workflowError
+        } else if let editError = error as? AutomationWorkflowDraftEditError {
+            cliError = WorkflowCLIError(editError.code, editError.message, path: editError.path)
+        } else {
+            cliError = WorkflowCLIError(
+                "commandFailed",
+                String(describing: error)
+            )
+        }
+        let envelope = AutomationCLIResultEnvelope<AutomationCLIEmptyPayload>.failure(
+            command: command,
+            code: cliError.code,
+            message: cliError.message,
+            path: cliError.path
+        )
+        if wantsJSON {
+            writeWorkflowJSON(envelope)
+        } else {
+            writeWorkflowError("SparkleRecorder: \(cliError.message)")
+        }
+        exit(1)
+    }
+}
+
+private func runWorkflowProductEvidenceSnapshot(
+    _ arguments: [String],
+    command: String,
+    wantsJSON: Bool
+) throws -> Int {
+    guard let scenarioArgument = arguments.first,
+          !scenarioArgument.hasPrefix("--") else {
+        throw WorkflowCLIError(
+            "missingArgument",
+                "Expected a snapshot scenario: idle, drag-link-authoring, task-reorder-authoring, running, failed-run-detail, failed-run-preview-unavailable, visual-diagnostics-drill-in, or branch-evidence."
+        )
+    }
+
+    guard let scenario = AutomationProductEvidenceSnapshotScenario(argument: scenarioArgument) else {
+        throw WorkflowCLIError(
+            "unsupportedScenario",
+            "Unsupported product evidence snapshot scenario '\(scenarioArgument)'.",
+            path: scenarioArgument
+        )
+    }
+
+    var outputURL = URL(fileURLWithPath: "docs/workflow-page-productization/product-evidence")
+        .appendingPathComponent(scenario.filename, isDirectory: false)
+    var width: Double = 1440
+    var height: Double = scenario.defaultHeight
+    var scale: Double = 2
+    var index = 1
+
+    while index < arguments.count {
+        let token = arguments[index]
+        switch token {
+        case "--json":
+            break
+        case "--output":
+            guard index + 1 < arguments.count else {
+                throw WorkflowCLIError("missingArgument", "--output requires a file path.", path: token)
+            }
+            outputURL = URL(fileURLWithPath: arguments[index + 1], isDirectory: false)
+            index += 1
+        case "--width":
+            width = try parsePositiveDoubleOption(arguments, index: index, option: token)
+            index += 1
+        case "--height":
+            height = try parsePositiveDoubleOption(arguments, index: index, option: token)
+            index += 1
+        case "--scale":
+            scale = try parsePositiveDoubleOption(arguments, index: index, option: token)
+            index += 1
+        default:
+            if token.hasPrefix("--") {
+                throw WorkflowCLIError("unsupportedOption", "Unsupported option '\(token)'.", path: token)
+            }
+            throw WorkflowCLIError("unexpectedArgument", "Unexpected argument '\(token)'.", path: token)
+        }
+        index += 1
+    }
+
+    let resolvedOutputURL = outputURL.standardizedFileURL
+    try MainActor.assumeIsolated {
+        try AutomationProductEvidenceSnapshotRenderer.render(
+            scenario: scenario,
+            outputURL: resolvedOutputURL,
+            width: CGFloat(width),
+            height: CGFloat(height),
+            scale: CGFloat(scale)
+        )
+    }
+
+    let payload = WorkflowProductEvidenceSnapshotPayload(
+        scenario: scenario.rawValue,
+        outputPath: resolvedOutputURL.path,
+        width: width,
+        height: height,
+        scale: scale
+    )
+    let envelope = AutomationCLIResultEnvelope<WorkflowProductEvidenceSnapshotPayload>(
+        ok: true,
+        command: command,
+        data: payload
+    )
+
+    if wantsJSON {
+        writeWorkflowJSON(envelope)
+    } else {
+        FileHandle.standardOutput.write(Data(
+            "SparkleRecorder: wrote \(scenario.rawValue) product evidence snapshot -> \(resolvedOutputURL.path)\n".utf8
+        ))
+    }
+    return 0
+}
+
+private func parsePositiveDoubleOption(
+    _ arguments: [String],
+    index: Int,
+    option: String
+) throws -> Double {
+    guard index + 1 < arguments.count else {
+        throw WorkflowCLIError("missingArgument", "\(option) requires a positive numeric value.", path: option)
+    }
+    guard let value = Double(arguments[index + 1]),
+          value > 0 else {
+        throw WorkflowCLIError("invalidArgument", "\(option) requires a positive numeric value.", path: option)
+    }
+    return value
+}
+
+private func runWorkflowMacros(
+    _ arguments: [String],
+    command: String,
+    wantsJSON: Bool
+) throws -> Int {
+    var search: String?
+    var macrosDirectory: URL?
+    var index = 0
+
+    while index < arguments.count {
+        let token = arguments[index]
+        switch token {
+        case "--json":
+            break
+        case "--search":
+            guard index + 1 < arguments.count else {
+                throw WorkflowCLIError("missingArgument", "--search requires a value.", path: token)
+            }
+            search = arguments[index + 1]
+            index += 1
+        case "--macros-dir":
+            guard index + 1 < arguments.count else {
+                throw WorkflowCLIError("missingArgument", "--macros-dir requires a directory path.", path: token)
+            }
+            macrosDirectory = URL(fileURLWithPath: arguments[index + 1], isDirectory: true)
+            index += 1
+        default:
+            if token.hasPrefix("--") {
+                throw WorkflowCLIError("unsupportedOption", "Unsupported option '\(token)'.", path: token)
+            }
+            throw WorkflowCLIError("unexpectedArgument", "Unexpected argument '\(token)'.", path: token)
+        }
+        index += 1
+    }
+
+    let manifests = try loadWorkflowMacroManifests(macrosDirectory: macrosDirectory)
+    let entries = manifests
+        .map(AutomationWorkflowDraftMacroCatalogEntry.init(macro:))
+        .filter { $0.matches(searchTerm: search) }
+    let envelope = AutomationCLIResultEnvelope<AutomationWorkflowMacroCatalogPayload>
+        .workflowMacroCatalog(
+            command: command,
+            macros: entries,
+            search: search?.trimmingCharacters(in: .whitespacesAndNewlines)
+        )
+
+    if wantsJSON {
+        writeWorkflowJSON(envelope)
+    } else {
+        writeWorkflowMacroSummary(entries)
+    }
+    return 0
+}
+
+private func runWorkflowList(
+    _ arguments: [String],
+    command: String,
+    wantsJSON: Bool
+) throws -> Int {
+    var repositoryDirectoryPath: String?
+    var index = 0
+
+    while index < arguments.count {
+        let token = arguments[index]
+        switch token {
+        case "--json":
+            break
+        case "--repository-dir":
+            repositoryDirectoryPath = try workflowCLIValue(after: token, in: arguments, at: &index)
+        default:
+            if token.hasPrefix("--") {
+                throw WorkflowCLIError("unsupportedOption", "Unsupported option '\(token)'.", path: token)
+            }
+            throw WorkflowCLIError("unexpectedArgument", "Unexpected argument '\(token)'.", path: token)
+        }
+        index += 1
+    }
+
+    let repository = workflowCLIRepository(directoryPath: repositoryDirectoryPath)
+    let snapshot = try waitForWorkflowCLIAsync {
+        let workflows = try await repository.loadWorkflows()
+        let runHistory = try await repository.loadRunHistory()
+        return (workflows, runHistory)
+    }
+    let envelope = AutomationCLIResultEnvelope<AutomationWorkflowListPayload>
+        .workflowList(
+            command: command,
+            workflows: snapshot.0,
+            runHistory: snapshot.1
+        )
+
+    if wantsJSON {
+        writeWorkflowJSON(envelope)
+    } else {
+        writeWorkflowListSummary(envelope.data?.workflows ?? [])
+    }
+    return 0
+}
+
+private func runWorkflowStatus(
+    _ arguments: [String],
+    command: String,
+    wantsJSON: Bool
+) throws -> Int {
+    var workflowID: UUID?
+    var repositoryDirectoryPath: String?
+    var index = 0
+
+    while index < arguments.count {
+        let token = arguments[index]
+        switch token {
+        case "--json":
+            break
+        case "--workflow-id":
+            workflowID = try parseWorkflowCLIUUID(
+                workflowCLIValue(after: token, in: arguments, at: &index),
+                path: token
+            )
+        case "--repository-dir":
+            repositoryDirectoryPath = try workflowCLIValue(after: token, in: arguments, at: &index)
+        default:
+            if token.hasPrefix("--") {
+                throw WorkflowCLIError("unsupportedOption", "Unsupported option '\(token)'.", path: token)
+            }
+            guard workflowID == nil else {
+                throw WorkflowCLIError("unexpectedArgument", "Unexpected argument '\(token)'.", path: token)
+            }
+            workflowID = try parseWorkflowCLIUUID(token, path: "workflow-id")
+        }
+        index += 1
+    }
+
+    let repository = workflowCLIRepository(directoryPath: repositoryDirectoryPath)
+    let snapshot = try waitForWorkflowCLIAsync {
+        let workflows = try await repository.loadWorkflows()
+        let runHistory = try await repository.loadRunHistory()
+        return (workflows, runHistory)
+    }
+
+    let workflows: [AutomationWorkflow]
+    if let workflowID {
+        guard let workflow = snapshot.0.first(where: { $0.id == workflowID }) else {
+            throw WorkflowCLIError(
+                "workflowNotFound",
+                "Workflow '\(workflowID.uuidString)' was not found.",
+                path: "workflow-id"
+            )
+        }
+        workflows = [workflow]
+    } else {
+        workflows = snapshot.0
+    }
+
+    let envelope = AutomationCLIResultEnvelope<AutomationWorkflowStatusPayload>
+        .workflowStatus(
+            command: command,
+            workflows: workflows,
+            runHistory: snapshot.1
+        )
+
+    if wantsJSON {
+        writeWorkflowJSON(envelope)
+    } else {
+        writeWorkflowStatusSummary(envelope.data)
+    }
+    return 0
+}
+
+private enum WorkflowCLIPlayerMode: String {
+    case live
+    case fakeSuccess
+    case reject
+}
+
+private func runWorkflowRun(
+    _ arguments: [String],
+    command: String,
+    wantsJSON: Bool
+) throws -> Int {
+    var workflowID: UUID?
+    var taskSelector: String?
+    var repositoryDirectoryPath: String?
+    var macrosDirectoryPath: String?
+    var requestedAt = Date.now
+    var waitTimeout: TimeInterval = 3_600
+    var playerMode = WorkflowCLIPlayerMode.live
+    var shouldHandoffToAppHost = false
+    var isConfirmed = false
+    var index = 0
+
+    while index < arguments.count {
+        let token = arguments[index]
+        switch token {
+        case "--json":
+            break
+        case "--confirm", "--yes":
+            isConfirmed = true
+        case "--workflow-id":
+            workflowID = try parseWorkflowCLIUUID(
+                workflowCLIValue(after: token, in: arguments, at: &index),
+                path: token
+            )
+        case "--task":
+            taskSelector = try workflowCLIValue(after: token, in: arguments, at: &index)
+        case "--repository-dir":
+            repositoryDirectoryPath = try workflowCLIValue(after: token, in: arguments, at: &index)
+        case "--macros-dir":
+            macrosDirectoryPath = try workflowCLIValue(after: token, in: arguments, at: &index)
+        case "--handoff-app":
+            shouldHandoffToAppHost = true
+        case "--handoff":
+            let value = try workflowCLIValue(after: token, in: arguments, at: &index)
+            guard value == "app" || value == "appHost" else {
+                throw WorkflowCLIError(
+                    "unsupportedHandoffTarget",
+                    "--handoff must be 'app'.",
+                    path: token
+                )
+            }
+            shouldHandoffToAppHost = true
+        case "--at":
+            requestedAt = try parseWorkflowCLIDate(workflowCLIValue(after: token, in: arguments, at: &index))
+        case "--wait-timeout", "--timeout":
+            waitTimeout = try parseWorkflowCLIDuration(
+                workflowCLIValue(after: token, in: arguments, at: &index),
+                path: token
+            )
+        case "--player-mode":
+            let value = try workflowCLIValue(after: token, in: arguments, at: &index)
+            guard let mode = WorkflowCLIPlayerMode(rawValue: value) else {
+                throw WorkflowCLIError(
+                    "unsupportedPlayerMode",
+                    "--player-mode must be live, fakeSuccess, or reject.",
+                    path: token
+                )
+            }
+            playerMode = mode
+        default:
+            if token.hasPrefix("--") {
+                throw WorkflowCLIError("unsupportedOption", "Unsupported option '\(token)'.", path: token)
+            }
+            guard workflowID == nil else {
+                throw WorkflowCLIError("unexpectedArgument", "Unexpected argument '\(token)'.", path: token)
+            }
+            workflowID = try parseWorkflowCLIUUID(token, path: "workflow-id")
+        }
+        index += 1
+    }
+
+    guard isConfirmed else {
+        throw WorkflowCLIError(
+            "confirmationRequired",
+            "workflow run can move mouse or keyboard input and requires --confirm.",
+            path: "--confirm"
+        )
+    }
+    guard let workflowID else {
+        throw WorkflowCLIError("missingArgument", "workflow run requires a workflow ID.")
+    }
+
+    let repository = workflowCLIRepository(directoryPath: repositoryDirectoryPath)
+    let handoffClient = workflowCLIRuntimeHandoffClient(directoryPath: repositoryDirectoryPath)
+    if shouldHandoffToAppHost {
+        let handoffTaskSelector = taskSelector
+        let handoffRequestedAt = requestedAt
+        let payload = try waitForWorkflowCLIAsync {
+            try await enqueueWorkflowRunHandoff(
+                workflowID: workflowID,
+                taskSelector: handoffTaskSelector,
+                repository: repository,
+                handoffClient: handoffClient,
+                requestedAt: handoffRequestedAt
+            )
+        }
+        let envelope = AutomationCLIResultEnvelope<AutomationRuntimeHandoffPayload>
+            .workflowHandoff(command: command, payload: payload)
+
+        if wantsJSON {
+            writeWorkflowJSON(envelope)
+        } else {
+            writeWorkflowHandoffSummary(payload)
+        }
+        return envelope.ok ? 0 : 1
+    }
+
+    let macrosDirectory = macrosDirectoryPath.map { URL(fileURLWithPath: $0, isDirectory: true) }
+    let selectedTaskSelector = taskSelector
+    let runRequestedAt = requestedAt
+    let runWaitTimeout = waitTimeout
+    let runPlayerMode = playerMode
+    let payload = try waitForWorkflowCLIAsync {
+        try await runWorkflowRuntimeControl(
+            workflowID: workflowID,
+            taskSelector: selectedTaskSelector,
+            repository: repository,
+            macrosDirectory: macrosDirectory,
+            requestedAt: runRequestedAt,
+            waitTimeout: runWaitTimeout,
+            playerMode: runPlayerMode
+        )
+    }
+    let envelope = AutomationCLIResultEnvelope<AutomationWorkflowRunPayload>
+        .workflowRun(command: command, payload: payload)
+
+    if wantsJSON {
+        writeWorkflowJSON(envelope)
+    } else {
+        writeWorkflowRunSummary(payload)
+    }
+    return envelope.ok ? 0 : 1
+}
+
+private func runWorkflowCancel(
+    _ arguments: [String],
+    command: String,
+    wantsJSON: Bool
+) throws -> Int {
+    var runID: UUID?
+    var repositoryDirectoryPath: String?
+    var requestedAt = Date.now
+    var shouldHandoffToAppHost = false
+    var isConfirmed = false
+    var index = 0
+
+    while index < arguments.count {
+        let token = arguments[index]
+        switch token {
+        case "--json":
+            break
+        case "--confirm", "--yes":
+            isConfirmed = true
+        case "--run-id":
+            runID = try parseWorkflowCLIUUID(
+                workflowCLIValue(after: token, in: arguments, at: &index),
+                path: token
+            )
+        case "--repository-dir":
+            repositoryDirectoryPath = try workflowCLIValue(after: token, in: arguments, at: &index)
+        case "--handoff-app":
+            shouldHandoffToAppHost = true
+        case "--handoff":
+            let value = try workflowCLIValue(after: token, in: arguments, at: &index)
+            guard value == "app" || value == "appHost" else {
+                throw WorkflowCLIError(
+                    "unsupportedHandoffTarget",
+                    "--handoff must be 'app'.",
+                    path: token
+                )
+            }
+            shouldHandoffToAppHost = true
+        case "--at":
+            requestedAt = try parseWorkflowCLIDate(workflowCLIValue(after: token, in: arguments, at: &index))
+        default:
+            if token.hasPrefix("--") {
+                throw WorkflowCLIError("unsupportedOption", "Unsupported option '\(token)'.", path: token)
+            }
+            guard runID == nil else {
+                throw WorkflowCLIError("unexpectedArgument", "Unexpected argument '\(token)'.", path: token)
+            }
+            runID = try parseWorkflowCLIUUID(token, path: "run-id")
+        }
+        index += 1
+    }
+
+    guard isConfirmed else {
+        throw WorkflowCLIError(
+            "confirmationRequired",
+            "workflow cancel changes runtime state and requires --confirm.",
+            path: "--confirm"
+        )
+    }
+    guard let runID else {
+        throw WorkflowCLIError("missingArgument", "workflow cancel requires a run ID.")
+    }
+
+    let repository = workflowCLIRepository(directoryPath: repositoryDirectoryPath)
+    let handoffClient = workflowCLIRuntimeHandoffClient(directoryPath: repositoryDirectoryPath)
+    if shouldHandoffToAppHost {
+        let handoffRequestedAt = requestedAt
+        let payload = try waitForWorkflowCLIAsync {
+            try await enqueueWorkflowCancelHandoff(
+                runID: runID,
+                repository: repository,
+                handoffClient: handoffClient,
+                requestedAt: handoffRequestedAt
+            )
+        }
+        let envelope = AutomationCLIResultEnvelope<AutomationRuntimeHandoffPayload>
+            .workflowHandoff(command: command, payload: payload)
+
+        if wantsJSON {
+            writeWorkflowJSON(envelope)
+        } else {
+            writeWorkflowHandoffSummary(payload)
+        }
+        return envelope.ok ? 0 : 1
+    }
+
+    let cancelRequestedAt = requestedAt
+    let payload = try waitForWorkflowCLIAsync {
+        try await cancelWorkflowRun(
+            runID: runID,
+            repository: repository,
+            requestedAt: cancelRequestedAt
+        )
+    }
+    let envelope = AutomationCLIResultEnvelope<AutomationWorkflowCancelPayload>
+        .workflowCancel(command: command, payload: payload)
+
+    if wantsJSON {
+        writeWorkflowJSON(envelope)
+    } else {
+        writeWorkflowCancelSummary(payload)
+    }
+    return envelope.ok ? 0 : 1
+}
+
+private func runWorkflowHandoffStatus(
+    _ arguments: [String],
+    command: String,
+    wantsJSON: Bool
+) throws -> Int {
+    var commandID: UUID?
+    var repositoryDirectoryPath: String?
+    var index = 0
+
+    while index < arguments.count {
+        let token = arguments[index]
+        switch token {
+        case "--json":
+            break
+        case "--command-id":
+            commandID = try parseWorkflowCLIUUID(
+                workflowCLIValue(after: token, in: arguments, at: &index),
+                path: token
+            )
+        case "--repository-dir":
+            repositoryDirectoryPath = try workflowCLIValue(after: token, in: arguments, at: &index)
+        default:
+            if token.hasPrefix("--") {
+                throw WorkflowCLIError("unsupportedOption", "Unsupported option '\(token)'.", path: token)
+            }
+            guard commandID == nil else {
+                throw WorkflowCLIError("unexpectedArgument", "Unexpected argument '\(token)'.", path: token)
+            }
+            commandID = try parseWorkflowCLIUUID(token, path: "command-id")
+        }
+        index += 1
+    }
+
+    guard let commandID else {
+        throw WorkflowCLIError("missingArgument", "workflow handoff status requires a command ID.")
+    }
+
+    let repository = workflowCLIRepository(directoryPath: repositoryDirectoryPath)
+    let handoffClient = workflowCLIRuntimeHandoffClient(directoryPath: repositoryDirectoryPath)
+    let payload = try waitForWorkflowCLIAsync {
+        try await loadWorkflowHandoffStatus(
+            commandID: commandID,
+            handoffClient: handoffClient,
+            repository: repository,
+            checkedAt: Date.now
+        )
+    }
+    let envelope = AutomationCLIResultEnvelope<AutomationRuntimeHandoffStatusPayload>
+        .workflowHandoffStatus(command: command, payload: payload)
+
+    if wantsJSON {
+        writeWorkflowJSON(envelope)
+    } else {
+        writeWorkflowHandoffStatusSummary(payload)
+    }
+    return envelope.ok ? 0 : 1
+}
+
+private func runWorkflowRuns(
+    _ arguments: [String],
+    command: String,
+    wantsJSON: Bool
+) throws -> Int {
+    var workflowID: UUID?
+    var repositoryDirectoryPath: String?
+    var index = 0
+
+    while index < arguments.count {
+        let token = arguments[index]
+        switch token {
+        case "--json":
+            break
+        case "--workflow-id":
+            workflowID = try parseWorkflowCLIUUID(
+                workflowCLIValue(after: token, in: arguments, at: &index),
+                path: token
+            )
+        case "--repository-dir":
+            repositoryDirectoryPath = try workflowCLIValue(after: token, in: arguments, at: &index)
+        default:
+            if token.hasPrefix("--") {
+                throw WorkflowCLIError("unsupportedOption", "Unsupported option '\(token)'.", path: token)
+            }
+            guard workflowID == nil else {
+                throw WorkflowCLIError("unexpectedArgument", "Unexpected argument '\(token)'.", path: token)
+            }
+            workflowID = try parseWorkflowCLIUUID(token, path: "workflow-id")
+        }
+        index += 1
+    }
+
+    guard let workflowID else {
+        throw WorkflowCLIError("missingArgument", "\(command) requires a workflow ID.")
+    }
+
+    let repository = workflowCLIRepository(directoryPath: repositoryDirectoryPath)
+    let snapshot = try waitForWorkflowCLIAsync {
+        let workflows = try await repository.loadWorkflows()
+        let runHistory = try await repository.loadRunHistory()
+        return (workflows, runHistory)
+    }
+    guard let workflow = snapshot.0.first(where: { $0.id == workflowID }) else {
+        throw WorkflowCLIError(
+            "workflowNotFound",
+            "Workflow '\(workflowID.uuidString)' was not found.",
+            path: "workflow-id"
+        )
+    }
+
+    let envelope = AutomationCLIResultEnvelope<AutomationWorkflowRunsPayload>
+        .workflowRuns(command: command, workflow: workflow, runHistory: snapshot.1)
+
+    if wantsJSON {
+        writeWorkflowJSON(envelope)
+    } else {
+        writeWorkflowRunsSummary(envelope.data)
+    }
+    return 0
+}
+
+private func runWorkflowShow(
+    _ arguments: [String],
+    command: String,
+    wantsJSON: Bool
+) throws -> Int {
+    var workflowID: UUID?
+    var repositoryDirectoryPath: String?
+    var index = 0
+
+    while index < arguments.count {
+        let token = arguments[index]
+        switch token {
+        case "--json":
+            break
+        case "--workflow-id":
+            workflowID = try parseWorkflowCLIUUID(
+                workflowCLIValue(after: token, in: arguments, at: &index),
+                path: token
+            )
+        case "--repository-dir":
+            repositoryDirectoryPath = try workflowCLIValue(after: token, in: arguments, at: &index)
+        default:
+            if token.hasPrefix("--") {
+                throw WorkflowCLIError("unsupportedOption", "Unsupported option '\(token)'.", path: token)
+            }
+            guard workflowID == nil else {
+                throw WorkflowCLIError("unexpectedArgument", "Unexpected argument '\(token)'.", path: token)
+            }
+            workflowID = try parseWorkflowCLIUUID(token, path: "workflow-id")
+        }
+        index += 1
+    }
+
+    guard let workflowID else {
+        throw WorkflowCLIError("missingArgument", "workflow show requires a workflow ID.")
+    }
+
+    let repository = workflowCLIRepository(directoryPath: repositoryDirectoryPath)
+    let snapshot = try waitForWorkflowCLIAsync {
+        let workflows = try await repository.loadWorkflows()
+        let runHistory = try await repository.loadRunHistory()
+        return (workflows, runHistory)
+    }
+    guard let workflow = snapshot.0.first(where: { $0.id == workflowID }) else {
+        throw WorkflowCLIError(
+            "workflowNotFound",
+            "Workflow '\(workflowID.uuidString)' was not found.",
+            path: "workflow-id"
+        )
+    }
+
+    let envelope = AutomationCLIResultEnvelope<AutomationWorkflowShowPayload>
+        .workflowShow(
+            command: command,
+            workflow: workflow,
+            runHistory: snapshot.1
+        )
+
+    if wantsJSON {
+        writeWorkflowJSON(envelope)
+    } else {
+        writeWorkflowShowSummary(envelope.data)
+    }
+    return 0
+}
+
+private func runWorkflowExport(
+    _ arguments: [String],
+    command: String,
+    wantsJSON: Bool
+) throws -> Int {
+    var workflowID: UUID?
+    var repositoryDirectoryPath: String?
+    var macroCatalogPath: String?
+    var outPath: String?
+    var format = "draft-json"
+    var index = 0
+
+    while index < arguments.count {
+        let token = arguments[index]
+        switch token {
+        case "--json":
+            break
+        case "--workflow-id":
+            workflowID = try parseWorkflowCLIUUID(
+                workflowCLIValue(after: token, in: arguments, at: &index),
+                path: token
+            )
+        case "--repository-dir":
+            repositoryDirectoryPath = try workflowCLIValue(after: token, in: arguments, at: &index)
+        case "--macro-catalog", "--catalog":
+            macroCatalogPath = try workflowCLIValue(after: token, in: arguments, at: &index)
+        case "--format":
+            format = try workflowCLIValue(after: token, in: arguments, at: &index)
+        case "--out":
+            outPath = try workflowCLIValue(after: token, in: arguments, at: &index)
+        default:
+            if token.hasPrefix("--") {
+                throw WorkflowCLIError("unsupportedOption", "Unsupported option '\(token)'.", path: token)
+            }
+            guard workflowID == nil else {
+                throw WorkflowCLIError("unexpectedArgument", "Unexpected argument '\(token)'.", path: token)
+            }
+            workflowID = try parseWorkflowCLIUUID(token, path: "workflow-id")
+        }
+        index += 1
+    }
+
+    guard format == "draft-json" else {
+        throw WorkflowCLIError(
+            "unsupportedFormat",
+            "workflow export currently supports --format draft-json.",
+            path: "--format"
+        )
+    }
+    guard let workflowID else {
+        throw WorkflowCLIError("missingArgument", "workflow export requires a workflow ID.")
+    }
+
+    let repository = workflowCLIRepository(directoryPath: repositoryDirectoryPath)
+    let workflows = try waitForWorkflowCLIAsync {
+        try await repository.loadWorkflows()
+    }
+    guard let workflow = workflows.first(where: { $0.id == workflowID }) else {
+        throw WorkflowCLIError(
+            "workflowNotFound",
+            "Workflow '\(workflowID.uuidString)' was not found.",
+            path: "workflow-id"
+        )
+    }
+
+    let macroCatalog: [AutomationWorkflowDraftMacroCatalogEntry]
+    if let macroCatalogPath {
+        let data = try readWorkflowCLIFile(at: macroCatalogPath)
+        macroCatalog = try decodeWorkflowMacroCatalog(from: data)
+    } else {
+        macroCatalog = []
+    }
+    let result = AutomationWorkflowDraftExporter.export(
+        workflow,
+        options: AutomationWorkflowDraftExportOptions(macroCatalog: macroCatalog)
+    )
+    if let outPath {
+        let data = try encodeWorkflowCLIJSON(result.document)
+        try writeWorkflowCLIFile(data, to: outPath)
+    }
+
+    let envelope = AutomationCLIResultEnvelope<AutomationWorkflowDraftExportPayload>
+        .workflowDraftExport(command: command, result: result, wrotePath: outPath)
+
+    if wantsJSON {
+        writeWorkflowJSON(envelope)
+    } else {
+        writeWorkflowExportSummary(result, wrotePath: outPath)
+    }
+    return result.isExportable ? 0 : 1
+}
+
+private func runWorkflowDraftInit(
+    _ arguments: [String],
+    command: String,
+    wantsJSON: Bool
+) throws -> Int {
+    var name: String?
+    var outPath: String?
+    var index = 0
+
+    while index < arguments.count {
+        let token = arguments[index]
+        switch token {
+        case "--json":
+            break
+        case "--name":
+            name = try workflowCLIValue(after: token, in: arguments, at: &index)
+        case "--out":
+            outPath = try workflowCLIValue(after: token, in: arguments, at: &index)
+        default:
+            if token.hasPrefix("--") {
+                throw WorkflowCLIError("unsupportedOption", "Unsupported option '\(token)'.", path: token)
+            }
+            throw WorkflowCLIError("unexpectedArgument", "Unexpected argument '\(token)'.", path: token)
+        }
+        index += 1
+    }
+
+    guard let name else {
+        throw WorkflowCLIError("missingArgument", "workflow draft init requires --name.", path: "--name")
+    }
+
+    let result = try AutomationWorkflowDraftEditor.makeDocument(name: name)
+    return try finishWorkflowDraftEdit(
+        result,
+        outPath: outPath,
+        command: command,
+        wantsJSON: wantsJSON
+    )
+}
+
+private func runWorkflowDraftInspect(
+    _ arguments: [String],
+    command: String,
+    wantsJSON: Bool
+) throws -> Int {
+    var draftPath: String?
+    var macroCatalogPath: String?
+    var index = 0
+
+    while index < arguments.count {
+        let token = arguments[index]
+        switch token {
+        case "--json":
+            break
+        case "--macro-catalog", "--catalog":
+            macroCatalogPath = try workflowCLIValue(after: token, in: arguments, at: &index)
+        default:
+            if token.hasPrefix("--") {
+                throw WorkflowCLIError("unsupportedOption", "Unsupported option '\(token)'.", path: token)
+            }
+            guard draftPath == nil else {
+                throw WorkflowCLIError("unexpectedArgument", "Unexpected argument '\(token)'.", path: token)
+            }
+            draftPath = token
+        }
+        index += 1
+    }
+
+    let document = try loadWorkflowDraftDocument(path: draftPath, command: "workflow draft inspect")
+    let context = try loadWorkflowDraftValidationContext(macroCatalogPath: macroCatalogPath)
+    let result = AutomationWorkflowDraftEditor.inspect(document, context: context)
+    return try finishWorkflowDraftEdit(
+        result,
+        outPath: nil,
+        command: command,
+        wantsJSON: wantsJSON
+    )
+}
+
+private func runWorkflowDraftNormalize(
+    _ arguments: [String],
+    command: String,
+    wantsJSON: Bool
+) throws -> Int {
+    var draftPath: String?
+    var outPath: String?
+    var macroCatalogPath: String?
+    var index = 0
+
+    while index < arguments.count {
+        let token = arguments[index]
+        switch token {
+        case "--json":
+            break
+        case "--out":
+            outPath = try workflowCLIValue(after: token, in: arguments, at: &index)
+        case "--macro-catalog", "--catalog":
+            macroCatalogPath = try workflowCLIValue(after: token, in: arguments, at: &index)
+        default:
+            if token.hasPrefix("--") {
+                throw WorkflowCLIError("unsupportedOption", "Unsupported option '\(token)'.", path: token)
+            }
+            guard draftPath == nil else {
+                throw WorkflowCLIError("unexpectedArgument", "Unexpected argument '\(token)'.", path: token)
+            }
+            draftPath = token
+        }
+        index += 1
+    }
+
+    let document = try loadWorkflowDraftDocument(path: draftPath, command: "workflow draft normalize")
+    let context = try loadWorkflowDraftValidationContext(macroCatalogPath: macroCatalogPath)
+    let result = AutomationWorkflowDraftEditor.normalize(document, context: context)
+    return try finishWorkflowDraftEdit(
+        result,
+        outPath: outPath,
+        command: command,
+        wantsJSON: wantsJSON
+    )
+}
+
+private func runWorkflowDraftPatch(
+    _ arguments: [String],
+    command: String,
+    wantsJSON: Bool
+) throws -> Int {
+    var draftPath: String?
+    var patchPath: String?
+    var outPath: String?
+    var macroCatalogPath: String?
+    var index = 0
+
+    while index < arguments.count {
+        let token = arguments[index]
+        switch token {
+        case "--json":
+            break
+        case "--out":
+            outPath = try workflowCLIValue(after: token, in: arguments, at: &index)
+        case "--macro-catalog", "--catalog":
+            macroCatalogPath = try workflowCLIValue(after: token, in: arguments, at: &index)
+        default:
+            if token.hasPrefix("--") {
+                throw WorkflowCLIError("unsupportedOption", "Unsupported option '\(token)'.", path: token)
+            }
+            if draftPath == nil {
+                draftPath = token
+            } else if patchPath == nil {
+                patchPath = token
+            } else {
+                throw WorkflowCLIError("unexpectedArgument", "Unexpected argument '\(token)'.", path: token)
+            }
+        }
+        index += 1
+    }
+
+    let document = try loadWorkflowDraftDocument(path: draftPath, command: command)
+    let patch = try loadWorkflowDraftPatchDocument(path: patchPath, command: command)
+    let context = try loadWorkflowDraftValidationContext(macroCatalogPath: macroCatalogPath)
+    let result = try AutomationWorkflowDraftPatchApplier.apply(
+        patch,
+        to: document,
+        context: context
+    )
+    return try finishWorkflowDraftEdit(
+        result,
+        outPath: outPath,
+        command: command,
+        wantsJSON: wantsJSON
+    )
+}
+
+private func runWorkflowDraftTaskAdd(
+    _ arguments: [String],
+    command: String,
+    wantsJSON: Bool
+) throws -> Int {
+    var draftPath: String?
+    var outPath: String?
+    var macroCatalogPath: String?
+    var key: String?
+    var type: String?
+    var name: String?
+    var macroID: UUID?
+    var macroName: String?
+    var resource: AutomationWorkflowDraftResource?
+    var delaySeconds: TimeInterval?
+    var notificationTitle: String?
+    var notificationBody: String?
+    var notificationSeverity: String?
+    var timeoutSeconds: TimeInterval?
+    var pollingSeconds: TimeInterval?
+    var retryMaxAttempts: Int?
+    var joinPolicy: String?
+    var enabled: Bool?
+    var graphX: Double?
+    var graphY: Double?
+    var maxResourceWaitSeconds: TimeInterval?
+    var index = 0
+
+    while index < arguments.count {
+        let token = arguments[index]
+        switch token {
+        case "--json":
+            break
+        case "--out":
+            outPath = try workflowCLIValue(after: token, in: arguments, at: &index)
+        case "--macro-catalog", "--catalog":
+            macroCatalogPath = try workflowCLIValue(after: token, in: arguments, at: &index)
+        case "--key":
+            key = try workflowCLIValue(after: token, in: arguments, at: &index)
+        case "--type":
+            type = try workflowCLIValue(after: token, in: arguments, at: &index)
+        case "--name":
+            name = try workflowCLIValue(after: token, in: arguments, at: &index)
+        case "--macro-id":
+            macroID = try parseWorkflowCLIUUID(workflowCLIValue(after: token, in: arguments, at: &index), path: token)
+        case "--macro-name":
+            macroName = try workflowCLIValue(after: token, in: arguments, at: &index)
+        case "--resource":
+            resource = try parseWorkflowCLIResource(workflowCLIValue(after: token, in: arguments, at: &index), path: token)
+        case "--max-resource-wait":
+            maxResourceWaitSeconds = try parseWorkflowCLIDuration(workflowCLIValue(after: token, in: arguments, at: &index), path: token)
+        case "--delay":
+            delaySeconds = try parseWorkflowCLIDuration(workflowCLIValue(after: token, in: arguments, at: &index), path: token)
+        case "--title":
+            notificationTitle = try workflowCLIValue(after: token, in: arguments, at: &index)
+        case "--body":
+            notificationBody = try workflowCLIValue(after: token, in: arguments, at: &index)
+        case "--severity":
+            notificationSeverity = try workflowCLIValue(after: token, in: arguments, at: &index)
+        case "--timeout":
+            timeoutSeconds = try parseWorkflowCLIDuration(workflowCLIValue(after: token, in: arguments, at: &index), path: token)
+        case "--polling":
+            pollingSeconds = try parseWorkflowCLIDuration(workflowCLIValue(after: token, in: arguments, at: &index), path: token)
+        case "--retry-max":
+            retryMaxAttempts = try parseWorkflowCLIInt(workflowCLIValue(after: token, in: arguments, at: &index), path: token)
+        case "--join-policy":
+            joinPolicy = try workflowCLIValue(after: token, in: arguments, at: &index)
+        case "--enabled":
+            enabled = try parseWorkflowCLIBool(workflowCLIValue(after: token, in: arguments, at: &index), path: token)
+        case "--x":
+            graphX = try parseWorkflowCLIDouble(workflowCLIValue(after: token, in: arguments, at: &index), path: token)
+        case "--y":
+            graphY = try parseWorkflowCLIDouble(workflowCLIValue(after: token, in: arguments, at: &index), path: token)
+        default:
+            if token.hasPrefix("--") {
+                throw WorkflowCLIError("unsupportedOption", "Unsupported option '\(token)'.", path: token)
+            }
+            guard draftPath == nil else {
+                throw WorkflowCLIError("unexpectedArgument", "Unexpected argument '\(token)'.", path: token)
+            }
+            draftPath = token
+        }
+        index += 1
+    }
+
+    guard let key else {
+        throw WorkflowCLIError("missingArgument", "workflow draft task add requires --key.", path: "--key")
+    }
+    guard let type else {
+        throw WorkflowCLIError("missingArgument", "workflow draft task add requires --type.", path: "--type")
+    }
+
+    let document = try loadWorkflowDraftDocument(path: draftPath, command: "workflow draft task add")
+    let context = try loadWorkflowDraftValidationContext(macroCatalogPath: macroCatalogPath)
+    let graphPosition = try workflowCLIGraphPoint(x: graphX, y: graphY)
+    let task = AutomationWorkflowDraftTask(
+        key: key,
+        type: type,
+        name: name,
+        macroRef: (macroID != nil || macroName != nil) ? AutomationWorkflowDraftMacroRef(id: macroID, name: macroName) : nil,
+        condition: type == "condition" ? AutomationWorkflowDraftCondition(type: "ocrText") : nil,
+        delaySeconds: delaySeconds,
+        notification: notificationTitle.map {
+            AutomationWorkflowDraftNotification(title: $0, body: notificationBody, severity: notificationSeverity)
+        },
+        resource: resource,
+        maxResourceWaitSeconds: maxResourceWaitSeconds,
+        timeoutSeconds: timeoutSeconds,
+        pollingSeconds: pollingSeconds,
+        retry: retryMaxAttempts.map { AutomationWorkflowDraftRetry(maxAttempts: $0) },
+        joinPolicy: joinPolicy,
+        enabled: enabled,
+        graphPosition: graphPosition
+    )
+    let result = try AutomationWorkflowDraftEditor.addTask(task, to: document, context: context)
+    return try finishWorkflowDraftEdit(
+        result,
+        outPath: outPath,
+        command: command,
+        wantsJSON: wantsJSON
+    )
+}
+
+private func runWorkflowDraftTaskSet(
+    _ arguments: [String],
+    command: String,
+    wantsJSON: Bool
+) throws -> Int {
+    var draftPath: String?
+    var taskKey: String?
+    var outPath: String?
+    var macroCatalogPath: String?
+    var name: String?
+    var timeoutSeconds: TimeInterval?
+    var pollingSeconds: TimeInterval?
+    var retryMaxAttempts: Int?
+    var joinPolicy: String?
+    var resource: AutomationWorkflowDraftResource?
+    var maxResourceWaitSeconds: TimeInterval?
+    var enabled: Bool?
+    var graphX: Double?
+    var graphY: Double?
+    var index = 0
+
+    while index < arguments.count {
+        let token = arguments[index]
+        switch token {
+        case "--json":
+            break
+        case "--out":
+            outPath = try workflowCLIValue(after: token, in: arguments, at: &index)
+        case "--macro-catalog", "--catalog":
+            macroCatalogPath = try workflowCLIValue(after: token, in: arguments, at: &index)
+        case "--name":
+            name = try workflowCLIValue(after: token, in: arguments, at: &index)
+        case "--timeout":
+            timeoutSeconds = try parseWorkflowCLIDuration(workflowCLIValue(after: token, in: arguments, at: &index), path: token)
+        case "--polling":
+            pollingSeconds = try parseWorkflowCLIDuration(workflowCLIValue(after: token, in: arguments, at: &index), path: token)
+        case "--retry-max":
+            retryMaxAttempts = try parseWorkflowCLIInt(workflowCLIValue(after: token, in: arguments, at: &index), path: token)
+        case "--join-policy":
+            joinPolicy = try workflowCLIValue(after: token, in: arguments, at: &index)
+        case "--resource":
+            resource = try parseWorkflowCLIResource(workflowCLIValue(after: token, in: arguments, at: &index), path: token)
+        case "--max-resource-wait":
+            maxResourceWaitSeconds = try parseWorkflowCLIDuration(workflowCLIValue(after: token, in: arguments, at: &index), path: token)
+        case "--enabled":
+            enabled = try parseWorkflowCLIBool(workflowCLIValue(after: token, in: arguments, at: &index), path: token)
+        case "--x":
+            graphX = try parseWorkflowCLIDouble(workflowCLIValue(after: token, in: arguments, at: &index), path: token)
+        case "--y":
+            graphY = try parseWorkflowCLIDouble(workflowCLIValue(after: token, in: arguments, at: &index), path: token)
+        default:
+            if token.hasPrefix("--") {
+                throw WorkflowCLIError("unsupportedOption", "Unsupported option '\(token)'.", path: token)
+            }
+            if draftPath == nil {
+                draftPath = token
+            } else if taskKey == nil {
+                taskKey = token
+            } else {
+                throw WorkflowCLIError("unexpectedArgument", "Unexpected argument '\(token)'.", path: token)
+            }
+        }
+        index += 1
+    }
+
+    let document = try loadWorkflowDraftDocument(path: draftPath, command: "workflow draft task set")
+    guard let taskKey else {
+        throw WorkflowCLIError("missingArgument", "workflow draft task set requires a task key.")
+    }
+    let context = try loadWorkflowDraftValidationContext(macroCatalogPath: macroCatalogPath)
+    let graphPosition = try workflowCLIGraphPoint(x: graphX, y: graphY)
+    let result = try AutomationWorkflowDraftEditor.setTask(
+        key: taskKey,
+        in: document,
+        name: name,
+        timeoutSeconds: timeoutSeconds,
+        pollingSeconds: pollingSeconds,
+        retryMaxAttempts: retryMaxAttempts,
+        joinPolicy: joinPolicy,
+        resource: resource,
+        maxResourceWaitSeconds: maxResourceWaitSeconds,
+        enabled: enabled,
+        graphPosition: graphPosition,
+        context: context
+    )
+    return try finishWorkflowDraftEdit(
+        result,
+        outPath: outPath,
+        command: command,
+        wantsJSON: wantsJSON
+    )
+}
+
+private func runWorkflowDraftTaskRemove(
+    _ arguments: [String],
+    command: String,
+    wantsJSON: Bool
+) throws -> Int {
+    var draftPath: String?
+    var taskKey: String?
+    var outPath: String?
+    var macroCatalogPath: String?
+    var index = 0
+
+    while index < arguments.count {
+        let token = arguments[index]
+        switch token {
+        case "--json":
+            break
+        case "--out":
+            outPath = try workflowCLIValue(after: token, in: arguments, at: &index)
+        case "--macro-catalog", "--catalog":
+            macroCatalogPath = try workflowCLIValue(after: token, in: arguments, at: &index)
+        default:
+            if token.hasPrefix("--") {
+                throw WorkflowCLIError("unsupportedOption", "Unsupported option '\(token)'.", path: token)
+            }
+            if draftPath == nil {
+                draftPath = token
+            } else if taskKey == nil {
+                taskKey = token
+            } else {
+                throw WorkflowCLIError("unexpectedArgument", "Unexpected argument '\(token)'.", path: token)
+            }
+        }
+        index += 1
+    }
+
+    let document = try loadWorkflowDraftDocument(path: draftPath, command: "workflow draft task remove")
+    guard let taskKey else {
+        throw WorkflowCLIError("missingArgument", "workflow draft task remove requires a task key.")
+    }
+    let context = try loadWorkflowDraftValidationContext(macroCatalogPath: macroCatalogPath)
+    let result = try AutomationWorkflowDraftEditor.removeTask(
+        key: taskKey,
+        from: document,
+        context: context
+    )
+    return try finishWorkflowDraftEdit(
+        result,
+        outPath: outPath,
+        command: command,
+        wantsJSON: wantsJSON
+    )
+}
+
+private func runWorkflowDraftScheduleSet(
+    _ arguments: [String],
+    command: String,
+    wantsJSON: Bool
+) throws -> Int {
+    var draftPath: String?
+    var taskKey: String?
+    var outPath: String?
+    var macroCatalogPath: String?
+    var scheduleType: String?
+    var startAt: Date?
+    var every: Int?
+    var unit: String?
+    var timeZone: String?
+    var index = 0
+
+    while index < arguments.count {
+        let token = arguments[index]
+        switch token {
+        case "--json":
+            break
+        case "--out":
+            outPath = try workflowCLIValue(after: token, in: arguments, at: &index)
+        case "--macro-catalog", "--catalog":
+            macroCatalogPath = try workflowCLIValue(after: token, in: arguments, at: &index)
+        case "--type":
+            scheduleType = try workflowCLIValue(after: token, in: arguments, at: &index)
+        case "--at", "--start-at":
+            startAt = try parseWorkflowCLIDate(workflowCLIValue(after: token, in: arguments, at: &index))
+        case "--every":
+            every = try parseWorkflowCLIInt(workflowCLIValue(after: token, in: arguments, at: &index), path: token)
+        case "--unit":
+            unit = try workflowCLIValue(after: token, in: arguments, at: &index)
+        case "--time-zone":
+            timeZone = try workflowCLIValue(after: token, in: arguments, at: &index)
+        default:
+            if token.hasPrefix("--") {
+                throw WorkflowCLIError("unsupportedOption", "Unsupported option '\(token)'.", path: token)
+            }
+            if draftPath == nil {
+                draftPath = token
+            } else if taskKey == nil {
+                taskKey = token
+            } else {
+                throw WorkflowCLIError("unexpectedArgument", "Unexpected argument '\(token)'.", path: token)
+            }
+        }
+        index += 1
+    }
+
+    let document = try loadWorkflowDraftDocument(path: draftPath, command: "workflow draft schedule set")
+    guard let taskKey else {
+        throw WorkflowCLIError("missingArgument", "workflow draft schedule set requires a task key.")
+    }
+    guard let scheduleType else {
+        throw WorkflowCLIError("missingArgument", "workflow draft schedule set requires --type.", path: "--type")
+    }
+    let schedule = parseWorkflowCLIDraftSchedule(
+        type: scheduleType,
+        startAt: startAt,
+        every: every,
+        unit: unit,
+        timeZone: timeZone
+    )
+    let context = try loadWorkflowDraftValidationContext(macroCatalogPath: macroCatalogPath)
+    let result = try AutomationWorkflowDraftEditor.setSchedule(
+        taskKey: taskKey,
+        schedule: schedule,
+        in: document,
+        context: context
+    )
+    return try finishWorkflowDraftEdit(
+        result,
+        outPath: outPath,
+        command: command,
+        wantsJSON: wantsJSON
+    )
+}
+
+private func runWorkflowDraftConditionSet(
+    _ arguments: [String],
+    command: String,
+    wantsJSON: Bool
+) throws -> Int {
+    var draftPath: String?
+    var taskKey: String?
+    var outPath: String?
+    var macroCatalogPath: String?
+    var conditionType: String?
+    var text: String?
+    var matchMode: TextMatchMode?
+    var regionRef: String?
+    var requireVisible: Bool?
+    var outcome: String?
+    var imageRef: String?
+    var baselineRef: String?
+    var colorHex: String?
+    var threshold: Double?
+    var pixelX: Double?
+    var pixelY: Double?
+    var timeoutSeconds: TimeInterval?
+    var pollingSeconds: TimeInterval?
+    var index = 0
+
+    while index < arguments.count {
+        let token = arguments[index]
+        switch token {
+        case "--json":
+            break
+        case "--out":
+            outPath = try workflowCLIValue(after: token, in: arguments, at: &index)
+        case "--macro-catalog", "--catalog":
+            macroCatalogPath = try workflowCLIValue(after: token, in: arguments, at: &index)
+        case "--type":
+            conditionType = try workflowCLIValue(after: token, in: arguments, at: &index)
+        case "--text":
+            text = try workflowCLIValue(after: token, in: arguments, at: &index)
+        case "--match":
+            matchMode = try parseWorkflowCLITextMatchMode(workflowCLIValue(after: token, in: arguments, at: &index), path: token)
+        case "--region":
+            regionRef = try workflowCLIValue(after: token, in: arguments, at: &index)
+        case "--require-visible":
+            requireVisible = try parseWorkflowCLIBool(workflowCLIValue(after: token, in: arguments, at: &index), path: token)
+        case "--outcome":
+            outcome = try workflowCLIValue(after: token, in: arguments, at: &index)
+        case "--image", "--image-ref":
+            imageRef = try workflowCLIValue(after: token, in: arguments, at: &index)
+        case "--baseline", "--baseline-ref":
+            baselineRef = try workflowCLIValue(after: token, in: arguments, at: &index)
+        case "--color", "--color-hex":
+            colorHex = try workflowCLIValue(after: token, in: arguments, at: &index)
+        case "--threshold":
+            threshold = try parseWorkflowCLIDouble(workflowCLIValue(after: token, in: arguments, at: &index), path: token)
+        case "--pixel-x":
+            pixelX = try parseWorkflowCLIDouble(workflowCLIValue(after: token, in: arguments, at: &index), path: token)
+        case "--pixel-y":
+            pixelY = try parseWorkflowCLIDouble(workflowCLIValue(after: token, in: arguments, at: &index), path: token)
+        case "--timeout":
+            timeoutSeconds = try parseWorkflowCLIDuration(workflowCLIValue(after: token, in: arguments, at: &index), path: token)
+        case "--polling":
+            pollingSeconds = try parseWorkflowCLIDuration(workflowCLIValue(after: token, in: arguments, at: &index), path: token)
+        default:
+            if token.hasPrefix("--") {
+                throw WorkflowCLIError("unsupportedOption", "Unsupported option '\(token)'.", path: token)
+            }
+            if draftPath == nil {
+                draftPath = token
+            } else if taskKey == nil {
+                taskKey = token
+            } else {
+                throw WorkflowCLIError("unexpectedArgument", "Unexpected argument '\(token)'.", path: token)
+            }
+        }
+        index += 1
+    }
+
+    let document = try loadWorkflowDraftDocument(path: draftPath, command: "workflow draft condition set")
+    guard let taskKey else {
+        throw WorkflowCLIError("missingArgument", "workflow draft condition set requires a task key.")
+    }
+    let condition = AutomationWorkflowDraftCondition(
+        type: conditionType ?? "ocrText",
+        text: text,
+        matchMode: matchMode,
+        regionRef: regionRef,
+        requireVisible: requireVisible,
+        outcome: outcome,
+        imageRef: imageRef,
+        baselineRef: baselineRef,
+        pixel: try workflowCLIOptionalPoint(x: pixelX, y: pixelY),
+        colorHex: colorHex,
+        threshold: threshold
+    )
+    let context = try loadWorkflowDraftValidationContext(macroCatalogPath: macroCatalogPath)
+    let result = try AutomationWorkflowDraftEditor.setCondition(
+        taskKey: taskKey,
+        condition: condition,
+        in: document,
+        timeoutSeconds: timeoutSeconds,
+        pollingSeconds: pollingSeconds,
+        context: context
+    )
+    return try finishWorkflowDraftEdit(
+        result,
+        outPath: outPath,
+        command: command,
+        wantsJSON: wantsJSON
+    )
+}
+
+private func runWorkflowDraftDependencyAdd(
+    _ arguments: [String],
+    command: String,
+    wantsJSON: Bool
+) throws -> Int {
+    var draftPath: String?
+    var outPath: String?
+    var macroCatalogPath: String?
+    var key: String?
+    var from: String?
+    var to: String?
+    var trigger: String?
+    var delaySeconds: TimeInterval?
+    var enabled: Bool?
+    var index = 0
+
+    while index < arguments.count {
+        let token = arguments[index]
+        switch token {
+        case "--json":
+            break
+        case "--out":
+            outPath = try workflowCLIValue(after: token, in: arguments, at: &index)
+        case "--macro-catalog", "--catalog":
+            macroCatalogPath = try workflowCLIValue(after: token, in: arguments, at: &index)
+        case "--key":
+            key = try workflowCLIValue(after: token, in: arguments, at: &index)
+        case "--from":
+            from = try workflowCLIValue(after: token, in: arguments, at: &index)
+        case "--to":
+            to = try workflowCLIValue(after: token, in: arguments, at: &index)
+        case "--trigger":
+            trigger = try workflowCLIValue(after: token, in: arguments, at: &index)
+        case "--delay":
+            delaySeconds = try parseWorkflowCLIDuration(workflowCLIValue(after: token, in: arguments, at: &index), path: token)
+        case "--enabled":
+            enabled = try parseWorkflowCLIBool(workflowCLIValue(after: token, in: arguments, at: &index), path: token)
+        default:
+            if token.hasPrefix("--") {
+                throw WorkflowCLIError("unsupportedOption", "Unsupported option '\(token)'.", path: token)
+            }
+            guard draftPath == nil else {
+                throw WorkflowCLIError("unexpectedArgument", "Unexpected argument '\(token)'.", path: token)
+            }
+            draftPath = token
+        }
+        index += 1
+    }
+
+    let document = try loadWorkflowDraftDocument(path: draftPath, command: "workflow draft dependency add")
+    guard let from else {
+        throw WorkflowCLIError("missingArgument", "workflow draft dependency add requires --from.", path: "--from")
+    }
+    guard let to else {
+        throw WorkflowCLIError("missingArgument", "workflow draft dependency add requires --to.", path: "--to")
+    }
+    guard let trigger else {
+        throw WorkflowCLIError("missingArgument", "workflow draft dependency add requires --trigger.", path: "--trigger")
+    }
+
+    let context = try loadWorkflowDraftValidationContext(macroCatalogPath: macroCatalogPath)
+    let result = try AutomationWorkflowDraftEditor.addDependency(
+        AutomationWorkflowDraftDependency(
+            key: key,
+            from: from,
+            to: to,
+            trigger: trigger,
+            delaySeconds: delaySeconds,
+            enabled: enabled
+        ),
+        to: document,
+        context: context
+    )
+    return try finishWorkflowDraftEdit(
+        result,
+        outPath: outPath,
+        command: command,
+        wantsJSON: wantsJSON
+    )
+}
+
+private func runWorkflowDraftDependencySet(
+    _ arguments: [String],
+    command: String,
+    wantsJSON: Bool
+) throws -> Int {
+    var draftPath: String?
+    var outPath: String?
+    var macroCatalogPath: String?
+    var selectorKey: String?
+    var selectorFrom: String?
+    var selectorTo: String?
+    var selectorTrigger: String?
+    var newKey: String?
+    var newFrom: String?
+    var newTo: String?
+    var newTrigger: String?
+    var delaySeconds: TimeInterval?
+    var enabled: Bool?
+    var index = 0
+
+    while index < arguments.count {
+        let token = arguments[index]
+        switch token {
+        case "--json":
+            break
+        case "--out":
+            outPath = try workflowCLIValue(after: token, in: arguments, at: &index)
+        case "--macro-catalog", "--catalog":
+            macroCatalogPath = try workflowCLIValue(after: token, in: arguments, at: &index)
+        case "--key":
+            selectorKey = try workflowCLIValue(after: token, in: arguments, at: &index)
+        case "--from":
+            selectorFrom = try workflowCLIValue(after: token, in: arguments, at: &index)
+        case "--to":
+            selectorTo = try workflowCLIValue(after: token, in: arguments, at: &index)
+        case "--trigger":
+            selectorTrigger = try workflowCLIValue(after: token, in: arguments, at: &index)
+        case "--new-key":
+            newKey = try workflowCLIValue(after: token, in: arguments, at: &index)
+        case "--new-from":
+            newFrom = try workflowCLIValue(after: token, in: arguments, at: &index)
+        case "--new-to":
+            newTo = try workflowCLIValue(after: token, in: arguments, at: &index)
+        case "--new-trigger":
+            newTrigger = try workflowCLIValue(after: token, in: arguments, at: &index)
+        case "--delay":
+            delaySeconds = try parseWorkflowCLIDuration(workflowCLIValue(after: token, in: arguments, at: &index), path: token)
+        case "--enabled":
+            enabled = try parseWorkflowCLIBool(workflowCLIValue(after: token, in: arguments, at: &index), path: token)
+        default:
+            if token.hasPrefix("--") {
+                throw WorkflowCLIError("unsupportedOption", "Unsupported option '\(token)'.", path: token)
+            }
+            guard draftPath == nil else {
+                throw WorkflowCLIError("unexpectedArgument", "Unexpected argument '\(token)'.", path: token)
+            }
+            draftPath = token
+        }
+        index += 1
+    }
+
+    let document = try loadWorkflowDraftDocument(path: draftPath, command: "workflow draft dependency set")
+    let context = try loadWorkflowDraftValidationContext(macroCatalogPath: macroCatalogPath)
+    let result = try AutomationWorkflowDraftEditor.setDependency(
+        matching: AutomationWorkflowDraftDependencySelector(
+            key: selectorKey,
+            from: selectorFrom,
+            to: selectorTo,
+            trigger: selectorTrigger
+        ),
+        in: document,
+        key: newKey,
+        from: newFrom,
+        to: newTo,
+        trigger: newTrigger,
+        delaySeconds: delaySeconds,
+        enabled: enabled,
+        context: context
+    )
+    return try finishWorkflowDraftEdit(
+        result,
+        outPath: outPath,
+        command: command,
+        wantsJSON: wantsJSON
+    )
+}
+
+private func runWorkflowDraftDependencyRemove(
+    _ arguments: [String],
+    command: String,
+    wantsJSON: Bool
+) throws -> Int {
+    var draftPath: String?
+    var outPath: String?
+    var macroCatalogPath: String?
+    var selectorKey: String?
+    var selectorFrom: String?
+    var selectorTo: String?
+    var selectorTrigger: String?
+    var index = 0
+
+    while index < arguments.count {
+        let token = arguments[index]
+        switch token {
+        case "--json":
+            break
+        case "--out":
+            outPath = try workflowCLIValue(after: token, in: arguments, at: &index)
+        case "--macro-catalog", "--catalog":
+            macroCatalogPath = try workflowCLIValue(after: token, in: arguments, at: &index)
+        case "--key":
+            selectorKey = try workflowCLIValue(after: token, in: arguments, at: &index)
+        case "--from":
+            selectorFrom = try workflowCLIValue(after: token, in: arguments, at: &index)
+        case "--to":
+            selectorTo = try workflowCLIValue(after: token, in: arguments, at: &index)
+        case "--trigger":
+            selectorTrigger = try workflowCLIValue(after: token, in: arguments, at: &index)
+        default:
+            if token.hasPrefix("--") {
+                throw WorkflowCLIError("unsupportedOption", "Unsupported option '\(token)'.", path: token)
+            }
+            guard draftPath == nil else {
+                throw WorkflowCLIError("unexpectedArgument", "Unexpected argument '\(token)'.", path: token)
+            }
+            draftPath = token
+        }
+        index += 1
+    }
+
+    let document = try loadWorkflowDraftDocument(path: draftPath, command: "workflow draft dependency remove")
+    let context = try loadWorkflowDraftValidationContext(macroCatalogPath: macroCatalogPath)
+    let result = try AutomationWorkflowDraftEditor.removeDependency(
+        matching: AutomationWorkflowDraftDependencySelector(
+            key: selectorKey,
+            from: selectorFrom,
+            to: selectorTo,
+            trigger: selectorTrigger
+        ),
+        from: document,
+        context: context
+    )
+    return try finishWorkflowDraftEdit(
+        result,
+        outPath: outPath,
+        command: command,
+        wantsJSON: wantsJSON
+    )
+}
+
+private func runWorkflowDraftValidate(
+    _ arguments: [String],
+    command: String,
+    wantsJSON: Bool
+) throws -> Int {
+    var draftPath: String?
+    var macroCatalogPath: String?
+    var index = 0
+
+    while index < arguments.count {
+        let token = arguments[index]
+        switch token {
+        case "--json":
+            break
+        case "--macro-catalog", "--catalog":
+            guard index + 1 < arguments.count else {
+                throw WorkflowCLIError("missingArgument", "\(token) requires a file path.", path: token)
+            }
+            macroCatalogPath = arguments[index + 1]
+            index += 1
+        default:
+            if token.hasPrefix("--") {
+                throw WorkflowCLIError("unsupportedOption", "Unsupported option '\(token)'.", path: token)
+            }
+            guard draftPath == nil else {
+                throw WorkflowCLIError("unexpectedArgument", "Unexpected argument '\(token)'.", path: token)
+            }
+            draftPath = token
+        }
+        index += 1
+    }
+
+    guard let draftPath else {
+        throw WorkflowCLIError("missingArgument", "workflow draft validate requires a draft JSON file path.")
+    }
+
+    let draftData = try readWorkflowCLIFile(at: draftPath)
+    let document = try decodeWorkflowCLIJSON(AutomationWorkflowDraftDocument.self, from: draftData)
+    let macroCatalog: [AutomationWorkflowDraftMacroCatalogEntry]
+    if let macroCatalogPath {
+        let data = try readWorkflowCLIFile(at: macroCatalogPath)
+        macroCatalog = try decodeWorkflowMacroCatalog(from: data)
+    } else {
+        macroCatalog = []
+    }
+    let result = AutomationWorkflowDraftValidator.validate(
+        document,
+        context: AutomationWorkflowDraftValidationContext(macroCatalog: macroCatalog)
+    )
+    let envelope = AutomationCLIResultEnvelope<AutomationWorkflowDraftValidationPayload>
+        .workflowDraftValidation(command: command, result: result)
+
+    if wantsJSON {
+        writeWorkflowJSON(envelope)
+    } else {
+        writeWorkflowValidationSummary(result)
+    }
+    return result.isValid ? 0 : 1
+}
+
+private func runWorkflowDraftSimulate(
+    _ arguments: [String],
+    command: String,
+    wantsJSON: Bool
+) throws -> Int {
+    var draftPath: String?
+    var macroCatalogPath: String?
+    var startAt = Date(timeIntervalSince1970: 0)
+    var scenario: AutomationWorkflowDraftSimulationScenario?
+    var index = 0
+
+    while index < arguments.count {
+        let token = arguments[index]
+        switch token {
+        case "--json":
+            break
+        case "--macro-catalog", "--catalog":
+            guard index + 1 < arguments.count else {
+                throw WorkflowCLIError("missingArgument", "\(token) requires a file path.", path: token)
+            }
+            macroCatalogPath = arguments[index + 1]
+            index += 1
+        case "--at":
+            guard index + 1 < arguments.count else {
+                throw WorkflowCLIError("missingArgument", "--at requires an ISO-8601 date.", path: token)
+            }
+            startAt = try parseWorkflowCLIDate(arguments[index + 1])
+            index += 1
+        case "--scenario":
+            guard index + 1 < arguments.count else {
+                throw WorkflowCLIError("missingArgument", "--scenario requires a value like timeout:wait_exit.", path: token)
+            }
+            guard let parsed = AutomationWorkflowDraftSimulationScenario(rawValue: arguments[index + 1]) else {
+                throw WorkflowCLIError("invalidScenario", "Scenario must look like timeout:<task>, failure:<task>, or conditionNotMatched:<task>.", path: token)
+            }
+            scenario = parsed
+            index += 1
+        default:
+            if token.hasPrefix("--") {
+                throw WorkflowCLIError("unsupportedOption", "Unsupported option '\(token)'.", path: token)
+            }
+            guard draftPath == nil else {
+                throw WorkflowCLIError("unexpectedArgument", "Unexpected argument '\(token)'.", path: token)
+            }
+            draftPath = token
+        }
+        index += 1
+    }
+
+    guard let draftPath else {
+        throw WorkflowCLIError("missingArgument", "workflow draft simulate requires a draft JSON file path.")
+    }
+
+    let draftData = try readWorkflowCLIFile(at: draftPath)
+    let document = try decodeWorkflowCLIJSON(AutomationWorkflowDraftDocument.self, from: draftData)
+    let macroCatalog: [AutomationWorkflowDraftMacroCatalogEntry]
+    if let macroCatalogPath {
+        let data = try readWorkflowCLIFile(at: macroCatalogPath)
+        macroCatalog = try decodeWorkflowMacroCatalog(from: data)
+    } else {
+        macroCatalog = []
+    }
+    let result = AutomationWorkflowDraftSimulator.simulate(
+        document,
+        context: AutomationWorkflowDraftValidationContext(macroCatalog: macroCatalog),
+        options: AutomationWorkflowDraftSimulationOptions(startAt: startAt, scenario: scenario)
+    )
+    let envelope = AutomationCLIResultEnvelope<AutomationWorkflowDraftSimulationPayload>
+        .workflowDraftSimulation(command: command, result: result)
+
+    if wantsJSON {
+        writeWorkflowJSON(envelope)
+    } else {
+        writeWorkflowSimulationSummary(result)
+    }
+    return result.isSimulatable ? 0 : 1
+}
+
+private func runWorkflowImport(
+    _ arguments: [String],
+    command: String,
+    wantsJSON: Bool
+) throws -> Int {
+    var draftPath: String?
+    var macroCatalogPath: String?
+    var repositoryDirectoryPath: String?
+    var visualAssetsRootPath: String?
+    var importedAt = Date.now
+    var isDryRun = false
+    var wantsConfirm = false
+    var index = 0
+
+    while index < arguments.count {
+        let token = arguments[index]
+        switch token {
+        case "--json":
+            break
+        case "--dry-run":
+            isDryRun = true
+        case "--confirm":
+            wantsConfirm = true
+        case "--repository-dir":
+            guard index + 1 < arguments.count else {
+                throw WorkflowCLIError("missingArgument", "--repository-dir requires a directory path.", path: token)
+            }
+            repositoryDirectoryPath = arguments[index + 1]
+            index += 1
+        case "--visual-assets-root":
+            guard index + 1 < arguments.count else {
+                throw WorkflowCLIError("missingArgument", "--visual-assets-root requires a directory path.", path: token)
+            }
+            visualAssetsRootPath = arguments[index + 1]
+            index += 1
+        case "--macro-catalog", "--catalog":
+            guard index + 1 < arguments.count else {
+                throw WorkflowCLIError("missingArgument", "\(token) requires a file path.", path: token)
+            }
+            macroCatalogPath = arguments[index + 1]
+            index += 1
+        case "--at":
+            guard index + 1 < arguments.count else {
+                throw WorkflowCLIError("missingArgument", "--at requires an ISO-8601 date.", path: token)
+            }
+            importedAt = try parseWorkflowCLIDate(arguments[index + 1])
+            index += 1
+        default:
+            if token.hasPrefix("--") {
+                throw WorkflowCLIError("unsupportedOption", "Unsupported option '\(token)'.", path: token)
+            }
+            guard draftPath == nil else {
+                throw WorkflowCLIError("unexpectedArgument", "Unexpected argument '\(token)'.", path: token)
+            }
+            draftPath = token
+        }
+        index += 1
+    }
+
+    if isDryRun && wantsConfirm {
+        throw WorkflowCLIError(
+            "unsupportedOption",
+            "workflow import accepts either --dry-run or --confirm, not both.",
+            path: "--confirm"
+        )
+    }
+    guard isDryRun || wantsConfirm else {
+        throw WorkflowCLIError(
+            "missingArgument",
+            "workflow import requires either --dry-run or --confirm.",
+            path: "--dry-run"
+        )
+    }
+    guard let draftPath else {
+        throw WorkflowCLIError("missingArgument", "workflow import requires a draft JSON file path.")
+    }
+
+    let draftData = try readWorkflowCLIFile(at: draftPath)
+    let document = try decodeWorkflowCLIJSON(AutomationWorkflowDraftDocument.self, from: draftData)
+    let macroCatalog: [AutomationWorkflowDraftMacroCatalogEntry]
+    if let macroCatalogPath {
+        let data = try readWorkflowCLIFile(at: macroCatalogPath)
+        macroCatalog = try decodeWorkflowMacroCatalog(from: data)
+    } else {
+        macroCatalog = []
+    }
+
+    var result = AutomationWorkflowDraftImporter.compile(
+        document,
+        context: AutomationWorkflowDraftValidationContext(macroCatalog: macroCatalog),
+        options: AutomationWorkflowDraftImportOptions(
+            mode: wantsConfirm ? .confirm : .dryRun,
+            importedAt: importedAt
+        )
+    )
+
+    if wantsConfirm && result.isImportable {
+        guard let workflow = result.workflow else {
+            throw WorkflowCLIError(
+                "importRejected",
+                "Workflow import reported success without a compiled workflow."
+            )
+        }
+        let repository: AutomationRepositoryClient
+        if let repositoryDirectoryPath {
+            repository = .fileBacked(directoryURL: URL(fileURLWithPath: repositoryDirectoryPath, isDirectory: true))
+        } else {
+            repository = .fileBacked()
+        }
+        let visualAssetRootClient = workflowCLIVisualAssetRootClient(directoryPath: repositoryDirectoryPath)
+        let visualAssetsRootURL = workflowCLIVisualAssetsRootURL(
+            overridePath: visualAssetsRootPath,
+            draftPath: draftPath
+        )
+        let confirmedAt = importedAt
+        let importResult = result
+        result = try waitForWorkflowCLIAsync {
+            try await confirmWorkflowImport(
+                result: importResult,
+                workflow: workflow,
+                repository: repository,
+                visualAssetRootClient: visualAssetRootClient,
+                visualAssetsRootURL: visualAssetsRootURL,
+                importedAt: confirmedAt
+            )
+        }
+    }
+
+    let envelope = AutomationCLIResultEnvelope<AutomationWorkflowDraftImportPayload>
+        .workflowDraftImport(command: command, result: result)
+
+    if wantsJSON {
+        writeWorkflowJSON(envelope)
+    } else {
+        writeWorkflowImportSummary(result)
+    }
+    return result.isImportable ? 0 : 1
+}
+
+private func confirmWorkflowImport(
+    result: AutomationWorkflowDraftImportResult,
+    workflow: AutomationWorkflow,
+    repository: AutomationRepositoryClient,
+    visualAssetRootClient: AutomationVisualAssetPackageRootClient,
+    visualAssetsRootURL: URL,
+    importedAt: Date
+) async throws -> AutomationWorkflowDraftImportResult {
+    let existingWorkflows = try await repository.loadWorkflows()
+    let initialState = AutomationRunState(workflows: existingWorkflows, now: importedAt)
+    let reducerResult = AutomationReducer.reduce(
+        state: initialState,
+        action: .upsertWorkflow(workflow, at: importedAt)
+    )
+
+    guard case .persistWorkflows(let workflowsToPersist)? = reducerResult.effects.first else {
+        throw WorkflowCLIError(
+            "importRejected",
+            "Compiled workflow was rejected by the Automation reducer."
+        )
+    }
+    guard reducerResult.effects.count == 1 else {
+        throw WorkflowCLIError(
+            "unexpectedImportEffect",
+            "Workflow import expected one persistence effect, got \(reducerResult.effects.count)."
+        )
+    }
+
+    try await repository.saveWorkflows(workflowsToPersist)
+
+    var confirmed = result
+    confirmed.mode = .confirm
+    confirmed.workflow = reducerResult.state.workflow(id: workflow.id) ?? workflow
+    if let confirmedWorkflow = confirmed.workflow {
+        let roots = AutomationVisualAssetPackageRoot.roots(
+            for: [confirmedWorkflow],
+            packageDirectoryURL: visualAssetsRootURL,
+            source: .aiDraftImport,
+            associatedAt: importedAt
+        )
+        if roots.isEmpty {
+            try await visualAssetRootClient.removeRoots(Set([workflow.id]))
+        } else {
+            try await visualAssetRootClient.upsertRoots(roots)
+        }
+    }
+    return confirmed
+}
+
+private func enqueueWorkflowRunHandoff(
+    workflowID: UUID,
+    taskSelector: String?,
+    repository: AutomationRepositoryClient,
+    handoffClient: AutomationRuntimeHandoffClient,
+    requestedAt: Date
+) async throws -> AutomationRuntimeHandoffPayload {
+    let workflows = try await repository.loadWorkflows()
+    guard let workflow = workflows.first(where: { $0.id == workflowID }) else {
+        throw WorkflowCLIError(
+            "workflowNotFound",
+            "Workflow '\(workflowID.uuidString)' was not found.",
+            path: "workflow-id"
+        )
+    }
+    let task = try resolveWorkflowCLITask(selector: taskSelector, in: workflow)
+    guard task.isEnabled else {
+        throw WorkflowCLIError(
+            "taskDisabled",
+            "Task '\(task.name)' is disabled and cannot be started.",
+            path: "--task"
+        )
+    }
+
+    let command = AutomationRuntimeHandoffCommand(
+        kind: .manualStart(workflowID: workflow.id, taskID: task.id),
+        requestedAt: requestedAt,
+        source: "SparkleRecorder CLI"
+    )
+    let enqueued = try await handoffClient.enqueue(command)
+    let pendingCommands = try await handoffClient.loadCommands()
+    return AutomationRuntimeHandoffPayload(
+        command: enqueued,
+        enqueuedAt: Date.now,
+        pendingCommandCount: pendingCommands.count
+    )
+}
+
+private func enqueueWorkflowCancelHandoff(
+    runID: UUID,
+    repository: AutomationRepositoryClient,
+    handoffClient: AutomationRuntimeHandoffClient,
+    requestedAt: Date
+) async throws -> AutomationRuntimeHandoffPayload {
+    let beforeRuns = try await repository.loadRunHistory()
+    guard let beforeRun = beforeRuns.first(where: { $0.id == runID }) else {
+        throw WorkflowCLIError(
+            "runNotFound",
+            "Run '\(runID.uuidString)' was not found in workflow run history.",
+            path: "run-id"
+        )
+    }
+    guard !beforeRun.isTerminal else {
+        throw WorkflowCLIError(
+            "runAlreadyTerminal",
+            "Run '\(runID.uuidString)' is already terminal and cannot be handed off for cancellation.",
+            path: "run-id"
+        )
+    }
+
+    let command = AutomationRuntimeHandoffCommand(
+        kind: .cancelRun(runID: runID),
+        requestedAt: requestedAt,
+        source: "SparkleRecorder CLI"
+    )
+    let enqueued = try await handoffClient.enqueue(command)
+    let pendingCommands = try await handoffClient.loadCommands()
+    return AutomationRuntimeHandoffPayload(
+        command: enqueued,
+        enqueuedAt: Date.now,
+        pendingCommandCount: pendingCommands.count
+    )
+}
+
+private func loadWorkflowHandoffStatus(
+    commandID: UUID,
+    handoffClient: AutomationRuntimeHandoffClient,
+    repository: AutomationRepositoryClient,
+    checkedAt: Date
+) async throws -> AutomationRuntimeHandoffStatusPayload {
+    let commands = try await handoffClient.loadCommands()
+    let receipts = try await handoffClient.loadReceipts()
+    let command = commands.first { $0.id == commandID }
+    let receipt = receipts.first { $0.commandID == commandID }
+    let workflows = try await repository.loadWorkflows()
+    let runHistory = try await repository.loadRunHistory()
+    let runs = workflowHandoffRunSnapshots(
+        command: command,
+        receipt: receipt,
+        runHistory: runHistory
+    )
+    let workflowStatus = workflowHandoffWorkflow(
+        command: command,
+        receipt: receipt,
+        runs: runs,
+        workflows: workflows
+    ).map { workflow in
+        AutomationWorkflowStatus(workflow: workflow, runHistory: runHistory)
+    }
+    return AutomationRuntimeHandoffStatusPayload(
+        commandID: commandID,
+        command: command,
+        receipt: receipt,
+        workflowStatus: workflowStatus,
+        runs: runs,
+        pendingCommandCount: commands.count,
+        receiptCount: receipts.count,
+        checkedAt: checkedAt
+    )
+}
+
+private func workflowHandoffRunSnapshots(
+    command: AutomationRuntimeHandoffCommand?,
+    receipt: AutomationRuntimeHandoffReceipt?,
+    runHistory: [AutomationTaskRun]
+) -> [AutomationTaskRun] {
+    let runIDs: [UUID]
+    if let receipt, !receipt.runIDs.isEmpty {
+        runIDs = receipt.runIDs
+    } else if case .cancelRun(let runID) = command?.kind {
+        runIDs = [runID]
+    } else if case .cancelRun(let runID) = receipt?.commandKind {
+        runIDs = [runID]
+    } else {
+        runIDs = []
+    }
+
+    guard !runIDs.isEmpty else {
+        return []
+    }
+    let runsByID = Dictionary(grouping: runHistory, by: \.id)
+        .mapValues { groupedRuns in
+            groupedRuns.sorted { workflowCLIRunSortDate($0) > workflowCLIRunSortDate($1) }.first!
+        }
+    return runIDs.compactMap { runsByID[$0] }
+}
+
+private func workflowHandoffWorkflow(
+    command: AutomationRuntimeHandoffCommand?,
+    receipt: AutomationRuntimeHandoffReceipt?,
+    runs: [AutomationTaskRun],
+    workflows: [AutomationWorkflow]
+) -> AutomationWorkflow? {
+    let workflowID: UUID?
+    if case .manualStart(let id, _) = command?.kind {
+        workflowID = id
+    } else if case .manualStart(let id, _) = receipt?.commandKind {
+        workflowID = id
+    } else {
+        workflowID = runs.first?.workflowID
+    }
+    guard let workflowID else {
+        return nil
+    }
+    return workflows.first { $0.id == workflowID }
+}
+
+private func workflowCLIRunSortDate(_ run: AutomationTaskRun) -> Date {
+    run.completedAt ??
+        run.actualStartTime ??
+        run.earliestStartTime ??
+        run.scheduledStartTime ??
+        run.createdAt
+}
+
+private func runWorkflowRuntimeControl(
+    workflowID: UUID,
+    taskSelector: String?,
+    repository: AutomationRepositoryClient,
+    macrosDirectory: URL?,
+    requestedAt: Date,
+    waitTimeout: TimeInterval,
+    playerMode: WorkflowCLIPlayerMode
+) async throws -> AutomationWorkflowRunPayload {
+    let workflows = try await repository.loadWorkflows()
+    let beforeRuns = try await repository.loadRunHistory()
+    guard let workflow = workflows.first(where: { $0.id == workflowID }) else {
+        throw WorkflowCLIError(
+            "workflowNotFound",
+            "Workflow '\(workflowID.uuidString)' was not found.",
+            path: "workflow-id"
+        )
+    }
+    let task = try resolveWorkflowCLITask(selector: taskSelector, in: workflow)
+    guard task.isEnabled else {
+        throw WorkflowCLIError(
+            "taskDisabled",
+            "Task '\(task.name)' is disabled and cannot be started.",
+            path: "--task"
+        )
+    }
+
+    let now: @Sendable () -> Date = { Date() }
+    let effectRunner = try await workflowCLIRuntimeEffectRunner(
+        repository: repository,
+        macrosDirectory: macrosDirectory,
+        playerMode: playerMode,
+        now: now
+    )
+    let session = AutomationRuntimeSession(
+        repository: repository,
+        scheduler: .fixed([]),
+        effectRunner: effectRunner
+    )
+    _ = try await session.start()
+    let dispatchedState = try await session.dispatch(.manualStart(
+        workflowID: workflow.id,
+        taskID: task.id,
+        requestedAt: requestedAt
+    ))
+    let beforeRunIDs = Set(beforeRuns.map(\.id))
+    guard let startedRun = dispatchedState.runs.first(where: {
+        $0.workflowID == workflow.id &&
+            $0.taskID == task.id &&
+            !beforeRunIDs.contains($0.id)
+    }) ?? dispatchedState.runs.first(where: {
+        $0.workflowID == workflow.id && !beforeRunIDs.contains($0.id)
+    }) else {
+        await session.stop(at: requestedAt)
+        throw WorkflowCLIError(
+            "runNotCreated",
+            "The Automation reducer did not create a run for task '\(task.name)'.",
+            path: "--task"
+        )
+    }
+
+    let waitResult = await waitForWorkflowCLIExecution(
+        session: session,
+        executionID: startedRun.executionID,
+        startedRunID: startedRun.id,
+        waitTimeout: waitTimeout
+    )
+    await session.stop()
+
+    let finalState = await session.currentState() ?? dispatchedState
+
+    return AutomationWorkflowRunPayload(
+        workflow: workflow,
+        requestedTaskID: task.id,
+        requestedAt: requestedAt,
+        beforeRuns: beforeRuns,
+        afterState: finalState.runs.isEmpty ? waitResult.state : finalState,
+        timedOut: waitResult.timedOut
+    )
+}
+
+private func cancelWorkflowRun(
+    runID: UUID,
+    repository: AutomationRepositoryClient,
+    requestedAt: Date
+) async throws -> AutomationWorkflowCancelPayload {
+    let workflows = try await repository.loadWorkflows()
+    let beforeRuns = try await repository.loadRunHistory()
+    guard let beforeRun = beforeRuns.first(where: { $0.id == runID }) else {
+        throw WorkflowCLIError(
+            "runNotFound",
+            "Run '\(runID.uuidString)' was not found in workflow run history.",
+            path: "run-id"
+        )
+    }
+
+    let effectRunner = AutomationEffectRunner(
+        resourceArbiter: .live(),
+        player: .rejecting(.cancelled(reason: "CLI cancellation only")),
+        repository: repository,
+        now: { requestedAt },
+        sleep: { _ in }
+    )
+    let session = AutomationRuntimeSession(
+        repository: repository,
+        scheduler: .fixed([]),
+        effectRunner: effectRunner
+    )
+    _ = try await session.start()
+    let state = try await session.dispatch(.cancelRun(runID: runID, at: requestedAt))
+    await session.stop(at: requestedAt)
+
+    let stateWithWorkflows = AutomationRunState(
+        workflows: state.workflows.isEmpty ? workflows : state.workflows,
+        runs: state.runs,
+        leases: state.leases,
+        now: state.now
+    )
+    return AutomationWorkflowCancelPayload(
+        runID: runID,
+        requestedAt: requestedAt,
+        beforeRun: beforeRun,
+        afterState: stateWithWorkflows
+    )
+}
+
+private func workflowCLIRuntimeEffectRunner(
+    repository: AutomationRepositoryClient,
+    macrosDirectory: URL?,
+    playerMode: WorkflowCLIPlayerMode,
+    now: @escaping @Sendable () -> Date
+) async throws -> AutomationEffectRunner {
+    let playerClient: AutomationPlayerClient
+    switch playerMode {
+    case .live:
+        playerClient = await MainActor.run {
+            AutomationPlayerClient.live(
+                player: Player(),
+                windowTracker: WindowTracker(),
+                now: now
+            )
+        }
+    case .fakeSuccess:
+        playerClient = AutomationPlayerClient(
+            start: { _ in .rejected(.succeeded(report: nil)) },
+            cancel: { _ in },
+            events: { .finished }
+        )
+    case .reject:
+        playerClient = .rejecting(.rejected(reason: "CLI player mode rejected playback"))
+    }
+
+    return AutomationEffectRunner(
+        resourceArbiter: .live(),
+        player: playerClient,
+        conditionEvaluator: .live(now: now),
+        repository: repository,
+        loadMacro: { macroID in
+            try loadWorkflowMacroManifests(macrosDirectory: macrosDirectory)
+                .first { $0.id == macroID }
+        },
+        now: now
+    )
+}
+
+private func waitForWorkflowCLIExecution(
+    session: AutomationRuntimeSession,
+    executionID: UUID,
+    startedRunID: UUID,
+    waitTimeout: TimeInterval
+) async -> (state: AutomationRunState, timedOut: Bool) {
+    let timeout = max(0, waitTimeout)
+    let startedAt = Date()
+    var latestState = await session.currentState() ?? AutomationRunState()
+
+    while true {
+        if let state = await session.currentState() {
+            latestState = state
+        }
+        let executionRuns = latestState.runs.filter { $0.executionID == executionID }
+        if !executionRuns.isEmpty, executionRuns.allSatisfy(\.isTerminal) {
+            return (latestState, false)
+        }
+        if latestState.run(id: startedRunID)?.isTerminal == true, executionRuns.isEmpty {
+            return (latestState, false)
+        }
+        if timeout > 0, Date().timeIntervalSince(startedAt) >= timeout {
+            return (latestState, true)
+        }
+        try? await Task.sleep(nanoseconds: 100_000_000)
+    }
+}
+
+private func resolveWorkflowCLITask(
+    selector: String?,
+    in workflow: AutomationWorkflow
+) throws -> AutomationTask {
+    if let selector {
+        if let taskID = UUID(uuidString: selector) {
+            guard let task = workflow.task(id: taskID) else {
+                throw WorkflowCLIError(
+                    "taskNotFound",
+                    "Task '\(taskID.uuidString)' was not found in workflow '\(workflow.name)'.",
+                    path: "--task"
+                )
+            }
+            return task
+        }
+
+        let matches = workflow.tasks.filter {
+            $0.name.localizedCaseInsensitiveCompare(selector) == .orderedSame
+        }
+        guard !matches.isEmpty else {
+            throw WorkflowCLIError(
+                "taskNotFound",
+                "Task '\(selector)' was not found by UUID or exact name in workflow '\(workflow.name)'.",
+                path: "--task"
+            )
+        }
+        guard matches.count == 1 else {
+            throw WorkflowCLIError(
+                "ambiguousTask",
+                "Task selector '\(selector)' matched \(matches.count) tasks. Use a task UUID.",
+                path: "--task"
+            )
+        }
+        return matches[0]
+    }
+
+    let dependencyTargets = Set(workflow.dependencies.filter(\.isEnabled).map(\.toTaskID))
+    let rootTasks = workflow.tasks.filter { task in
+        task.isEnabled && !dependencyTargets.contains(task.id)
+    }
+    guard !rootTasks.isEmpty else {
+        throw WorkflowCLIError(
+            "taskRequired",
+            "workflow run could not infer a start task. Pass --task <task-id-or-name>.",
+            path: "--task"
+        )
+    }
+    guard rootTasks.count == 1 else {
+        throw WorkflowCLIError(
+            "ambiguousStartTask",
+            "Workflow '\(workflow.name)' has \(rootTasks.count) possible start tasks. Pass --task <task-id-or-name>.",
+            path: "--task"
+        )
+    }
+    return rootTasks[0]
+}
+
+private func workflowCLIRepository(directoryPath: String?) -> AutomationRepositoryClient {
+    if let directoryPath {
+        return .fileBacked(directoryURL: URL(fileURLWithPath: directoryPath, isDirectory: true))
+    }
+    return .fileBacked()
+}
+
+private func workflowCLIVisualAssetRootClient(directoryPath: String?) -> AutomationVisualAssetPackageRootClient {
+    if let directoryPath {
+        return .fileBacked(directoryURL: URL(fileURLWithPath: directoryPath, isDirectory: true))
+    }
+    return .fileBacked()
+}
+
+private func workflowCLIRuntimeHandoffClient(directoryPath: String?) -> AutomationRuntimeHandoffClient {
+    if let directoryPath {
+        return .fileBacked(directoryURL: URL(fileURLWithPath: directoryPath, isDirectory: true))
+    }
+    return .fileBacked()
+}
+
+private func workflowCLIVisualAssetsRootURL(overridePath: String?, draftPath: String) -> URL {
+    if let overridePath {
+        return URL(fileURLWithPath: overridePath, isDirectory: true)
+    }
+    return URL(fileURLWithPath: draftPath)
+        .deletingLastPathComponent()
+}
+
+private final class WorkflowCLIAsyncResultBox<Value>: @unchecked Sendable {
+    private let lock = NSLock()
+    private var result: Result<Value, Error>?
+
+    func set(_ result: Result<Value, Error>) {
+        lock.lock()
+        self.result = result
+        lock.unlock()
+    }
+
+    func get() -> Result<Value, Error>? {
+        lock.lock()
+        let current = result
+        lock.unlock()
+        return current
+    }
+}
+
+private func waitForWorkflowCLIAsync<Value: Sendable>(
+    _ operation: @escaping @Sendable () async throws -> Value
+) throws -> Value {
+    let semaphore = DispatchSemaphore(value: 0)
+    let box = WorkflowCLIAsyncResultBox<Value>()
+
+    Task {
+        do {
+            box.set(.success(try await operation()))
+        } catch {
+            box.set(.failure(error))
+        }
+        semaphore.signal()
+    }
+
+    semaphore.wait()
+    guard let result = box.get() else {
+        throw WorkflowCLIError("asyncBridgeFailed", "Workflow CLI async operation did not return a result.")
+    }
+    return try result.get()
+}
+
+private struct LegacyWorkflowCLILibraryData: Decodable {
+    var macros: [SavedMacro]
+}
+
+private func loadWorkflowMacroManifests(macrosDirectory: URL?) throws -> [SavedMacro] {
+    let fileManager = FileManager.default
+    let directory = macrosDirectory ?? defaultWorkflowMacrosDirectory()
+    guard fileManager.fileExists(atPath: directory.path) else {
+        if macrosDirectory == nil, let legacy = try loadLegacyWorkflowMacroLibrary() {
+            return legacy
+        }
+        return []
+    }
+
+    let packageURLs = try fileManager.contentsOfDirectory(
+        at: directory,
+        includingPropertiesForKeys: [.isDirectoryKey],
+        options: [.skipsHiddenFiles]
+    )
+    let manifests = packageURLs
+        .filter { $0.pathExtension == "sparkrec" }
+        .compactMap { packageURL -> SavedMacro? in
+            let manifestURL = packageURL.appendingPathComponent("macro.json")
+            guard let data = try? Data(contentsOf: manifestURL) else {
+                return nil
+            }
+            guard var macro = try? decodeWorkflowCLIJSON(SavedMacro.self, from: data) else {
+                return nil
+            }
+            let eventsURL = packageURL.appendingPathComponent("events.json")
+            if let eventData = try? Data(contentsOf: eventsURL),
+               let events = try? decodeWorkflowCLIJSON([RecordedEvent].self, from: eventData) {
+                macro.events = events
+                macro.refreshCachesFromEvents()
+            }
+            return macro
+        }
+
+    if manifests.isEmpty, macrosDirectory == nil, let legacy = try loadLegacyWorkflowMacroLibrary() {
+        return legacy
+    }
+
+    return manifests.sorted { left, right in
+        if left.createdAt != right.createdAt {
+            return left.createdAt > right.createdAt
+        }
+        return left.name.localizedCaseInsensitiveCompare(right.name) == .orderedAscending
+    }
+}
+
+private func defaultWorkflowMacrosDirectory() -> URL {
+    let appSupport = FileManager.default
+        .urls(for: .applicationSupportDirectory, in: .userDomainMask)
+        .first!
+    return appSupport
+        .appendingPathComponent("SparkleRecorder", isDirectory: true)
+        .appendingPathComponent("Macros", isDirectory: true)
+}
+
+private func loadLegacyWorkflowMacroLibrary() throws -> [SavedMacro]? {
+    let appSupport = FileManager.default
+        .urls(for: .applicationSupportDirectory, in: .userDomainMask)
+        .first!
+    let legacyURL = appSupport
+        .appendingPathComponent("SparkleRecorder", isDirectory: true)
+        .appendingPathComponent("library.json")
+    guard FileManager.default.fileExists(atPath: legacyURL.path) else {
+        return nil
+    }
+    let data = try readWorkflowCLIFile(at: legacyURL.path)
+    return try decodeWorkflowCLIJSON(LegacyWorkflowCLILibraryData.self, from: data).macros
+}
+
+private func workflowCommandName(_ workflowArgs: [String]) -> String {
+    guard !workflowArgs.isEmpty else {
+        return "workflow"
+    }
+    return "workflow " + workflowArgs.prefix(3).joined(separator: " ")
+}
+
+private func readWorkflowCLIFile(at path: String) throws -> Data {
+    do {
+        return try Data(contentsOf: URL(fileURLWithPath: path))
+    } catch {
+        throw WorkflowCLIError("fileReadFailed", "Could not read file '\(path)': \(error.localizedDescription)", path: path)
+    }
+}
+
+private func decodeWorkflowCLIJSON<Value: Decodable>(_ type: Value.Type, from data: Data) throws -> Value {
+    let isoDecoder = JSONDecoder()
+    isoDecoder.dateDecodingStrategy = .iso8601
+    do {
+        return try isoDecoder.decode(type, from: data)
+    } catch {
+        do {
+            return try JSONDecoder().decode(type, from: data)
+        } catch {
+            throw WorkflowCLIError("jsonDecodeFailed", "Could not decode workflow JSON: \(error.localizedDescription)")
+        }
+    }
+}
+
+private func decodeWorkflowMacroCatalog(from data: Data) throws -> [AutomationWorkflowDraftMacroCatalogEntry] {
+    if let entries = try? decodeWorkflowCLIJSON([AutomationWorkflowDraftMacroCatalogEntry].self, from: data) {
+        return entries
+    }
+    let envelope = try decodeWorkflowCLIJSON(
+        AutomationCLIResultEnvelope<AutomationWorkflowMacroCatalogPayload>.self,
+        from: data
+    )
+    return envelope.data?.macros ?? []
+}
+
+private func loadWorkflowDraftDocument(path: String?, command: String) throws -> AutomationWorkflowDraftDocument {
+    guard let path else {
+        throw WorkflowCLIError("missingArgument", "\(command) requires a draft JSON file path.")
+    }
+    let data = try readWorkflowCLIFile(at: path)
+    return try decodeWorkflowCLIJSON(AutomationWorkflowDraftDocument.self, from: data)
+}
+
+private func loadWorkflowDraftPatchDocument(path: String?, command: String) throws -> AutomationWorkflowDraftPatchDocument {
+    guard let path else {
+        throw WorkflowCLIError("missingArgument", "\(command) requires a patch JSON file path.")
+    }
+    let data = try readWorkflowCLIFile(at: path)
+    return try decodeWorkflowCLIJSON(AutomationWorkflowDraftPatchDocument.self, from: data)
+}
+
+private func loadWorkflowDraftValidationContext(
+    macroCatalogPath: String?
+) throws -> AutomationWorkflowDraftValidationContext {
+    guard let macroCatalogPath else {
+        return AutomationWorkflowDraftValidationContext()
+    }
+    let data = try readWorkflowCLIFile(at: macroCatalogPath)
+    return AutomationWorkflowDraftValidationContext(
+        macroCatalog: try decodeWorkflowMacroCatalog(from: data)
+    )
+}
+
+private func finishWorkflowDraftEdit(
+    _ result: AutomationWorkflowDraftEditResult,
+    outPath: String?,
+    command: String,
+    wantsJSON: Bool
+) throws -> Int {
+    let finalResult: AutomationWorkflowDraftEditResult
+    if let outPath {
+        let data = try encodeWorkflowCLIJSON(result.document)
+        try writeWorkflowCLIFile(data, to: outPath)
+        finalResult = result.withWrotePath(outPath)
+    } else {
+        finalResult = result
+    }
+
+    let envelope = AutomationCLIResultEnvelope<AutomationWorkflowDraftEditPayload>
+        .workflowDraftEdit(command: command, result: finalResult)
+    if wantsJSON {
+        writeWorkflowJSON(envelope)
+    } else {
+        writeWorkflowDraftEditSummary(finalResult)
+    }
+    return 0
+}
+
+private func workflowCLIValue(
+    after option: String,
+    in arguments: [String],
+    at index: inout Int
+) throws -> String {
+    guard index + 1 < arguments.count else {
+        throw WorkflowCLIError("missingArgument", "\(option) requires a value.", path: option)
+    }
+    index += 1
+    return arguments[index]
+}
+
+private func workflowCLIGraphPoint(x: Double?, y: Double?) throws -> AutomationGraphPoint? {
+    switch (x, y) {
+    case (.none, .none):
+        return nil
+    case (.some(let x), .some(let y)):
+        return AutomationGraphPoint(x: x, y: y)
+    default:
+        throw WorkflowCLIError("missingArgument", "Graph position needs both --x and --y.")
+    }
+}
+
+private func workflowCLIOptionalPoint(x: Double?, y: Double?) throws -> AutomationGraphPoint? {
+    switch (x, y) {
+    case (.none, .none):
+        return nil
+    case (.some(let x), .some(let y)):
+        return AutomationGraphPoint(x: x, y: y)
+    default:
+        throw WorkflowCLIError("missingArgument", "Pixel match needs both --pixel-x and --pixel-y.")
+    }
+}
+
+private func parseWorkflowCLIUUID(_ value: String, path: String) throws -> UUID {
+    guard let uuid = UUID(uuidString: value) else {
+        throw WorkflowCLIError("invalidUUID", "\(path) must be a UUID.", path: path)
+    }
+    return uuid
+}
+
+private func parseWorkflowCLIDuration(_ value: String, path: String) throws -> TimeInterval {
+    guard let duration = TimeInterval(value) else {
+        throw WorkflowCLIError("invalidDuration", "\(path) must be a number of seconds.", path: path)
+    }
+    return duration
+}
+
+private func parseWorkflowCLIDouble(_ value: String, path: String) throws -> Double {
+    guard let number = Double(value) else {
+        throw WorkflowCLIError("invalidNumber", "\(path) must be a number.", path: path)
+    }
+    return number
+}
+
+private func parseWorkflowCLIInt(_ value: String, path: String) throws -> Int {
+    guard let number = Int(value) else {
+        throw WorkflowCLIError("invalidInteger", "\(path) must be an integer.", path: path)
+    }
+    return number
+}
+
+private func parseWorkflowCLIBool(_ value: String, path: String) throws -> Bool {
+    switch value.lowercased() {
+    case "true", "yes", "1", "enabled":
+        return true
+    case "false", "no", "0", "disabled":
+        return false
+    default:
+        throw WorkflowCLIError("invalidBoolean", "\(path) must be true or false.", path: path)
+    }
+}
+
+private func parseWorkflowCLIResource(
+    _ value: String,
+    path: String
+) throws -> AutomationWorkflowDraftResource {
+    guard let resource = AutomationWorkflowDraftResource(rawValue: value) else {
+        throw WorkflowCLIError(
+            "unsupportedResource",
+            "\(path) must be foregroundInput, screenCapture, accessibility, network, or none.",
+            path: path
+        )
+    }
+    return resource
+}
+
+private func parseWorkflowCLITextMatchMode(_ value: String, path: String) throws -> TextMatchMode {
+    guard let matchMode = TextMatchMode(rawValue: value) else {
+        throw WorkflowCLIError("unsupportedMatchMode", "\(path) must be contains or exact.", path: path)
+    }
+    return matchMode
+}
+
+private func parseWorkflowCLIDraftSchedule(
+    type: String,
+    startAt: Date?,
+    every: Int?,
+    unit: String?,
+    timeZone: String?
+) -> AutomationWorkflowDraftSchedule? {
+    let normalizedType = type.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard normalizedType != "none" else {
+        return nil
+    }
+    return AutomationWorkflowDraftSchedule(
+        type: normalizedType,
+        startAt: startAt,
+        every: every,
+        unit: unit,
+        timeZone: timeZone
+    )
+}
+
+private func parseWorkflowCLIDate(_ value: String) throws -> Date {
+    let formatter = ISO8601DateFormatter()
+    formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+    if let date = formatter.date(from: value) {
+        return date
+    }
+    formatter.formatOptions = [.withInternetDateTime]
+    if let date = formatter.date(from: value) {
+        return date
+    }
+    if let seconds = TimeInterval(value) {
+        return Date(timeIntervalSince1970: seconds)
+    }
+    throw WorkflowCLIError("invalidDate", "--at must be ISO-8601 or a Unix timestamp.", path: "--at")
+}
+
+private func workflowCLIISO8601String(_ date: Date) -> String {
+    let formatter = ISO8601DateFormatter()
+    formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+    return formatter.string(from: date)
+}
+
+private func encodeWorkflowCLIJSON<Value: Encodable>(_ value: Value) throws -> Data {
+    let encoder = JSONEncoder()
+    encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+    encoder.dateEncodingStrategy = .iso8601
+    do {
+        return try encoder.encode(value)
+    } catch {
+        throw WorkflowCLIError("jsonEncodeFailed", "Could not encode workflow JSON: \(error.localizedDescription)")
+    }
+}
+
+private func writeWorkflowCLIFile(_ data: Data, to path: String) throws {
+    let url = URL(fileURLWithPath: path)
+    do {
+        let directory = url.deletingLastPathComponent()
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        try data.write(to: url, options: .atomic)
+    } catch {
+        throw WorkflowCLIError("fileWriteFailed", "Could not write file '\(path)': \(error.localizedDescription)", path: path)
+    }
+}
+
+private func writeWorkflowJSON<Value: Encodable>(_ value: Value) {
+    let encoder = JSONEncoder()
+    encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+    encoder.dateEncodingStrategy = .iso8601
+    if let data = try? encoder.encode(value) {
+        FileHandle.standardOutput.write(data)
+        FileHandle.standardOutput.write(Data("\n".utf8))
+    }
+}
+
+private func writeWorkflowDraftEditSummary(_ result: AutomationWorkflowDraftEditResult) {
+    var lines = [
+        "SparkleRecorder: \(result.operation) applied.",
+        "- workflow \(result.document.workflow.name)",
+        "- tasks \(result.document.workflow.tasks.count), dependencies \(result.document.workflow.dependencies.count)",
+        "- valid \(result.isValid ? "yes" : "no")"
+    ]
+    if let wrotePath = result.wrotePath {
+        lines.append("- wrote \(wrotePath)")
+    }
+    if !result.changedTaskKeys.isEmpty {
+        lines.append("- changed tasks \(result.changedTaskKeys.joined(separator: ", "))")
+    }
+    if !result.changedDependencyKeys.isEmpty {
+        lines.append("- changed dependencies \(result.changedDependencyKeys.joined(separator: ", "))")
+    }
+    for issue in result.validation.issues {
+        lines.append("- [\(issue.severity.rawValue)] \(issue.code.rawValue): \(issue.message)")
+    }
+    FileHandle.standardOutput.write(Data((lines.joined(separator: "\n") + "\n").utf8))
+}
+
+private func writeWorkflowValidationSummary(_ result: AutomationWorkflowDraftValidationResult) {
+    var lines: [String] = [
+        result.isValid ? "SparkleRecorder: workflow draft is valid." : "SparkleRecorder: workflow draft has errors."
+    ]
+    for issue in result.issues {
+        lines.append("- [\(issue.severity.rawValue)] \(issue.code.rawValue): \(issue.message)")
+    }
+    FileHandle.standardOutput.write(Data((lines.joined(separator: "\n") + "\n").utf8))
+}
+
+private func writeWorkflowSimulationSummary(_ result: AutomationWorkflowDraftSimulationResult) {
+    var lines: [String] = [
+        result.isSimulatable ? "SparkleRecorder: workflow draft simulation." : "SparkleRecorder: workflow draft cannot be simulated."
+    ]
+    for step in result.steps {
+        lines.append("- #\(step.order + 1) \(step.taskKey) \(step.outcome.rawValue) \(step.durationSeconds)s")
+    }
+    for issue in result.validationIssues {
+        lines.append("- [\(issue.severity.rawValue)] \(issue.code.rawValue): \(issue.message)")
+    }
+    FileHandle.standardOutput.write(Data((lines.joined(separator: "\n") + "\n").utf8))
+}
+
+private func writeWorkflowImportSummary(_ result: AutomationWorkflowDraftImportResult) {
+    var lines: [String] = [
+        result.isImportable
+            ? (result.mode == .confirm ? "SparkleRecorder: workflow import confirmed." : "SparkleRecorder: workflow import dry-run passed.")
+            : (result.mode == .confirm ? "SparkleRecorder: workflow import failed." : "SparkleRecorder: workflow import dry-run failed.")
+    ]
+    if let workflow = result.workflow {
+        lines.append("- workflow \(workflow.id.uuidString) \(workflow.name)")
+        lines.append("- tasks \(workflow.tasks.count), dependencies \(workflow.dependencies.count)")
+    }
+    for resolution in result.macroResolutions {
+        lines.append("- macro \(resolution.taskKey): \(resolution.macroID?.uuidString ?? "unresolved")")
+    }
+    for issue in result.validationIssues {
+        lines.append("- [\(issue.severity.rawValue)] \(issue.code.rawValue): \(issue.message)")
+    }
+    FileHandle.standardOutput.write(Data((lines.joined(separator: "\n") + "\n").utf8))
+}
+
+private func writeWorkflowListSummary(_ summaries: [AutomationWorkflowSummary]) {
+    var lines = ["SparkleRecorder: \(summaries.count) workflows"]
+    for summary in summaries {
+        lines.append("- \(summary.id.uuidString)  \(summary.name)  \(summary.taskCount) tasks, \(summary.dependencyCount) dependencies, \(summary.runCount) runs")
+    }
+    FileHandle.standardOutput.write(Data((lines.joined(separator: "\n") + "\n").utf8))
+}
+
+private func writeWorkflowStatusSummary(_ payload: AutomationWorkflowStatusPayload?) {
+    guard let payload else {
+        FileHandle.standardOutput.write(Data("SparkleRecorder: workflow status unavailable.\n".utf8))
+        return
+    }
+
+    var lines = ["SparkleRecorder: \(payload.count) workflow statuses"]
+    for workflowStatus in payload.workflows {
+        lines.append("- \(workflowStatus.summary.id.uuidString)  \(workflowStatus.summary.name)  \(workflowStatus.statusLabel)")
+        lines.append("  \(workflowStatus.statusDetail)")
+        for task in workflowStatus.tasks {
+            lines.append("  - \(task.taskName): \(task.statusLabel)")
+        }
+    }
+    FileHandle.standardOutput.write(Data((lines.joined(separator: "\n") + "\n").utf8))
+}
+
+private func writeWorkflowRunSummary(_ payload: AutomationWorkflowRunPayload) {
+    var lines = [
+        payload.timedOut
+            ? "SparkleRecorder: workflow run wait timed out."
+            : "SparkleRecorder: workflow run finished.",
+        "- workflow \(payload.workflowID.uuidString) \(payload.workflowName)",
+        "- task \(payload.requestedTaskID.uuidString)",
+        "- run \(payload.startedRunID?.uuidString ?? "not-created")",
+        "- complete \(payload.isComplete ? "yes" : "no")"
+    ]
+    for run in payload.executionRuns {
+        lines.append("- \(run.id.uuidString) \(run.status) \(run.outcome.map(String.init(describing:)) ?? "pending")")
+    }
+    FileHandle.standardOutput.write(Data((lines.joined(separator: "\n") + "\n").utf8))
+}
+
+private func writeWorkflowCancelSummary(_ payload: AutomationWorkflowCancelPayload) {
+    var lines = [
+        payload.cancelled
+            ? "SparkleRecorder: workflow run cancelled."
+            : "SparkleRecorder: workflow run was already terminal or not cancellable.",
+        "- run \(payload.runID.uuidString)"
+    ]
+    if let run = payload.run {
+        lines.append("- status \(run.status)")
+        if let outcome = run.outcome {
+            lines.append("- outcome \(outcome)")
+        }
+    }
+    FileHandle.standardOutput.write(Data((lines.joined(separator: "\n") + "\n").utf8))
+}
+
+private func writeWorkflowHandoffSummary(_ payload: AutomationRuntimeHandoffPayload) {
+    let description: String
+    switch payload.command.kind {
+    case .manualStart(let workflowID, let taskID):
+        description = "start workflow \(workflowID.uuidString) task \(taskID.uuidString)"
+    case .cancelRun(let runID):
+        description = "cancel run \(runID.uuidString)"
+    }
+    let lines = [
+        "SparkleRecorder: workflow command handed off to App host.",
+        "- command \(payload.command.id.uuidString)",
+        "- target \(payload.target.rawValue)",
+        "- action \(description)",
+        "- pending \(payload.pendingCommandCount)"
+    ]
+    FileHandle.standardOutput.write(Data((lines.joined(separator: "\n") + "\n").utf8))
+}
+
+private func writeWorkflowHandoffStatusSummary(_ payload: AutomationRuntimeHandoffStatusPayload) {
+    var lines = [
+        "SparkleRecorder: workflow handoff \(payload.state.rawValue).",
+        "- command \(payload.commandID.uuidString)",
+        "- target \(payload.target.rawValue)",
+        "- pending \(payload.pendingCommandCount)",
+        "- receipts \(payload.receiptCount)"
+    ]
+    if let command = payload.command {
+        lines.append("- queued \(workflowHandoffDescription(command.kind))")
+    }
+    if let receipt = payload.receipt {
+        lines.append("- handledAt \(workflowCLIISO8601String(receipt.handledAt))")
+        lines.append("- status \(receipt.status.rawValue)")
+        if !receipt.runIDs.isEmpty {
+            lines.append("- runs \(receipt.runIDs.map(\.uuidString).joined(separator: ", "))")
+        }
+        if let message = receipt.message, !message.isEmpty {
+            lines.append("- message \(message)")
+        }
+    }
+    if let workflowStatus = payload.workflowStatus {
+        lines.append("- workflow \(workflowStatus.summary.id.uuidString) \(workflowStatus.summary.name)")
+        lines.append("- workflowStatus \(workflowStatus.overallStatus.rawValue) \(workflowStatus.statusLabel)")
+    }
+    for run in payload.runs {
+        let outcome = run.outcome.map { String(describing: $0) } ?? "pending"
+        lines.append("- run \(run.id.uuidString) \(String(describing: run.status)) \(outcome)")
+    }
+    FileHandle.standardOutput.write(Data((lines.joined(separator: "\n") + "\n").utf8))
+}
+
+private func workflowHandoffDescription(_ kind: AutomationRuntimeHandoffCommandKind) -> String {
+    switch kind {
+    case .manualStart(let workflowID, let taskID):
+        return "start workflow \(workflowID.uuidString) task \(taskID.uuidString)"
+    case .cancelRun(let runID):
+        return "cancel run \(runID.uuidString)"
+    }
+}
+
+private func writeWorkflowRunsSummary(_ payload: AutomationWorkflowRunsPayload?) {
+    guard let payload else {
+        FileHandle.standardOutput.write(Data("SparkleRecorder: workflow runs unavailable.\n".utf8))
+        return
+    }
+
+    var lines = [
+        "SparkleRecorder: \(payload.count) runs",
+        "- workflow \(payload.workflowID.uuidString) \(payload.workflowName)",
+        "- status \(payload.status.statusLabel)"
+    ]
+    for run in payload.runs {
+        lines.append("- \(run.id.uuidString) \(run.status) \(run.outcome.map(String.init(describing:)) ?? "pending")")
+    }
+    FileHandle.standardOutput.write(Data((lines.joined(separator: "\n") + "\n").utf8))
+}
+
+private func writeWorkflowShowSummary(_ payload: AutomationWorkflowShowPayload?) {
+    guard let payload else {
+        FileHandle.standardOutput.write(Data("SparkleRecorder: workflow not found.\n".utf8))
+        return
+    }
+
+    var lines = [
+        "SparkleRecorder: workflow \(payload.workflow.id.uuidString)",
+        "- name \(payload.workflow.name)",
+        "- tasks \(payload.workflow.tasks.count), dependencies \(payload.workflow.dependencies.count), runs \(payload.runHistory.count)"
+    ]
+    for task in payload.workflow.tasks {
+        lines.append("- task \(task.id.uuidString) \(task.name)")
+    }
+    FileHandle.standardOutput.write(Data((lines.joined(separator: "\n") + "\n").utf8))
+}
+
+private func writeWorkflowExportSummary(
+    _ result: AutomationWorkflowDraftExportResult,
+    wrotePath: String?
+) {
+    var lines = [
+        result.isExportable
+            ? "SparkleRecorder: workflow exported as draft."
+            : "SparkleRecorder: workflow export has errors.",
+        "- workflow \(result.workflowID.uuidString) \(result.workflowName)",
+        "- tasks \(result.document.workflow.tasks.count), dependencies \(result.document.workflow.dependencies.count)"
+    ]
+    if let wrotePath {
+        lines.append("- wrote \(wrotePath)")
+    }
+    for issue in result.issues {
+        lines.append("- [\(issue.severity.rawValue)] \(issue.code.rawValue): \(issue.message)")
+    }
+    FileHandle.standardOutput.write(Data((lines.joined(separator: "\n") + "\n").utf8))
+}
+
+private func writeWorkflowMacroSummary(_ entries: [AutomationWorkflowDraftMacroCatalogEntry]) {
+    var lines = ["SparkleRecorder: \(entries.count) macros"]
+    for entry in entries {
+        lines.append("- \(entry.id.uuidString)  \(entry.name)  \(entry.eventCount) events")
+    }
+    FileHandle.standardOutput.write(Data((lines.joined(separator: "\n") + "\n").utf8))
+}
+
+private func writeWorkflowError(_ message: String) {
+    FileHandle.standardError.write(Data((message + "\n").utf8))
+}
+
 if args.count >= 2, args[1] == "--self-test" {
     print("→ Running SparkleRecorder self-test...")
     // 1. TextMacroFormat round-trip

@@ -6,10 +6,16 @@ struct AutomationFlowGraphView: View {
     let selectedTaskID: UUID?
     let selectedDependencyID: UUID?
     let pendingDependencySourceID: UUID?
+    let pendingDependencyTrigger: AutomationDependencyTriggerDraft
+    let linkPreview: AutomationFlowGraphLinkPreviewState?
     let onSelectTask: (UUID) -> Void
     let onSelectDependency: (UUID) -> Void
+    let onDeleteDependency: (UUID) -> Void
     let onStartDependency: (UUID) -> Void
     let onCompleteDependency: (UUID) -> Void
+    let onSetPendingDependencyTrigger: (AutomationDependencyTriggerDraft) -> Void
+    let onCancelDependency: () -> Void
+    let onMacroDropped: (SavedMacro) -> Void
     let onAction: (AutomationAction) -> Void
     var now: () -> Date = { Date() }
 
@@ -24,12 +30,11 @@ struct AutomationFlowGraphView: View {
                         )
 
                         if pendingDependencySourceID != nil {
-                            Label(NSLocalizedString("Linking", comment: ""), systemImage: "link")
-                                .font(.caption)
-                                .foregroundStyle(Brand.sigAmber)
-                                .padding(.horizontal, 7)
-                                .padding(.vertical, 4)
-                                .glassSurface(cornerRadius: 7, tint: Brand.sigAmber, interactive: false)
+                            AutomationFlowGraphLinkingToolbar(
+                                trigger: pendingDependencyTrigger,
+                                onSetTrigger: onSetPendingDependencyTrigger,
+                                onCancel: onCancelDependency
+                            )
                         }
                     }
                     Text(workflow.name)
@@ -52,49 +57,27 @@ struct AutomationFlowGraphView: View {
                             height: CGFloat(workflow.graphSize.height)
                         )
 
+                    if let linkPreview,
+                       let start = linkPreviewStart(for: linkPreview) {
+                        AutomationFlowGraphLinkPreview(
+                            start: start,
+                            end: linkPreview.end
+                        )
+                            .frame(
+                                width: CGFloat(workflow.graphSize.width),
+                                height: CGFloat(workflow.graphSize.height)
+                            )
+                    }
+
                     AutomationFlowGraphEdgeListView(
                         edges: workflow.edges,
                         selectedDependencyID: selectedDependencyID,
-                        onSelectDependency: onSelectDependency
+                        onSelectDependency: onSelectDependency,
+                        onDeleteDependency: onDeleteDependency
                     )
 
                     ForEach(workflow.nodes) { node in
-                        AutomationFlowGraphNodeView(
-                            node: node,
-                            size: workflow.nodeSize,
-                            isSelected: selectedTaskID == node.taskID,
-                            isConnectionSource: pendingDependencySourceID == node.taskID,
-                            canCompleteConnection: pendingDependencySourceID != nil && pendingDependencySourceID != node.taskID,
-                            onSelect: {
-                                onSelectTask(node.taskID)
-                            },
-                            onRun: {
-                                let intent = AutomationViewIntent.startTask(
-                                    workflowID: workflow.id,
-                                    taskID: node.taskID
-                                )
-                                onAction(intent.reducerAction(at: now()))
-                            },
-                            onCancelRun: { runID in
-                                onAction(.cancelRun(runID: runID, at: now()))
-                            },
-                            onConnect: {
-                                if pendingDependencySourceID != nil && pendingDependencySourceID != node.taskID {
-                                    onCompleteDependency(node.taskID)
-                                } else {
-                                    onStartDependency(node.taskID)
-                                }
-                            },
-                            onMoveEnded: { position in
-                                let intent = AutomationViewIntent.moveTask(
-                                    workflowID: workflow.id,
-                                    taskID: node.taskID,
-                                    position: position
-                                )
-                                onAction(intent.reducerAction(at: now()))
-                            }
-                        )
-                            .offset(x: CGFloat(node.position.x), y: CGFloat(node.position.y))
+                        nodeView(for: node)
                     }
                 }
                 .frame(
@@ -107,4 +90,65 @@ struct AutomationFlowGraphView: View {
             .scrollIndicators(.hidden)
         }
     }
+
+    private func nodeView(for node: AutomationTaskNodeProjection) -> some View {
+        AutomationFlowGraphNodeView(
+            node: node,
+            size: workflow.nodeSize,
+            isSelected: selectedTaskID == node.taskID,
+            isConnectionSource: pendingDependencySourceID == node.taskID,
+            canCompleteConnection: canCompleteConnection(to: node.taskID),
+            connectionTriggerTitle: pendingDependencyTrigger.title,
+            onSelect: {
+                onSelectTask(node.taskID)
+            },
+            onRun: {
+                startTask(node.taskID)
+            },
+            onCancelRun: { runID in
+                cancelRun(runID)
+            },
+            onConnect: {
+                connect(to: node.taskID)
+            },
+            isDragging: false
+        )
+        .offset(x: CGFloat(node.position.x), y: CGFloat(node.position.y))
+    }
+
+    private func linkPreviewStart(for preview: AutomationFlowGraphLinkPreviewState) -> AutomationGraphPoint? {
+        guard let node = workflow.nodes.first(where: { $0.taskID == preview.sourceTaskID }) else {
+            return nil
+        }
+
+        return AutomationGraphPoint(
+            x: node.position.x + workflow.nodeSize.width,
+            y: node.position.y + (workflow.nodeSize.height / 2)
+        )
+    }
+
+    private func canCompleteConnection(to taskID: UUID) -> Bool {
+        pendingDependencySourceID != nil && pendingDependencySourceID != taskID
+    }
+
+    private func connect(to taskID: UUID) {
+        if canCompleteConnection(to: taskID) {
+            onCompleteDependency(taskID)
+        } else {
+            onStartDependency(taskID)
+        }
+    }
+
+    private func startTask(_ taskID: UUID) {
+        let intent = AutomationViewIntent.startTask(
+            workflowID: workflow.id,
+            taskID: taskID
+        )
+        onAction(intent.reducerAction(at: now()))
+    }
+
+    private func cancelRun(_ runID: UUID) {
+        onAction(.cancelRun(runID: runID, at: now()))
+    }
+
 }

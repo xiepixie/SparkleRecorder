@@ -1,7 +1,6 @@
 import Cocoa
 import SwiftUI
 import ApplicationServices
-import IOKit.hid
 import SparkleRecorderCore
 
 final class WelcomeWindowController: NSWindowController, NSWindowDelegate {
@@ -47,8 +46,9 @@ final class WelcomeWindowController: NSWindowController, NSWindowDelegate {
 }
 
 /// True when macOS Input Monitoring is granted (separate from Accessibility).
+@MainActor
 func inputMonitoringGranted() -> Bool {
-    IOHIDCheckAccess(kIOHIDRequestTypeListenEvent) == kIOHIDAccessTypeGranted
+    PermissionCenter.shared.checkListenEventAccess() == .authorized
 }
 
 private enum Step: Int, CaseIterable {

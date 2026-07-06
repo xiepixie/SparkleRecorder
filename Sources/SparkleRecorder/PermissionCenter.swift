@@ -2,6 +2,7 @@ import Foundation
 import CoreGraphics
 import ApplicationServices
 import AppKit
+import IOKit.hid
 
 public enum PermissionStatus: Sendable {
     case authorized
@@ -19,19 +20,26 @@ public final class PermissionCenter {
     // MARK: - 1. Listen Event Access (For Recording)
     
     public func checkListenEventAccess() -> PermissionStatus {
+        if IOHIDCheckAccess(kIOHIDRequestTypeListenEvent) == kIOHIDAccessTypeGranted {
+            return .authorized
+        }
+
         if #available(macOS 14.4, *) {
             return CGPreflightListenEventAccess() ? .authorized : .denied
         } else {
-            return AXIsProcessTrusted() ? .authorized : .denied
+            return .denied
         }
     }
     
     public func requestListenEventAccess() -> Bool {
+        if IOHIDRequestAccess(kIOHIDRequestTypeListenEvent) {
+            return true
+        }
+
         if #available(macOS 14.4, *) {
             return CGRequestListenEventAccess()
         } else {
-            let options = [Self.axPromptOptionKey: true] as CFDictionary
-            return AXIsProcessTrustedWithOptions(options)
+            return false
         }
     }
     

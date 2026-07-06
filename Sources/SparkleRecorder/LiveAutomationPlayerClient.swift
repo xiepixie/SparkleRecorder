@@ -38,7 +38,7 @@ private final class AutomationPlayerContinuationBox: @unchecked Sendable {
 @MainActor
 private final class LiveAutomationPlayerBox: @unchecked Sendable {
     private let player: Player
-    private weak var windowTracker: WindowTracker?
+    private let windowTracker: WindowTracker?
 
     init(player: Player, windowTracker: WindowTracker?) {
         self.player = player

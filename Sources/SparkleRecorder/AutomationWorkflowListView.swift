@@ -65,14 +65,15 @@ struct AutomationWorkflowListView: View {
                 } else {
                     LazyVStack(spacing: 8) {
                         ForEach(projection.workflows) { workflow in
-                            AutomationWorkflowRow(
-                                workflow: workflow,
-                                isSelected: (selectedWorkflowID ?? projection.workflows.first?.id) == workflow.id
-                            )
-                            .contentShape(Rectangle())
-                            .onTapGesture {
+                            Button {
                                 onSelectWorkflow(workflow.id)
+                            } label: {
+                                AutomationWorkflowRow(
+                                    workflow: workflow,
+                                    isSelected: (selectedWorkflowID ?? projection.workflows.first?.id) == workflow.id
+                                )
                             }
+                            .buttonStyle(.plain)
                         }
                     }
                 }

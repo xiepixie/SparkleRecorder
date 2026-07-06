@@ -3,6 +3,8 @@ import SparkleRecorderCore
 
 struct AutomationResourceTimelineView: View {
     let items: [AutomationResourceTimelineItem]
+    let nextScheduledOccurrence: Date?
+    let nextScheduledTaskName: String?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -14,15 +16,20 @@ struct AutomationResourceTimelineView: View {
             .padding(.top, 12)
 
             ScrollView {
-                if items.isEmpty {
-                    AutomationEmptyState(
-                        systemImage: "clock.badge.questionmark",
-                        title: NSLocalizedString("No resource activity", comment: ""),
-                        subtitle: NSLocalizedString("Runs will appear here when scheduler or manual starts create task history.", comment: "")
+                LazyVStack(spacing: 8) {
+                    AutomationTimelineSchedulePreview(
+                        date: nextScheduledOccurrence,
+                        taskName: nextScheduledTaskName
                     )
-                    .frame(maxWidth: .infinity, minHeight: 260)
-                } else {
-                    LazyVStack(spacing: 8) {
+
+                    if items.isEmpty {
+                        AutomationEmptyState(
+                            systemImage: "clock.badge.questionmark",
+                            title: NSLocalizedString("No resource activity", comment: ""),
+                            subtitle: NSLocalizedString("Runs will appear here when scheduler or manual starts create task history.", comment: "")
+                        )
+                        .frame(maxWidth: .infinity, minHeight: 220)
+                    } else {
                         ForEach(items) { item in
                             AutomationTimelineItemView(item: item)
                         }

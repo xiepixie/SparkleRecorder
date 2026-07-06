@@ -110,7 +110,7 @@ public actor AutomationResourceLeaseStore {
         leasesByResource = leasesByResource.filter { _, lease in
             !expiredIDs.contains(lease.id)
         }
-        return expiredLeases.sorted { $0.acquiredAt < $1.acquiredAt }
+        return expiredLeases.sorted(by: Self.leaseSort)
     }
 
     public func currentLease(for resource: AutomationResource) -> AutomationResourceLease? {
@@ -118,7 +118,20 @@ public actor AutomationResourceLeaseStore {
     }
 
     public func allLeases() -> [AutomationResourceLease] {
-        leasesByResource.values.sorted { $0.acquiredAt < $1.acquiredAt }
+        leasesByResource.values.sorted(by: Self.leaseSort)
+    }
+
+    private static func leaseSort(
+        _ left: AutomationResourceLease,
+        _ right: AutomationResourceLease
+    ) -> Bool {
+        if left.acquiredAt != right.acquiredAt {
+            return left.acquiredAt < right.acquiredAt
+        }
+        if left.resource.rawValue != right.resource.rawValue {
+            return left.resource.rawValue < right.resource.rawValue
+        }
+        return left.id.uuidString < right.id.uuidString
     }
 }
 

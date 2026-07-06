@@ -43,8 +43,6 @@ struct PopoverContentView: View {
                     // live in the leading inset.
                     ZStack {
                         BrandTitleStrip()
-                        
-
                     }
                     .frame(height: 38)
                     .frame(maxWidth: .infinity)
@@ -70,6 +68,7 @@ struct PopoverContentView: View {
                         .padding(.horizontal, 8)
                         .padding(.vertical, 6)
                 }
+                .ignoresSafeArea(edges: .top)
             } else {
                 VStack(spacing: 0) {
                     libraryColumn

@@ -19,12 +19,14 @@ struct AutomationStatusBadge: View {
             Image(systemName: status.systemImage)
         }
         .font(.caption)
-        .bold()
         .foregroundStyle(status.tint)
         .lineLimit(1)
-        .padding(.horizontal, 8)
-        .padding(.vertical, 5)
-        .glassSurface(cornerRadius: 8, tint: status.tint, interactive: false)
+        .padding(.horizontal, 6)
+        .padding(.vertical, 4)
+        .background(
+            RoundedRectangle(cornerRadius: 6, style: .continuous)
+                .fill(status.tint.opacity(0.12))
+        )
         .accessibilityLabel(count.map { "\(status.label), \($0)" } ?? status.label)
     }
 }

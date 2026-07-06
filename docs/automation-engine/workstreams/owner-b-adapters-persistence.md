@@ -17,6 +17,7 @@ Owner B owns the boundary between pure AutomationEngine state and the real macOS
 | Scheduler adapter | `Sources/SparkleRecorder/AutomationSchedulerClient.swift` |
 | Repository client | `Sources/SparkleRecorder/AutomationRepositoryClient.swift` |
 | Repository snapshot/refresh | `AutomationRepositorySnapshotClient` in `Sources/SparkleRecorder/AutomationRepositoryClient.swift` |
+| Runtime handoff mailbox | `Sources/SparkleRecorder/AutomationRuntimeHandoff.swift`, `LiveAutomationRuntimeHost` polling |
 | Persistence format | `AutomationPersistenceDocument` and `AutomationWorkflowPackageDocument` in `Sources/SparkleRecorder/AutomationRepositoryClient.swift` |
 | Adapter tests | `Tests/SparkleRecorderTests/AutomationOwnerBClientTests.swift`, `Tests/SparkleRecorderTests/AutomationRuntimeSessionTests.swift` |
 
@@ -64,6 +65,7 @@ Owner B owns the boundary between pure AutomationEngine state and the real macOS
 18. [x] Persist reducer-approved workflow edits through `AutomationEffect.persistWorkflows`.
 19. [x] Add OCR search-region coordinate spaces and runtime context injection for display/window/content remapping.
 20. [x] Freeze `.sparkrec_workflow` as a static workflow package codec with version, duplicate ID, and DAG validation.
+21. [x] Add App-host runtime handoff mailbox first pass for CLI manual-start/cancel-run delivery when the App is already running.
 
 ## Acceptance Criteria
 
@@ -97,7 +99,7 @@ Owner B owns the boundary between pure AutomationEngine state and the real macOS
 - `AutomationEffect.evaluateCondition` carries `previousOutcomes` derived by Owner A from `AutomationTaskRun.upstreamRunIDs`; Owner B consumes that value through `AutomationConditionEvaluationRequest` and does not read reducer state.
 - Owner B must return completion only as `AutomationAction` values, never direct state mutation.
 - `AutomationTaskRun.executionID` links a chain of dependent runs.
-- Owner C only needs evidence availability and run-history timing as metadata (`evidenceID` / `hasEvidence`, start/completion dates); screenshots and macro packages must not load from SwiftUI views.
+- Owner C only needs evidence availability and run-history timing as metadata (`evidenceID` / `hasEvidence`, start/completion dates); failed playback `evidenceID` maps to macro package per-run evidence (`runs/<evidenceID>/manifest.json` / `report.json`), but screenshots and macro packages must still load only through app-edge presenters, not SwiftUI view bodies.
 - `AutomationEffectRunner` is the adapter orchestration boundary; it receives effects and returns actions, but does not own reducer state.
 - Single-resource requirements may emit `resourceLeaseAcquired`; multi-resource requirements emit `resourceLeasesAcquired` only after every required lease is acquired. If any resource is denied, Owner B releases already-acquired leases before emitting `resourceLeaseDenied`.
 - `AutomationEngineRuntime` may hold `AutomationRunState`, but only mutates it by calling `AutomationReducer`; all live work remains behind Owner B clients.
@@ -109,9 +111,12 @@ Owner B owns the boundary between pure AutomationEngine state and the real macOS
 - `LivePlaybackRunStepClient` owns live AppKit locator/OCR step execution and real event posting handoff. It stays in the app target, consumes `PlaybackRunStepRequest`, returns `PlaybackRunStepResult`, and uses core `PlaybackLocatorCache` for locator reuse without putting cache state back into `Player`.
 - `PlaybackSynchronousRunEngine` owns the blocking CLI Player outer loop boundary. `LivePlaybackSynchronousRunStepClient` owns blocking AppKit locator/OCR step execution and event posting handoff. They keep `Player.playSynchronously` as a thin composition point.
 - `LiveAutomationRuntimeHost` is app-target glue only. It wires `Player`, `WindowTracker`, `MacroRepositoryClient`, `AutomationRepositoryClient.fileBacked`, and timer scheduler into `AutomationRuntimeSession`; it must not be added to `SparkleRecorderCore`.
-- `AutomationConditionEvaluatorClient.contextual` handles `previousOutcome`, injected `externalSignal`, injected `manualApproval`, and testable OCR closures.
-- `LiveAutomationConditionEvaluatorClient` supports full-display OCR text matching through existing `ScreenCaptureService` and `VisionDetector`, filters matches by `AutomationOCRSearchRegionSpace`, maps OCR capture failures to `AutomationOutcome`, and stays SwiftUI-free. `LiveAutomationRuntimeHost` accepts external signal, manual approval, and OCR region context providers from app/product code without letting SwiftUI call the evaluator directly.
+- `AutomationConditionEvaluatorClient.contextual` handles `previousOutcome`, injected `externalSignal`, injected `manualApproval`, and testable OCR closures. Context-only conditions return `AutomationConditionEvaluationEvidence` with predicate/signal/approval diagnostics through `evaluateResult`, while the legacy `evaluate` helper remains outcome-only.
+- `LiveAutomationConditionEvaluatorClient` supports full-display OCR text matching through existing `ScreenCaptureService` and `VisionDetector`, filters matches by `AutomationOCRSearchRegionSpace`, maps OCR capture failures to `AutomationOutcome`, returns durable diagnostics for matched, not-matched, failed, and rejected terminal paths, and stays SwiftUI-free. `LiveAutomationRuntimeHost` accepts external signal, manual approval, and OCR region context providers from app/product code without letting SwiftUI call the evaluator directly.
 - `AutomationSignalStore` / `AutomationExternalSignalSourceView` and `AutomationManualApprovalPresenter` are app-target sources for provider data; they feed Owner B clients and do not mutate reducer state.
+- `AutomationRuntimeHandoffCommand` is a core value contract for App-host delivery. `AutomationRuntimeHandoffClient` may enqueue/load/remove commands from a file-backed mailbox or in-memory fake, but it never mutates reducer state directly.
+- CLI `workflow run/cancel --handoff app` writes mailbox commands only; it does not run `Player` in the CLI process. `LiveAutomationRuntimeHost` consumes commands by dispatching their mapped `AutomationAction` through `AutomationRuntimeSession`, then removes successfully dispatched commands.
+- The runtime handoff mailbox is a first pass, not a daemon. It writes command receipts so CLI/AI can query `workflow handoff status`; the status payload also reads repository run history to include run snapshots and workflow status for dispatched commands when possible. It still does not wake a non-running App, keep a CLI session alive, or provide push-style live progress/results.
 
 ## Planning Log
 
@@ -136,6 +141,11 @@ Owner B owns the boundary between pure AutomationEngine state and the real macOS
 - 2026-07-05: `PlaybackRunEngine` extracted the live Player outer loop from `Player.play`, with Swift Testing coverage for loop/progress callbacks, window refresh handoff, conflict abort, and failure evidence construction.
 - 2026-07-05: `LivePlaybackRunStepClient` extracted live locator/OCR step execution and event posting handoff from `Player.play`; core `PlaybackLocatorCacheTests` cover cache key and reuse semantics.
 - 2026-07-05: `PlaybackSynchronousRunEngine` and `LivePlaybackSynchronousRunStepClient` extracted the blocking CLI playback loop/step path from `Player.playSynchronously`, with Swift Testing coverage for loop/progress callbacks, conflict abort, failure evidence, and continuous-plan no-op behavior.
+- 2026-07-06: `AutomationRuntimeHandoff` added a file-backed App-host mailbox first pass. CLI `workflow run/cancel --handoff app` enqueues manual-start/cancel-run commands; `LiveAutomationRuntimeHost` polls and dispatches them through the existing runtime session.
+- 2026-07-06: Runtime handoff receipts/status added and then extended with repository-backed result context. `AutomationRuntimeHandoffReceipt` records dispatched/failed command handling plus created run IDs; `LiveAutomationRuntimeHost` atomically completes consumed commands with receipts; CLI `workflow handoff status <command-id>` returns pending/dispatched/failed/missing state plus `runs` snapshots and `workflowStatus` when the same repository has persisted run history. This gives AI a direct readback for created/running/terminal runs without turning the mailbox into a daemon or stream.
+- 2026-07-06: Condition diagnostics artifact refs added. `AutomationConditionEvidenceArtifactWriter` saves live OCR/visual last-sample and watched-region PNGs under App Support `AutomationEvidence/<runID>/...`; `AutomationConditionEvidenceArtifactPresenter` resolves those safe relative refs for preview/open/reveal; `AutomationConditionEvaluationEvidence` persists relative refs only, so repository JSON stays value-based and SwiftUI does not call ScreenCapture/OCR/image providers or construct artifact paths itself.
+- 2026-07-06: Live condition diagnostics were hardened for failure payloads. OCR capture failures now return explanatory `AutomationConditionEvaluationEvidence`; OCR/Vision failures after a screenshot save the last sample/crop when possible. Visual capture, bitmap decode, and configuration failures also return evidence with outcome, sample count, target description, diagnostic fields, and sample artifacts when a screenshot was available; bitmap-decode failure now saves the captured display sample and watched-region crop before returning the rejected payload.
+- 2026-07-06: Context-only condition diagnostics now use the same result path. `AutomationConditionEvaluationEvidence.contextual` builds durable payloads for `previousOutcome`, external signal, and manual approval conditions, and both `AutomationConditionEvaluatorClient.contextual` and `LiveAutomationConditionEvaluatorClient` attach that payload to `evaluateResult`.
 
 ## Handoff Checklist
 
@@ -159,4 +169,6 @@ Owner B owns the boundary between pure AutomationEngine state and the real macOS
 - [x] Synchronous playback loop/step runner boundary documented and covered by pure tests.
 - [x] Live condition evaluator first pass documented.
 - [x] Runtime session and menu-bar lifecycle host documented.
+- [x] Runtime App-host handoff mailbox and receipt/status first pass documented and covered by fake/file-backed tests.
+- [x] Condition diagnostics payload, safe artifact path helper, context-only evidence payloads, live artifact writer, failure/rejected live payload behavior, and artifact presenter boundary documented; core tests cover Codable/backward compatibility/path normalization and contextual evidence, while app-edge writer/presenter/evaluator wiring are verified by Swift 6 build.
 - [x] Adapter tests pass without moving mouse or invoking real OCR.

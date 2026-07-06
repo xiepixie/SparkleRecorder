@@ -36,6 +36,36 @@ public struct RunReport: Codable, Equatable, Sendable {
     }
 }
 
+public struct RunEvidenceManifest: Codable, Equatable, Sendable {
+    public static let currentSchemaVersion = 1
+
+    public var schemaVersion: Int
+    public var evidenceID: UUID
+    public var macroID: UUID
+    public var runID: UUID
+    public var reportFilename: String
+    public var screenshotFilename: String?
+    public var createdAt: Date
+
+    public init(
+        schemaVersion: Int = Self.currentSchemaVersion,
+        evidenceID: UUID,
+        macroID: UUID,
+        runID: UUID,
+        reportFilename: String = "report.json",
+        screenshotFilename: String? = nil,
+        createdAt: Date = Date.now
+    ) {
+        self.schemaVersion = schemaVersion
+        self.evidenceID = evidenceID
+        self.macroID = macroID
+        self.runID = runID
+        self.reportFilename = reportFilename
+        self.screenshotFilename = screenshotFilename
+        self.createdAt = createdAt
+    }
+}
+
 public struct PlaybackFailureEvidence: Codable, Equatable, Sendable {
     public var macroID: UUID
     public var runID: UUID

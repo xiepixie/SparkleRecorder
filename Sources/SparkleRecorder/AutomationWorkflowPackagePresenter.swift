@@ -7,6 +7,11 @@ import UniformTypeIdentifiers
 enum AutomationWorkflowPackagePresenter {
     private static var sharedPackageURLs: [URL] = []
 
+    private struct WorkflowPackageImportItem {
+        var workflow: AutomationWorkflow
+        var packageDirectoryURL: URL
+    }
+
     static func export(workflow: AutomationWorkflow) {
         export(
             workflows: [workflow],
@@ -123,17 +128,25 @@ enum AutomationWorkflowPackagePresenter {
             }
 
             do {
-                let workflows = try panel.urls.flatMap { url in
+                let importItems = try panel.urls.flatMap { url in
                     let data = try Data(contentsOf: url)
-                    return try AutomationWorkflowPackage.decode(data).workflows
+                    let packageDirectoryURL = url.deletingLastPathComponent()
+                    return try AutomationWorkflowPackage.decode(data).workflows.map {
+                        WorkflowPackageImportItem(
+                            workflow: $0,
+                            packageDirectoryURL: packageDirectoryURL
+                        )
+                    }
                 }
-                guard let prepared = prepareForImport(workflows, currentWorkflows: currentWorkflows) else {
+                guard let prepared = prepareForImport(importItems, currentWorkflows: currentWorkflows) else {
                     return
                 }
-                guard confirmMissingMacroReferences(in: prepared, availableMacroIDs: availableMacroIDs) else {
+                let workflows = prepared.map(\.workflow)
+                guard confirmMissingMacroReferences(in: workflows, availableMacroIDs: availableMacroIDs) else {
                     return
                 }
-                onImport(prepared)
+                onImport(workflows)
+                persistVisualAssetPackageRoots(for: prepared)
             } catch {
                 showError(
                     title: NSLocalizedString("Import failed", comment: ""),
@@ -144,13 +157,14 @@ enum AutomationWorkflowPackagePresenter {
     }
 
     private static func prepareForImport(
-        _ workflows: [AutomationWorkflow],
+        _ importItems: [WorkflowPackageImportItem],
         currentWorkflows: [AutomationWorkflow]
-    ) -> [AutomationWorkflow]? {
-        guard !workflows.isEmpty else {
+    ) -> [WorkflowPackageImportItem]? {
+        guard !importItems.isEmpty else {
             return []
         }
 
+        let workflows = importItems.map(\.workflow)
         let currentIDs = Set(currentWorkflows.map(\.id))
         let importedIDs = workflows.map(\.id)
         let duplicateIDs = duplicateValues(importedIDs)
@@ -158,7 +172,7 @@ enum AutomationWorkflowPackagePresenter {
         let conflictsWithinImport = !duplicateIDs.isEmpty
 
         guard conflictsExisting || conflictsWithinImport else {
-            return workflows
+            return importItems
         }
 
         let alert = NSAlert()
@@ -174,9 +188,9 @@ enum AutomationWorkflowPackagePresenter {
 
         switch alert.runModal() {
         case .alertFirstButtonReturn:
-            return workflowsWithCopiedConflicts(workflows, currentIDs: currentIDs)
+            return importItemsWithCopiedConflicts(importItems, currentIDs: currentIDs)
         case .alertSecondButtonReturn:
-            return workflows
+            return importItems
         default:
             return nil
         }
@@ -225,25 +239,61 @@ enum AutomationWorkflowPackagePresenter {
             .sorted { $0.uuidString < $1.uuidString }
     }
 
-    private static func workflowsWithCopiedConflicts(
-        _ workflows: [AutomationWorkflow],
+    private static func importItemsWithCopiedConflicts(
+        _ importItems: [WorkflowPackageImportItem],
         currentIDs: Set<UUID>
-    ) -> [AutomationWorkflow] {
+    ) -> [WorkflowPackageImportItem] {
         var seenIDs = currentIDs
         let now = Date()
-        return workflows.map { workflow in
+        return importItems.map { item in
+            var workflow = item.workflow
             guard seenIDs.contains(workflow.id) else {
                 seenIDs.insert(workflow.id)
-                return workflow
+                return item
             }
 
-            var copy = workflow
-            copy.id = UUID()
-            copy.name = String(format: NSLocalizedString("%@ Copy", comment: ""), workflow.name)
-            copy.createdAt = now
-            copy.modifiedAt = now
-            seenIDs.insert(copy.id)
-            return copy
+            workflow.id = UUID()
+            workflow.name = String(format: NSLocalizedString("%@ Copy", comment: ""), workflow.name)
+            workflow.createdAt = now
+            workflow.modifiedAt = now
+            seenIDs.insert(workflow.id)
+            return WorkflowPackageImportItem(
+                workflow: workflow,
+                packageDirectoryURL: item.packageDirectoryURL
+            )
+        }
+    }
+
+    private static func persistVisualAssetPackageRoots(
+        for importItems: [WorkflowPackageImportItem]
+    ) {
+        let associatedAt = Date()
+        let roots = importItems.flatMap { item in
+            AutomationVisualAssetPackageRoot.roots(
+                for: [item.workflow],
+                packageDirectoryURL: item.packageDirectoryURL,
+                source: .workflowPackageImport,
+                associatedAt: associatedAt
+            )
+        }
+        let rootedWorkflowIDs = Set(roots.map(\.workflowID))
+        let unrootedWorkflowIDs = Set(importItems.map(\.workflow.id)).subtracting(rootedWorkflowIDs)
+        guard !roots.isEmpty || !unrootedWorkflowIDs.isEmpty else {
+            return
+        }
+
+        let client = AutomationVisualAssetPackageRootClient.fileBacked()
+        Task {
+            do {
+                if !roots.isEmpty {
+                    try await client.upsertRoots(roots)
+                }
+                if !unrootedWorkflowIDs.isEmpty {
+                    try await client.removeRoots(unrootedWorkflowIDs)
+                }
+            } catch {
+                NSLog("SparkleRecorder: Failed to persist imported workflow visual asset roots: \(error)")
+            }
         }
     }
 

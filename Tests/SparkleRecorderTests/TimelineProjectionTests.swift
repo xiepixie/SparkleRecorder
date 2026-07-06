@@ -71,7 +71,7 @@ struct TimelineProjectionTests {
             totalDuration: 10,
             groups: groups
         )
-        #expect(tiny == [second.id])
+        #expect(tiny == [third.id])
 
         let nearest = try #require(TimelineProjection.nearestGroup(to: 7.9, groups: groups))
         #expect(nearest.id == third.id)

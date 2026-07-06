@@ -27,12 +27,30 @@ CLI 应该围绕这些动作，而不是围绕内部文件路径。
 
 | Tier | Commands | Writes App State | Safe For AI By Default |
 | --- | --- | --- | --- |
-| Read | `macros`, `workflow list/show/export`, `draft inspect` | No | Yes |
+| Read | `macros`, `workflow list/show/status/export`, `draft inspect` | No | Yes |
 | Draft | `draft init/add/set/connect/remove/patch/validate/simulate` | No, unless `--out` overwrites draft file | Yes |
 | Import | `workflow import` | Yes | Only with `--confirm` or UI approval |
-| Runtime | `workflow run/status/cancel/history` | Creates runs / cancels runs | No by default; requires explicit user approval |
+| Runtime | `workflow run/cancel/history` | Creates runs / cancels runs | No by default; requires explicit user approval |
 
 AI 应优先停留在 Read + Draft tier。Import 和 Runtime tier 必须让用户确认。
+
+## Implementation Status
+
+更新时间：2026-07-06
+
+| Capability | Status | Evidence |
+| --- | --- | --- |
+| External draft schema `sparkle.workflow.draft.v1` | First pass implemented | `AutomationWorkflowDraft.swift`, `AutomationWorkflowDraftTests` |
+| CLI result envelope `sparkle.cli.result.v1` | First pass implemented | `AutomationCLIResult.swift`, envelope test |
+| `workflow draft validate <draft.json> --json` | First pass implemented and tested | `main.swift`, targeted Swift Testing, CLI smoke command |
+| Optional `--macro-catalog` validation context | First pass implemented | CLI decode path and validator context |
+| `workflow macros --json` | First pass implemented and tested | Reads `.sparkrec` catalog, supports `--search`, emits macro IDs/stats/surfaces without event payload |
+| `workflow draft simulate` | First pass implemented and tested | Deterministic draft preview with planned steps, branch decisions, resource timeline, skipped task keys, validation warnings, and `--scenario` support |
+| `workflow import --dry-run` | First pass implemented and tested | Compiles draft to internal `AutomationWorkflow` preview with stable IDs, macro resolutions, key maps, and import-blocking issues; read-only |
+| `workflow import --confirm` | First pass implemented and tested | Compiles draft, routes write through reducer `.upsertWorkflow` / `.persistWorkflows`, persists via repository, and does not run Player |
+| `workflow list/show/status/export --json` | First pass implemented and tested | Reads repository workflows/run history, reports per-workflow/task runtime status, and exports existing workflows to `sparkle.workflow.draft.v1`; export reports lossy OCR region/resource/schedule warnings |
+| `workflow run/cancel/runs/handoff status --json` | First pass implemented and tested | Runtime commands require explicit confirmation for writes, use reducer/runtime session paths, support fixture repositories, and now have `--handoff app` mailbox plus receipt/status/result-readback first pass for App-host delivery; `workflow handoff status` returns repository-backed run snapshots/workflow status when receipts identify run IDs; daemon/background sessions remain future work |
+| Fine-grained draft editing commands | First pass implemented and tested | `workflow draft init`, `inspect`, `normalize`, `patch`, `task add`, `task set`, `task remove`, `schedule set`, `condition set`, `dependency add`, `dependency set`, and `dependency remove`; task add/set support `--join-policy all|any|firstMatched` and `--max-resource-wait`; condition set supports visual fields for `regionChanged`, `imageAppeared`, `imageDisappeared`, and `pixelMatched` |
 
 ## Output Envelope
 
@@ -107,11 +125,16 @@ AI rule: never invent macro IDs. Always choose from catalog results.
 ```bash
 sparkle-recorder workflow list --json
 sparkle-recorder workflow show <workflow-id> --json
+sparkle-recorder workflow status --json
+sparkle-recorder workflow status <workflow-id> --json
 sparkle-recorder workflow export <workflow-id> --format draft-json --json
+sparkle-recorder workflow runs <workflow-id> --json
 sparkle-recorder workflow history <workflow-id> --json
 ```
 
-`export --format draft-json` converts internal workflow to AI-readable draft. It should preserve task `key` values if available; otherwise it generates stable keys from task name + ID suffix.
+`export --format draft-json` converts internal workflow to AI-readable draft. Internal workflows do not currently persist original draft keys, so export generates stable keys from task name + ID suffix. Concrete OCR/visual region bounds now round-trip through `visualAssets.regions` when they are representable; fields that still cannot round-trip cleanly emit a `lossyWorkflowExport` warning.
+
+`workflow status` is read-only. It loads workflows and run history, then returns user-facing status summaries for the workflow and each task: `idle`, `planned`, `waitingForDependencies`, `waitingForResource`, `queued`, `running`, `completed`, or `needsAttention`. It is safe for AI agents to call because it does not create runs, cancel runs, acquire resources, or start Player.
 
 ### 3. Draft Lifecycle
 
@@ -134,12 +157,15 @@ sparkle-recorder workflow draft task add battle.json \
   --type macro \
   --macro-name "点击屏幕" \
   --resource foregroundInput \
+  --max-resource-wait 30 \
   --out battle.json \
   --json
 
 sparkle-recorder workflow draft task set battle.json tap_screen \
   --timeout 10 \
   --retry-max 1 \
+  --join-policy all \
+  --max-resource-wait 30 \
   --name "点击屏幕让按钮出现" \
   --out battle.json \
   --json
@@ -154,11 +180,47 @@ sparkle-recorder workflow draft condition set battle.json wait_exit \
   --out battle.json \
   --json
 
+sparkle-recorder workflow draft condition set battle.json wait_spinner_gone \
+  --type imageDisappeared \
+  --region battle_result_area \
+  --image loading_spinner_template \
+  --threshold 0.91 \
+  --timeout 60 \
+  --polling 0.5 \
+  --out battle.json \
+  --json
+
+sparkle-recorder workflow draft condition set battle.json wait_button_color \
+  --type pixelMatched \
+  --region battle_result_area \
+  --color '#FFCC00' \
+  --threshold 0.15 \
+  --out battle.json \
+  --json
+
 sparkle-recorder workflow draft dependency add battle.json \
   --from tap_screen \
   --to wait_exit \
   --trigger success \
   --delay 1 \
+  --out battle.json \
+  --json
+
+sparkle-recorder workflow draft schedule set battle.json tap_screen \
+  --type repeating \
+  --start-at "2026-07-07T03:00:00+08:00" \
+  --every 1 \
+  --unit days \
+  --time-zone Asia/Shanghai \
+  --out battle.json \
+  --json
+
+sparkle-recorder workflow draft dependency set battle.json \
+  --from tap_screen \
+  --to wait_exit \
+  --trigger success \
+  --new-key tap_then_wait \
+  --delay 2 \
   --out battle.json \
   --json
 ```
@@ -168,10 +230,10 @@ Required editing commands:
 | Command | Purpose |
 | --- | --- |
 | `task add` | Add macro/delay/condition/notification/manualApproval task. |
-| `task set` | Rename, enable/disable, timeout, retry, resource, graph position. |
-| `task remove` | Remove task and dependent edges, or require `--keep-orphans false`. |
+| `task set` | Rename, enable/disable, timeout, retry, join policy, resource, graph position. |
+| `task remove` | Remove task and dependent edges. |
 | `dependency add` | Add edge with trigger and delay. |
-| `dependency set` | Change trigger, delay, enabled state. |
+| `dependency set` | Change key, source, target, trigger, delay, and enabled state. |
 | `dependency remove` | Remove edge by source/target or dependency key. |
 | `schedule set` | Manual/once/repeating schedule. |
 | `condition set` | OCR/visual/outcome/external/manual condition details. |
@@ -218,6 +280,20 @@ Patch schema:
 
 Every patch result must list changed task keys, changed dependency keys, warnings, and validation state.
 
+First pass supported operations:
+
+- `addTask`
+- `setTask`
+- `removeTask`
+- `setSchedule`
+- `setCondition`
+- `addDependency`
+- `setDependency`
+- `removeDependency`
+- `normalize`
+
+Patch commands use the same edit envelope as single-step commands. They only write when `--out` is explicit and never touch `automations.json`.
+
 ### 6. Validation
 
 ```bash
@@ -233,10 +309,11 @@ Validation must check:
 - cycles.
 - missing dependency endpoints.
 - unsupported condition type.
+- visual condition references: image appear/disappear require `imageRef`; pixel match requires `colorHex` and either `pixel` or `regionRef`; thresholds must be between 0 and 1.
 - resource conflict risks.
 - timeout branch missing for long waits.
 - repeating schedule validity.
-- join policy ambiguity.
+- join policy values: `all`, `any`, or `firstMatched`.
 - import compatibility with current app version.
 
 Validation should distinguish:
@@ -275,19 +352,25 @@ sparkle-recorder workflow import battle.json --confirm --json
 Rules:
 
 - `--dry-run` compiles draft to internal workflow and returns planned changes.
-- `--confirm` is required to write `automations.json`.
+- `--confirm` is required to write `automations.json`; current first pass writes through reducer/repository boundaries and supports `--repository-dir` for fixture/smoke verification.
+- `--visual-assets-root <dir>` can override the default draft parent directory used for package-local `visualAssets.images/baselines`; confirmed import records this root in the visual asset roots manifest only when the compiled workflow carries package file assets.
+- Confirmed import persists the compiled static `AutomationWorkflow` only. It does not start the workflow, move mouse/keyboard, mutate `SavedMacro`, or append runtime evidence.
 - Import never writes `SavedMacro` runtime fields.
 - Missing macro refs block import unless user supplies an explicit resolution file.
 - Ambiguous macro refs block import.
+- Visual condition drafts such as `regionChanged`, `imageAppeared`, `imageDisappeared`, and `pixelMatched` now import into core visual condition specs.
+- OCR and visual `regionRef` resolve through draft/package `visualAssets.regions` when present. Unresolved refs remain dry-run warnings and import without concrete bounds. App-edge package image provider, workflow-scoped package binding, and package-root retention first passes can resolve package-local `visualAssets.images/baselines` when a confirmed import, AI Draft Preview import, workflow package import, or explicit `--visual-assets-root` records a local package directory. AI Draft Preview now has package-local image/baseline file registration, external image/baseline import-copy, and package-local baseline capture first passes for drafts opened from disk; broader managed storage/migration remains separate productization work.
 
 ### 9. Runtime Control
 
 Runtime CLI is useful, but more dangerous. It should come after draft/import basics.
 
 ```bash
-sparkle-recorder workflow run <workflow-id> --task <task-key-or-id> --json
-sparkle-recorder workflow status <workflow-id> --json
+sparkle-recorder workflow run <workflow-id> --task <task-id-or-exact-name> --confirm --json
+sparkle-recorder workflow run <workflow-id> --task <task-id-or-exact-name> --confirm --handoff app --json
 sparkle-recorder workflow cancel <run-id> --confirm --json
+sparkle-recorder workflow cancel <run-id> --confirm --handoff app --json
+sparkle-recorder workflow handoff status <command-id> --json
 sparkle-recorder workflow runs <workflow-id> --json
 ```
 
@@ -295,7 +378,13 @@ Rules:
 
 - Runtime commands must go through the same reducer/runtime path as UI.
 - Running a workflow can move mouse/keyboard; require explicit user confirmation unless app preference allows trusted CLI.
-- Status is read-only and safe for AI.
+- Runtime status reads are handled by the read-tier `workflow status` command and do not require runtime approval.
+- `workflow run` starts from an explicit task, or infers the single enabled root task when there is exactly one root. It waits for the execution to finish or for `--wait-timeout` to expire.
+- `workflow run` supports `--repository-dir` and `--macros-dir` for isolated fixtures, and `--player-mode fakeSuccess` for tests that must not post real input.
+- `workflow run --handoff app` and `workflow cancel --handoff app` enqueue an `automation-runtime-handoff.json` command for the running App host and return a handoff payload. They do not run Player in the CLI process.
+- `workflow handoff status <command-id>` is read-only and returns whether the command is still `pending`, was `dispatched`, `failed`, or is `missing`. It can be used by AI tools to poll App-host delivery without watching files directly.
+- `workflow cancel` without handoff remains a first-pass reducer/repository cancellation path for runs visible in the repository snapshot.
+- `workflow runs` is read-only run history and does not require confirmation.
 
 ## AI Collaboration Loop
 
@@ -339,6 +428,7 @@ sparkle-recorder workflow draft dependency add battle-exit.json --from wait_exit
 sparkle-recorder workflow draft validate battle-exit.json --json
 sparkle-recorder workflow draft simulate battle-exit.json --scenario timeout:wait_exit --json
 sparkle-recorder workflow import battle-exit.json --dry-run --json
+sparkle-recorder workflow import battle-exit.json --confirm --json
 ```
 
 ## Phase Slicing
@@ -346,30 +436,33 @@ sparkle-recorder workflow import battle-exit.json --dry-run --json
 ### Phase 1: Useful Skeleton
 
 - `workflow macros`
+- `workflow list/show/status/export`
 - `workflow draft init/inspect/normalize`
+- `workflow draft patch`
 - `workflow draft task add/set/remove`
-- `workflow draft dependency add/remove`
+- `workflow draft schedule set`
+- `workflow draft dependency add/set/remove`
+- `workflow draft condition set`
 - `workflow draft validate`
 - `workflow draft simulate` with deterministic fake outcomes
 - `workflow import --dry-run`
+- `workflow import --confirm` first pass
 
 ### Phase 2: Write And UI Preview
 
-- `workflow import --confirm`
-- `workflow list/show/export`
 - validation warnings keyed to task/dependency keys
 - UI draft preview consumes same JSON
 
 ### Phase 3: Runtime
 
-- `workflow run`
-- `workflow status`
-- `workflow cancel`
-- `workflow runs/history`
+- `workflow run` first pass: explicit `--confirm`, reducer/runtime path, isolated repository support, fake player mode for tests, waits for terminal execution.
+- `workflow run/cancel --handoff app` first pass: explicit `--confirm`, writes a mailbox command for the running App host, and returns `AutomationRuntimeHandoffPayload`.
+- `workflow handoff status` first pass: reads command/receipt state and returns `AutomationRuntimeHandoffStatusPayload`.
+- `workflow cancel` first pass: explicit `--confirm`, reducer/repository cancellation for visible non-terminal runs; mailbox handoff covers App-host delivery when the App is running, while daemon/background long-running sessions remain future work.
+- `workflow runs/history` first pass: read-only run history payload.
 
 ### Deferred
 
 - MCP server.
 - Direct natural language command inside CLI.
 - Background scheduler installation/login item management.
-

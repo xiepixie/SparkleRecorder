@@ -154,6 +154,7 @@ public actor MacroRepository {
     }
     
     /// Saves a run evidence report and an optional failure screenshot to the runs directory.
+    /// Writes both a stable per-run payload and the legacy latest files used by older UI.
     public func saveRunEvidence(id: UUID, report: RunReport, screenshot: Data?) throws {
         let packageURL = macrosDirectory.appendingPathComponent("\(id.uuidString).sparkrec")
         let runsURL = packageURL.appendingPathComponent("runs")
@@ -162,14 +163,45 @@ public actor MacroRepository {
         if !fm.fileExists(atPath: runsURL.path) {
             try fm.createDirectory(at: runsURL, withIntermediateDirectories: true, attributes: nil)
         }
-        
-        let reportURL = runsURL.appendingPathComponent("latest.json")
+
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted]
+
+        let evidenceURL = runsURL.appendingPathComponent(report.runID.uuidString, isDirectory: true)
+        if !fm.fileExists(atPath: evidenceURL.path) {
+            try fm.createDirectory(at: evidenceURL, withIntermediateDirectories: true, attributes: nil)
+        }
+
+        let perRunReportURL = evidenceURL.appendingPathComponent("report.json", isDirectory: false)
         let reportData = try encoder.encode(report)
+        try reportData.write(to: perRunReportURL, options: .atomic)
+
+        let perRunScreenshotURL = evidenceURL.appendingPathComponent("failure.png", isDirectory: false)
+        let screenshotFilename: String?
+        if let screenshot {
+            try screenshot.write(to: perRunScreenshotURL, options: .atomic)
+            screenshotFilename = "failure.png"
+        } else {
+            if fm.fileExists(atPath: perRunScreenshotURL.path) {
+                try fm.removeItem(at: perRunScreenshotURL)
+            }
+            screenshotFilename = nil
+        }
+
+        let manifest = RunEvidenceManifest(
+            evidenceID: report.runID,
+            macroID: id,
+            runID: report.runID,
+            screenshotFilename: screenshotFilename
+        )
+        let manifestURL = evidenceURL.appendingPathComponent("manifest.json", isDirectory: false)
+        let manifestData = try encoder.encode(manifest)
+        try manifestData.write(to: manifestURL, options: .atomic)
+
+        let reportURL = runsURL.appendingPathComponent("latest.json", isDirectory: false)
         try reportData.write(to: reportURL, options: .atomic)
         
-        let screenshotURL = runsURL.appendingPathComponent("failure.png")
+        let screenshotURL = runsURL.appendingPathComponent("failure.png", isDirectory: false)
         if let screenshot = screenshot {
             try screenshot.write(to: screenshotURL, options: .atomic)
         } else if fm.fileExists(atPath: screenshotURL.path) {

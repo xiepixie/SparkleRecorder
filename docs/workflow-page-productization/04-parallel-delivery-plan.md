@@ -7,6 +7,7 @@
 必须先完成：
 
 - 本目录的页面模型、AI draft schema、两人边界被接受。
+- Workflow visual/UX contract 被接受：Pro macOS 克制风格、拖拽编排、依赖图、运行反馈作为 UI 验收标准。
 - 两个 owner 各自写完下一阶段 workstream。
 - 列出第一批 ready-for-ui backend capability notices。
 - UI owner 拿到 fixture，不依赖 live 后端也能重建页面。
@@ -16,7 +17,9 @@
 | Owner | Can Work In Parallel | Must Not Do |
 | --- | --- | --- |
 | 1: Engine/Runtime/AI CLI | repeating occurrence、join policy、timeout/retry、resource waiting、visual condition、projection fields、workflow CLI validator/importer | import SwiftUI；决定 UI 布局；让 CLI 写内部 state；不得在本阶段开发 MCP server。 |
-| 2: Product UI/UX | Workflow 页面布局、fixture-based graph/timeline/inspector、拖拽/拉线交互模型、状态文案、AI draft preview | 在 SwiftUI 里补 reducer 语义；直接调用 repository/player/evaluator；把未 ready-for-ui 的能力当成 live 功能。 |
+| 2: Product UI/UX | Workflow 页面布局、fixture-based graph/timeline/inspector、拖拽/拉线交互模型、Pro macOS 视觉收敛、状态文案、AI draft preview | 在 SwiftUI 里补 reducer 语义；直接调用 repository/player/evaluator；把未 ready-for-ui 的能力当成 live 功能；用 Web 风格高饱和全宽按钮替代原生生产力工具质感。 |
+
+Owner 2 的 Phase 1 输出必须包含 idle、drag/link、running 三个状态的截图或短录屏；只给静止态截图不能算完成。视觉审查优先看普通控件是否退到背景、用户数据是否成为主视觉、拖拽/连线/运行态是否通过原生 affordance 而不是大色块表达。
 
 ## Phase 2: Live Wiring
 
@@ -61,7 +64,7 @@ flowchart LR
 ## Do Not Parallelize
 
 - 不要同时修改 internal workflow package 和 external AI draft schema。
-- 不要在 join policy 未定时重做复杂拉线 UI。
-- 不要在 resource waiting 语义未定时做资源时间轴最终交互。
+- 不要在 join policy 的 FlowGraph/Inspector 表达未通过 fixture/截图验收前，把复杂合流 UI 标为完成。
+- 不要把 resource waiting first pass 误标为完整队列产品；priority、preemption、starvation 和 cross-process arbitration 还不能做最终交互承诺。
 - 本阶段不要做 MCP server。
 - 不要在 projection 字段未定时让 UI 读取 reducer 内部数组自行推导。

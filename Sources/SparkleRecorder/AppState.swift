@@ -2,7 +2,6 @@ import Foundation
 import SwiftUI
 import Combine
 import ApplicationServices
-import IOKit.hid
 import SparkleRecorderCore
 
 /// User-configurable settings persisted in UserDefaults.
@@ -30,8 +29,7 @@ final class AppState: ObservableObject {
     /// Input Monitoring is a separate TCC permission from Accessibility; both are
     /// required to record. Polled live alongside Accessibility so the UI reflects
     /// grants made in System Settings without a relaunch.
-    @Published var inputMonitoringGranted: Bool =
-        IOHIDCheckAccess(kIOHIDRequestTypeListenEvent) == kIOHIDAccessTypeGranted
+    @Published var inputMonitoringGranted: Bool = false
     @Published var screenCaptureGranted: Bool = false
 
     /// Pre-record countdown seconds. 0 disables.
@@ -111,7 +109,7 @@ final class AppState: ObservableObject {
             accessibilityGranted = trusted
         }
 
-        let inputOK = IOHIDCheckAccess(kIOHIDRequestTypeListenEvent) == kIOHIDAccessTypeGranted
+        let inputOK = PermissionCenter.shared.checkListenEventAccess() == .authorized
         if inputOK != inputMonitoringGranted {
             inputMonitoringGranted = inputOK
         }

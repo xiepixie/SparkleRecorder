@@ -39,6 +39,18 @@ public enum AutomationEffect: Codable, Equatable, Sendable {
 }
 
 public enum AutomationReducer {
+    private struct DependencyResolution {
+        var isSatisfied: Bool
+        var earliestStartTime: Date?
+        var upstreamRunIDs: [UUID]
+    }
+
+    private struct DependencyMatch {
+        var dependency: AutomationDependency
+        var run: AutomationTaskRun
+        var readyAt: Date
+    }
+
     public static func reduce(
         state: AutomationRunState,
         action: AutomationAction,
@@ -57,8 +69,11 @@ public enum AutomationReducer {
         switch action {
         case .clockTick(let now):
             state.now = now
-            var effects = createDueScheduledRuns(in: &state, now: now, environment: environment)
+            var effects = expireTimedOutRuns(in: &state, now: now, environment: environment)
+            effects.append(contentsOf: expireResourceWaits(in: &state, now: now, environment: environment))
+            effects.append(contentsOf: refreshWaitingResourceRuns(in: &state, now: now))
             effects.append(contentsOf: refreshDueRuns(in: &state, now: now))
+            effects.append(contentsOf: createDueScheduledRuns(in: &state, now: now, environment: environment))
             return effects
 
         case .manualStart(let workflowID, let taskID, let requestedAt):
@@ -130,7 +145,9 @@ public enum AutomationReducer {
             if !state.leases.contains(where: { $0.id == lease.id }) {
                 state.leases.append(lease)
             }
-            guard let index = state.runs.firstIndex(where: { $0.id == runID }), !state.runs[index].isTerminal else {
+            guard let index = state.runs.firstIndex(where: { $0.id == runID }),
+                  !state.runs[index].isTerminal,
+                  state.runs[index].status == .waitingForResource else {
                 return []
             }
             state.runs[index].leaseID = lease.id
@@ -145,21 +162,32 @@ public enum AutomationReducer {
             for lease in sortedLeases where !state.leases.contains(where: { $0.id == lease.id }) {
                 state.leases.append(lease)
             }
-            guard let index = state.runs.firstIndex(where: { $0.id == runID }), !state.runs[index].isTerminal else {
+            guard let index = state.runs.firstIndex(where: { $0.id == runID }),
+                  !state.runs[index].isTerminal,
+                  state.runs[index].status == .waitingForResource else {
                 return []
             }
             state.runs[index].leaseID = sortedLeases.first?.id
             return startTask(runID: runID, in: &state, now: at)
 
-        case .resourceLeaseDenied(let runID, let resource, let at):
+        case .resourceLeaseDenied(let runID, _, let at):
             state.now = at
-            return completeRun(
-                runID: runID,
-                outcome: .resourceConflict(resource: resource),
-                at: at,
-                in: &state,
-                environment: environment
-            )
+            guard let index = state.runs.firstIndex(where: { $0.id == runID }), !state.runs[index].isTerminal else {
+                return []
+            }
+            state.runs[index].status = .waitingForResource
+            state.runs[index].leaseID = nil
+            if let deadline = resourceWaitDeadline(for: state.runs[index], in: state),
+               deadline <= at {
+                return completeRun(
+                    runID: runID,
+                    outcome: .timedOut(deadline: deadline),
+                    at: at,
+                    in: &state,
+                    environment: environment
+                )
+            }
+            return []
 
         case .playerStarted(let runID, let at):
             state.now = at
@@ -175,6 +203,17 @@ public enum AutomationReducer {
             state.now = at
             return completeRun(runID: runID, outcome: outcome, at: at, in: &state, environment: environment)
 
+        case .conditionEvaluationCompleted(let runID, let result, let at):
+            state.now = at
+            return completeRun(
+                runID: runID,
+                outcome: result.outcome,
+                at: at,
+                conditionEvidence: result.evidence,
+                in: &state,
+                environment: environment
+            )
+
         case .cancelRun(let runID, let at):
             state.now = at
             var effects = cancelLiveWork(runID: runID, in: state)
@@ -189,7 +228,9 @@ public enum AutomationReducer {
 
         case .panicRelease(let runID, let at):
             state.now = at
-            return releaseLeases(runID: runID, in: &state)
+            var effects = releaseLeases(runID: runID, in: &state)
+            effects.append(contentsOf: refreshWaitingResourceRuns(in: &state, now: at))
+            return effects
         }
     }
 
@@ -361,6 +402,144 @@ public enum AutomationReducer {
         return [.cancelPlayer(runID: runID)]
     }
 
+    private static func expireTimedOutRuns(
+        in state: inout AutomationRunState,
+        now: Date,
+        environment: AutomationReducerEnvironment
+    ) -> [AutomationEffect] {
+        let timedOutRuns = state.runs.compactMap { run -> (runID: UUID, deadline: Date, createdAt: Date)? in
+            guard
+                !run.isTerminal,
+                run.status == .queued || run.status == .running,
+                let deadline = timeoutDeadline(for: run, in: state),
+                deadline <= now
+            else {
+                return nil
+            }
+
+            return (run.id, deadline, run.createdAt)
+        }
+        .sorted { lhs, rhs in
+            if lhs.deadline != rhs.deadline {
+                return lhs.deadline < rhs.deadline
+            }
+            if lhs.createdAt != rhs.createdAt {
+                return lhs.createdAt < rhs.createdAt
+            }
+            return lhs.runID.uuidString < rhs.runID.uuidString
+        }
+
+        var effects: [AutomationEffect] = []
+        for timedOutRun in timedOutRuns {
+            guard
+                let run = state.run(id: timedOutRun.runID),
+                !run.isTerminal,
+                let deadline = timeoutDeadline(for: run, in: state),
+                deadline <= now
+            else {
+                continue
+            }
+
+            effects.append(contentsOf: cancelLiveWork(runID: timedOutRun.runID, in: state))
+            effects.append(contentsOf: completeRun(
+                runID: timedOutRun.runID,
+                outcome: .timedOut(deadline: deadline),
+                at: now,
+                in: &state,
+                environment: environment
+            ))
+        }
+
+        return effects
+    }
+
+    private static func timeoutDeadline(
+        for run: AutomationTaskRun,
+        in state: AutomationRunState
+    ) -> Date? {
+        guard
+            let workflow = state.workflow(id: run.workflowID),
+            let task = workflow.task(id: run.taskID),
+            let timeout = task.timeout,
+            let startedAt = run.actualStartTime
+        else {
+            return nil
+        }
+
+        return startedAt.addingTimeInterval(timeout)
+    }
+
+    private static func expireResourceWaits(
+        in state: inout AutomationRunState,
+        now: Date,
+        environment: AutomationReducerEnvironment
+    ) -> [AutomationEffect] {
+        let expiredWaits = state.runs.compactMap { run -> (runID: UUID, deadline: Date, createdAt: Date)? in
+            guard
+                !run.isTerminal,
+                run.status == .waitingForResource,
+                let deadline = resourceWaitDeadline(for: run, in: state),
+                deadline <= now
+            else {
+                return nil
+            }
+
+            return (run.id, deadline, run.createdAt)
+        }
+        .sorted { lhs, rhs in
+            if lhs.deadline != rhs.deadline {
+                return lhs.deadline < rhs.deadline
+            }
+            if lhs.createdAt != rhs.createdAt {
+                return lhs.createdAt < rhs.createdAt
+            }
+            return lhs.runID.uuidString < rhs.runID.uuidString
+        }
+
+        var effects: [AutomationEffect] = []
+        for expiredWait in expiredWaits {
+            guard
+                let run = state.run(id: expiredWait.runID),
+                !run.isTerminal,
+                run.status == .waitingForResource,
+                let deadline = resourceWaitDeadline(for: run, in: state),
+                deadline <= now
+            else {
+                continue
+            }
+
+            effects.append(contentsOf: completeRun(
+                runID: expiredWait.runID,
+                outcome: .timedOut(deadline: deadline),
+                at: now,
+                in: &state,
+                environment: environment
+            ))
+        }
+
+        return effects
+    }
+
+    private static func resourceWaitDeadline(
+        for run: AutomationTaskRun,
+        in state: AutomationRunState
+    ) -> Date? {
+        guard
+            let workflow = state.workflow(id: run.workflowID),
+            let task = workflow.task(id: run.taskID),
+            let maxWaitDuration = task.resourceRequirement.maxWaitDuration
+        else {
+            return nil
+        }
+
+        let waitingStart = resourceWaitingStart(for: run)
+        return waitingStart.addingTimeInterval(maxWaitDuration)
+    }
+
+    private static func resourceWaitingStart(for run: AutomationTaskRun) -> Date {
+        run.actualStartTime ?? run.earliestStartTime ?? run.scheduledStartTime ?? run.createdAt
+    }
+
     private static func createDueScheduledRuns(
         in state: inout AutomationRunState,
         now: Date,
@@ -370,22 +549,27 @@ public enum AutomationReducer {
 
         for workflow in state.workflows {
             for task in workflow.tasks where task.isEnabled {
-                guard let scheduledStart = task.schedule?.initialScheduledStart, scheduledStart <= now else {
+                guard let schedule = task.schedule else {
                     continue
                 }
-                guard !state.runs.contains(where: {
-                    $0.workflowID == workflow.id &&
-                    $0.taskID == task.id &&
-                    $0.scheduledStartTime == scheduledStart
-                }) else {
+                let representedScheduledStarts = Set(state.runs.compactMap { run -> Date? in
+                    guard run.workflowID == workflow.id, run.taskID == task.id else {
+                        return nil
+                    }
+                    return run.scheduledStartTime
+                })
+                guard let occurrence = schedule.nextDueOccurrence(
+                    onOrBefore: now,
+                    excludingScheduledStartTimes: representedScheduledStarts
+                ) else {
                     continue
                 }
 
                 effects.append(contentsOf: createRun(
                     workflowID: workflow.id,
                     taskID: task.id,
-                    scheduledStartTime: scheduledStart,
-                    earliestStartTime: scheduledStart,
+                    scheduledStartTime: occurrence.scheduledAt,
+                    earliestStartTime: occurrence.scheduledAt,
                     createdAt: now,
                     executionID: nil,
                     upstreamRunIDs: [],
@@ -414,6 +598,30 @@ public enum AutomationReducer {
         }
     }
 
+    private static func refreshWaitingResourceRuns(
+        in state: inout AutomationRunState,
+        now: Date
+    ) -> [AutomationEffect] {
+        let waitingRunIDs = state.runs
+            .filter { run in
+                guard !run.isTerminal, run.status == .waitingForResource else {
+                    return false
+                }
+                return !state.leases.contains { $0.runID == run.id }
+            }
+            .sorted { lhs, rhs in
+                if lhs.createdAt != rhs.createdAt {
+                    return lhs.createdAt < rhs.createdAt
+                }
+                return lhs.id.uuidString < rhs.id.uuidString
+            }
+            .map(\.id)
+
+        return waitingRunIDs.flatMap { runID in
+            prepareRun(runID: runID, in: &state, now: now)
+        }
+    }
+
     private static func createRun(
         workflowID: UUID,
         taskID: UUID,
@@ -422,6 +630,7 @@ public enum AutomationReducer {
         createdAt: Date,
         executionID: UUID?,
         upstreamRunIDs: [UUID],
+        attempt: Int = 1,
         in state: inout AutomationRunState,
         environment: AutomationReducerEnvironment
     ) -> [AutomationEffect] {
@@ -440,6 +649,7 @@ public enum AutomationReducer {
             scheduledStartTime: scheduledStartTime,
             earliestStartTime: earliestStartTime,
             createdAt: createdAt,
+            attempt: attempt,
             upstreamRunIDs: upstreamRunIDs
         )
         state.runs.append(run)
@@ -461,12 +671,22 @@ public enum AutomationReducer {
         }
 
         if !workflow.dependencies(to: task.id).isEmpty {
-            let resolution = dependencyResolution(
-                for: task,
-                in: workflow,
-                executionID: state.runs[index].executionID,
-                state: state
-            )
+            let resolution: DependencyResolution
+            if task.joinPolicy == .firstMatched, !state.runs[index].upstreamRunIDs.isEmpty {
+                resolution = lockedFirstMatchedDependencyResolution(
+                    for: task,
+                    in: workflow,
+                    upstreamRunIDs: state.runs[index].upstreamRunIDs,
+                    state: state
+                )
+            } else {
+                resolution = dependencyResolution(
+                    for: task,
+                    in: workflow,
+                    executionID: state.runs[index].executionID,
+                    state: state
+                )
+            }
             guard resolution.isSatisfied else {
                 state.runs[index].status = .waitingForDependencies
                 state.runs[index].upstreamRunIDs = resolution.upstreamRunIDs
@@ -506,6 +726,9 @@ public enum AutomationReducer {
 
         switch task.kind {
         case .macro(let macroID):
+            if state.runs[index].actualStartTime == nil {
+                state.runs[index].actualStartTime = now
+            }
             state.runs[index].status = .queued
             return [.startPlayer(runID: runID, workflowID: workflow.id, taskID: task.id, macroID: macroID)]
 
@@ -545,6 +768,7 @@ public enum AutomationReducer {
         runID: UUID,
         outcome: AutomationOutcome,
         at completedAt: Date,
+        conditionEvidence: AutomationConditionEvaluationEvidence? = nil,
         in state: inout AutomationRunState,
         environment: AutomationReducerEnvironment
     ) -> [AutomationEffect] {
@@ -554,21 +778,243 @@ public enum AutomationReducer {
 
         var effects = releaseLeases(runID: runID, in: &state)
 
-        var completedRun = state.runs[index].completed(with: outcome, at: completedAt)
+        var completedRun = state.runs[index].completed(
+            with: outcome,
+            at: completedAt,
+            evidenceID: evidenceID(for: outcome),
+            conditionEvidence: conditionEvidence
+        )
         if completedRun.actualStartTime == nil {
             completedRun.actualStartTime = completedAt
         }
         state.runs[index] = completedRun
 
-        effects.append(.persistRun(completedRun))
-        effects.append(contentsOf: resolveDownstream(
+        let waitingResourceEffects = refreshWaitingResourceRuns(in: &state, now: completedAt)
+        if let retryEffects = createRetryAttemptIfNeeded(
             from: completedRun,
             outcome: outcome,
             completedAt: completedAt,
             in: &state,
             environment: environment
-        ))
+        ) {
+            effects.append(.persistRun(completedRun))
+            effects.append(contentsOf: waitingResourceEffects)
+            effects.append(contentsOf: retryEffects)
+            return effects
+        }
+        let downstreamEffects = resolveDownstream(
+            from: completedRun,
+            outcome: outcome,
+            completedAt: completedAt,
+            in: &state,
+            environment: environment
+        )
+        let branchEvidence = branchDecisionEvidence(
+            for: completedRun,
+            outcome: outcome,
+            completedAt: completedAt,
+            in: state
+        )
+        if !branchEvidence.isEmpty {
+            completedRun.branchEvidence = branchEvidence
+            if let completedIndex = state.runs.firstIndex(where: { $0.id == completedRun.id }) {
+                state.runs[completedIndex].branchEvidence = branchEvidence
+            }
+        }
+
+        effects.append(.persistRun(completedRun))
+        effects.append(contentsOf: waitingResourceEffects)
+        effects.append(contentsOf: downstreamEffects)
         return effects
+    }
+
+    private static func branchDecisionEvidence(
+        for completedRun: AutomationTaskRun,
+        outcome: AutomationOutcome,
+        completedAt: Date,
+        in state: AutomationRunState
+    ) -> [AutomationBranchDecisionEvidence] {
+        guard let workflow = state.workflow(id: completedRun.workflowID) else {
+            return []
+        }
+
+        return workflow.dependencies
+            .filter { $0.fromTaskID == completedRun.taskID }
+            .sorted { left, right in
+                if left.toTaskID.uuidString != right.toTaskID.uuidString {
+                    return left.toTaskID.uuidString < right.toTaskID.uuidString
+                }
+                return left.id.uuidString < right.id.uuidString
+            }
+            .map { dependency in
+                let targetTask = workflow.task(id: dependency.toTaskID)
+                let targetRunID = downstreamRunID(
+                    for: dependency,
+                    sourceRun: completedRun,
+                    in: state
+                )
+                let status: AutomationBranchDecisionStatus
+                let reason: String
+                if !dependency.isEnabled {
+                    status = .disabled
+                    reason = NSLocalizedString("Dependency disabled", comment: "")
+                } else if dependency.fires(for: outcome) {
+                    status = .triggered
+                    reason = String(
+                        format: NSLocalizedString("Triggered after %@", comment: ""),
+                        outcomeLabel(for: outcome)
+                    )
+                } else {
+                    status = .skipped
+                    reason = String(
+                        format: NSLocalizedString("Skipped after %@", comment: ""),
+                        outcomeLabel(for: outcome)
+                    )
+                }
+
+                return AutomationBranchDecisionEvidence(
+                    sourceRunID: completedRun.id,
+                    sourceTaskID: completedRun.taskID,
+                    dependencyID: dependency.id,
+                    trigger: dependency.trigger,
+                    status: status,
+                    targetTaskID: dependency.toTaskID,
+                    targetRunID: targetRunID,
+                    executionID: completedRun.executionID,
+                    sourceOutcome: outcome,
+                    decidedAt: completedAt,
+                    delay: dependency.delay,
+                    targetJoinPolicy: targetTask?.joinPolicy,
+                    reason: reason
+                )
+            }
+    }
+
+    private static func downstreamRunID(
+        for dependency: AutomationDependency,
+        sourceRun: AutomationTaskRun,
+        in state: AutomationRunState
+    ) -> UUID? {
+        state.runs
+            .filter { run in
+                run.workflowID == sourceRun.workflowID &&
+                    run.taskID == dependency.toTaskID &&
+                    run.executionID == sourceRun.executionID &&
+                    run.upstreamRunIDs.contains(sourceRun.id)
+            }
+            .max { left, right in
+                runSortDate(left) < runSortDate(right)
+            }?
+            .id
+    }
+
+    private static func runSortDate(_ run: AutomationTaskRun) -> Date {
+        run.completedAt ?? run.actualStartTime ?? run.earliestStartTime ?? run.scheduledStartTime ?? run.createdAt
+    }
+
+    private static func outcomeLabel(for outcome: AutomationOutcome) -> String {
+        switch outcome {
+        case .succeeded:
+            return NSLocalizedString("Success", comment: "")
+        case .failed:
+            return NSLocalizedString("Failure", comment: "")
+        case .cancelled:
+            return NSLocalizedString("Cancelled", comment: "")
+        case .timedOut:
+            return NSLocalizedString("Timeout", comment: "")
+        case .resourceConflict:
+            return NSLocalizedString("Resource conflict", comment: "")
+        case .permissionDenied:
+            return NSLocalizedString("Permission denied", comment: "")
+        case .conditionMatched:
+            return NSLocalizedString("Condition matched", comment: "")
+        case .conditionNotMatched:
+            return NSLocalizedString("Condition not matched", comment: "")
+        case .missingMacro:
+            return NSLocalizedString("Missing macro", comment: "")
+        case .rejected:
+            return NSLocalizedString("Rejected", comment: "")
+        }
+    }
+
+    private static func createRetryAttemptIfNeeded(
+        from completedRun: AutomationTaskRun,
+        outcome: AutomationOutcome,
+        completedAt: Date,
+        in state: inout AutomationRunState,
+        environment: AutomationReducerEnvironment
+    ) -> [AutomationEffect]? {
+        guard
+            isRetryableOutcome(outcome),
+            let workflow = state.workflow(id: completedRun.workflowID),
+            let task = workflow.task(id: completedRun.taskID),
+            task.isEnabled,
+            completedRun.attempt < task.retryPolicy.maxAttempts
+        else {
+            return nil
+        }
+
+        let delay = retryDelay(
+            for: task.retryPolicy,
+            completedAttempt: completedRun.attempt
+        )
+        let retryStartTime = completedAt.addingTimeInterval(delay)
+        return createRun(
+            workflowID: completedRun.workflowID,
+            taskID: completedRun.taskID,
+            scheduledStartTime: completedRun.scheduledStartTime,
+            earliestStartTime: retryStartTime,
+            createdAt: completedAt,
+            executionID: completedRun.executionID,
+            upstreamRunIDs: completedRun.upstreamRunIDs,
+            attempt: completedRun.attempt + 1,
+            in: &state,
+            environment: environment
+        )
+    }
+
+    private static func isRetryableOutcome(_ outcome: AutomationOutcome) -> Bool {
+        AutomationOutcomePredicate.failure.matches(outcome) ||
+            AutomationOutcomePredicate.timeout.matches(outcome)
+    }
+
+    private static func evidenceID(for outcome: AutomationOutcome) -> UUID? {
+        switch outcome {
+        case .failed(let report):
+            return report?.runID
+        case .succeeded, .cancelled, .timedOut, .resourceConflict, .permissionDenied,
+             .conditionMatched, .conditionNotMatched, .missingMacro, .rejected:
+            return nil
+        }
+    }
+
+    private static func retryDelay(
+        for policy: AutomationRetryPolicy,
+        completedAttempt: Int
+    ) -> TimeInterval {
+        switch policy.backoff {
+        case .none:
+            return 0
+        case .fixed(let delay):
+            return finiteNonNegative(delay)
+        case .exponential(let initial, let multiplier, let maximum):
+            let base = finiteNonNegative(initial)
+            let cap = finiteNonNegative(maximum)
+            let safeMultiplier = multiplier.isFinite && multiplier > 0 ? multiplier : 1
+            let exponent = max(0, completedAttempt - 1)
+            let uncapped = base * pow(safeMultiplier, Double(exponent))
+            guard uncapped.isFinite else {
+                return cap
+            }
+            return min(uncapped, cap)
+        }
+    }
+
+    private static func finiteNonNegative(_ value: TimeInterval) -> TimeInterval {
+        guard value.isFinite else {
+            return 0
+        }
+        return max(0, value)
     }
 
     private static func releaseLeases(
@@ -607,8 +1053,46 @@ public enum AutomationReducer {
             .filter { $0.fires(for: outcome) }
             .map(\.toTaskID))
 
-        for targetTaskID in targetTaskIDs {
+        for targetTaskID in targetTaskIDs.sorted(by: { $0.uuidString < $1.uuidString }) {
             guard let task = workflow.task(id: targetTaskID), task.isEnabled else {
+                continue
+            }
+
+            if let existingIndex = state.runs.firstIndex(where: {
+                $0.workflowID == workflow.id &&
+                $0.taskID == targetTaskID &&
+                $0.executionID == completedRun.executionID
+            }) {
+                guard !state.runs[existingIndex].isTerminal else {
+                    continue
+                }
+                guard state.runs[existingIndex].status == .planned ||
+                        state.runs[existingIndex].status == .waitingForDependencies else {
+                    continue
+                }
+                if task.joinPolicy == .firstMatched, !state.runs[existingIndex].upstreamRunIDs.isEmpty {
+                    effects.append(contentsOf: prepareRun(runID: state.runs[existingIndex].id, in: &state, now: completedAt))
+                    continue
+                }
+
+                let resolution = dependencyResolution(
+                    for: task,
+                    in: workflow,
+                    executionID: completedRun.executionID,
+                    state: state
+                )
+                let earliestStartTime = maxDate(task.schedule?.initialScheduledStart, resolution.earliestStartTime)
+                switch task.joinPolicy {
+                case .all:
+                    state.runs[existingIndex].earliestStartTime = maxDate(
+                        state.runs[existingIndex].earliestStartTime,
+                        earliestStartTime
+                    )
+                case .any, .firstMatched:
+                    state.runs[existingIndex].earliestStartTime = earliestStartTime
+                }
+                state.runs[existingIndex].upstreamRunIDs = resolution.upstreamRunIDs
+                effects.append(contentsOf: prepareRun(runID: state.runs[existingIndex].id, in: &state, now: completedAt))
                 continue
             }
 
@@ -619,19 +1103,6 @@ public enum AutomationReducer {
                 state: state
             )
             let earliestStartTime = maxDate(task.schedule?.initialScheduledStart, resolution.earliestStartTime)
-
-            if let existingIndex = state.runs.firstIndex(where: {
-                !$0.isTerminal &&
-                $0.workflowID == workflow.id &&
-                $0.taskID == targetTaskID &&
-                $0.executionID == completedRun.executionID
-            }) {
-                state.runs[existingIndex].earliestStartTime = maxDate(state.runs[existingIndex].earliestStartTime, earliestStartTime)
-                state.runs[existingIndex].upstreamRunIDs = resolution.upstreamRunIDs
-                effects.append(contentsOf: prepareRun(runID: state.runs[existingIndex].id, in: &state, now: completedAt))
-                continue
-            }
-
             effects.append(contentsOf: createRun(
                 workflowID: workflow.id,
                 taskID: targetTaskID,
@@ -653,37 +1124,150 @@ public enum AutomationReducer {
         in workflow: AutomationWorkflow,
         executionID: UUID,
         state: AutomationRunState
-    ) -> (isSatisfied: Bool, earliestStartTime: Date?, upstreamRunIDs: [UUID]) {
+    ) -> DependencyResolution {
         let dependencies = workflow.dependencies(to: task.id)
         guard !dependencies.isEmpty else {
-            return (true, nil, [])
+            return DependencyResolution(isSatisfied: true, earliestStartTime: nil, upstreamRunIDs: [])
         }
 
+        switch task.joinPolicy {
+        case .all:
+            return allDependencyResolution(
+                dependencies: dependencies,
+                workflow: workflow,
+                executionID: executionID,
+                state: state
+            )
+        case .any, .firstMatched:
+            return singleDependencyResolution(
+                dependencies: dependencies,
+                workflow: workflow,
+                executionID: executionID,
+                state: state
+            )
+        }
+    }
+
+    private static func allDependencyResolution(
+        dependencies: [AutomationDependency],
+        workflow: AutomationWorkflow,
+        executionID: UUID,
+        state: AutomationRunState
+    ) -> DependencyResolution {
         var earliestStartTime: Date?
         var upstreamRunIDs: [UUID] = []
 
         for dependency in dependencies {
-            let matchingRun = state.runs
-                .filter {
-                    $0.workflowID == workflow.id &&
+            guard let match = dependencyMatch(
+                for: dependency,
+                workflow: workflow,
+                executionID: executionID,
+                state: state
+            ) else {
+                return DependencyResolution(
+                    isSatisfied: false,
+                    earliestStartTime: earliestStartTime,
+                    upstreamRunIDs: upstreamRunIDs
+                )
+            }
+
+            upstreamRunIDs.append(match.run.id)
+            earliestStartTime = maxDate(earliestStartTime, match.readyAt)
+        }
+
+        return DependencyResolution(isSatisfied: true, earliestStartTime: earliestStartTime, upstreamRunIDs: upstreamRunIDs)
+    }
+
+    private static func singleDependencyResolution(
+        dependencies: [AutomationDependency],
+        workflow: AutomationWorkflow,
+        executionID: UUID,
+        state: AutomationRunState
+    ) -> DependencyResolution {
+        let matches = dependencies.compactMap {
+            dependencyMatch(for: $0, workflow: workflow, executionID: executionID, state: state)
+        }
+        guard let match = firstReadyMatch(matches) else {
+            return DependencyResolution(isSatisfied: false, earliestStartTime: nil, upstreamRunIDs: [])
+        }
+        return DependencyResolution(isSatisfied: true, earliestStartTime: match.readyAt, upstreamRunIDs: [match.run.id])
+    }
+
+    private static func lockedFirstMatchedDependencyResolution(
+        for task: AutomationTask,
+        in workflow: AutomationWorkflow,
+        upstreamRunIDs: [UUID],
+        state: AutomationRunState
+    ) -> DependencyResolution {
+        let dependencies = workflow.dependencies(to: task.id)
+        let matches = upstreamRunIDs.compactMap { upstreamRunID -> DependencyMatch? in
+            guard let run = state.run(id: upstreamRunID),
+                  run.workflowID == workflow.id,
+                  let completedAt = run.completedAt,
+                  let outcome = run.outcome,
+                  let dependency = dependencies.first(where: {
+                      $0.fromTaskID == run.taskID && $0.fires(for: outcome)
+                  }) else {
+                return nil
+            }
+            return DependencyMatch(
+                dependency: dependency,
+                run: run,
+                readyAt: completedAt.addingTimeInterval(dependency.delay)
+            )
+        }
+        guard !matches.isEmpty else {
+            return DependencyResolution(isSatisfied: false, earliestStartTime: nil, upstreamRunIDs: upstreamRunIDs)
+        }
+        let earliestStartTime = matches.reduce(nil as Date?) { partial, match in
+            maxDate(partial, match.readyAt)
+        }
+        return DependencyResolution(
+            isSatisfied: true,
+            earliestStartTime: earliestStartTime,
+            upstreamRunIDs: upstreamRunIDs
+        )
+    }
+
+    private static func dependencyMatch(
+        for dependency: AutomationDependency,
+        workflow: AutomationWorkflow,
+        executionID: UUID,
+        state: AutomationRunState
+    ) -> DependencyMatch? {
+        guard let matchingRun = state.runs
+            .filter({
+                $0.workflowID == workflow.id &&
                     $0.taskID == dependency.fromTaskID &&
                     $0.executionID == executionID &&
                     $0.outcome.map(dependency.fires(for:)) == true &&
                     $0.completedAt != nil
-                }
-                .max { lhs, rhs in
-                    (lhs.completedAt ?? .distantPast) < (rhs.completedAt ?? .distantPast)
-                }
-
-            guard let matchingRun, let completedAt = matchingRun.completedAt else {
-                return (false, earliestStartTime, upstreamRunIDs)
-            }
-
-            upstreamRunIDs.append(matchingRun.id)
-            earliestStartTime = maxDate(earliestStartTime, completedAt.addingTimeInterval(dependency.delay))
+            })
+            .max(by: { lhs, rhs in
+                (lhs.completedAt ?? .distantPast) < (rhs.completedAt ?? .distantPast)
+            }),
+            let completedAt = matchingRun.completedAt else {
+            return nil
         }
+        return DependencyMatch(
+            dependency: dependency,
+            run: matchingRun,
+            readyAt: completedAt.addingTimeInterval(dependency.delay)
+        )
+    }
 
-        return (true, earliestStartTime, upstreamRunIDs)
+    private static func firstReadyMatch(_ matches: [DependencyMatch]) -> DependencyMatch? {
+        matches.min { lhs, rhs in
+            if lhs.readyAt != rhs.readyAt {
+                return lhs.readyAt < rhs.readyAt
+            }
+            let lhsCompletedAt = lhs.run.completedAt ?? .distantPast
+            let rhsCompletedAt = rhs.run.completedAt ?? .distantPast
+            if lhsCompletedAt != rhsCompletedAt {
+                return lhsCompletedAt < rhsCompletedAt
+            }
+            return lhs.dependency.id.uuidString < rhs.dependency.id.uuidString
+        }
     }
 
     private static func maxDate(_ lhs: Date?, _ rhs: Date?) -> Date? {

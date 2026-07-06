@@ -21,6 +21,10 @@ public extension AutomationRunState {
         let taskTimeout = fixedUUID("00000000-0000-0000-0000-00000000c206")
         let taskBlocked = fixedUUID("00000000-0000-0000-0000-00000000c207")
         let taskScheduled = fixedUUID("00000000-0000-0000-0000-00000000c208")
+        let taskResourceWait = fixedUUID("00000000-0000-0000-0000-00000000c209")
+        let taskRetry = fixedUUID("00000000-0000-0000-0000-00000000c20a")
+        let taskVisualWait = fixedUUID("00000000-0000-0000-0000-00000000c20b")
+        let conditionVisualSpinner = fixedUUID("00000000-0000-0000-0000-00000000c60b")
 
         let tasks = [
             AutomationTask(
@@ -56,7 +60,8 @@ public extension AutomationRunState {
                     body: "The nightly report could not complete.",
                     severity: .error
                 )),
-                resourceRequirement: .none
+                resourceRequirement: .none,
+                joinPolicy: .any
             ),
             AutomationTask(
                 id: taskCleanup,
@@ -86,6 +91,37 @@ public extension AutomationRunState {
                 )),
                 schedule: .once(now.addingTimeInterval(86_400)),
                 resourceRequirement: .none
+            ),
+            AutomationTask(
+                id: taskResourceWait,
+                name: "Wait for mouse handoff",
+                kind: .macro(macroID: macroB),
+                resourceRequirement: .foregroundInput
+            ),
+            AutomationTask(
+                id: taskRetry,
+                name: "Retry upload receipt",
+                kind: .macro(macroID: macroB),
+                resourceRequirement: .backgroundReadOnly,
+                retryPolicy: AutomationRetryPolicy(maxAttempts: 3, backoff: .fixed(120))
+            ),
+            AutomationTask(
+                id: taskVisualWait,
+                name: "Watch spinner disappearance",
+                kind: .condition(AutomationConditionSpec(
+                    id: conditionVisualSpinner,
+                    name: "Spinner disappears",
+                    kind: .visual(AutomationVisualCondition(
+                        type: .imageDisappeared,
+                        regionRef: "battle_result_area",
+                        imageRef: "loading_spinner_template",
+                        baselineRef: "battle_start",
+                        threshold: 0.91
+                    )),
+                    timeout: 45,
+                    pollingInterval: 0.5
+                )),
+                resourceRequirement: .backgroundReadOnly
             )
         ]
 
@@ -103,6 +139,18 @@ public extension AutomationRunState {
                 toTaskID: taskExport,
                 trigger: .onConditionMatched,
                 delay: 3
+            ),
+            AutomationDependency(
+                id: fixedUUID("00000000-0000-0000-0000-00000000c30a"),
+                fromTaskID: taskVerify,
+                toTaskID: taskAlert,
+                trigger: .onConditionNotMatched
+            ),
+            AutomationDependency(
+                id: fixedUUID("00000000-0000-0000-0000-00000000c30b"),
+                fromTaskID: taskTimeout,
+                toTaskID: taskAlert,
+                trigger: .onTimeout
             ),
             AutomationDependency(
                 id: fixedUUID("00000000-0000-0000-0000-00000000c303"),
@@ -200,7 +248,35 @@ public extension AutomationRunState {
                 completedAt: now.addingTimeInterval(-440),
                 status: .completed,
                 outcome: .timedOut(deadline: now.addingTimeInterval(-440)),
-                createdAt: now.addingTimeInterval(-501)
+                createdAt: now.addingTimeInterval(-501),
+                branchEvidence: [
+                    AutomationBranchDecisionEvidence(
+                        sourceRunID: fixedUUID("00000000-0000-0000-0000-00000000c406"),
+                        sourceTaskID: taskTimeout,
+                        dependencyID: fixedUUID("00000000-0000-0000-0000-00000000c30b"),
+                        trigger: .onTimeout,
+                        status: .triggered,
+                        targetTaskID: taskAlert,
+                        targetRunID: fixedUUID("00000000-0000-0000-0000-00000000c404"),
+                        executionID: fixedUUID("00000000-0000-0000-0000-00000000c406"),
+                        sourceOutcome: .timedOut(deadline: now.addingTimeInterval(-440)),
+                        decidedAt: now.addingTimeInterval(-440),
+                        targetJoinPolicy: .any,
+                        reason: "Source timed out, so the timeout branch triggered."
+                    ),
+                    AutomationBranchDecisionEvidence(
+                        sourceRunID: fixedUUID("00000000-0000-0000-0000-00000000c406"),
+                        sourceTaskID: taskTimeout,
+                        dependencyID: fixedUUID("00000000-0000-0000-0000-00000000c304"),
+                        trigger: .onSuccess,
+                        status: .skipped,
+                        targetTaskID: taskBlocked,
+                        executionID: fixedUUID("00000000-0000-0000-0000-00000000c406"),
+                        sourceOutcome: .timedOut(deadline: now.addingTimeInterval(-440)),
+                        decidedAt: now.addingTimeInterval(-440),
+                        reason: "Source outcome was Timeout, so the success branch was skipped."
+                    )
+                ]
             ),
             AutomationTaskRun(
                 id: fixedUUID("00000000-0000-0000-0000-00000000c407"),
@@ -212,6 +288,126 @@ public extension AutomationRunState {
                 status: .completed,
                 outcome: .missingMacro(macroID: missingMacro),
                 createdAt: now.addingTimeInterval(-361)
+            ),
+            AutomationTaskRun(
+                id: fixedUUID("00000000-0000-0000-0000-00000000c408"),
+                workflowID: workflowID,
+                taskID: taskResourceWait,
+                macroID: macroB,
+                earliestStartTime: now.addingTimeInterval(-250),
+                status: .waitingForResource,
+                createdAt: now.addingTimeInterval(-251)
+            ),
+            AutomationTaskRun(
+                id: fixedUUID("00000000-0000-0000-0000-00000000c409"),
+                executionID: fixedUUID("00000000-0000-0000-0000-00000000c409"),
+                workflowID: workflowID,
+                taskID: taskRetry,
+                macroID: macroB,
+                actualStartTime: now.addingTimeInterval(-180),
+                completedAt: now.addingTimeInterval(-160),
+                status: .completed,
+                outcome: .failed(report: RunReport(
+                    runID: fixedUUID("00000000-0000-0000-0000-00000000c409"),
+                    startTime: now.addingTimeInterval(-180),
+                    duration: 20,
+                    isSuccess: false,
+                    failedEventIndex: 2,
+                    errorMessage: "Upload receipt was not visible"
+                )),
+                evidenceID: fixedUUID("00000000-0000-0000-0000-00000000c409"),
+                createdAt: now.addingTimeInterval(-181),
+                attempt: 1
+            ),
+            AutomationTaskRun(
+                id: fixedUUID("00000000-0000-0000-0000-00000000c40a"),
+                executionID: fixedUUID("00000000-0000-0000-0000-00000000c409"),
+                workflowID: workflowID,
+                taskID: taskRetry,
+                macroID: macroB,
+                earliestStartTime: now.addingTimeInterval(120),
+                status: .planned,
+                createdAt: now.addingTimeInterval(-160),
+                attempt: 2
+            ),
+            AutomationTaskRun(
+                id: fixedUUID("00000000-0000-0000-0000-00000000c40c"),
+                workflowID: workflowID,
+                taskID: taskVisualWait,
+                earliestStartTime: now.addingTimeInterval(-120),
+                actualStartTime: now.addingTimeInterval(-118),
+                completedAt: now.addingTimeInterval(-94),
+                status: .completed,
+                outcome: .conditionMatched,
+                createdAt: now.addingTimeInterval(-121),
+                conditionEvidence: AutomationConditionEvaluationEvidence(
+                    runID: fixedUUID("00000000-0000-0000-0000-00000000c40c"),
+                    workflowID: workflowID,
+                    taskID: taskVisualWait,
+                    conditionID: conditionVisualSpinner,
+                    kind: .imageDisappeared,
+                    outcome: .conditionMatched,
+                    evaluatedAt: now.addingTimeInterval(-94),
+                    firstSampleAt: now.addingTimeInterval(-118),
+                    lastSampleAt: now.addingTimeInterval(-95),
+                    sampleCount: 8,
+                    displayBounds: RectValue(x: 0, y: 0, width: 1440, height: 900),
+                    resolvedSearchRegion: RectValue(x: 520, y: 284, width: 360, height: 220),
+                    searchRegionSpace: .displayAbsolute,
+                    targetDescription: "loading_spinner_template in battle_result_area",
+                    observedSummary: "Spinner template similarity fell to 0.12, below the 0.91 disappearance threshold.",
+                    score: 0.12,
+                    threshold: 0.91,
+                    fields: [
+                        AutomationConditionDiagnosticField(
+                            id: "regionRef",
+                            title: "Region",
+                            value: "battle_result_area"
+                        ),
+                        AutomationConditionDiagnosticField(
+                            id: "imageRef",
+                            title: "Image",
+                            value: "loading_spinner_template"
+                        ),
+                        AutomationConditionDiagnosticField(
+                            id: "baselineRef",
+                            title: "Baseline",
+                            value: "battle_start"
+                        ),
+                        AutomationConditionDiagnosticField(
+                            id: "samples",
+                            title: "Samples",
+                            value: "8 frames over 23s"
+                        )
+                    ],
+                    artifacts: [
+                        AutomationConditionDiagnosticArtifact(
+                            id: "lastSampleImage",
+                            title: "Last sample",
+                            kind: .displaySampleImage,
+                            relativePath: "fixture-artifacts/visual-condition/condition-last-sample.png",
+                            pixelBounds: RectValue(x: 0, y: 0, width: 960, height: 540),
+                            createdAt: now.addingTimeInterval(-95)
+                        ),
+                        AutomationConditionDiagnosticArtifact(
+                            id: "regionSampleImage",
+                            title: "Watched region",
+                            kind: .regionSampleImage,
+                            relativePath: "fixture-artifacts/visual-condition/condition-region-sample.png",
+                            pixelBounds: RectValue(x: 520, y: 284, width: 360, height: 220),
+                            createdAt: now.addingTimeInterval(-95)
+                        )
+                    ]
+                )
+            ),
+            AutomationTaskRun(
+                id: fixedUUID("00000000-0000-0000-0000-00000000c40b"),
+                workflowID: workflowID,
+                taskID: taskVisualWait,
+                earliestStartTime: now.addingTimeInterval(-40),
+                actualStartTime: now.addingTimeInterval(-30),
+                status: .running,
+                createdAt: now.addingTimeInterval(-41)
             )
         ]
 

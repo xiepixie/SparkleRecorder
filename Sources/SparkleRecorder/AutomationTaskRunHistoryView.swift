@@ -3,9 +3,34 @@ import SparkleRecorderCore
 
 struct AutomationTaskRunHistoryView: View {
     let runs: [AutomationTaskRun]
+    let workflow: AutomationWorkflow
+    let dependencyEdges: [AutomationDependencyEdgeProjection]
+    var resourceRequirement: AutomationResourceRequirement?
+    var retryPolicy: AutomationRetryPolicy = .none
+    var initialSelectedRunID: UUID?
+
+    @State private var selectedRunID: UUID?
+
+    init(
+        runs: [AutomationTaskRun],
+        workflow: AutomationWorkflow,
+        dependencyEdges: [AutomationDependencyEdgeProjection],
+        resourceRequirement: AutomationResourceRequirement? = nil,
+        retryPolicy: AutomationRetryPolicy = .none,
+        initialSelectedRunID: UUID? = nil
+    ) {
+        self.runs = runs
+        self.workflow = workflow
+        self.dependencyEdges = dependencyEdges
+        self.resourceRequirement = resourceRequirement
+        self.retryPolicy = retryPolicy
+        self.initialSelectedRunID = initialSelectedRunID
+        _selectedRunID = State(initialValue: initialSelectedRunID)
+    }
 
     var body: some View {
-        let visibleRuns = runs.prefix(5)
+        let visibleRuns = Array(runs.prefix(5))
+        let selectedRun = selectedRun(from: visibleRuns)
 
         VStack(alignment: .leading, spacing: 10) {
             AutomationSectionHeader(
@@ -33,11 +58,36 @@ struct AutomationTaskRunHistoryView: View {
             } else {
                 VStack(alignment: .leading, spacing: 8) {
                     ForEach(visibleRuns) { run in
-                        AutomationTaskRunRowView(run: run)
+                        Button {
+                            selectedRunID = run.id
+                        } label: {
+                            AutomationTaskRunRowView(
+                                run: run,
+                                resourceRequirement: resourceRequirement,
+                                isSelected: selectedRun?.id == run.id
+                            )
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityHint(NSLocalizedString("Shows run details", comment: ""))
+
                         if run.id != visibleRuns.last?.id {
                             Divider().opacity(0.45)
                         }
                     }
+                }
+
+                if let selectedRun {
+                    AutomationTaskRunDetailView(
+                        run: selectedRun,
+                        workflow: workflow,
+                        dependencyEdges: dependencyEdges,
+                        display: AutomationTaskRunDisplay(
+                            run: selectedRun,
+                            resourceRequirement: resourceRequirement
+                        ),
+                        retryPolicy: retryPolicy,
+                        hasLaterAttempt: hasLaterAttempt(after: selectedRun)
+                    )
                 }
 
                 if runs.count > visibleRuns.count {
@@ -49,5 +99,23 @@ struct AutomationTaskRunHistoryView: View {
         }
         .padding(10)
         .sectionSurface(cornerRadius: 10)
+        .onChange(of: initialSelectedRunID) {
+            selectedRunID = initialSelectedRunID
+        }
+    }
+
+    private func selectedRun(from visibleRuns: [AutomationTaskRun]) -> AutomationTaskRun? {
+        if let selectedRunID,
+           let selected = runs.first(where: { $0.id == selectedRunID }) {
+            return selected
+        }
+        return visibleRuns.first
+    }
+
+    private func hasLaterAttempt(after run: AutomationTaskRun) -> Bool {
+        runs.contains {
+            $0.executionID == run.executionID &&
+                $0.attempt > run.attempt
+        }
     }
 }

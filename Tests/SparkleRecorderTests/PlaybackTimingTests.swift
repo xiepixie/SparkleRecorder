@@ -9,9 +9,9 @@ struct PlaybackTimingTests {
         let strategy = PlaybackWaitStrategy.precise
 
         let short = strategy.plan(now: 10.0, target: 10.001)
-        #expect(short.delay == 0.001)
+        #expect(abs(short.delay - 0.001) < 0.000_001)
         #expect(short.sleepDuration == 0)
-        #expect(short.spinDuration == 0.001)
+        #expect(abs(short.spinDuration - 0.001) < 0.000_001)
         #expect(!short.shouldSleep)
 
         let long = strategy.plan(now: 10.0, target: 10.010)

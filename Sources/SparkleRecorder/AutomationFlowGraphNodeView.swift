@@ -7,13 +7,12 @@ struct AutomationFlowGraphNodeView: View {
     let isSelected: Bool
     let isConnectionSource: Bool
     let canCompleteConnection: Bool
+    let connectionTriggerTitle: String
     let onSelect: () -> Void
     let onRun: () -> Void
     let onCancelRun: (UUID) -> Void
     let onConnect: () -> Void
-    let onMoveEnded: (AutomationGraphPoint) -> Void
-
-    @GestureState private var dragTranslation: CGSize = .zero
+    let isDragging: Bool
 
     var body: some View {
         VStack(alignment: .leading, spacing: 7) {
@@ -26,39 +25,39 @@ struct AutomationFlowGraphNodeView: View {
 
                 Spacer(minLength: 0)
 
-                Button("Inspect task", systemImage: "sidebar.right", action: onSelect)
-                    .labelStyle(.iconOnly)
-                    .buttonStyle(.plain)
-                    .frame(width: 22, height: 22)
-                    .controlSurface(cornerRadius: 7, tint: Brand.libraryBlue, isActive: isSelected)
-                    .help(NSLocalizedString("Inspect task", comment: ""))
-                    .accessibilityLabel(NSLocalizedString("Inspect task", comment: ""))
+                AutomationNodeToolButton(
+                    title: NSLocalizedString("Inspect task", comment: ""),
+                    systemImage: "sidebar.right",
+                    tint: Brand.libraryBlue,
+                    isActive: isSelected,
+                    action: onSelect
+                )
 
-                Button(connectButtonTitle, systemImage: connectButtonImage, action: onConnect)
-                    .labelStyle(.iconOnly)
-                    .buttonStyle(.plain)
-                    .frame(width: 22, height: 22)
-                    .controlSurface(cornerRadius: 7, tint: Brand.sigAmber, isActive: isConnectionSource || canCompleteConnection)
-                    .help(connectButtonTitle)
-                    .accessibilityLabel(connectButtonTitle)
+                AutomationNodeToolButton(
+                    title: connectButtonTitle,
+                    systemImage: connectButtonImage,
+                    tint: Brand.sigAmber,
+                    isActive: isConnectionSource || canCompleteConnection,
+                    action: onConnect
+                )
 
                 if let runID = node.runID, canCancel {
-                    Button("Cancel run", systemImage: "xmark", action: { onCancelRun(runID) })
-                        .labelStyle(.iconOnly)
-                        .buttonStyle(.plain)
-                        .frame(width: 22, height: 22)
-                        .controlSurface(cornerRadius: 7, tint: Brand.red500, isActive: false)
-                        .help(NSLocalizedString("Cancel run", comment: ""))
-                        .accessibilityLabel(NSLocalizedString("Cancel run", comment: ""))
+                    AutomationNodeToolButton(
+                        title: NSLocalizedString("Cancel run", comment: ""),
+                        systemImage: "xmark",
+                        tint: Brand.red500,
+                        isActive: true,
+                        action: { onCancelRun(runID) }
+                    )
                 } else {
-                    Button("Run task now", systemImage: "play.fill", action: onRun)
-                        .labelStyle(.iconOnly)
-                        .buttonStyle(.plain)
-                        .frame(width: 22, height: 22)
-                        .controlSurface(cornerRadius: 7, tint: Brand.libraryGreen, isActive: false)
+                    AutomationNodeToolButton(
+                        title: NSLocalizedString("Run task now", comment: ""),
+                        systemImage: "play.fill",
+                        tint: Brand.libraryGreen,
+                        isActive: false,
+                        action: onRun
+                    )
                         .disabled(!canRun)
-                        .help(NSLocalizedString("Run task now", comment: ""))
-                        .accessibilityLabel(NSLocalizedString("Run task now", comment: ""))
                 }
 
                 if node.hasEvidence {
@@ -75,15 +74,41 @@ struct AutomationFlowGraphNodeView: View {
                 .lineLimit(2)
                 .minimumScaleFactor(0.85)
 
-            Text(node.statusDetail)
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .lineLimit(1)
-                .truncationMode(.tail)
+            AutomationRuntimeDetailStrip(
+                statusDetail: node.statusDetail,
+                statusTint: node.status.tint,
+                timeoutCountdown: node.timeoutCountdown,
+                retryAttemptSummary: node.retryAttemptSummary,
+                density: .node
+            )
+
+            if let conditionProgress = node.conditionProgress {
+                AutomationConditionProgressView(
+                    progress: conditionProgress,
+                    tint: node.status.tint,
+                    density: .compact
+                )
+            }
+
+            if showsJoinPolicy {
+                AutomationJoinPolicyBadgeView(
+                    policy: node.joinPolicy,
+                    label: node.joinPolicyLabel,
+                    incomingDependencyCount: node.incomingDependencyCount
+                )
+            }
 
             HStack(spacing: 5) {
                 Text(node.resourceLabel)
-                Text(node.scheduleLabel)
+                if let nextScheduledOccurrence = node.nextScheduledOccurrence {
+                    AutomationNextScheduleBadge(
+                        date: nextScheduledOccurrence,
+                        title: NSLocalizedString("Next", comment: ""),
+                        isCompact: true
+                    )
+                } else {
+                    Text(node.scheduleLabel)
+                }
             }
             .font(.caption)
             .foregroundStyle(.tertiary)
@@ -92,14 +117,18 @@ struct AutomationFlowGraphNodeView: View {
         .padding(10)
         .frame(width: CGFloat(size.width), height: CGFloat(size.height), alignment: .topLeading)
         .sectionSurface(cornerRadius: 10)
+        .overlay(alignment: .top) {
+            AutomationRuntimeStatusHairline(status: node.status)
+                .padding(.horizontal, 12)
+                .padding(.top, 5)
+        }
         .overlay(
             RoundedRectangle(cornerRadius: 10)
                 .strokeBorder(selectionTint.opacity(isSelected || isConnectionSource ? 0.9 : 0), lineWidth: 1.4)
         )
-        .offset(dragTranslation)
         .scaleEffect(isDragging ? 1.015 : 1)
         .zIndex(isDragging ? 1 : 0)
-        .gesture(dragGesture)
+        .preventWindowDrag()
         .help(NSLocalizedString("Drag to move task", comment: ""))
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(accessibilitySummary)
@@ -107,9 +136,17 @@ struct AutomationFlowGraphNodeView: View {
     }
 
     private var connectButtonTitle: String {
-        canCompleteConnection
-            ? NSLocalizedString("Connect task", comment: "")
-            : NSLocalizedString("Start dependency", comment: "")
+        if canCompleteConnection {
+            return String(
+                format: NSLocalizedString("Connect with %@", comment: ""),
+                connectionTriggerTitle
+            )
+        }
+        return NSLocalizedString("Start dependency", comment: "")
+    }
+
+    private var showsJoinPolicy: Bool {
+        node.incomingDependencyCount > 1 || node.joinPolicy != .all
     }
 
     private var connectButtonImage: String {
@@ -118,10 +155,6 @@ struct AutomationFlowGraphNodeView: View {
 
     private var selectionTint: Color {
         isConnectionSource ? Brand.sigAmber : Brand.libraryBlue
-    }
-
-    private var isDragging: Bool {
-        abs(dragTranslation.width) > 0.5 || abs(dragTranslation.height) > 0.5
     }
 
     private var canRun: Bool {
@@ -144,31 +177,6 @@ struct AutomationFlowGraphNodeView: View {
         }
     }
 
-    private var dragGesture: some Gesture {
-        DragGesture(minimumDistance: 3)
-            .updating($dragTranslation) { value, state, _ in
-                state = value.translation
-            }
-            .onEnded { value in
-                guard abs(value.translation.width) > 0.5 || abs(value.translation.height) > 0.5 else {
-                    return
-                }
-                onMoveEnded(snappedPosition(for: value.translation))
-            }
-    }
-
-    private func snappedPosition(for translation: CGSize) -> AutomationGraphPoint {
-        AutomationGraphPoint(
-            x: snap(node.position.x + Double(translation.width)),
-            y: snap(node.position.y + Double(translation.height))
-        )
-    }
-
-    private func snap(_ value: Double) -> Double {
-        let gridSize = 24.0
-        return max(0, (value / gridSize).rounded() * gridSize)
-    }
-
     private var accessibilitySummary: String {
         var summary = String(
             format: NSLocalizedString("%@, %@, %@", comment: ""),
@@ -178,6 +186,21 @@ struct AutomationFlowGraphNodeView: View {
         )
         if node.hasEvidence {
             summary += ", " + NSLocalizedString("Evidence available", comment: "")
+        }
+        if showsJoinPolicy {
+            summary += ", " + String(
+                format: NSLocalizedString("Join policy: %@", comment: ""),
+                node.joinPolicyLabel
+            )
+        }
+        if let runtimeSummary = AutomationRuntimeDetailFormatter.accessibilitySummary(
+            timeoutCountdown: node.timeoutCountdown,
+            retryAttemptSummary: node.retryAttemptSummary
+        ) {
+            summary += ", " + runtimeSummary
+        }
+        if let conditionProgress = node.conditionProgress {
+            summary += ", " + AutomationConditionProgressFormatter.accessibilitySummary(for: conditionProgress)
         }
         return summary
     }

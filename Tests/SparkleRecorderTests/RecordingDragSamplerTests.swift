@@ -28,7 +28,7 @@ struct RecordingDragSamplerTests {
         arguments: [
             ThresholdCase(
                 name: "below time threshold",
-                location: CGPoint(x: 3.0, y: 0),
+                location: CGPoint(x: 13.0, y: 0),
                 time: 0.025,
                 expected: .drop
             ),

@@ -28,6 +28,7 @@
 | `cancelReleasesLeaseAndStopsDownstreamSuccess` | cancel 后 panic release，不走 success edge |
 | `sessionStopCancelsActiveRuns` | runtime stop 通过 reducer/effects 取消 active Player、释放 lease、持久化 cancelled run |
 | `resourceBusyQueuesTask` | 资源忙时 task 留在 waitingForResource |
+| `resourceWaitTimesOutAfterMaxWaitDuration` | waitingForResource 超过 max wait 后走 `.timedOut(deadline:)`，触发 timeout branch/retry |
 | `batchResourceLeasesStartOnceAndReleaseAllOnTerminalOutcome` | 多资源 task 只在整组 lease 到达后启动，终态释放全部 lease |
 | `partialMultiResourceAcquisitionReleasesAcquiredLeases` | 多资源获取中途失败时释放已拿到的 lease |
 | `startProgressAndFinishUpdateSnapshots` | Player run lifecycle 的 generation、loop、progress、finish snapshot 由纯状态机决定 |
@@ -84,8 +85,11 @@
 - 测试能覆盖 live OCR locator cache key/reuse 语义，不依赖真实 Vision 或鼠标事件。
 - 测试能覆盖 batch lease handoff 和 partial-acquire cleanup。
 - 测试能覆盖 condition evaluator 的上下文/provider handoff。
+- 测试能覆盖 condition diagnostics payload 的 Codable、旧 payload 无 `artifacts` 字段时的兼容解码、安全相对路径规范化/拒绝规则，以及 reducer/repository 持久化边界；live PNG artifact writer、failure/rejected payload wiring 和 artifact presenter 通过 Swift 6 build、fixture/product验收覆盖，不在 unit test 里触发真实 ScreenCapture 或任意 Application Support 文件副作用。
+- 测试能覆盖资源等待 max-wait 的 reducer timeout、projection deadline/remaining/fraction、draft import/export/edit/patch/CLI schema 和旧 JSON 兼容。
 - 测试能覆盖 OCR region picker 的纯坐标转换，不依赖真实 OCR 或鼠标事件。
 - 测试能覆盖 workflow edit action 和 `persistWorkflows` effect handoff。
 - 测试能覆盖 repository refresh state 的 loading/error/previous snapshot handoff。
 - 测试能覆盖 workflow package codec 和 import validation。
+- 测试能覆盖 App-host handoff payload/status 语义，包括 pending/dispatched/failed/missing、receipt run IDs、repository-backed `runs` snapshots / `workflowStatus` readback，以及旧 status JSON 缺少这些新字段时的兼容解码。
 - 测试能覆盖 `SavedMacro` 与 `AutomationTaskRun` 分离。

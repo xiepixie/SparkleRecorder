@@ -85,6 +85,8 @@ Owner A 是状态语义 owner。目标是把 AutomationEngine 做成纯、确定
 - 2026-07-05: A/B condition handoff now includes completed upstream outcomes for contextual condition evaluation.
 - 2026-07-05: Reducer edit contract now includes static workflow edits and `moveTask` for C FlowGraph node-position persistence.
 - 2026-07-05: UI manual start is now represented as `AutomationViewIntent.startTask`, keeping FlowGraph run buttons on the reducer path.
+- 2026-07-06: Condition terminal runs now carry durable `AutomationConditionEvaluationEvidence`, including optional `AutomationConditionDiagnosticArtifact` refs. A owns the pure payload, backward-compatible decoding, and safe relative-path normalization helper; B owns live artifact writing/presenter adapters; C only renders/opens accepted payload.
+- 2026-07-06: Resource waiting gained a pure max-wait timeout policy. `AutomationResourceRequirement.maxWaitDuration` stays separate from lease expiry, `clockTick` expires waiting runs as `.timedOut(deadline:)` through normal terminal cleanup/branching, and projection exposes deadline/remaining/fraction so C does not recalculate it in SwiftUI.
 
 ## Handoff Checklist
 

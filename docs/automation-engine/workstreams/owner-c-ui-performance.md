@@ -108,6 +108,7 @@ Owner C owns how users understand and edit automation. The first UI goal is not 
 - 2026-07-05: Owner C added all-workflow package export from the workflow list header while keeping selected-workflow export in the inspector.
 - 2026-07-05: Owner C added OCR region preview/micro-editing plus display/window/content context hints, and added selected/all workflow package sharing through macOS share sheet.
 - 2026-07-05: Owner C added task inspector run history/detail rows for outcome reason, lifecycle timing, attempts, execution chain, upstream count, evidence availability, and duration metadata without crossing into Player/evidence payload loading.
+- 2026-07-06: Owner A/B exposed durable condition diagnostics with optional sample artifact refs. Owner C may render `AutomationTaskRun.conditionEvidence` and route artifact preview/open/reveal through `AutomationConditionEvidenceArtifactPresenter`, but SwiftUI must not call ScreenCapture, OCR, evaluator clients, image providers, or ad-hoc artifact path builders for diagnostics. Failure/rejected condition runs can now still carry explanatory evidence; UI should show the payload when present and only label diagnostics missing when `conditionEvidence == nil`.
 
 ## Handoff Checklist
 

@@ -50,11 +50,24 @@ public struct AutomationManualApprovalClient: Sendable {
 
 public struct AutomationConditionEvaluatorClient: Sendable {
     public var evaluate: @Sendable (AutomationConditionEvaluationRequest) async -> AutomationOutcome
+    public var evaluateResult: @Sendable (AutomationConditionEvaluationRequest) async -> AutomationConditionEvaluationResult
 
     public init(
         evaluate: @escaping @Sendable (AutomationConditionEvaluationRequest) async -> AutomationOutcome
     ) {
         self.evaluate = evaluate
+        self.evaluateResult = { request in
+            AutomationConditionEvaluationResult(outcome: await evaluate(request))
+        }
+    }
+
+    public init(
+        evaluateResult: @escaping @Sendable (AutomationConditionEvaluationRequest) async -> AutomationConditionEvaluationResult
+    ) {
+        self.evaluateResult = evaluateResult
+        self.evaluate = { request in
+            await evaluateResult(request).outcome
+        }
     }
 
     public static func constant(_ outcome: AutomationOutcome) -> AutomationConditionEvaluatorClient {
@@ -67,29 +80,174 @@ public struct AutomationConditionEvaluatorClient: Sendable {
         ocrText: @escaping @Sendable (
             _ request: AutomationConditionEvaluationRequest,
             _ condition: AutomationOCRCondition
-        ) async -> AutomationOutcome = { _, _ in .conditionNotMatched }
+        ) async -> AutomationOutcome = { _, _ in .conditionNotMatched },
+        visual: @escaping @Sendable (
+            _ request: AutomationConditionEvaluationRequest,
+            _ condition: AutomationVisualCondition
+        ) async -> AutomationOutcome = { _, _ in .conditionNotMatched },
+        now: @escaping @Sendable () -> Date = { Date.now }
     ) -> AutomationConditionEvaluatorClient {
-        AutomationConditionEvaluatorClient { request in
+        AutomationConditionEvaluatorClient(evaluateResult: { request in
+            let outcome: AutomationOutcome
             switch request.condition.kind {
             case .ocrText(let condition):
-                return await ocrText(request, condition)
+                outcome = await ocrText(request, condition)
+
+            case .visual(let condition):
+                outcome = await visual(request, condition)
 
             case .previousOutcome(let predicate):
-                return request.previousOutcomes.contains(where: predicate.matches)
+                outcome = request.previousOutcomes.contains(where: predicate.matches)
                     ? .conditionMatched
                     : .conditionNotMatched
 
             case .externalSignal(let signalName):
-                return await externalSignal.isActive(signalName)
+                outcome = await externalSignal.isActive(signalName)
                     ? .conditionMatched
                     : .conditionNotMatched
 
             case .manualApproval:
-                return await manualApproval.requestApproval(request)
+                outcome = await manualApproval.requestApproval(request)
                     ? .conditionMatched
                     : .conditionNotMatched
             }
+            return AutomationConditionEvaluationResult(
+                outcome: outcome,
+                evidence: AutomationConditionEvaluationEvidence.contextual(
+                    request: request,
+                    outcome: outcome,
+                    evaluatedAt: now()
+                )
+            )
+        })
+    }
+}
+
+public extension AutomationConditionEvaluationEvidence {
+    static func contextual(
+        request: AutomationConditionEvaluationRequest,
+        outcome: AutomationOutcome,
+        evaluatedAt: Date
+    ) -> AutomationConditionEvaluationEvidence? {
+        switch request.condition.kind {
+        case .previousOutcome(let predicate):
+            let previousOutcomeLabels = request.previousOutcomes.map(contextualOutcomeLabel)
+            let observedSummary = outcome == .conditionMatched
+                ? "Found a matching upstream outcome"
+                : "No upstream outcome matched \(predicate.rawValue)"
+            return AutomationConditionEvaluationEvidence(
+                runID: request.runID,
+                workflowID: request.workflowID,
+                taskID: request.taskID,
+                conditionID: request.condition.id,
+                kind: .previousOutcome,
+                outcome: outcome,
+                evaluatedAt: evaluatedAt,
+                sampleCount: request.previousOutcomes.count,
+                targetDescription: "Previous outcome: \(predicate.rawValue)",
+                observedSummary: observedSummary,
+                fields: [
+                    AutomationConditionDiagnosticField(
+                        id: "predicate",
+                        title: "Predicate",
+                        value: predicate.rawValue
+                    ),
+                    AutomationConditionDiagnosticField(
+                        id: "previousOutcomeCount",
+                        title: "Previous outcome count",
+                        value: "\(request.previousOutcomes.count)"
+                    ),
+                    AutomationConditionDiagnosticField(
+                        id: "previousOutcomes",
+                        title: "Previous outcomes",
+                        value: previousOutcomeLabels.isEmpty
+                            ? "None"
+                            : previousOutcomeLabels.joined(separator: " | ")
+                    )
+                ]
+            )
+
+        case .externalSignal(let signalName):
+            let isActive = outcome == .conditionMatched
+            return AutomationConditionEvaluationEvidence(
+                runID: request.runID,
+                workflowID: request.workflowID,
+                taskID: request.taskID,
+                conditionID: request.condition.id,
+                kind: .externalSignal,
+                outcome: outcome,
+                evaluatedAt: evaluatedAt,
+                sampleCount: 1,
+                targetDescription: signalName,
+                observedSummary: isActive
+                    ? "External signal '\(signalName)' was active"
+                    : "External signal '\(signalName)' was inactive",
+                fields: [
+                    AutomationConditionDiagnosticField(
+                        id: "signalName",
+                        title: "Signal",
+                        value: signalName
+                    ),
+                    AutomationConditionDiagnosticField(
+                        id: "signalState",
+                        title: "Signal state",
+                        value: isActive ? "active" : "inactive"
+                    )
+                ]
+            )
+
+        case .manualApproval:
+            let isApproved = outcome == .conditionMatched
+            return AutomationConditionEvaluationEvidence(
+                runID: request.runID,
+                workflowID: request.workflowID,
+                taskID: request.taskID,
+                conditionID: request.condition.id,
+                kind: .manualApproval,
+                outcome: outcome,
+                evaluatedAt: evaluatedAt,
+                sampleCount: 1,
+                targetDescription: request.condition.name,
+                observedSummary: isApproved
+                    ? "Manual approval was granted"
+                    : "Manual approval was rejected",
+                fields: [
+                    AutomationConditionDiagnosticField(
+                        id: "approval",
+                        title: "Approval",
+                        value: isApproved ? "granted" : "rejected"
+                    )
+                ]
+            )
+
+        case .ocrText, .visual:
+            return nil
         }
+    }
+}
+
+private func contextualOutcomeLabel(_ outcome: AutomationOutcome) -> String {
+    switch outcome {
+    case .succeeded:
+        return "success"
+    case .failed:
+        return "failure"
+    case .cancelled:
+        return "cancelled"
+    case .timedOut:
+        return "timeout"
+    case .resourceConflict:
+        return "resourceConflict"
+    case .permissionDenied:
+        return "permissionDenied"
+    case .conditionMatched:
+        return "conditionMatched"
+    case .conditionNotMatched:
+        return "conditionNotMatched"
+    case .missingMacro:
+        return "missingMacro"
+    case .rejected:
+        return "rejected"
     }
 }
 
@@ -182,8 +340,8 @@ public struct AutomationEffectRunner: Sendable {
                 condition: condition,
                 previousOutcomes: previousOutcomes
             )
-            let outcome = await conditionEvaluator.evaluate(request)
-            return [.conditionEvaluated(runID: runID, outcome: outcome, at: now())]
+            let result = await conditionEvaluator.evaluateResult(request)
+            return [.conditionEvaluationCompleted(runID: runID, result: result, at: now())]
 
         case .wait(let runID, _, _, let duration):
             await sleep(max(0, duration))

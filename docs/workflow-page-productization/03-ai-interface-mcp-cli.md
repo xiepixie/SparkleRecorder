@@ -36,11 +36,11 @@ CI 不是 AI 接口，也不属于 MCP/CLI 选型。后续可以用 CI 做回归
         "key": "wait_exit_text",
         "type": "condition",
         "condition": {
-          "type": "ocrText",
-          "text": "离开",
-          "matchMode": "contains",
-          "regionRef": "battle_result_area",
-          "requireVisible": true
+        "type": "ocrText",
+        "text": "离开",
+        "matchMode": "contains",
+        "regionRef": "battle_result_area",
+        "requireVisible": true
         },
         "timeoutSeconds": 120,
         "pollingSeconds": 0.5
@@ -74,7 +74,7 @@ CI 不是 AI 接口，也不属于 MCP/CLI 选型。后续可以用 CI 做回归
 推荐命令形态：
 
 ```bash
-sparkle-recorder workflow macros --format json
+sparkle-recorder workflow macros --json
 sparkle-recorder workflow draft validate draft.json --json
 sparkle-recorder workflow draft simulate draft.json --json
 sparkle-recorder workflow import draft.json --dry-run --json
@@ -100,12 +100,13 @@ MCP 不在本阶段开发。未来如果需要 MCP，它不能另写一套语义
 
 给 AI 的系统提示应包含：
 
-- 只能使用 `sparkle-recorder workflow macros --format json` 返回的宏，不要编造宏 ID。
+- 只能使用 `sparkle-recorder workflow macros --json` 返回的宏，不要编造宏 ID。
 - 输出必须是 `sparkle.workflow.draft.v1` JSON。
 - 每个 task 必须有稳定 `key`。
 - 每条 dependency 必须声明 `trigger`。
 - 需要前台鼠标键盘的宏默认互斥。
 - 条件优先使用用户可理解类型：等待文本、等待图标出现、等待区域变化、等待图标消失。
+- 非 OCR 视觉条件使用 `regionChanged`、`imageAppeared`、`imageDisappeared` 或 `pixelMatched`，并尽量提供 `regionRef`；图标出现/消失提供 `imageRef`，像素/颜色匹配提供 `colorHex` 和 `pixel` 或 `regionRef`。
 - timeout 和 failure 必须显式分支，不要隐藏成普通失败。
 - 不输出内部 Swift enum 结构，不输出 `.sparkrec_workflow`。
 

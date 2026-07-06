@@ -235,21 +235,66 @@ extension View {
     }
     
     func sectionSurface(cornerRadius: CGFloat = 10) -> some View {
-        glassSurface(cornerRadius: cornerRadius, tint: nil, interactive: false)
+        modifier(CardSurface(cornerRadius: cornerRadius))
+    }
+
+    func automationSubsurface(
+        cornerRadius: CGFloat = 8,
+        tint: Color? = nil,
+        isActive: Bool = false
+    ) -> some View {
+        modifier(AutomationSubsurface(cornerRadius: cornerRadius, tint: tint, isActive: isActive))
     }
 }
 
 private struct CardSurface: ViewModifier {
     let cornerRadius: CGFloat
+    @Environment(\.colorScheme) private var colorScheme
+
     func body(content: Content) -> some View {
+        let isDark = colorScheme == .dark
+        let fill = isDark
+            ? Color(red: 0.075, green: 0.085, blue: 0.095).opacity(0.94)
+            : Color.primary.opacity(0.04)
+        let stroke = isDark
+            ? Color.white.opacity(0.10)
+            : Color.primary.opacity(0.10)
+
         content
             .background(
                 RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                    .fill(Color.primary.opacity(0.04))
+                    .fill(fill)
                     .overlay(
                         RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                            .strokeBorder(Color.primary.opacity(0.10), lineWidth: 0.5)
+                            .strokeBorder(stroke, lineWidth: 0.5)
                     )
+            )
+    }
+}
+
+private struct AutomationSubsurface: ViewModifier {
+    let cornerRadius: CGFloat
+    let tint: Color?
+    let isActive: Bool
+
+    @Environment(\.colorScheme) private var colorScheme
+
+    func body(content: Content) -> some View {
+        let isDark = colorScheme == .dark
+        let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+        let baseFill = isDark
+            ? Color(red: 0.065, green: 0.075, blue: 0.085).opacity(0.96)
+            : Color.primary.opacity(isActive ? 0.055 : 0.035)
+        let accent = tint ?? (isDark ? Color.white : Color.primary)
+        let accentFill = tint?.opacity(isActive ? 0.09 : 0.035) ?? Color.clear
+        let stroke = accent.opacity(isActive ? 0.26 : (tint == nil ? 0.10 : 0.18))
+
+        content
+            .background(
+                shape
+                    .fill(baseFill)
+                    .overlay(shape.fill(accentFill))
+                    .overlay(shape.strokeBorder(stroke, lineWidth: 0.6))
             )
     }
 }
@@ -416,6 +461,33 @@ extension View {
             self.focusEffectDisabled()
         } else {
             self
+        }
+    }
+
+    /// Prevents the window from being dragged when clicking on this view,
+    /// even if the window has `isMovableByWindowBackground = true`.
+    func preventWindowDrag() -> some View {
+        self.background(WindowDragPreventionView())
+    }
+}
+
+private struct WindowDragPreventionView: NSViewRepresentable {
+    func makeNSView(context: Context) -> NSView {
+        let view = DragPreventingView()
+        return view
+    }
+
+    func updateNSView(_ nsView: NSView, context: Context) {}
+
+    class DragPreventingView: NSView {
+        override var mouseDownCanMoveWindow: Bool {
+            return false
+        }
+
+        override func hitTest(_ point: NSPoint) -> NSView? {
+            // Only capture the hit if it hit us directly, not subviews
+            let hit = super.hitTest(point)
+            return hit == self ? self : hit
         }
     }
 }

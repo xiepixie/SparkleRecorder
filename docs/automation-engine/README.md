@@ -31,7 +31,7 @@
 
 - `SavedMacro` 是静态模板，不保存运行实例状态。
 - 编排层生成 `AutomationTaskRun`，每次运行都有自己的 `runID`、时间、outcome 和 evidence。
-- UI 只能展示 `AutomationTaskRun` 的 run history、outcome 和 evidence metadata，不直接打开 Player internals、截图或 evidence payload。
+- UI 只能展示 `AutomationTaskRun` 的 run history、outcome、evidence metadata 和已接受的 evidence/artifact refs；不能直接打开 Player internals、调用 ScreenCapture/OCR/evaluator，或在 SwiftUI 中重新生成 evidence payload。
 - 定时启动不是直接调用 `Player`，而是向 reducer 发送 `clockTick(Date)`。
 - 前台键鼠控制权是唯一资源，所有终态必须优先释放 lease。
 - 条件判断通过 reducer effect 交给 Owner B；`previousOutcome` 只使用 effect 携带的上游 outcome，不让 adapter 回读 state。

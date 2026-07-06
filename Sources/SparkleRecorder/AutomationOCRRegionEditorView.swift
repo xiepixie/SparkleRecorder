@@ -38,8 +38,8 @@ struct AutomationOCRRegionEditorView: View {
                     Label(NSLocalizedString("Clear Region", comment: ""), systemImage: "xmark.circle")
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
-                .buttonStyle(.borderless)
-                .controlSurface(cornerRadius: 8, tint: Brand.red500, isActive: false)
+                .buttonStyle(.bordered)
+                .tint(Brand.red500)
             }
 
             HStack(spacing: 8) {
@@ -47,15 +47,15 @@ struct AutomationOCRRegionEditorView: View {
                     Label(NSLocalizedString("Pick Text Region", comment: ""), systemImage: "text.viewfinder")
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
-                .buttonStyle(.borderless)
-                .controlSurface(cornerRadius: 8, tint: Brand.sigAmber, isActive: false)
+                .buttonStyle(.bordered)
+                .tint(Brand.sigAmber)
 
                 Button(action: onDraw) {
                     Label(NSLocalizedString("Draw Region", comment: ""), systemImage: "viewfinder.rectangular")
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
-                .buttonStyle(.borderless)
-                .controlSurface(cornerRadius: 8, tint: Brand.libraryBlue, isActive: false)
+                .buttonStyle(.bordered)
+                .tint(Brand.libraryBlue)
             }
         }
     }

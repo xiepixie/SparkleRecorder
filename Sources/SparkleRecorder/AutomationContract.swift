@@ -6,6 +6,7 @@ public struct AutomationWorkflow: Codable, Equatable, Sendable, Identifiable {
     public var name: String
     public var tasks: [AutomationTask]
     public var dependencies: [AutomationDependency]
+    public var visualAssets: AutomationWorkflowDraftVisualAssets?
     public var createdAt: Date
     public var modifiedAt: Date
 
@@ -15,6 +16,7 @@ public struct AutomationWorkflow: Codable, Equatable, Sendable, Identifiable {
         name: String,
         tasks: [AutomationTask] = [],
         dependencies: [AutomationDependency] = [],
+        visualAssets: AutomationWorkflowDraftVisualAssets? = nil,
         createdAt: Date = Date.now,
         modifiedAt: Date = Date.now
     ) {
@@ -23,6 +25,7 @@ public struct AutomationWorkflow: Codable, Equatable, Sendable, Identifiable {
         self.name = name
         self.tasks = tasks
         self.dependencies = dependencies
+        self.visualAssets = visualAssets?.isEmpty == true ? nil : visualAssets
         self.createdAt = createdAt
         self.modifiedAt = modifiedAt
     }
@@ -74,6 +77,12 @@ public enum AutomationWorkflowValidationIssue: Codable, Equatable, Sendable {
     case cycleDetected(taskID: UUID)
 }
 
+public enum AutomationJoinPolicy: String, Codable, Equatable, Sendable {
+    case all
+    case any
+    case firstMatched
+}
+
 public struct AutomationTask: Codable, Equatable, Sendable, Identifiable {
     public var id: UUID
     public var name: String
@@ -82,6 +91,7 @@ public struct AutomationTask: Codable, Equatable, Sendable, Identifiable {
     public var resourceRequirement: AutomationResourceRequirement
     public var timeout: TimeInterval?
     public var retryPolicy: AutomationRetryPolicy
+    public var joinPolicy: AutomationJoinPolicy
     public var isEnabled: Bool
     public var graphPosition: AutomationGraphPoint?
 
@@ -93,6 +103,7 @@ public struct AutomationTask: Codable, Equatable, Sendable, Identifiable {
         resourceRequirement: AutomationResourceRequirement = .foregroundInput,
         timeout: TimeInterval? = nil,
         retryPolicy: AutomationRetryPolicy = .none,
+        joinPolicy: AutomationJoinPolicy = .all,
         isEnabled: Bool = true,
         graphPosition: AutomationGraphPoint? = nil
     ) {
@@ -103,8 +114,53 @@ public struct AutomationTask: Codable, Equatable, Sendable, Identifiable {
         self.resourceRequirement = resourceRequirement
         self.timeout = timeout.map { max(0, $0) }
         self.retryPolicy = retryPolicy
+        self.joinPolicy = joinPolicy
         self.isEnabled = isEnabled
         self.graphPosition = graphPosition
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case id
+        case name
+        case kind
+        case schedule
+        case resourceRequirement
+        case timeout
+        case retryPolicy
+        case joinPolicy
+        case isEnabled
+        case graphPosition
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.id = try container.decode(UUID.self, forKey: .id)
+        self.name = try container.decode(String.self, forKey: .name)
+        self.kind = try container.decode(AutomationTaskKind.self, forKey: .kind)
+        self.schedule = try container.decodeIfPresent(AutomationSchedule.self, forKey: .schedule)
+        self.resourceRequirement = try container.decodeIfPresent(
+            AutomationResourceRequirement.self,
+            forKey: .resourceRequirement
+        ) ?? .foregroundInput
+        self.timeout = try container.decodeIfPresent(TimeInterval.self, forKey: .timeout).map { max(0, $0) }
+        self.retryPolicy = try container.decodeIfPresent(AutomationRetryPolicy.self, forKey: .retryPolicy) ?? .none
+        self.joinPolicy = try container.decodeIfPresent(AutomationJoinPolicy.self, forKey: .joinPolicy) ?? .all
+        self.isEnabled = try container.decodeIfPresent(Bool.self, forKey: .isEnabled) ?? true
+        self.graphPosition = try container.decodeIfPresent(AutomationGraphPoint.self, forKey: .graphPosition)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(id, forKey: .id)
+        try container.encode(name, forKey: .name)
+        try container.encode(kind, forKey: .kind)
+        try container.encodeIfPresent(schedule, forKey: .schedule)
+        try container.encode(resourceRequirement, forKey: .resourceRequirement)
+        try container.encodeIfPresent(timeout, forKey: .timeout)
+        try container.encode(retryPolicy, forKey: .retryPolicy)
+        try container.encode(joinPolicy, forKey: .joinPolicy)
+        try container.encode(isEnabled, forKey: .isEnabled)
+        try container.encodeIfPresent(graphPosition, forKey: .graphPosition)
     }
 
     public func makeRun(
@@ -228,15 +284,18 @@ public struct AutomationResourceRequirement: Codable, Equatable, Sendable {
     public var resources: Set<AutomationResource>
     public var priority: AutomationResourcePriority
     public var leaseTimeout: TimeInterval?
+    public var maxWaitDuration: TimeInterval?
 
     public init(
         resources: Set<AutomationResource>,
         priority: AutomationResourcePriority = .normal,
-        leaseTimeout: TimeInterval? = nil
+        leaseTimeout: TimeInterval? = nil,
+        maxWaitDuration: TimeInterval? = nil
     ) {
         self.resources = resources
         self.priority = priority
         self.leaseTimeout = leaseTimeout.map { max(0, $0) }
+        self.maxWaitDuration = maxWaitDuration.map { max(0, $0) }
     }
 
     public var requiresForegroundInput: Bool {
@@ -303,6 +362,7 @@ public struct AutomationConditionSpec: Codable, Equatable, Sendable, Identifiabl
 
 public enum AutomationConditionKind: Codable, Equatable, Sendable {
     case ocrText(AutomationOCRCondition)
+    case visual(AutomationVisualCondition)
     case previousOutcome(AutomationOutcomePredicate)
     case externalSignal(String)
     case manualApproval
@@ -522,6 +582,67 @@ public struct AutomationOCRCondition: Codable, Equatable, Sendable {
     }
 }
 
+public enum AutomationVisualConditionType: String, Codable, Equatable, Sendable {
+    case regionChanged
+    case imageAppeared
+    case imageDisappeared
+    case pixelMatched
+}
+
+public struct AutomationVisualCondition: Codable, Equatable, Sendable {
+    public var type: AutomationVisualConditionType
+    public var regionRef: String?
+    public var searchRegion: RectValue?
+    public var searchRegionSpace: AutomationOCRSearchRegionSpace
+    public var imageRef: String?
+    public var baselineRef: String?
+    public var pixel: AutomationGraphPoint?
+    public var targetColorHex: String?
+    public var threshold: Double?
+    public var requireVisible: Bool
+
+    public init(
+        type: AutomationVisualConditionType,
+        regionRef: String? = nil,
+        searchRegion: RectValue? = nil,
+        searchRegionSpace: AutomationOCRSearchRegionSpace = .automatic,
+        imageRef: String? = nil,
+        baselineRef: String? = nil,
+        pixel: AutomationGraphPoint? = nil,
+        targetColorHex: String? = nil,
+        threshold: Double? = nil,
+        requireVisible: Bool = true
+    ) {
+        self.type = type
+        self.regionRef = regionRef?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmptyForAutomationCondition
+        self.searchRegion = searchRegion
+        self.searchRegionSpace = searchRegionSpace
+        self.imageRef = imageRef?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmptyForAutomationCondition
+        self.baselineRef = baselineRef?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmptyForAutomationCondition
+        self.pixel = pixel
+        self.targetColorHex = targetColorHex?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmptyForAutomationCondition
+        self.threshold = threshold.map { min(max($0, 0), 1) }
+        self.requireVisible = requireVisible
+    }
+
+    public func searchRegionResolution(
+        in context: AutomationOCRSearchRegionContext
+    ) -> AutomationOCRSearchRegionResolution {
+        AutomationOCRCondition(
+            text: "",
+            searchRegion: searchRegion,
+            searchRegionSpace: searchRegionSpace
+        )
+        .searchRegionResolution(in: context)
+    }
+}
+
+private extension String {
+    var nilIfEmptyForAutomationCondition: String? {
+        isEmpty ? nil : self
+    }
+}
+
 private extension RectValue {
     var maxX: CGFloat {
         x + width
@@ -730,6 +851,306 @@ public enum AutomationTaskRunStatus: Codable, Equatable, Sendable {
     case completed
 }
 
+public enum AutomationBranchDecisionStatus: String, Codable, Equatable, Hashable, Sendable {
+    case waiting
+    case triggered
+    case skipped
+    case disabled
+
+    public var label: String {
+        switch self {
+        case .waiting:
+            return NSLocalizedString("Waiting", comment: "")
+        case .triggered:
+            return NSLocalizedString("Triggered", comment: "")
+        case .skipped:
+            return NSLocalizedString("Skipped", comment: "")
+        case .disabled:
+            return NSLocalizedString("Disabled", comment: "")
+        }
+    }
+}
+
+public struct AutomationBranchDecisionEvidence: Codable, Equatable, Sendable, Identifiable {
+    public var id: UUID { dependencyID }
+
+    public var sourceRunID: UUID
+    public var sourceTaskID: UUID
+    public var dependencyID: UUID
+    public var trigger: AutomationDependencyTrigger
+    public var status: AutomationBranchDecisionStatus
+    public var targetTaskID: UUID
+    public var targetRunID: UUID?
+    public var executionID: UUID
+    public var sourceOutcome: AutomationOutcome
+    public var decidedAt: Date
+    public var delay: TimeInterval
+    public var targetJoinPolicy: AutomationJoinPolicy?
+    public var reason: String
+
+    public init(
+        sourceRunID: UUID,
+        sourceTaskID: UUID,
+        dependencyID: UUID,
+        trigger: AutomationDependencyTrigger,
+        status: AutomationBranchDecisionStatus,
+        targetTaskID: UUID,
+        targetRunID: UUID? = nil,
+        executionID: UUID,
+        sourceOutcome: AutomationOutcome,
+        decidedAt: Date,
+        delay: TimeInterval = 0,
+        targetJoinPolicy: AutomationJoinPolicy? = nil,
+        reason: String
+    ) {
+        self.sourceRunID = sourceRunID
+        self.sourceTaskID = sourceTaskID
+        self.dependencyID = dependencyID
+        self.trigger = trigger
+        self.status = status
+        self.targetTaskID = targetTaskID
+        self.targetRunID = targetRunID
+        self.executionID = executionID
+        self.sourceOutcome = sourceOutcome
+        self.decidedAt = decidedAt
+        self.delay = max(0, delay)
+        self.targetJoinPolicy = targetJoinPolicy
+        self.reason = reason
+    }
+}
+
+public enum AutomationConditionEvidenceKind: String, Codable, Equatable, Sendable {
+    case ocrText
+    case regionChanged
+    case imageAppeared
+    case imageDisappeared
+    case pixelMatched
+    case previousOutcome
+    case externalSignal
+    case manualApproval
+}
+
+public struct AutomationConditionDiagnosticField: Codable, Equatable, Sendable, Identifiable {
+    public var id: String
+    public var title: String
+    public var value: String
+
+    public init(id: String, title: String, value: String) {
+        self.id = id
+        self.title = title
+        self.value = value
+    }
+}
+
+public enum AutomationConditionDiagnosticArtifactKind: String, Codable, Equatable, Sendable {
+    case displaySampleImage
+    case regionSampleImage
+    case templateImage
+    case baselineImage
+}
+
+public struct AutomationConditionDiagnosticArtifact: Codable, Equatable, Sendable, Identifiable {
+    public var id: String
+    public var title: String
+    public var kind: AutomationConditionDiagnosticArtifactKind
+    public var relativePath: String
+    public var contentType: String
+    public var pixelBounds: RectValue?
+    public var createdAt: Date?
+
+    public init(
+        id: String,
+        title: String,
+        kind: AutomationConditionDiagnosticArtifactKind,
+        relativePath: String,
+        contentType: String = "image/png",
+        pixelBounds: RectValue? = nil,
+        createdAt: Date? = nil
+    ) {
+        self.id = id
+        self.title = title
+        self.kind = kind
+        self.relativePath = relativePath
+        self.contentType = contentType
+        self.pixelBounds = pixelBounds
+        self.createdAt = createdAt
+    }
+
+    public var normalizedRelativePath: String? {
+        Self.normalizedRelativePath(relativePath)
+    }
+
+    public func resolvedURL(relativeTo baseDirectory: URL) -> URL? {
+        guard let normalizedRelativePath else {
+            return nil
+        }
+
+        var url = baseDirectory.standardizedFileURL
+        for component in normalizedRelativePath.split(separator: "/") {
+            url.appendPathComponent(String(component), isDirectory: false)
+        }
+        return url.standardizedFileURL
+    }
+
+    public static func normalizedRelativePath(_ path: String?) -> String? {
+        guard let path = path?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !path.isEmpty else {
+            return nil
+        }
+        guard !path.hasPrefix("/"),
+              !path.hasPrefix("~"),
+              !path.contains("://"),
+              !path.contains(":"),
+              !path.contains("\\") else {
+            return nil
+        }
+
+        let components = path
+            .split(separator: "/", omittingEmptySubsequences: true)
+            .map(String.init)
+        guard !components.isEmpty,
+              components.allSatisfy({ $0 != "." && $0 != ".." }) else {
+            return nil
+        }
+        return components.joined(separator: "/")
+    }
+}
+
+public struct AutomationConditionEvaluationEvidence: Codable, Equatable, Sendable, Identifiable {
+    public var id: UUID { runID }
+
+    public var runID: UUID
+    public var workflowID: UUID
+    public var taskID: UUID
+    public var conditionID: UUID
+    public var kind: AutomationConditionEvidenceKind
+    public var outcome: AutomationOutcome
+    public var evaluatedAt: Date
+    public var firstSampleAt: Date?
+    public var lastSampleAt: Date?
+    public var sampleCount: Int
+    public var displayBounds: RectValue?
+    public var resolvedSearchRegion: RectValue?
+    public var searchRegionSpace: AutomationOCRSearchRegionSpace?
+    public var targetDescription: String
+    public var observedSummary: String
+    public var score: Double?
+    public var threshold: Double?
+    public var fields: [AutomationConditionDiagnosticField]
+    public var artifacts: [AutomationConditionDiagnosticArtifact]
+
+    public init(
+        runID: UUID,
+        workflowID: UUID,
+        taskID: UUID,
+        conditionID: UUID,
+        kind: AutomationConditionEvidenceKind,
+        outcome: AutomationOutcome,
+        evaluatedAt: Date,
+        firstSampleAt: Date? = nil,
+        lastSampleAt: Date? = nil,
+        sampleCount: Int = 0,
+        displayBounds: RectValue? = nil,
+        resolvedSearchRegion: RectValue? = nil,
+        searchRegionSpace: AutomationOCRSearchRegionSpace? = nil,
+        targetDescription: String,
+        observedSummary: String,
+        score: Double? = nil,
+        threshold: Double? = nil,
+        fields: [AutomationConditionDiagnosticField] = [],
+        artifacts: [AutomationConditionDiagnosticArtifact] = []
+    ) {
+        self.runID = runID
+        self.workflowID = workflowID
+        self.taskID = taskID
+        self.conditionID = conditionID
+        self.kind = kind
+        self.outcome = outcome
+        self.evaluatedAt = evaluatedAt
+        self.firstSampleAt = firstSampleAt
+        self.lastSampleAt = lastSampleAt
+        self.sampleCount = max(0, sampleCount)
+        self.displayBounds = displayBounds
+        self.resolvedSearchRegion = resolvedSearchRegion
+        self.searchRegionSpace = searchRegionSpace
+        self.targetDescription = targetDescription
+        self.observedSummary = observedSummary
+        self.score = score.map { min(max($0, 0), 1) }
+        self.threshold = threshold.map { min(max($0, 0), 1) }
+        self.fields = fields
+        self.artifacts = artifacts
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case runID
+        case workflowID
+        case taskID
+        case conditionID
+        case kind
+        case outcome
+        case evaluatedAt
+        case firstSampleAt
+        case lastSampleAt
+        case sampleCount
+        case displayBounds
+        case resolvedSearchRegion
+        case searchRegionSpace
+        case targetDescription
+        case observedSummary
+        case score
+        case threshold
+        case fields
+        case artifacts
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.init(
+            runID: try container.decode(UUID.self, forKey: .runID),
+            workflowID: try container.decode(UUID.self, forKey: .workflowID),
+            taskID: try container.decode(UUID.self, forKey: .taskID),
+            conditionID: try container.decode(UUID.self, forKey: .conditionID),
+            kind: try container.decode(AutomationConditionEvidenceKind.self, forKey: .kind),
+            outcome: try container.decode(AutomationOutcome.self, forKey: .outcome),
+            evaluatedAt: try container.decode(Date.self, forKey: .evaluatedAt),
+            firstSampleAt: try container.decodeIfPresent(Date.self, forKey: .firstSampleAt),
+            lastSampleAt: try container.decodeIfPresent(Date.self, forKey: .lastSampleAt),
+            sampleCount: try container.decodeIfPresent(Int.self, forKey: .sampleCount) ?? 0,
+            displayBounds: try container.decodeIfPresent(RectValue.self, forKey: .displayBounds),
+            resolvedSearchRegion: try container.decodeIfPresent(RectValue.self, forKey: .resolvedSearchRegion),
+            searchRegionSpace: try container.decodeIfPresent(
+                AutomationOCRSearchRegionSpace.self,
+                forKey: .searchRegionSpace
+            ),
+            targetDescription: try container.decode(String.self, forKey: .targetDescription),
+            observedSummary: try container.decode(String.self, forKey: .observedSummary),
+            score: try container.decodeIfPresent(Double.self, forKey: .score),
+            threshold: try container.decodeIfPresent(Double.self, forKey: .threshold),
+            fields: try container.decodeIfPresent(
+                [AutomationConditionDiagnosticField].self,
+                forKey: .fields
+            ) ?? [],
+            artifacts: try container.decodeIfPresent(
+                [AutomationConditionDiagnosticArtifact].self,
+                forKey: .artifacts
+            ) ?? []
+        )
+    }
+}
+
+public struct AutomationConditionEvaluationResult: Codable, Equatable, Sendable {
+    public var outcome: AutomationOutcome
+    public var evidence: AutomationConditionEvaluationEvidence?
+
+    public init(
+        outcome: AutomationOutcome,
+        evidence: AutomationConditionEvaluationEvidence? = nil
+    ) {
+        self.outcome = outcome
+        self.evidence = evidence
+    }
+}
+
 public struct AutomationTaskRun: Codable, Equatable, Sendable, Identifiable {
     public var id: UUID
     public var executionID: UUID
@@ -747,6 +1168,8 @@ public struct AutomationTaskRun: Codable, Equatable, Sendable, Identifiable {
     public var createdAt: Date
     public var attempt: Int
     public var upstreamRunIDs: [UUID]
+    public var conditionEvidence: AutomationConditionEvaluationEvidence?
+    public var branchEvidence: [AutomationBranchDecisionEvidence]?
 
     public init(
         id: UUID = UUID(),
@@ -764,7 +1187,9 @@ public struct AutomationTaskRun: Codable, Equatable, Sendable, Identifiable {
         leaseID: UUID? = nil,
         createdAt: Date = Date.now,
         attempt: Int = 1,
-        upstreamRunIDs: [UUID] = []
+        upstreamRunIDs: [UUID] = [],
+        conditionEvidence: AutomationConditionEvaluationEvidence? = nil,
+        branchEvidence: [AutomationBranchDecisionEvidence]? = nil
     ) {
         self.id = id
         self.executionID = executionID ?? id
@@ -782,6 +1207,8 @@ public struct AutomationTaskRun: Codable, Equatable, Sendable, Identifiable {
         self.createdAt = createdAt
         self.attempt = max(1, attempt)
         self.upstreamRunIDs = upstreamRunIDs
+        self.conditionEvidence = conditionEvidence
+        self.branchEvidence = branchEvidence?.isEmpty == true ? nil : branchEvidence
     }
 
     public var isTerminal: Bool {
@@ -796,11 +1223,17 @@ public struct AutomationTaskRun: Codable, Equatable, Sendable, Identifiable {
         return copy
     }
 
-    public func completed(with outcome: AutomationOutcome, at completedAt: Date, evidenceID: UUID? = nil) -> AutomationTaskRun {
+    public func completed(
+        with outcome: AutomationOutcome,
+        at completedAt: Date,
+        evidenceID: UUID? = nil,
+        conditionEvidence: AutomationConditionEvaluationEvidence? = nil
+    ) -> AutomationTaskRun {
         var copy = self
         copy.completedAt = completedAt
         copy.outcome = outcome
         copy.evidenceID = evidenceID ?? self.evidenceID
+        copy.conditionEvidence = conditionEvidence ?? self.conditionEvidence
         copy.leaseID = nil
         copy.status = .completed
         return copy
@@ -825,6 +1258,7 @@ public enum AutomationAction: Codable, Equatable, Sendable {
     case playerStarted(runID: UUID, at: Date)
     case playerFinished(runID: UUID, outcome: AutomationOutcome, at: Date)
     case conditionEvaluated(runID: UUID, outcome: AutomationOutcome, at: Date)
+    case conditionEvaluationCompleted(runID: UUID, result: AutomationConditionEvaluationResult, at: Date)
     case taskFinished(runID: UUID, outcome: AutomationOutcome, at: Date)
     case cancelRun(runID: UUID, at: Date)
     case panicRelease(runID: UUID, at: Date)

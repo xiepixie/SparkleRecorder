@@ -3,6 +3,7 @@ import SparkleRecorderCore
 
 struct AutomationTaskRunDisplay {
     let run: AutomationTaskRun
+    var resourceRequirement: AutomationResourceRequirement?
 
     var title: String {
         if let outcome = run.outcome {
@@ -224,7 +225,7 @@ struct AutomationTaskRunDisplay {
         case .waitingForDependencies:
             return NSLocalizedString("Waiting for an upstream task", comment: "")
         case .waitingForResource:
-            return NSLocalizedString("Waiting for a required resource", comment: "")
+            return resourceWaitingDetail()
         case .queued:
             return NSLocalizedString("Queued to run", comment: "")
         case .running:
@@ -264,6 +265,25 @@ struct AutomationTaskRunDisplay {
         case .network:
             return NSLocalizedString("Network", comment: "")
         }
+    }
+
+    private func resourceWaitingDetail() -> String {
+        guard let resourceRequirement else {
+            return NSLocalizedString("Waiting for a required resource", comment: "")
+        }
+        if resourceRequirement.resources.contains(.foregroundInput) {
+            return NSLocalizedString("Waiting for mouse and keyboard", comment: "")
+        }
+        guard !resourceRequirement.resources.isEmpty else {
+            return NSLocalizedString("Waiting for a required resource", comment: "")
+        }
+        return String(
+            format: NSLocalizedString("Waiting for %@", comment: ""),
+            resourceRequirement.resources
+                .sorted { $0.rawValue < $1.rawValue }
+                .map(resourceLabel(for:))
+                .joined(separator: ", ")
+        )
     }
 
     private func permissionLabel(for permission: AutomationPermission) -> String {

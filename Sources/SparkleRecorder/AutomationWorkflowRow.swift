@@ -28,6 +28,17 @@ struct AutomationWorkflowRow: View {
             }
             .font(.caption)
             .foregroundStyle(.secondary)
+
+            Label(workflow.statusDetail, systemImage: workflow.status.systemImage)
+                .font(.caption2)
+                .lineLimit(1)
+                .foregroundStyle(workflow.status.tint)
+
+            AutomationNextScheduleBadge(
+                date: workflow.nextScheduledOccurrence,
+                title: NSLocalizedString("Next", comment: ""),
+                isCompact: true
+            )
         }
         .padding(10)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -45,5 +56,6 @@ struct AutomationWorkflowRow: View {
             workflow.nodes.count,
             workflow.edges.count
         ))
+        .accessibilityValue("\(workflow.status.label), \(workflow.statusDetail)")
     }
 }
