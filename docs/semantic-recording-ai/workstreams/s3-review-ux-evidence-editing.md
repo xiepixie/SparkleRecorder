@@ -1,7 +1,7 @@
 # S3 Review UX And Evidence Editing
 
 更新时间：2026-07-06
-状态：Macro Review integration + Draft Preview handoff + pixel color picking first pass; live product evidence open
+状态：Macro Review integration + Draft Preview handoff + pixel color picking + suggestion review first pass; live product evidence open
 Owner：S3, Review UX / Evidence Editing
 并行对象：S0 Workflow Evidence Closure, S1 Contract/Core, S2 App Capture/Visual Index, S4 CLI/AI
 
@@ -40,6 +40,7 @@ S3 does not own:
 - Run Detail Macro Review entry: `AutomationTaskRunDetailView`
 - Review patch -> Draft Preview -> confirm import handoff through the existing draft import path
 - Pixel sample color picking UI for `pixelMatched` candidates
+- Suggestion accept/reject local review state
 - Product evidence snapshot scenario: `workflow product-evidence snapshot semantic-review-timeline`
 - Unit tests: `SemanticRecordingReviewProjectionTests`
 
@@ -54,6 +55,7 @@ S3 does not own:
 - Review UI 可以从 app-edge presenter 加载 live bundle manifest，显示存在的 frame image artifact，Open/Reveal source/runtime/diff artifacts，并允许用户在 frame canvas 上拖拽生成 region selection。
 - Review UI 的候选 patch 现在可以打开 `AutomationWorkflowDraftPreviewSheet`。用户确认前不会修改原 workflow；确认时复用既有 Draft Preview import path，并在已有 workflow 上覆盖 compiled id/createdAt，避免生成重复 workflow。
 - Pixel candidates now expose `AutomationVisualColorPickerView` inside Review, and the selected hex is passed into `SemanticRecordingReviewDraftPatchRequest.pixelColorHex` so `pixelMatched` patches no longer require metadata-provided `colorHex` when the user supplies a reviewed target color.
+- Suggestion rows now show evidence refs and explicit `Accept Patch` / `Reject` actions. `Accept Patch` jumps to the cited frame/event, resolves the matching condition candidate, and generates the same review-only draft patch path; `Reject` records local review state only and does not mutate the workflow.
 - Run Detail 已提供 Macro Review 入口；由于 `AutomationTaskRun` 还没有 semantic recording id，当前入口是用户选择真实 bundle directory / `manifest.json`，不是自动绑定某一次 run。
 - SwiftUI Review 只消费 presenter 解析好的 artifact statuses，不在 view body 内运行 Vision/AX/ScreenCaptureKit，也不自己拼 raw bundle paths。
 
@@ -63,6 +65,7 @@ S3 does not own:
 - frame crop file copy / package materialization semantics；当前 patch 登记 safe refs，真实文件复制仍属于 app-edge presenter/package import 层。
 - frame-to-condition live clip and real product evidence.
 - image/baseline crop extraction UI still needs package-local file materialization before broad shipping.
+- refreshed product evidence snapshot for suggestion review accept/reject; current shared worktree build is blocked by S2 `LiveSemanticRecordingSuppressionContext.swift`, so screenshot refresh waits for that compile issue to clear.
 
 ## Accepted S1 Contract Usage
 
@@ -126,8 +129,9 @@ Observed status on 2026-07-06:
 
 1. Add S2 automatic run/macro -> semantic bundle association so Run Detail can open the correct Review without an open panel.
 2. Define frame crop file copy/package materialization semantics for package-local image/baseline refs.
-3. Capture live product evidence for frame-to-condition creation once a live bundle can be opened from the installed app.
-4. Add product evidence for pixel color picking and the Review -> Draft Preview -> confirm import handoff from an installed-app bundle once automatic binding lands.
+3. Refresh `semantic-review-timeline.png` once the shared app build is green, so fixture product evidence shows suggestion evidence refs plus Accept Patch / Reject actions.
+4. Capture live product evidence for frame-to-condition creation once a live bundle can be opened from the installed app.
+5. Add product evidence for pixel color picking and the Review -> Draft Preview -> confirm import handoff from an installed-app bundle once automatic binding lands.
 
 ## Implementation Log
 
@@ -136,3 +140,4 @@ Observed status on 2026-07-06:
 - 2026-07-06: Added `SemanticRecordingReviewDraftPatchBuilder`, visual asset upsert patch operations, app-edge `SemanticRecordingReviewPresenter`, Run Detail Macro Review entry, frame drag selection and patch save flow. The original workflow remains review-only; generated patches can be saved and applied through the existing draft patch pathway.
 - 2026-07-06: Connected Review-generated frame-to-condition patches to `AutomationWorkflowDraftPreviewSheet` and the existing confirmed import callback, preserving review-only behavior until the user explicitly imports.
 - 2026-07-06: Added Review-side pixel color picking for `pixelMatched` candidates and a pure test proving user-picked color can generate and apply a valid pixel condition patch without metadata color evidence.
+- 2026-07-06: Added suggestion review actions. Suggestions now expose cited evidence rows, `Accept Patch` to create a review-only patch from matching evidence, and `Reject` as a local non-mutating review decision.

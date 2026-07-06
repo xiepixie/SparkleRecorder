@@ -16,6 +16,7 @@ struct SemanticRecordingReviewFixtureView: View {
     @State private var selectedCandidateID: String?
     @State private var regionSelection: SemanticRecordingFrameRegionSelection?
     @State private var pixelColorHexes: [String: String] = [:]
+    @State private var suggestionReviewDecisions: [UUID: SuggestionReviewDecision] = [:]
     @State private var draftPatchResult: SemanticRecordingReviewDraftPatchResult?
     @State private var draftPatchErrorMessage = ""
     @State private var draftPreviewState: AutomationWorkflowDraftPreviewState?
@@ -589,17 +590,71 @@ struct SemanticRecordingReviewFixtureView: View {
             sectionTitle("Suggestion Review")
             if !projection.suggestionRows.isEmpty {
                 ForEach(projection.suggestionRows) { suggestion in
-                    inspectorRow(
-                        title: suggestion.title,
-                        subtitle: "\(suggestion.kind.rawValue) · confidence \(percent(suggestion.confidence))",
-                        detail: suggestion.risk ?? suggestion.mutationPolicy,
-                        accent: Color(red: 0.34, green: 0.72, blue: 0.95)
-                    )
+                    VStack(alignment: .leading, spacing: 8) {
+                        inspectorRow(
+                            title: suggestion.title,
+                            subtitle: "\(suggestion.kind.rawValue) · confidence \(percent(suggestion.confidence))",
+                            detail: suggestion.risk ?? suggestion.mutationPolicy,
+                            accent: Color(red: 0.34, green: 0.72, blue: 0.95)
+                        )
+
+                        suggestionEvidenceSummary(suggestion)
+
+                        HStack(spacing: 8) {
+                            Button(NSLocalizedString("Accept Patch", comment: ""), systemImage: "checkmark.circle") {
+                                acceptSuggestion(suggestion)
+                            }
+                            .buttonStyle(.bordered)
+                            .controlSize(.small)
+                            .disabled(bundle == nil)
+
+                            Button(NSLocalizedString("Reject", comment: ""), systemImage: "xmark.circle") {
+                                rejectSuggestion(suggestion)
+                            }
+                            .buttonStyle(.bordered)
+                            .controlSize(.small)
+
+                            if let decision = suggestionReviewDecisions[suggestion.id] {
+                                Label(decision.title, systemImage: decision.systemImage)
+                                    .font(.system(size: 11, weight: .semibold))
+                                    .foregroundStyle(decision.tint)
+                            }
+
+                            Spacer(minLength: 0)
+                        }
+                    }
                 }
             } else {
                 emptyInspectorText("No suggestions for this fixture.")
             }
         }
+    }
+
+    private func suggestionEvidenceSummary(
+        _ suggestion: SemanticRecordingReviewProjection.SuggestionRow
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 5) {
+            ForEach(Array(suggestion.evidence.prefix(2).enumerated()), id: \.offset) { _, evidence in
+                HStack(alignment: .firstTextBaseline, spacing: 6) {
+                    Image(systemName: "link")
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundStyle(Color.white.opacity(0.40))
+                    Text(suggestionEvidenceLabel(evidence))
+                        .font(.system(size: 11, weight: .medium, design: .monospaced))
+                        .foregroundStyle(Color.white.opacity(0.52))
+                        .lineLimit(1)
+                    if let summary = evidence.summary {
+                        Text(summary)
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundStyle(Color.white.opacity(0.46))
+                            .lineLimit(1)
+                    }
+                }
+            }
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 8)
+        .background(Color.black.opacity(0.12), in: RoundedRectangle(cornerRadius: 7))
     }
 
     private var safetySection: some View {
@@ -901,6 +956,91 @@ struct SemanticRecordingReviewFixtureView: View {
         }
     }
 
+    private func acceptSuggestion(
+        _ suggestion: SemanticRecordingReviewProjection.SuggestionRow
+    ) {
+        guard let bundle else {
+            draftPatchResult = nil
+            draftPatchErrorMessage = NSLocalizedString("Open a live bundle before accepting a suggestion.", comment: "")
+            return
+        }
+        guard let match = suggestionPatchCandidate(suggestion, bundle: bundle) else {
+            draftPatchResult = nil
+            draftPatchErrorMessage = NSLocalizedString("No patchable evidence was found for this suggestion.", comment: "")
+            return
+        }
+
+        selectedEventID = match.eventID
+        selectedFrameID = match.frameID
+        selectedCandidateID = match.candidate.id
+        let effectiveSelection = regionSelection?.frameID == match.candidate.sourceFrameID ? regionSelection : nil
+        do {
+            draftPatchResult = try SemanticRecordingReviewDraftPatchBuilder.makePatch(
+                bundle: bundle,
+                request: SemanticRecordingReviewDraftPatchRequest(
+                    candidate: match.candidate,
+                    regionSelection: effectiveSelection,
+                    pixelColorHex: pixelColorHex(for: match.candidate)
+                )
+            )
+            draftPatchErrorMessage = ""
+            patchSaveMessage = ""
+            suggestionReviewDecisions[suggestion.id] = .accepted
+        } catch {
+            draftPatchResult = nil
+            draftPatchErrorMessage = String(describing: error)
+        }
+    }
+
+    private func rejectSuggestion(
+        _ suggestion: SemanticRecordingReviewProjection.SuggestionRow
+    ) {
+        suggestionReviewDecisions[suggestion.id] = .rejected
+        draftPatchErrorMessage = ""
+        patchSaveMessage = ""
+    }
+
+    private func suggestionPatchCandidate(
+        _ suggestion: SemanticRecordingReviewProjection.SuggestionRow,
+        bundle: SemanticRecordingBundle
+    ) -> (
+        candidate: SemanticRecordingReviewProjection.ConditionCandidateRow,
+        frameID: UUID,
+        eventID: UUID?
+    )? {
+        for evidence in suggestion.evidence {
+            let reviewProjection = SemanticRecordingReviewProjection(
+                bundle: bundle,
+                suggestions: suggestions,
+                selectedEventID: evidence.eventIDs.first,
+                selectedFrameID: evidence.frameID
+            )
+            guard let frame = reviewProjection.selectedFrame else {
+                continue
+            }
+            let candidate = frame.conditionCandidates.first { candidate in
+                candidateMatches(candidate, evidence: evidence)
+            } ?? frame.conditionCandidates.first
+            if let candidate {
+                return (candidate, frame.id, evidence.eventIDs.first)
+            }
+        }
+        return nil
+    }
+
+    private func candidateMatches(
+        _ candidate: SemanticRecordingReviewProjection.ConditionCandidateRow,
+        evidence: SemanticRecordingReviewProjection.EvidenceRow
+    ) -> Bool {
+        if let artifactPath = evidence.artifactPath, candidate.artifactPath == artifactPath {
+            return true
+        }
+        if let observationID = candidate.observationID, evidence.observationIDs.contains(observationID) {
+            return true
+        }
+        return evidence.frameID == candidate.sourceFrameID
+    }
+
     private func pixelColorBinding(
         for candidate: SemanticRecordingReviewProjection.ConditionCandidateRow
     ) -> Binding<String> {
@@ -1032,5 +1172,50 @@ struct SemanticRecordingReviewFixtureView: View {
     private func shortID(_ id: UUID?) -> String {
         guard let id else { return "not set" }
         return String(id.uuidString.suffix(8))
+    }
+
+    private func suggestionEvidenceLabel(_ evidence: SemanticRecordingReviewProjection.EvidenceRow) -> String {
+        var parts: [String] = []
+        if let frameID = evidence.frameID {
+            parts.append("frame \(shortID(frameID))")
+        }
+        if let artifactPath = evidence.artifactPath {
+            parts.append(artifactPath)
+        } else if let observationID = evidence.observationIDs.first {
+            parts.append("obs \(shortID(observationID))")
+        }
+        return parts.isEmpty ? NSLocalizedString("evidence", comment: "") : parts.joined(separator: " · ")
+    }
+}
+
+private enum SuggestionReviewDecision {
+    case accepted
+    case rejected
+
+    var title: String {
+        switch self {
+        case .accepted:
+            return NSLocalizedString("Accepted", comment: "")
+        case .rejected:
+            return NSLocalizedString("Rejected", comment: "")
+        }
+    }
+
+    var systemImage: String {
+        switch self {
+        case .accepted:
+            return "checkmark.circle.fill"
+        case .rejected:
+            return "xmark.circle.fill"
+        }
+    }
+
+    var tint: Color {
+        switch self {
+        case .accepted:
+            return Color(red: 0.48, green: 0.76, blue: 0.52)
+        case .rejected:
+            return Color(red: 1.00, green: 0.50, blue: 0.58)
+        }
     }
 }
