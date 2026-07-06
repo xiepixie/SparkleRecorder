@@ -84,12 +84,16 @@ struct SemanticRecordingReviewFixtureView: View {
         state: SemanticRecordingReviewState,
         workflow: AutomationWorkflow? = nil,
         macros: [SavedMacro] = [],
+        selectedEventID: UUID? = nil,
+        selectedFrameID: UUID? = nil,
         initialDraftPatchCandidateID: String? = nil,
         onImportWorkflow: @escaping (AutomationWorkflow, URL?) -> Void = { _, _ in }
     ) {
         let projection = SemanticRecordingReviewProjection(
             bundle: state.bundle,
-            suggestions: state.suggestions
+            suggestions: state.suggestions,
+            selectedEventID: selectedEventID,
+            selectedFrameID: selectedFrameID
         )
         self.staticProjection = projection
         self.bundle = state.bundle
@@ -98,6 +102,8 @@ struct SemanticRecordingReviewFixtureView: View {
         self.workflow = workflow
         self.macros = macros
         self.onImportWorkflow = onImportWorkflow
+        _selectedEventID = State(initialValue: selectedEventID)
+        _selectedFrameID = State(initialValue: selectedFrameID)
         _selectedCandidateID = State(initialValue: initialDraftPatchCandidateID)
         _draftPatchResult = State(initialValue: Self.initialDraftPatchResult(
             bundle: state.bundle,
@@ -167,13 +173,21 @@ struct SemanticRecordingReviewFixtureView: View {
                 HStack(alignment: .top, spacing: 16) {
                     timeline
                         .frame(width: 360)
+                        .clipped()
 
                     reviewFrame
-                        .frame(maxWidth: .infinity)
+                        .frame(width: 440)
+                        .clipped()
+                        .zIndex(0)
 
                     inspector
                         .frame(width: 380)
+                        .background(Color(red: 0.08, green: 0.09, blue: 0.10))
+                        .clipped()
+                        .zIndex(1)
                 }
+                .frame(width: 1_228, alignment: .topLeading)
+                .clipped()
             }
             .padding(26)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
@@ -366,10 +380,11 @@ struct SemanticRecordingReviewFixtureView: View {
                             )
                         }
                     }
+                    .clipped()
                     .contentShape(Rectangle())
                     .gesture(frameSelectionGesture(frame: frame, canvasSize: proxy.size))
                 }
-                .frame(minHeight: 480)
+                .frame(width: 440, height: 480)
                 .clipShape(RoundedRectangle(cornerRadius: 8))
                 .overlay(
                     RoundedRectangle(cornerRadius: 8)
@@ -386,6 +401,8 @@ struct SemanticRecordingReviewFixtureView: View {
                     .background(Color.white.opacity(0.05), in: RoundedRectangle(cornerRadius: 8))
             }
         }
+        .frame(width: 440, alignment: .topLeading)
+        .clipped()
     }
 
     private func frameBackdrop(_ frame: SemanticRecordingReviewProjection.SelectedFrame) -> some View {
@@ -396,6 +413,7 @@ struct SemanticRecordingReviewFixtureView: View {
                     .resizable()
                     .scaledToFit()
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .clipped()
             }
             VStack(alignment: .leading, spacing: 8) {
                 Text(frame.source.rawValue)
@@ -417,6 +435,7 @@ struct SemanticRecordingReviewFixtureView: View {
                 )
             )
         }
+        .clipped()
     }
 
     private func overlayRect(
@@ -473,6 +492,8 @@ struct SemanticRecordingReviewFixtureView: View {
                 }
             }
         }
+        .frame(width: 440, alignment: .leading)
+        .clipped()
     }
 
     private var inspector: some View {
@@ -485,8 +506,10 @@ struct SemanticRecordingReviewFixtureView: View {
                 suggestionSection
                 safetySection
             }
-            .frame(maxWidth: .infinity, alignment: .topLeading)
+            .frame(width: 380, alignment: .topLeading)
         }
+        .frame(width: 380, alignment: .topLeading)
+        .clipped()
     }
 
     @ViewBuilder
@@ -959,7 +982,7 @@ struct SemanticRecordingReviewFixtureView: View {
     private func comparisonArtifactStrip(
         _ comparison: SemanticRecordingReviewProjection.ComparisonRow
     ) -> some View {
-        HStack(spacing: 8) {
+        VStack(spacing: 8) {
             comparisonArtifactTile(
                 title: NSLocalizedString("Source", comment: ""),
                 path: comparison.sourceArtifactPath,

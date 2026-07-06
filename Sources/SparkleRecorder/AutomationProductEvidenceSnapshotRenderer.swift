@@ -13,6 +13,7 @@ enum AutomationProductEvidenceSnapshotScenario: String, CaseIterable {
     case branchEvidence = "branch-evidence"
     case templateBaselinePreviewRefs = "template-baseline-preview-refs"
     case semanticReviewTimeline = "semantic-review-timeline"
+    case semanticReviewStoredBundle = "semantic-review-stored-bundle"
     case semanticReviewPixelColor = "semantic-review-pixel-color"
     case semanticReviewDraftPreview = "semantic-review-draft-preview"
     case semanticReviewRunDetail = "semantic-review-run-detail"
@@ -39,6 +40,8 @@ enum AutomationProductEvidenceSnapshotScenario: String, CaseIterable {
             self = .templateBaselinePreviewRefs
         case "semantic-review", "semantic-review-timeline", "review-timeline":
             self = .semanticReviewTimeline
+        case "semantic-review-stored-bundle", "review-stored-bundle", "stored-review":
+            self = .semanticReviewStoredBundle
         case "semantic-review-pixel-color", "review-pixel-color", "pixel-color":
             self = .semanticReviewPixelColor
         case "semantic-review-draft-preview", "review-draft-preview", "semantic-draft-preview":
@@ -72,6 +75,8 @@ enum AutomationProductEvidenceSnapshotScenario: String, CaseIterable {
             return "template-baseline-preview-refs.png"
         case .semanticReviewTimeline:
             return "semantic-review-timeline.png"
+        case .semanticReviewStoredBundle:
+            return "semantic-review-stored-bundle.png"
         case .semanticReviewPixelColor:
             return "semantic-review-pixel-color.png"
         case .semanticReviewDraftPreview:
@@ -91,6 +96,8 @@ enum AutomationProductEvidenceSnapshotScenario: String, CaseIterable {
             return 980
         case .semanticReviewTimeline:
             return 1_040
+        case .semanticReviewStoredBundle:
+            return 1_180
         case .semanticReviewPixelColor:
             return 1_040
         case .semanticReviewDraftPreview:
@@ -114,7 +121,7 @@ enum AutomationProductEvidenceSnapshotScenario: String, CaseIterable {
             return Self.fixedUUID("00000000-0000-0000-0000-00000000c20b")
         case .branchEvidence:
             return Self.fixedUUID("00000000-0000-0000-0000-00000000c206")
-        case .templateBaselinePreviewRefs, .semanticReviewTimeline, .semanticReviewPixelColor, .semanticReviewDraftPreview:
+        case .templateBaselinePreviewRefs, .semanticReviewTimeline, .semanticReviewStoredBundle, .semanticReviewPixelColor, .semanticReviewDraftPreview:
             return nil
         }
     }
@@ -128,7 +135,7 @@ enum AutomationProductEvidenceSnapshotScenario: String, CaseIterable {
         case .branchEvidence:
             return Self.fixedUUID("00000000-0000-0000-0000-00000000c406")
         case .idle, .dragLinkAuthoring, .taskReorderAuthoring, .running, .templateBaselinePreviewRefs,
-             .semanticReviewTimeline, .semanticReviewPixelColor, .semanticReviewDraftPreview:
+             .semanticReviewTimeline, .semanticReviewStoredBundle, .semanticReviewPixelColor, .semanticReviewDraftPreview:
             return nil
         }
     }
@@ -138,7 +145,7 @@ enum AutomationProductEvidenceSnapshotScenario: String, CaseIterable {
         case .dragLinkAuthoring:
             return Self.fixedUUID("00000000-0000-0000-0000-00000000c202")
         case .idle, .taskReorderAuthoring, .running, .failedRunDetail, .failedRunPreviewUnavailable, .visualDiagnostics, .branchEvidence,
-             .semanticReviewTimeline, .semanticReviewPixelColor, .semanticReviewDraftPreview, .semanticReviewRunDetail:
+             .semanticReviewTimeline, .semanticReviewStoredBundle, .semanticReviewPixelColor, .semanticReviewDraftPreview, .semanticReviewRunDetail:
             return nil
         case .templateBaselinePreviewRefs:
             return nil
@@ -150,7 +157,7 @@ enum AutomationProductEvidenceSnapshotScenario: String, CaseIterable {
         case .dragLinkAuthoring:
             return .onConditionMatched
         case .idle, .taskReorderAuthoring, .running, .failedRunDetail, .failedRunPreviewUnavailable, .visualDiagnostics, .branchEvidence,
-             .semanticReviewTimeline, .semanticReviewPixelColor, .semanticReviewDraftPreview, .semanticReviewRunDetail:
+             .semanticReviewTimeline, .semanticReviewStoredBundle, .semanticReviewPixelColor, .semanticReviewDraftPreview, .semanticReviewRunDetail:
             return .onSuccess
         case .templateBaselinePreviewRefs:
             return .onSuccess
@@ -162,7 +169,7 @@ enum AutomationProductEvidenceSnapshotScenario: String, CaseIterable {
         case .failedRunDetail, .failedRunPreviewUnavailable:
             return true
         case .idle, .dragLinkAuthoring, .taskReorderAuthoring, .running, .visualDiagnostics, .branchEvidence,
-             .templateBaselinePreviewRefs, .semanticReviewTimeline, .semanticReviewPixelColor, .semanticReviewDraftPreview, .semanticReviewRunDetail:
+             .templateBaselinePreviewRefs, .semanticReviewTimeline, .semanticReviewStoredBundle, .semanticReviewPixelColor, .semanticReviewDraftPreview, .semanticReviewRunDetail:
             return false
         }
     }
@@ -172,7 +179,7 @@ enum AutomationProductEvidenceSnapshotScenario: String, CaseIterable {
         case .failedRunPreviewUnavailable:
             return "fixture-macros-preview-unavailable"
         case .idle, .dragLinkAuthoring, .taskReorderAuthoring, .running, .failedRunDetail, .visualDiagnostics,
-             .branchEvidence, .templateBaselinePreviewRefs, .semanticReviewTimeline, .semanticReviewPixelColor, .semanticReviewDraftPreview,
+             .branchEvidence, .templateBaselinePreviewRefs, .semanticReviewTimeline, .semanticReviewStoredBundle, .semanticReviewPixelColor, .semanticReviewDraftPreview,
              .semanticReviewRunDetail:
             return "fixture-macros"
         }
@@ -187,7 +194,7 @@ enum AutomationProductEvidenceSnapshotScenario: String, CaseIterable {
             )
         case .idle, .dragLinkAuthoring, .running, .failedRunDetail,
              .failedRunPreviewUnavailable, .visualDiagnostics, .branchEvidence, .templateBaselinePreviewRefs,
-             .semanticReviewTimeline, .semanticReviewPixelColor, .semanticReviewDraftPreview, .semanticReviewRunDetail:
+             .semanticReviewTimeline, .semanticReviewStoredBundle, .semanticReviewPixelColor, .semanticReviewDraftPreview, .semanticReviewRunDetail:
             return nil
         }
     }
@@ -202,7 +209,7 @@ enum AutomationProductEvidenceSnapshotScenario: String, CaseIterable {
             return .succeeded(.revealReport)
         case .idle, .dragLinkAuthoring, .taskReorderAuthoring, .running,
              .failedRunPreviewUnavailable, .visualDiagnostics, .branchEvidence, .templateBaselinePreviewRefs,
-             .semanticReviewTimeline, .semanticReviewPixelColor, .semanticReviewDraftPreview, .semanticReviewRunDetail:
+             .semanticReviewTimeline, .semanticReviewStoredBundle, .semanticReviewPixelColor, .semanticReviewDraftPreview, .semanticReviewRunDetail:
             return nil
         }
     }
@@ -213,7 +220,7 @@ enum AutomationProductEvidenceSnapshotScenario: String, CaseIterable {
             return ["regionSampleImage": .succeeded(.reveal)]
         case .idle, .dragLinkAuthoring, .taskReorderAuthoring, .running,
              .failedRunDetail, .failedRunPreviewUnavailable, .branchEvidence, .templateBaselinePreviewRefs,
-             .semanticReviewTimeline, .semanticReviewPixelColor, .semanticReviewDraftPreview, .semanticReviewRunDetail:
+             .semanticReviewTimeline, .semanticReviewStoredBundle, .semanticReviewPixelColor, .semanticReviewDraftPreview, .semanticReviewRunDetail:
             return [:]
         }
     }
@@ -638,6 +645,31 @@ enum AutomationProductEvidenceSnapshotRenderer {
             )
             return
         }
+        if scenario == .semanticReviewStoredBundle {
+            let storedFixture = try semanticReviewStoredBundleFixture(
+                createdAt: now,
+                baseDirectory: outputURL.deletingLastPathComponent()
+            )
+            let view = SemanticRecordingReviewFixtureView(
+                state: storedFixture.state,
+                selectedEventID: SemanticRecordingFixture.waitEventID,
+                selectedFrameID: SemanticRecordingFixture.afterClickFrameID,
+                initialDraftPatchCandidateID: storedFixture.candidateID
+            )
+            .frame(width: width, height: height)
+            .environment(\.colorScheme, .dark)
+            .environment(\.locale, Locale(identifier: "en_US_POSIX"))
+            .background(Color(red: 0.08, green: 0.09, blue: 0.10))
+
+            try writeSwiftUISnapshot(
+                view,
+                outputURL: outputURL,
+                width: width,
+                height: height,
+                scale: scale
+            )
+            return
+        }
         if scenario == .semanticReviewPixelColor {
             let pixelFixture = semanticReviewPixelColorFixture(createdAt: now)
             let view = SemanticRecordingReviewFixtureView(
@@ -775,6 +807,210 @@ enum AutomationProductEvidenceSnapshotRenderer {
             "\(pixelSourceID.uuidString)-pixelMatched",
             "#2BC66A"
         )
+    }
+
+    private static func semanticReviewStoredBundleFixture(
+        createdAt: Date,
+        baseDirectory: URL
+    ) throws -> (state: SemanticRecordingReviewState, candidateID: String?) {
+        let rootDirectory = baseDirectory.appendingPathComponent(
+            "fixture-semantic-review-stored-bundles",
+            isDirectory: true
+        )
+        let bundle = SemanticRecordingFixture.checkoutBundle(createdAt: createdAt)
+        let bundleDirectory = rootDirectory.appendingPathComponent(
+            bundle.id.uuidString,
+            isDirectory: true
+        )
+        if FileManager.default.fileExists(atPath: bundleDirectory.path) {
+            try FileManager.default.removeItem(at: bundleDirectory)
+        }
+
+        try writeSemanticReviewStoredBundleManifest(bundle, to: bundleDirectory)
+        try seedSemanticReviewStoredBundleArtifacts(for: bundle, in: bundleDirectory)
+
+        let loadedBundle = try readSemanticReviewStoredBundleManifest(from: bundleDirectory)
+        let suggestions = SemanticRecordingFixture.checkoutSuggestions(bundle: loadedBundle)
+        let artifactStatuses = semanticReviewArtifactStatuses(
+            for: loadedBundle,
+            directory: bundleDirectory
+        )
+        let projection = SemanticRecordingReviewProjection(
+            bundle: loadedBundle,
+            suggestions: suggestions,
+            selectedEventID: SemanticRecordingFixture.waitEventID,
+            selectedFrameID: SemanticRecordingFixture.afterClickFrameID
+        )
+        let candidateID = projection.selectedFrame?.conditionCandidates.first?.id
+        let state = SemanticRecordingReviewState(
+            sourceName: "stored checkout bundle",
+            bundleDirectory: bundleDirectory,
+            loadedAt: createdAt,
+            bundle: loadedBundle,
+            suggestions: suggestions,
+            validationIssues: loadedBundle.validate(),
+            artifactStatuses: artifactStatuses
+        )
+        return (state, candidateID)
+    }
+
+    private static func writeSemanticReviewStoredBundleManifest(
+        _ bundle: SemanticRecordingBundle,
+        to directory: URL
+    ) throws {
+        try FileManager.default.createDirectory(
+            at: directory,
+            withIntermediateDirectories: true
+        )
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        let data = try encoder.encode(bundle)
+        try data.write(
+            to: directory.appendingPathComponent(SemanticRecordingSchema.manifestFileName),
+            options: .atomic
+        )
+    }
+
+    private static func readSemanticReviewStoredBundleManifest(
+        from directory: URL
+    ) throws -> SemanticRecordingBundle {
+        let data = try Data(
+            contentsOf: directory.appendingPathComponent(SemanticRecordingSchema.manifestFileName)
+        )
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        return try decoder.decode(SemanticRecordingBundle.self, from: data)
+    }
+
+    private static func seedSemanticReviewStoredBundleArtifacts(
+        for bundle: SemanticRecordingBundle,
+        in bundleDirectory: URL
+    ) throws {
+        for frame in bundle.frames {
+            try writeEvidencePNG(
+                to: bundleDirectory.appendingRecordingArtifactRef(frame.imageRef),
+                size: CGSize(width: frame.imageSize?.width ?? 1_440, height: frame.imageSize?.height ?? 900),
+                fill: NSColor(calibratedRed: 0.11, green: 0.13, blue: 0.13, alpha: 1),
+                accent: frame.id == SemanticRecordingFixture.afterClickFrameID
+                    ? NSColor(calibratedRed: 0.24, green: 0.58, blue: 0.72, alpha: 1)
+                    : NSColor(calibratedRed: 0.94, green: 0.64, blue: 0.21, alpha: 1),
+                label: frame.id == SemanticRecordingFixture.afterClickFrameID
+                    ? "Order confirmed"
+                    : "Checkout"
+            )
+        }
+        try writeEvidencePNG(
+            to: bundleDirectory.appendingPathComponent("visual-index/templates/checkout-button.png"),
+            size: CGSize(width: 180, height: 48),
+            fill: NSColor(calibratedRed: 0.91, green: 0.55, blue: 0.18, alpha: 1),
+            accent: NSColor.white,
+            label: "Checkout"
+        )
+        try writeEvidencePNG(
+            to: bundleDirectory.appendingPathComponent("visual-index/ocr/confirmation-region.png"),
+            size: CGSize(width: 260, height: 42),
+            fill: NSColor(calibratedRed: 0.21, green: 0.48, blue: 0.61, alpha: 1),
+            accent: NSColor.white,
+            label: "Order confirmed"
+        )
+        try writeEvidencePNG(
+            to: bundleDirectory.appendingPathComponent("runs/run-001/condition-confirmation/watched-region.png"),
+            size: CGSize(width: 260, height: 42),
+            fill: NSColor(calibratedRed: 0.20, green: 0.52, blue: 0.34, alpha: 1),
+            accent: NSColor.white,
+            label: "Runtime matched"
+        )
+        try writeEvidencePNG(
+            to: bundleDirectory.appendingPathComponent("runs/run-001/condition-confirmation/diff.png"),
+            size: CGSize(width: 260, height: 42),
+            fill: NSColor(calibratedRed: 0.16, green: 0.17, blue: 0.18, alpha: 1),
+            accent: NSColor(calibratedRed: 0.94, green: 0.64, blue: 0.21, alpha: 1),
+            label: "Diff stable"
+        )
+    }
+
+    private static func semanticReviewArtifactStatuses(
+        for bundle: SemanticRecordingBundle,
+        directory: URL
+    ) -> [String: SemanticRecordingReviewArtifactStatus] {
+        Dictionary(uniqueKeysWithValues: semanticReviewArtifactRefs(in: bundle).map { ref in
+            let url = directory.appendingRecordingArtifactRef(ref)
+            return (
+                ref.path,
+                SemanticRecordingReviewArtifactStatus(
+                    path: ref.path,
+                    url: url,
+                    exists: FileManager.default.fileExists(atPath: url.path)
+                )
+            )
+        })
+    }
+
+    private static func semanticReviewArtifactRefs(
+        in bundle: SemanticRecordingBundle
+    ) -> [RecordingArtifactRef] {
+        var refs: [RecordingArtifactRef] = []
+        refs.append(contentsOf: bundle.videoSegments.map(\.artifactRef))
+        refs.append(contentsOf: bundle.frames.map(\.imageRef))
+        refs.append(contentsOf: bundle.visualObservations.compactMap(\.artifactRef))
+        refs.append(contentsOf: bundle.sourcePreviews.compactMap(\.artifactRef))
+        refs.append(contentsOf: bundle.runtimeSamples.map(\.artifactRef))
+        refs.append(contentsOf: bundle.previewComparisons.compactMap(\.diffArtifactRef))
+        refs.append(contentsOf: bundle.suppressions.compactMap(\.redactedArtifactRef))
+
+        var seen = Set<String>()
+        return refs
+            .filter { seen.insert($0.path).inserted }
+            .sorted { $0.path < $1.path }
+    }
+
+    private static func writeEvidencePNG(
+        to url: URL,
+        size: CGSize,
+        fill: NSColor,
+        accent: NSColor,
+        label: String
+    ) throws {
+        try FileManager.default.createDirectory(
+            at: url.deletingLastPathComponent(),
+            withIntermediateDirectories: true
+        )
+        let image = NSImage(size: size)
+        image.lockFocus()
+        fill.setFill()
+        NSBezierPath(rect: CGRect(origin: .zero, size: size)).fill()
+        let inset = max(8, min(size.width, size.height) * 0.14)
+        let badgeRect = CGRect(
+            x: inset,
+            y: inset,
+            width: max(1, size.width - inset * 2),
+            height: max(1, size.height - inset * 2)
+        )
+        accent.withAlphaComponent(0.28).setFill()
+        NSBezierPath(roundedRect: badgeRect, xRadius: 8, yRadius: 8).fill()
+        accent.setStroke()
+        let outline = NSBezierPath(roundedRect: badgeRect, xRadius: 8, yRadius: 8)
+        outline.lineWidth = max(2, min(size.width, size.height) * 0.025)
+        outline.stroke()
+        let fontSize = max(10, min(36, min(size.width, size.height) * 0.24))
+        let textColor = fill.brightnessComponent > 0.62 ? NSColor.black : NSColor.white
+        let attributes: [NSAttributedString.Key: Any] = [
+            .font: NSFont.systemFont(ofSize: fontSize, weight: .semibold),
+            .foregroundColor: textColor
+        ]
+        NSString(string: label).draw(
+            in: badgeRect.insetBy(dx: 10, dy: max(4, (badgeRect.height - fontSize) / 2.2)),
+            withAttributes: attributes
+        )
+        image.unlockFocus()
+
+        guard let tiffData = image.tiffRepresentation,
+              let bitmap = NSBitmapImageRep(data: tiffData),
+              let pngData = bitmap.representation(using: .png, properties: [:]) else {
+            throw SnapshotError.fixturePreparationFailed("Could not encode semantic review stored-bundle PNG.")
+        }
+        try pngData.write(to: url, options: .atomic)
     }
 
     private static func semanticReviewDraftPreviewState(
