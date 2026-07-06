@@ -268,17 +268,18 @@ final class CoordinatePreviewOverlay {
         let relativeActions = actions.map { action -> RelativePreviewAction in
             let mappedStart = action.selectedPoint.map { screenToSwiftUI($0, window: win, primaryScreenHeight: primaryScreenHeight) }
             let mappedPath = action.dragPath.map { screenToSwiftUI($0, window: win, primaryScreenHeight: primaryScreenHeight) }
-	            return RelativePreviewAction(
-	                id: action.id,
-	                kind: action.kind,
-	                selectedPoint: mappedStart,
-	                dragPath: mappedPath,
-	                observedFrame: action.observedFrame.map { screenToSwiftUI($0, window: win, primaryScreenHeight: primaryScreenHeight) },
-	                searchRegion: action.searchRegion.map { screenToSwiftUI($0, window: win, primaryScreenHeight: primaryScreenHeight) },
-	                fallbackPoint: action.fallbackPoint.map { screenToSwiftUI($0, window: win, primaryScreenHeight: primaryScreenHeight) },
-	                themeColor: action.themeColor,
-	                order: action.order
-	            )
+            return RelativePreviewAction(
+                id: action.id,
+                kind: action.kind,
+                affordance: action.affordance,
+                selectedPoint: mappedStart,
+                dragPath: mappedPath,
+                observedFrame: action.observedFrame.map { screenToSwiftUI($0, window: win, primaryScreenHeight: primaryScreenHeight) },
+                searchRegion: action.searchRegion.map { screenToSwiftUI($0, window: win, primaryScreenHeight: primaryScreenHeight) },
+                fallbackPoint: action.fallbackPoint.map { screenToSwiftUI($0, window: win, primaryScreenHeight: primaryScreenHeight) },
+                themeColor: action.themeColor,
+                order: action.order
+            )
         }
         
         self.state.actions = relativeActions

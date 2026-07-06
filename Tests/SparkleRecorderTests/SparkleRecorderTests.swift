@@ -304,6 +304,29 @@ struct SparkleRecorderTests {
         #expect(group.textTargetReadiness == .missingAnchor)
     }
 
+    @Test("Event Grouper Does Not Merge Incomplete Text Click With Coordinate Clicks")
+    func eventGrouperDoesNotMergeIncompleteTextClickWithCoordinateClicks() throws {
+        var textDown = RecordedEvent.make(.leftMouseDown, time: 0.00, x: 130, y: 102, mouseButton: 0, clickCount: 1)
+        textDown.coordinateStrategy = .locatorOnly
+        var textUp = RecordedEvent.make(.leftMouseUp, time: 0.02, x: 130, y: 102, mouseButton: 0, clickCount: 1)
+        textUp.coordinateStrategy = .locatorOnly
+
+        let events = [
+            textDown,
+            textUp,
+            RecordedEvent.make(.leftMouseDown, time: 0.07, x: 180, y: 120, mouseButton: 0, clickCount: 1),
+            RecordedEvent.make(.leftMouseUp, time: 0.09, x: 180, y: 120, mouseButton: 0, clickCount: 1)
+        ]
+
+        let groups = EventGrouper().group(events)
+
+        #expect(groups.count == 2)
+        #expect(groups[0].summary == "Click text (needs text)")
+        #expect(groups[0].textTargetReadiness == .missingAnchor)
+        #expect(groups[1].kind == .click)
+        #expect(groups[1].textTargetReadiness == .notTextTarget)
+    }
+
     @Test("Recorded Coordinate Click Can Become Text Click")
     func recordedCoordinateClickCanBecomeTextClick() throws {
         var events = TestFixtures.clickPair(

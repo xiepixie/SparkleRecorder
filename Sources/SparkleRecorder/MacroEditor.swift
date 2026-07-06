@@ -357,8 +357,10 @@ struct EditorView: View {
             var observedFrame: CGRect? = nil
             var searchRegion: CGRect? = nil
             var fallbackPoint: CGPoint? = nil
+            var usesTextLocator = grp.textAnchor != nil
             if let firstIdx = grp.eventIndices.first, events.indices.contains(firstIdx) {
                 let ev = events[firstIdx]
+                usesTextLocator = usesTextLocator || ev.coordinateStrategy == .locatorOnly || ev.textAnchor != nil
                 startPt = try? resolver.resolve(ev, context: context).get()
                 if let anchor = ev.textAnchor {
                     let surfaceId = ev.surfaceId ?? currentMacro?.surfaces.keys.first
@@ -400,6 +402,7 @@ struct EditorView: View {
             actionsToPreview.append(PreviewAction(
                 id: item.id,
                 kind: grp.kind,
+                affordance: ActionGroupProjection.previewAffordance(for: grp.kind, usesTextLocator: usesTextLocator),
                 selectedPoint: startPt,
                 dragPath: resolvedPath,
                 observedFrame: observedFrame,

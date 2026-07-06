@@ -218,10 +218,12 @@ Do not do yet:
 
 ## 7. UI Checkpoint After S3 Pause
 
-S3 first pass 暂停后，UI 工作不再以继续扩 Review 功能为主，而是先修补后端状态到用户表面的断点。本轮 checkpoint 的第一处产品化修正是 Macro Editor 的 text-target readiness：
+S3 first pass 暂停后，UI 工作不再以继续扩 Review 功能为主，而是先修补后端状态到用户表面的断点。本轮 checkpoint 的第一处产品化修正是 Macro Editor 的 action preview / text-target readiness：
 
 - `EventGrouper` / `ActionGroup` 已能把 locator-only click、wait text、wait text gone 和 verify text 的 target 状态区分为 `missingAnchor`、`missingText` 或 `ready`。
 - Action list 现在优先显示 `No target text`，而不是在 locator-only / text action 缺目标时继续显示坐标；用户可以在运行前看到该动作还需要 Teach/Pick target。
+- `ActionPreviewAffordance` 把 ordinary click / text click / wait text / verify text / multipoint / drag 的预览 affordance 拆到 projection 层，避免 wait/verify 被误画成 click pulse。
+- Incomplete text click 不再参与 ordinary coordinate multi-click 合并，防止“需要先 Teach 的文本点击”被藏进普通多点点击里。
 - 这类 UI polish 属于后续 UI owner 常规职责：不改 S1 schema，不绕过 S2 capture，不把 S3 live evidence 提前标完成，只把已有 projection/state 变成清楚、可信、可修正的界面反馈。
 
 下一批同类 UI 打磨应沿着同一规则推进：后端已经提供结构化状态时，SwiftUI 负责可视化和操作路径；后端还没有 live evidence 或 presenter 输入时，UI 只能显示 pending / missing / degraded，不伪造成完成能力。

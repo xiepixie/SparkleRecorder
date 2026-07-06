@@ -9708,6 +9708,40 @@
         }
       }
     },
+    "Wait text": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Wait text"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "等待文本"
+          }
+        }
+      }
+    },
+    "Wait gone": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Wait gone"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "等待消失"
+          }
+        }
+      }
+    },
     "Wait for text: %@": {
       "extractionState": "manual",
       "localizations": {

@@ -5,6 +5,7 @@ import SparkleRecorderCore
 struct PreviewAction: Identifiable {
     let id: UUID
     let kind: ActionGroupKind
+    let affordance: ActionPreviewAffordance
     let selectedPoint: CGPoint?
     let dragPath: [CGPoint]
     let observedFrame: CGRect?

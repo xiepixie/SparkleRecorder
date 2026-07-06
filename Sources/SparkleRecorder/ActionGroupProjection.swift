@@ -35,6 +35,48 @@ public enum TextTargetReadiness: String, Codable, Equatable, Sendable {
     }
 }
 
+public enum ActionPreviewAffordance: String, Codable, Equatable, Sendable {
+    case none
+    case inputPoint
+    case inputPath
+    case pointSequence
+    case textClickTarget
+    case waitTextRegion
+    case waitTextGoneRegion
+    case verifyTextRegion
+
+    public var showsClickPulse: Bool {
+        switch self {
+        case .inputPoint, .textClickTarget:
+            return true
+        default:
+            return false
+        }
+    }
+
+    public var showsLocatorFallbackPoint: Bool {
+        self == .textClickTarget
+    }
+
+    public var showsConditionRegion: Bool {
+        switch self {
+        case .waitTextRegion, .waitTextGoneRegion, .verifyTextRegion:
+            return true
+        default:
+            return false
+        }
+    }
+
+    public var showsTargetRegionLabel: Bool {
+        switch self {
+        case .textClickTarget, .waitTextRegion, .waitTextGoneRegion, .verifyTextRegion:
+            return true
+        default:
+            return false
+        }
+    }
+}
+
 public enum ActionGroupProjection {
     public static func groups(
         from events: [RecordedEvent],
@@ -191,6 +233,30 @@ public enum ActionGroupProjection {
             }
         }
         return group.textAnchor
+    }
+
+    public static func previewAffordance(
+        for kind: ActionGroupKind,
+        usesTextLocator: Bool = false
+    ) -> ActionPreviewAffordance {
+        switch kind {
+        case .waitForText:
+            return .waitTextRegion
+        case .waitForTextGone:
+            return .waitTextGoneRegion
+        case .verifyText:
+            return .verifyTextRegion
+        case .multiPointClick:
+            return .pointSequence
+        case .drag:
+            return .inputPath
+        case .click, .doubleClick, .longPress, .repeatedClick:
+            return usesTextLocator ? .textClickTarget : .inputPoint
+        case .scroll, .mouseMove:
+            return .inputPoint
+        default:
+            return .none
+        }
     }
 
     private static func editsSemanticTextTarget(_ kind: ActionGroupKind) -> Bool {

@@ -295,4 +295,31 @@ struct ActionGroupProjectionTests {
         #expect(ActionGroupProjection.textTargetReadiness(for: group, events: [event]) == .ready)
         #expect(ActionGroupProjection.textAnchorIsReady(anchor))
     }
+
+    @Test("Preview affordance separates click pulses from condition regions")
+    func previewAffordanceSeparatesClickPulsesFromConditionRegions() {
+        let click = ActionGroupProjection.previewAffordance(for: .click)
+        let textClick = ActionGroupProjection.previewAffordance(for: .click, usesTextLocator: true)
+        let wait = ActionGroupProjection.previewAffordance(for: .waitForText)
+        let gone = ActionGroupProjection.previewAffordance(for: .waitForTextGone)
+        let verify = ActionGroupProjection.previewAffordance(for: .verifyText)
+
+        #expect(click == .inputPoint)
+        #expect(click.showsClickPulse)
+        #expect(!click.showsConditionRegion)
+        #expect(textClick == .textClickTarget)
+        #expect(textClick.showsClickPulse)
+        #expect(textClick.showsLocatorFallbackPoint)
+        #expect(textClick.showsTargetRegionLabel)
+
+        #expect(wait == .waitTextRegion)
+        #expect(gone == .waitTextGoneRegion)
+        #expect(verify == .verifyTextRegion)
+        #expect([wait, gone, verify].allSatisfy { $0.showsConditionRegion })
+        #expect([wait, gone, verify].allSatisfy { !$0.showsClickPulse })
+        #expect([wait, gone, verify].allSatisfy { $0.showsTargetRegionLabel })
+
+        #expect(ActionGroupProjection.previewAffordance(for: .multiPointClick) == .pointSequence)
+        #expect(ActionGroupProjection.previewAffordance(for: .drag) == .inputPath)
+    }
 }

@@ -956,7 +956,9 @@ public struct EventGrouper: Sendable {
     }
 
     private func isMergeableCoordinateClick(_ group: ActionGroup) -> Bool {
-        group.kind == .click && group.textAnchor == nil
+        group.kind == .click &&
+        group.textAnchor == nil &&
+        group.textTargetReadiness == .notTextTarget
     }
     
     private func aggregateScrollPayload(_ events: [RecordedEvent]) -> ScrollPayload? {

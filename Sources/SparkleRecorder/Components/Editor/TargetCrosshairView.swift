@@ -83,19 +83,44 @@ struct TargetCrosshairView: View {
         }
     }
 
+    private func targetBadgeTitle(for action: RelativePreviewAction) -> String? {
+        switch action.affordance {
+        case .textClickTarget:
+            return NSLocalizedString("Click text", comment: "")
+        case .waitTextRegion:
+            return NSLocalizedString("Wait text", comment: "")
+        case .waitTextGoneRegion:
+            return NSLocalizedString("Wait gone", comment: "")
+        case .verifyTextRegion:
+            return NSLocalizedString("Verify text", comment: "")
+        default:
+            return nil
+        }
+    }
+
     @ViewBuilder
-    private func orderBadge(for action: RelativePreviewAction) -> some View {
-        Text("\(action.order)")
-            .font(.system(size: 8.5, weight: .bold, design: .rounded))
-            .foregroundStyle(.white)
-            .padding(.horizontal, 5)
-            .padding(.vertical, 1)
+    private func targetBadge(for action: RelativePreviewAction) -> some View {
+        if let title = targetBadgeTitle(for: action) {
+            HStack(spacing: 4) {
+                Text("\(action.order)")
+                    .font(.system(size: 8.5, weight: .bold, design: .rounded))
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 4)
+                    .padding(.vertical, 0.5)
+                    .background(Capsule().fill(Color.white.opacity(0.18)))
+                Text(title)
+                    .font(.system(size: 9, weight: .semibold, design: .rounded))
+                    .foregroundStyle(.white)
+            }
+            .padding(.horizontal, 6)
+            .padding(.vertical, 3)
             .background(
                 Capsule()
-                    .fill(action.themeColor)
-                    .shadow(color: .black.opacity(0.2), radius: 1)
+                    .fill(action.themeColor.opacity(action.affordance.showsConditionRegion ? 0.92 : 0.82))
+                    .shadow(color: .black.opacity(0.22), radius: 1)
             )
             .fixedSize()
+        }
     }
 
     private func coordinateString(_ pt: CGPoint) -> String {
@@ -151,45 +176,45 @@ struct TargetCrosshairView: View {
                     .position(fPt)
             }
 
-	            // 3. Render each action's markers
-	            ForEach(actions) { action in
-	                if let region = action.searchRegion {
-	                    RoundedRectangle(cornerRadius: 6)
-	                        .fill(action.themeColor.opacity(0.08))
-	                        .overlay(
-	                            RoundedRectangle(cornerRadius: 6)
-	                                .stroke(action.themeColor.opacity(0.9), style: StrokeStyle(lineWidth: 2, dash: [7, 5], dashPhase: lineDashPhase))
-	                        )
-	                        .overlay(alignment: .topLeading) {
-	                            if action.kind.editsSemanticTextTarget {
-	                                orderBadge(for: action)
-	                                    .offset(x: 6, y: 6)
-	                            }
-	                        }
-	                        .frame(width: region.width, height: region.height)
-	                        .position(x: region.midX, y: region.midY)
-	                        .allowsHitTesting(false)
-	                }
+            // 3. Render each action's markers
+            ForEach(actions) { action in
+                if let region = action.searchRegion {
+                    RoundedRectangle(cornerRadius: 6)
+                        .fill(action.themeColor.opacity(0.08))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 6)
+                                .stroke(action.themeColor.opacity(0.9), style: StrokeStyle(lineWidth: 2, dash: [7, 5], dashPhase: lineDashPhase))
+                        )
+                        .overlay(alignment: .topLeading) {
+                            if action.affordance.showsTargetRegionLabel {
+                                targetBadge(for: action)
+                                    .offset(x: 6, y: 6)
+                            }
+                        }
+                        .frame(width: region.width, height: region.height)
+                        .position(x: region.midX, y: region.midY)
+                        .allowsHitTesting(false)
+                }
 
-	                if let observed = action.observedFrame {
-	                    RoundedRectangle(cornerRadius: 4)
-	                        .stroke(action.themeColor.opacity(0.95), lineWidth: 1.5)
-	                        .background(
-	                            RoundedRectangle(cornerRadius: 4)
-	                                .fill(action.themeColor.opacity(0.12))
-	                        )
-	                        .overlay(alignment: .topLeading) {
-	                            if action.kind.editsSemanticTextTarget {
-	                                orderBadge(for: action)
-	                                    .offset(x: 6, y: 6)
-	                            }
-	                        }
-	                        .frame(width: observed.width, height: observed.height)
-	                        .position(x: observed.midX, y: observed.midY)
-	                        .allowsHitTesting(false)
-	                }
+                if let observed = action.observedFrame {
+                    RoundedRectangle(cornerRadius: 4)
+                        .stroke(action.themeColor.opacity(0.95), lineWidth: 1.5)
+                        .background(
+                            RoundedRectangle(cornerRadius: 4)
+                                .fill(action.themeColor.opacity(0.12))
+                        )
+                        .overlay(alignment: .topLeading) {
+                            if action.affordance.showsTargetRegionLabel {
+                                targetBadge(for: action)
+                                    .offset(x: 6, y: 6)
+                            }
+                        }
+                        .frame(width: observed.width, height: observed.height)
+                        .position(x: observed.midX, y: observed.midY)
+                        .allowsHitTesting(false)
+                }
 
-	                if !action.kind.editsSemanticTextTarget, let fallback = action.fallbackPoint {
+	                if action.affordance.showsLocatorFallbackPoint, let fallback = action.fallbackPoint {
 	                    Image(systemName: "smallcircle.filled.circle")
 	                        .font(.system(size: 13, weight: .bold))
 	                        .foregroundStyle(action.themeColor)
@@ -369,11 +394,11 @@ struct TargetCrosshairView: View {
                         }
                     }
 
-	                // Targets
-	                if !action.kind.previewsPointSequence,
-	                   !action.kind.editsSemanticTextTarget,
-	                   action.selectedPoint != nil,
-	                   let displayPt = actionGeometries[action.id]?.startPoint {
+                // Targets
+                if !action.kind.previewsPointSequence,
+                   action.affordance.showsClickPulse,
+                   action.selectedPoint != nil,
+                   let displayPt = actionGeometries[action.id]?.startPoint {
                     let isCurrentDrag = (activeDrag?.actionID == action.id && activeDrag?.handle == .start)
 
                     ZStack {
