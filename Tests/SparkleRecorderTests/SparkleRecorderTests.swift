@@ -235,6 +235,38 @@ struct SparkleRecorderTests {
         #expect(groups[2].kind == .click)
     }
 
+    @Test("Event Grouper Keeps Visual Conditions Between Rapid Point Clicks")
+    func eventGrouperKeepsVisualConditionsBetweenRapidPointClicks() {
+        var wait = RecordedEvent.make(.waitForText, time: 0.05)
+        wait.textAnchor = TextAnchor(
+            text: "Ready",
+            observedFrame: RectValue(x: 90, y: 80, width: 80, height: 24)
+        )
+        var verify = RecordedEvent.make(.verifyText, time: 0.11)
+        verify.textAnchor = TextAnchor(
+            text: "Saved",
+            observedFrame: RectValue(x: 180, y: 100, width: 70, height: 24)
+        )
+
+        let events = [
+            RecordedEvent.make(.leftMouseDown, time: 0.00, x: 100, y: 100, mouseButton: 0, clickCount: 1),
+            RecordedEvent.make(.leftMouseUp, time: 0.02, x: 100, y: 100, mouseButton: 0, clickCount: 1),
+            wait,
+            RecordedEvent.make(.leftMouseDown, time: 0.07, x: 180, y: 120, mouseButton: 0, clickCount: 1),
+            RecordedEvent.make(.leftMouseUp, time: 0.09, x: 180, y: 120, mouseButton: 0, clickCount: 1),
+            verify,
+            RecordedEvent.make(.leftMouseDown, time: 0.13, x: 240, y: 140, mouseButton: 0, clickCount: 1),
+            RecordedEvent.make(.leftMouseUp, time: 0.15, x: 240, y: 140, mouseButton: 0, clickCount: 1)
+        ]
+
+        let groups = EventGrouper().group(events)
+
+        #expect(groups.map(\.kind) == [.click, .waitForText, .click, .verifyText, .click])
+        #expect(!groups.contains { $0.kind == .multiPointClick })
+        #expect(groups[1].textTargetReadiness == .ready)
+        #expect(groups[3].textTargetReadiness == .ready)
+    }
+
     @Test("Event Grouper Does Not Merge Text Click With Coordinate Clicks")
     func eventGrouperDoesNotMergeTextClickWithCoordinateClicks() throws {
         let anchor = TextAnchor(

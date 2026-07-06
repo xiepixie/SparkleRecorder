@@ -571,6 +571,15 @@ private func runWorkflowCLI(_ args: [String]) -> Never {
             exit(Int32(exitCode))
         }
 
+        if workflowArgs.count >= 4, workflowArgs[0] == "draft", workflowArgs[1] == "loop", workflowArgs[2] == "set" {
+            let exitCode = try runWorkflowDraftLoopSet(
+                Array(workflowArgs.dropFirst(3)),
+                command: "workflow draft loop set",
+                wantsJSON: wantsJSON
+            )
+            exit(Int32(exitCode))
+        }
+
         if workflowArgs.count >= 4, workflowArgs[0] == "draft", workflowArgs[1] == "schedule", workflowArgs[2] == "set" {
             let exitCode = try runWorkflowDraftScheduleSet(
                 Array(workflowArgs.dropFirst(3)),
@@ -4767,6 +4776,77 @@ private func runWorkflowDraftTaskRemove(
     )
 }
 
+private func runWorkflowDraftLoopSet(
+    _ arguments: [String],
+    command: String,
+    wantsJSON: Bool
+) throws -> Int {
+    var draftPath: String?
+    var taskKey: String?
+    var outPath: String?
+    var macroCatalogPath: String?
+    var count: Int?
+    var tasksJSON: String?
+    var tasksFile: String?
+    var index = 0
+
+    while index < arguments.count {
+        let token = arguments[index]
+        switch token {
+        case "--json":
+            break
+        case "--out":
+            outPath = try workflowCLIValue(after: token, in: arguments, at: &index)
+        case "--macro-catalog", "--catalog":
+            macroCatalogPath = try workflowCLIValue(after: token, in: arguments, at: &index)
+        case "--count":
+            count = try parseWorkflowCLIInt(workflowCLIValue(after: token, in: arguments, at: &index), path: token)
+        case "--tasks-json":
+            tasksJSON = try workflowCLIValue(after: token, in: arguments, at: &index)
+        case "--tasks-file":
+            tasksFile = try workflowCLIValue(after: token, in: arguments, at: &index)
+        default:
+            if token.hasPrefix("--") {
+                throw WorkflowCLIError("unsupportedOption", "Unsupported option '\(token)'.", path: token)
+            }
+            if draftPath == nil {
+                draftPath = token
+            } else if taskKey == nil {
+                taskKey = token
+            } else {
+                throw WorkflowCLIError("unexpectedArgument", "Unexpected argument '\(token)'.", path: token)
+            }
+        }
+        index += 1
+    }
+
+    let document = try loadWorkflowDraftDocument(path: draftPath, command: command)
+    guard let taskKey else {
+        throw WorkflowCLIError("missingArgument", "workflow draft loop set requires a task key.")
+    }
+    guard let count else {
+        throw WorkflowCLIError("missingArgument", "workflow draft loop set requires --count.", path: "--count")
+    }
+    let tasks = try loadWorkflowDraftLoopTasks(
+        tasksJSON: tasksJSON,
+        tasksFile: tasksFile
+    )
+    let context = try loadWorkflowDraftValidationContext(macroCatalogPath: macroCatalogPath)
+    let result = try AutomationWorkflowDraftEditor.setLoop(
+        taskKey: taskKey,
+        count: count,
+        tasks: tasks,
+        in: document,
+        context: context
+    )
+    return try finishWorkflowDraftEdit(
+        result,
+        outPath: outPath,
+        command: command,
+        wantsJSON: wantsJSON
+    )
+}
+
 private func runWorkflowDraftScheduleSet(
     _ arguments: [String],
     command: String,
@@ -6329,6 +6409,31 @@ private func loadWorkflowDraftPatchDocument(path: String?, command: String) thro
     }
     let data = try readWorkflowCLIFile(at: path)
     return try decodeWorkflowCLIJSON(AutomationWorkflowDraftPatchDocument.self, from: data)
+}
+
+private func loadWorkflowDraftLoopTasks(
+    tasksJSON: String?,
+    tasksFile: String?
+) throws -> [AutomationWorkflowDraftTask] {
+    switch (tasksJSON, tasksFile) {
+    case (.some, .some):
+        throw WorkflowCLIError(
+            "conflictingArguments",
+            "Use either --tasks-json or --tasks-file, not both.",
+            path: "--tasks-json"
+        )
+    case (.some(let json), .none):
+        return try decodeWorkflowCLIJSON([AutomationWorkflowDraftTask].self, from: Data(json.utf8))
+    case (.none, .some(let path)):
+        let data = try readWorkflowCLIFile(at: path)
+        return try decodeWorkflowCLIJSON([AutomationWorkflowDraftTask].self, from: data)
+    case (.none, .none):
+        throw WorkflowCLIError(
+            "missingArgument",
+            "workflow draft loop set requires --tasks-json or --tasks-file.",
+            path: "--tasks-json"
+        )
+    }
 }
 
 private func loadWorkflowDraftValidationContext(

@@ -243,6 +243,43 @@ public enum AutomationWorkflowDraftEditor {
         )
     }
 
+    public static func setLoop(
+        taskKey: String,
+        count: Int,
+        tasks: [AutomationWorkflowDraftTask],
+        in document: AutomationWorkflowDraftDocument,
+        context: AutomationWorkflowDraftValidationContext = AutomationWorkflowDraftValidationContext()
+    ) throws -> AutomationWorkflowDraftEditResult {
+        let key = try normalizedTaskKey(taskKey)
+        var document = document
+        guard let index = document.workflow.tasks.firstIndex(where: { $0.key.trimmedForDraftEditing == key }) else {
+            throw AutomationWorkflowDraftEditError(code: "missingTask", message: "Task '\(key)' was not found.", path: "$.workflow.tasks")
+        }
+
+        document.workflow.tasks[index].type = "loop"
+        document.workflow.tasks[index].loop = AutomationWorkflowDraftLoop(
+            count: count,
+            tasks: tasks.map(normalizedTask)
+        )
+        document.workflow.tasks[index].macroRef = nil
+        document.workflow.tasks[index].condition = nil
+        document.workflow.tasks[index].delaySeconds = nil
+        document.workflow.tasks[index].notification = nil
+        document.workflow.tasks[index].resource = nil
+        document.workflow.tasks[index].maxResourceWaitSeconds = nil
+        document.workflow.tasks[index].timeoutSeconds = nil
+        document.workflow.tasks[index].pollingSeconds = nil
+        document.workflow.tasks[index].retry = nil
+        document.workflow.tasks[index].joinPolicy = nil
+
+        return result(
+            operation: "draft loop set",
+            document: document,
+            context: context,
+            changedTaskKeys: [key]
+        )
+    }
+
     public static func setCondition(
         taskKey: String,
         condition: AutomationWorkflowDraftCondition,
@@ -446,6 +483,12 @@ public enum AutomationWorkflowDraftEditor {
         task.key = task.key.trimmedForDraftEditing
         task.name = task.name?.trimmedForDraftEditing.nilIfEmptyForDraftEditing
         task.type = task.type.trimmedForDraftEditing
+        task.loop = task.loop.map { loop in
+            AutomationWorkflowDraftLoop(
+                count: loop.count,
+                tasks: loop.tasks.map(normalizedTask)
+            )
+        }
         task.macroRef = task.macroRef.map { macroRef in
             AutomationWorkflowDraftMacroRef(
                 id: macroRef.id,

@@ -255,6 +255,53 @@ struct AutomationWorkflowDraftTests {
         #expect(importResult.dependencyKeyToID.keys.contains("repeat_battle__3__wait->done:conditionMatched"))
     }
 
+    @Test("Draft editor can author fixed loop body")
+    func draftEditorCanAuthorFixedLoopBody() throws {
+        var document = try AutomationWorkflowDraftEditor
+            .makeDocument(name: "Loop authoring")
+            .document
+        document = try AutomationWorkflowDraftEditor.addTask(
+            AutomationWorkflowDraftTask(key: "repeat_checkout", type: "delay", delaySeconds: 1),
+            to: document
+        ).document
+
+        let result = try AutomationWorkflowDraftEditor.setLoop(
+            taskKey: "repeat_checkout",
+            count: 2,
+            tasks: [
+                AutomationWorkflowDraftTask(key: " tap ", type: " delay ", delaySeconds: 1),
+                AutomationWorkflowDraftTask(
+                    key: " wait_done ",
+                    type: " condition ",
+                    condition: AutomationWorkflowDraftCondition(type: " ocrText ", text: " Done ")
+                )
+            ],
+            in: document
+        )
+        let loopTask = try #require(result.document.workflow.tasks.first)
+        let loop = try #require(loopTask.loop)
+        let simulation = AutomationWorkflowDraftSimulator.simulate(result.document)
+        let importResult = AutomationWorkflowDraftImporter.dryRun(result.document)
+
+        #expect(result.operation == "draft loop set")
+        #expect(result.isValid)
+        #expect(result.changedTaskKeys == ["repeat_checkout"])
+        #expect(loopTask.type == "loop")
+        #expect(loopTask.delaySeconds == nil)
+        #expect(loop.count == 2)
+        #expect(loop.tasks.map(\.key) == ["tap", "wait_done"])
+        #expect(loop.tasks.map(\.type) == ["delay", "condition"])
+        #expect(loop.tasks[1].condition?.text == "Done")
+        #expect(simulation.steps.map(\.taskKey) == [
+            "repeat_checkout__1__tap",
+            "repeat_checkout__1__wait_done",
+            "repeat_checkout__2__tap",
+            "repeat_checkout__2__wait_done"
+        ])
+        #expect(importResult.isImportable)
+        #expect(importResult.workflow?.validationIssues().isEmpty == true)
+    }
+
     @Test("Loop draft validates fixed count and rejects nested loops")
     func loopDraftValidatesFixedCountAndRejectsNestedLoops() {
         let invalidCount = AutomationWorkflowDraftDocument(workflow: AutomationWorkflowDraft(
