@@ -240,17 +240,32 @@ public struct AutomationWorkflowDraftVisualImageAsset: Codable, Equatable, Senda
     public var label: String?
     public var path: String?
     public var sha256: String?
+    public var sourceFrameID: UUID?
+    public var sourceSurfaceID: String?
+    public var sourceArtifactPath: String?
+    public var sourceBounds: RectValue?
+    public var sourceBoundsSpace: AutomationOCRSearchRegionSpace?
 
     public init(
         key: String,
         label: String? = nil,
         path: String? = nil,
-        sha256: String? = nil
+        sha256: String? = nil,
+        sourceFrameID: UUID? = nil,
+        sourceSurfaceID: String? = nil,
+        sourceArtifactPath: String? = nil,
+        sourceBounds: RectValue? = nil,
+        sourceBoundsSpace: AutomationOCRSearchRegionSpace? = nil
     ) {
         self.key = key
         self.label = label?.trimmedForDraftValidation.nilIfEmpty
         self.path = path?.trimmedForDraftValidation.nilIfEmpty
         self.sha256 = sha256?.trimmedForDraftValidation.nilIfEmpty
+        self.sourceFrameID = sourceFrameID
+        self.sourceSurfaceID = sourceSurfaceID?.trimmedForDraftValidation.nilIfEmpty
+        self.sourceArtifactPath = sourceArtifactPath?.trimmedForDraftValidation.nilIfEmpty
+        self.sourceBounds = sourceBounds
+        self.sourceBoundsSpace = sourceBoundsSpace
     }
 }
 
@@ -690,15 +705,24 @@ private struct Validator {
         noun: String
     ) {
         for (index, asset) in assets.enumerated() {
-            guard let pathValue = asset.path?.trimmedForDraftValidation, !pathValue.isEmpty else {
-                continue
-            }
-            if AutomationWorkflowDraftVisualAssets.normalizedRelativeAssetPath(pathValue) == nil {
+            if let pathValue = asset.path?.trimmedForDraftValidation,
+               !pathValue.isEmpty,
+               AutomationWorkflowDraftVisualAssets.normalizedRelativeAssetPath(pathValue) == nil {
                 add(
                     .error,
                     .invalidVisualAsset,
                     "\(noun.capitalized) path must be a relative package path.",
                     "\(path)[\(index)].path"
+                )
+            }
+            if let sourceArtifactPath = asset.sourceArtifactPath?.trimmedForDraftValidation,
+               !sourceArtifactPath.isEmpty,
+               AutomationWorkflowDraftVisualAssets.normalizedRelativeAssetPath(sourceArtifactPath) == nil {
+                add(
+                    .error,
+                    .invalidVisualAsset,
+                    "\(noun.capitalized) source artifact path must be a relative package path.",
+                    "\(path)[\(index)].sourceArtifactPath"
                 )
             }
         }

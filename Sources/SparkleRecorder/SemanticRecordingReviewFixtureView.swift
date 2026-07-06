@@ -1084,7 +1084,7 @@ struct SemanticRecordingReviewFixtureView: View {
     private func openDraftPreview(_ result: SemanticRecordingReviewDraftPatchResult) {
         do {
             draftPreviewState = try SemanticRecordingReviewPresenter.previewState(
-                applying: result.patch,
+                applying: result,
                 to: workflow,
                 macros: macros,
                 sourceName: "Macro Review \(shortID(projection.recordingID))",

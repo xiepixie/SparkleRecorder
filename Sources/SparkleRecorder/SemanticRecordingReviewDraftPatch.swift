@@ -52,6 +52,34 @@ public struct SemanticRecordingReviewMaterializedAsset: Codable, Equatable, Send
     }
 }
 
+public struct SemanticRecordingReviewAssetExtraction: Equatable, Sendable {
+    public var kind: SemanticRecordingReviewMaterializedAssetKind
+    public var assetKey: String
+    public var sourceFrameID: UUID
+    public var sourceSurfaceID: String?
+    public var sourceFrameImagePath: String
+    public var bounds: RecordingBounds
+    public var imageSize: RecordingImageSize?
+
+    public init(
+        kind: SemanticRecordingReviewMaterializedAssetKind,
+        assetKey: String,
+        sourceFrameID: UUID,
+        sourceSurfaceID: String? = nil,
+        sourceFrameImagePath: String,
+        bounds: RecordingBounds,
+        imageSize: RecordingImageSize? = nil
+    ) {
+        self.kind = kind
+        self.assetKey = assetKey
+        self.sourceFrameID = sourceFrameID
+        self.sourceSurfaceID = sourceSurfaceID?.trimmedForSemanticReviewPatch.nilIfEmptyForSemanticReviewPatch
+        self.sourceFrameImagePath = sourceFrameImagePath
+        self.bounds = bounds
+        self.imageSize = imageSize
+    }
+}
+
 public struct SemanticRecordingReviewAssetMaterializationResult: Equatable, Sendable {
     public var patch: AutomationWorkflowDraftPatchDocument
     public var copiedAssets: [SemanticRecordingReviewMaterializedAsset]
@@ -68,11 +96,18 @@ public struct SemanticRecordingReviewAssetMaterializationResult: Equatable, Send
 public enum SemanticRecordingReviewAssetMaterializer {
     public static func materialize(
         patch: AutomationWorkflowDraftPatchDocument,
+        assetExtractions: [SemanticRecordingReviewAssetExtraction] = [],
         readArtifact: (_ sourcePath: String) throws -> Data,
+        prepareAssetData: (_ data: Data, _ extraction: SemanticRecordingReviewAssetExtraction?) throws -> Data = { data, _ in data },
         writeAsset: (_ data: Data, _ destinationPath: String) throws -> Void
     ) throws -> SemanticRecordingReviewAssetMaterializationResult {
         var patch = patch
         var copiedAssets: [SemanticRecordingReviewMaterializedAsset] = []
+        let extractionsByKindAndKey = assetExtractions.reduce(
+            into: [String: SemanticRecordingReviewAssetExtraction]()
+        ) { partial, extraction in
+            partial[extractionKey(kind: extraction.kind, assetKey: extraction.assetKey)] = extraction
+        }
 
         for index in patch.ops.indices {
             switch patch.ops[index].op {
@@ -80,10 +115,13 @@ public enum SemanticRecordingReviewAssetMaterializer {
                 guard let asset = patch.ops[index].visualImage else {
                     continue
                 }
+                let extraction = extractionsByKindAndKey[extractionKey(kind: .image, assetKey: asset.key)]
                 let materialized = try materialize(
                     asset: asset,
                     kind: .image,
+                    extraction: extraction,
                     readArtifact: readArtifact,
+                    prepareAssetData: prepareAssetData,
                     writeAsset: writeAsset
                 )
                 patch.ops[index].visualImage?.path = materialized.destinationPath
@@ -94,10 +132,13 @@ public enum SemanticRecordingReviewAssetMaterializer {
                 guard let asset = patch.ops[index].visualBaseline else {
                     continue
                 }
+                let extraction = extractionsByKindAndKey[extractionKey(kind: .baseline, assetKey: asset.key)]
                 let materialized = try materialize(
                     asset: asset,
                     kind: .baseline,
+                    extraction: extraction,
                     readArtifact: readArtifact,
+                    prepareAssetData: prepareAssetData,
                     writeAsset: writeAsset
                 )
                 patch.ops[index].visualBaseline?.path = materialized.destinationPath
@@ -118,10 +159,13 @@ public enum SemanticRecordingReviewAssetMaterializer {
     private static func materialize(
         asset: AutomationWorkflowDraftVisualImageAsset,
         kind: SemanticRecordingReviewMaterializedAssetKind,
+        extraction: SemanticRecordingReviewAssetExtraction?,
         readArtifact: (_ sourcePath: String) throws -> Data,
+        prepareAssetData: (_ data: Data, _ extraction: SemanticRecordingReviewAssetExtraction?) throws -> Data,
         writeAsset: (_ data: Data, _ destinationPath: String) throws -> Void
     ) throws -> SemanticRecordingReviewMaterializedAsset {
-        guard let rawSourcePath = asset.path?.trimmedForSemanticReviewPatch.nilIfEmptyForSemanticReviewPatch,
+        guard let rawSourcePath = extraction?.sourceFrameImagePath ??
+                asset.path?.trimmedForSemanticReviewPatch.nilIfEmptyForSemanticReviewPatch,
               let sourcePath = try? RecordingArtifactRef.normalized(rawSourcePath) else {
             throw SemanticRecordingReviewAssetMaterializationError.missingSourceArtifact(asset.key)
         }
@@ -129,13 +173,14 @@ public enum SemanticRecordingReviewAssetMaterializer {
         let destinationPath = destinationPath(
             for: asset,
             sourcePath: sourcePath,
-            kind: kind
+            kind: kind,
+            usesCropExtraction: extraction != nil
         )
         guard AutomationWorkflowDraftVisualAssets.normalizedRelativeAssetPath(destinationPath) == destinationPath else {
             throw SemanticRecordingReviewAssetMaterializationError.unsafeDestinationPath(destinationPath)
         }
 
-        let data = try readArtifact(sourcePath)
+        let data = try prepareAssetData(readArtifact(sourcePath), extraction)
         let digest = SHA256.hash(data: data)
             .map { String(format: "%02x", $0) }
             .joined()
@@ -153,10 +198,18 @@ public enum SemanticRecordingReviewAssetMaterializer {
     private static func destinationPath(
         for asset: AutomationWorkflowDraftVisualImageAsset,
         sourcePath: String,
-        kind: SemanticRecordingReviewMaterializedAssetKind
+        kind: SemanticRecordingReviewMaterializedAssetKind,
+        usesCropExtraction: Bool
     ) -> String {
-        let fileExtension = safeFileExtension(from: sourcePath)
+        let fileExtension = usesCropExtraction ? "png" : safeFileExtension(from: sourcePath)
         return "assets/\(kind.directoryName)/\(safeFileStem(for: asset.key)).\(fileExtension)"
+    }
+
+    private static func extractionKey(
+        kind: SemanticRecordingReviewMaterializedAssetKind,
+        assetKey: String
+    ) -> String {
+        "\(kind.rawValue):\(assetKey)"
     }
 
     private static func safeFileExtension(from path: String) -> String {
@@ -302,6 +355,7 @@ public struct SemanticRecordingReviewDraftPatchResult: Equatable, Sendable {
     public var region: AutomationWorkflowDraftVisualRegion?
     public var imageAsset: AutomationWorkflowDraftVisualImageAsset?
     public var baselineAsset: AutomationWorkflowDraftVisualImageAsset?
+    public var assetExtractions: [SemanticRecordingReviewAssetExtraction]
     public var appliesToExistingTask: Bool
 
     public init(
@@ -311,6 +365,7 @@ public struct SemanticRecordingReviewDraftPatchResult: Equatable, Sendable {
         region: AutomationWorkflowDraftVisualRegion? = nil,
         imageAsset: AutomationWorkflowDraftVisualImageAsset? = nil,
         baselineAsset: AutomationWorkflowDraftVisualImageAsset? = nil,
+        assetExtractions: [SemanticRecordingReviewAssetExtraction] = [],
         appliesToExistingTask: Bool
     ) {
         self.patch = patch
@@ -319,6 +374,7 @@ public struct SemanticRecordingReviewDraftPatchResult: Equatable, Sendable {
         self.region = region
         self.imageAsset = imageAsset
         self.baselineAsset = baselineAsset
+        self.assetExtractions = assetExtractions
         self.appliesToExistingTask = appliesToExistingTask
     }
 }
@@ -337,6 +393,7 @@ public enum SemanticRecordingReviewDraftPatchBuilder {
             bundle.sourcePreviews.first { $0.id == id }
         }
         let observation = bestObservation(for: candidate, sourcePreview: sourcePreview, in: bundle)
+        let usesManualRegionSelection = request.regionSelection != nil
         let selection = try request.regionSelection ?? SemanticRecordingFrameRegionSelection(
             candidate: candidate,
             frame: frame,
@@ -357,6 +414,7 @@ public enum SemanticRecordingReviewDraftPatchBuilder {
         let condition: AutomationWorkflowDraftCondition
         var imageAsset: AutomationWorkflowDraftVisualImageAsset?
         var baselineAsset: AutomationWorkflowDraftVisualImageAsset?
+        var assetExtractions: [SemanticRecordingReviewAssetExtraction] = []
 
         switch candidate.kind {
         case .ocrWait:
@@ -384,8 +442,21 @@ public enum SemanticRecordingReviewDraftPatchBuilder {
                 key: imageKey,
                 label: sourcePreview?.label ?? observation?.labels.first ?? candidate.title,
                 path: artifactPath,
-                sha256: sourcePreview?.contentDigest?.value
+                sha256: sourcePreview?.contentDigest?.value,
+                sourceFrameID: frame.id,
+                sourceSurfaceID: selection.surfaceID ?? frame.surfaceID,
+                sourceArtifactPath: frame.imageRef.path,
+                sourceBounds: region.bounds,
+                sourceBoundsSpace: region.space
             )
+            if usesManualRegionSelection {
+                assetExtractions.append(assetExtraction(
+                    kind: .image,
+                    assetKey: imageKey,
+                    frame: frame,
+                    selection: selection
+                ))
+            }
             condition = AutomationWorkflowDraftCondition(
                 type: candidate.kind.rawValue,
                 regionRef: region.key,
@@ -404,8 +475,21 @@ public enum SemanticRecordingReviewDraftPatchBuilder {
                 key: baselineKey,
                 label: sourcePreview?.label ?? observation?.labels.first ?? candidate.title,
                 path: artifactPath,
-                sha256: sourcePreview?.contentDigest?.value
+                sha256: sourcePreview?.contentDigest?.value,
+                sourceFrameID: frame.id,
+                sourceSurfaceID: selection.surfaceID ?? frame.surfaceID,
+                sourceArtifactPath: frame.imageRef.path,
+                sourceBounds: region.bounds,
+                sourceBoundsSpace: region.space
             )
+            if usesManualRegionSelection {
+                assetExtractions.append(assetExtraction(
+                    kind: .baseline,
+                    assetKey: baselineKey,
+                    frame: frame,
+                    selection: selection
+                ))
+            }
             condition = AutomationWorkflowDraftCondition(
                 type: "regionChanged",
                 regionRef: region.key,
@@ -464,7 +548,25 @@ public enum SemanticRecordingReviewDraftPatchBuilder {
             region: region,
             imageAsset: imageAsset,
             baselineAsset: baselineAsset,
+            assetExtractions: assetExtractions,
             appliesToExistingTask: appliesToExistingTask
+        )
+    }
+
+    private static func assetExtraction(
+        kind: SemanticRecordingReviewMaterializedAssetKind,
+        assetKey: String,
+        frame: RecordingFrameReference,
+        selection: SemanticRecordingFrameRegionSelection
+    ) -> SemanticRecordingReviewAssetExtraction {
+        SemanticRecordingReviewAssetExtraction(
+            kind: kind,
+            assetKey: assetKey,
+            sourceFrameID: frame.id,
+            sourceSurfaceID: selection.surfaceID ?? frame.surfaceID,
+            sourceFrameImagePath: frame.imageRef.path,
+            bounds: selection.bounds,
+            imageSize: frame.imageSize
         )
     }
 

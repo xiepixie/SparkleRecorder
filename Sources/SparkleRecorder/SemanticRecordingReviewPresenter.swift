@@ -1,6 +1,7 @@
 import AppKit
 import CryptoKit
 import Foundation
+import ImageIO
 import SparkleRecorderCore
 import UniformTypeIdentifiers
 
@@ -47,11 +48,20 @@ enum SemanticRecordingReviewArtifactActionFeedback: Equatable {
 
 enum SemanticRecordingReviewPresenterError: LocalizedError {
     case applicationSupportDirectoryUnavailable
+    case couldNotDecodeFrameImage(String)
+    case emptyCropRegion(String)
+    case pngEncodingFailed(String)
 
     var errorDescription: String? {
         switch self {
         case .applicationSupportDirectoryUnavailable:
             return NSLocalizedString("Application Support directory is unavailable.", comment: "")
+        case .couldNotDecodeFrameImage(let path):
+            return String(format: NSLocalizedString("Could not decode frame image %@.", comment: ""), path)
+        case .emptyCropRegion(let key):
+            return String(format: NSLocalizedString("Selected crop region is empty for %@.", comment: ""), key)
+        case .pngEncodingFailed(let key):
+            return String(format: NSLocalizedString("Could not encode cropped asset %@.", comment: ""), key)
         }
     }
 }
@@ -172,7 +182,42 @@ enum SemanticRecordingReviewPresenter {
     }
 
     static func previewState(
+        applying result: SemanticRecordingReviewDraftPatchResult,
+        to workflow: AutomationWorkflow?,
+        macros: [SavedMacro],
+        sourceName: String,
+        sourceDirectory: URL?
+    ) throws -> AutomationWorkflowDraftPreviewState {
+        try previewState(
+            applying: result.patch,
+            assetExtractions: result.assetExtractions,
+            to: workflow,
+            macros: macros,
+            sourceName: sourceName,
+            sourceDirectory: sourceDirectory
+        )
+    }
+
+    static func previewState(
         applying patch: AutomationWorkflowDraftPatchDocument,
+        to workflow: AutomationWorkflow?,
+        macros: [SavedMacro],
+        sourceName: String,
+        sourceDirectory: URL?
+    ) throws -> AutomationWorkflowDraftPreviewState {
+        try previewState(
+            applying: patch,
+            assetExtractions: [],
+            to: workflow,
+            macros: macros,
+            sourceName: sourceName,
+            sourceDirectory: sourceDirectory
+        )
+    }
+
+    private static func previewState(
+        applying patch: AutomationWorkflowDraftPatchDocument,
+        assetExtractions: [SemanticRecordingReviewAssetExtraction],
         to workflow: AutomationWorkflow?,
         macros: [SavedMacro],
         sourceName: String,
@@ -180,6 +225,7 @@ enum SemanticRecordingReviewPresenter {
     ) throws -> AutomationWorkflowDraftPreviewState {
         let materializedPatch = try materializePatchAssetsIfNeeded(
             patch,
+            assetExtractions: assetExtractions,
             sourceDirectory: sourceDirectory
         )
         let baseDocument: AutomationWorkflowDraftDocument
@@ -223,6 +269,7 @@ enum SemanticRecordingReviewPresenter {
 
     private static func materializePatchAssetsIfNeeded(
         _ patch: AutomationWorkflowDraftPatchDocument,
+        assetExtractions: [SemanticRecordingReviewAssetExtraction],
         sourceDirectory: URL?
     ) throws -> SemanticRecordingReviewMaterializedPatch {
         guard let sourceDirectory else {
@@ -238,10 +285,17 @@ enum SemanticRecordingReviewPresenter {
         )
         let materialized = try SemanticRecordingReviewAssetMaterializer.materialize(
             patch: patch,
+            assetExtractions: assetExtractions,
             readArtifact: { path in
                 let ref = try RecordingArtifactRef(path)
                 let url = sourceDirectory.appendingRecordingArtifactRef(ref)
                 return try Data(contentsOf: url)
+            },
+            prepareAssetData: { data, extraction in
+                guard let extraction else {
+                    return data
+                }
+                return try croppedPNGData(from: data, extraction: extraction)
             },
             writeAsset: { data, path in
                 let ref = try RecordingArtifactRef(path)
@@ -281,6 +335,59 @@ enum SemanticRecordingReviewPresenter {
         return supportDirectory
             .appendingPathComponent("ReviewVisualAssets", isDirectory: true)
             .appendingPathComponent(digest, isDirectory: true)
+    }
+
+    private static func croppedPNGData(
+        from data: Data,
+        extraction: SemanticRecordingReviewAssetExtraction
+    ) throws -> Data {
+        guard let source = CGImageSourceCreateWithData(data as CFData, nil),
+              let image = CGImageSourceCreateImageAtIndex(source, 0, nil) else {
+            throw SemanticRecordingReviewPresenterError
+                .couldNotDecodeFrameImage(extraction.sourceFrameImagePath)
+        }
+        guard let cropRect = cropRect(for: extraction.bounds, image: image),
+              let cropped = image.cropping(to: cropRect) else {
+            throw SemanticRecordingReviewPresenterError.emptyCropRegion(extraction.assetKey)
+        }
+
+        let representation = NSBitmapImageRep(cgImage: cropped)
+        guard let pngData = representation.representation(using: .png, properties: [:]) else {
+            throw SemanticRecordingReviewPresenterError.pngEncodingFailed(extraction.assetKey)
+        }
+        return pngData
+    }
+
+    private static func cropRect(
+        for bounds: RecordingBounds,
+        image: CGImage
+    ) -> CGRect? {
+        let imageBounds = CGRect(x: 0, y: 0, width: image.width, height: image.height)
+        let rect: CGRect
+        switch bounds.coordinateSpace {
+        case .normalizedFrame:
+            rect = CGRect(
+                x: bounds.rect.x * Double(image.width),
+                y: bounds.rect.y * Double(image.height),
+                width: bounds.rect.width * Double(image.width),
+                height: bounds.rect.height * Double(image.height)
+            )
+        case .screenPixels, .displayPixels, .windowPixels, .contentPixels, .framePixels:
+            rect = CGRect(
+                x: bounds.rect.x,
+                y: bounds.rect.y,
+                width: bounds.rect.width,
+                height: bounds.rect.height
+            )
+        }
+
+        let clipped = rect.integral.intersection(imageBounds)
+        guard !clipped.isNull,
+              clipped.width >= 2,
+              clipped.height >= 2 else {
+            return nil
+        }
+        return clipped
     }
 
     static func savePatch(

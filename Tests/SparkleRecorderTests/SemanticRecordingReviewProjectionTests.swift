@@ -171,6 +171,11 @@ struct SemanticRecordingReviewProjectionTests {
         #expect(result.condition.threshold == 0.88)
         #expect(result.imageAsset?.path == "visual-index/templates/checkout-button.png")
         #expect(result.imageAsset?.sha256 == "fixture-template-digest")
+        #expect(result.imageAsset?.sourceFrameID == SemanticRecordingFixture.beforeClickFrameID)
+        #expect(result.imageAsset?.sourceArtifactPath == "frames/000014-before-click.png")
+        #expect(result.imageAsset?.sourceBounds == RectValue(x: 880, y: 620, width: 180, height: 48))
+        #expect(result.imageAsset?.sourceBoundsSpace == .windowLocal)
+        #expect(result.assetExtractions.isEmpty)
 
         let document = AutomationWorkflowDraftDocument(workflow: AutomationWorkflowDraft(name: "Checkout"))
         let patched = try AutomationWorkflowDraftPatchApplier.apply(result.patch, to: document)
@@ -230,6 +235,78 @@ struct SemanticRecordingReviewProjectionTests {
         #expect(imageAsset.path == expectedPath)
         #expect(imageAsset.sha256 == expectedDigest)
         #expect(writtenAssets[expectedPath] == templateData)
+    }
+
+    @Test("Manual image region selection materializes from the selected frame crop")
+    func manualImageRegionSelectionMaterializesFromSelectedFrameCrop() throws {
+        let bundle = SemanticRecordingFixture.checkoutBundle()
+        let projection = SemanticRecordingReviewProjection(
+            bundle: bundle,
+            selectedEventID: SemanticRecordingFixture.clickEventID
+        )
+        let candidate = try #require(
+            projection.selectedFrame?.conditionCandidates.first { $0.kind == .imageAppeared }
+        )
+        let selection = SemanticRecordingFrameRegionSelection(
+            frameID: SemanticRecordingFixture.beforeClickFrameID,
+            surfaceID: SemanticRecordingFixture.surfaceID,
+            bounds: RecordingBounds(
+                rect: RecordingRect(x: 20, y: 30, width: 80, height: 50),
+                coordinateSpace: .framePixels
+            ),
+            imageSize: RecordingImageSize(width: 1_440, height: 900),
+            label: "Manual button crop",
+            candidateKind: .imageAppeared,
+            sourcePreviewRefID: candidate.sourcePreviewRefID,
+            observationID: candidate.observationID,
+            artifactPath: candidate.artifactPath
+        )
+        let result = try SemanticRecordingReviewDraftPatchBuilder.makePatch(
+            bundle: bundle,
+            request: SemanticRecordingReviewDraftPatchRequest(
+                candidate: candidate,
+                regionSelection: selection
+            )
+        )
+        let extraction = try #require(result.assetExtractions.first)
+        let frameData = Data("frame-image".utf8)
+        let croppedData = Data("cropped-template".utf8)
+        var preparedExtraction: SemanticRecordingReviewAssetExtraction?
+        var writtenAssets: [String: Data] = [:]
+
+        let materialized = try SemanticRecordingReviewAssetMaterializer.materialize(
+            patch: result.patch,
+            assetExtractions: result.assetExtractions,
+            readArtifact: { sourcePath in
+                #expect(sourcePath == "frames/000014-before-click.png")
+                return frameData
+            },
+            prepareAssetData: { data, extraction in
+                #expect(data == frameData)
+                preparedExtraction = extraction
+                return croppedData
+            },
+            writeAsset: { data, destinationPath in
+                writtenAssets[destinationPath] = data
+            }
+        )
+
+        let imageOperation = try #require(
+            materialized.patch.ops.first { $0.op == "upsertVisualImage" }
+        )
+        let imageAsset = try #require(imageOperation.visualImage)
+        let expectedPath = "assets/images/sr_00000001_checkout_button_0000000f_template.png"
+        let expectedDigest = "758ae8687d52e2f871be2752f1b9c7ba97f9a3651a7f3be8768d0ee96ca4293f"
+
+        #expect(result.imageAsset?.sourceBounds == RectValue(x: 20, y: 30, width: 80, height: 50))
+        #expect(result.imageAsset?.sourceBoundsSpace == .displayAbsolute)
+        #expect(extraction.kind == .image)
+        #expect(extraction.sourceFrameImagePath == "frames/000014-before-click.png")
+        #expect(extraction.bounds == selection.bounds)
+        #expect(preparedExtraction == extraction)
+        #expect(imageAsset.path == expectedPath)
+        #expect(imageAsset.sha256 == expectedDigest)
+        #expect(writtenAssets[expectedPath] == croppedData)
     }
 
     @Test("Manual frame region selection can override candidate bounds")

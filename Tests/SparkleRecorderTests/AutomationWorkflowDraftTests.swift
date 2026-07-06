@@ -811,11 +811,12 @@ struct AutomationWorkflowDraftTests {
                     )
                 ],
                 images: [
-                    AutomationWorkflowDraftVisualImageAsset(
-                        key: "unsafe_image",
-                        path: "../outside.png"
-                    )
-                ],
+                AutomationWorkflowDraftVisualImageAsset(
+                    key: "unsafe_image",
+                    path: "../outside.png",
+                    sourceArtifactPath: "file:/tmp/source-frame.png"
+                )
+            ],
                 baselines: [
                     AutomationWorkflowDraftVisualImageAsset(
                         key: "unsafe_baseline",
@@ -842,6 +843,10 @@ struct AutomationWorkflowDraftTests {
         #expect(issues.contains {
             $0.code == .invalidVisualAsset &&
             $0.path == "$.visualAssets.images[0].path"
+        })
+        #expect(issues.contains {
+            $0.code == .invalidVisualAsset &&
+            $0.path == "$.visualAssets.images[0].sourceArtifactPath"
         })
         #expect(issues.contains {
             $0.code == .invalidVisualAsset &&
