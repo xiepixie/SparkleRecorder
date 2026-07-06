@@ -181,6 +181,28 @@ enum SemanticRecordingReviewPresenter {
         return .succeeded(.reveal, status.path)
     }
 
+    static func revealBundle(
+        from reference: MacroSemanticRecordingReference
+    ) -> SemanticRecordingReviewArtifactActionFeedback {
+        do {
+            let bundleRef = try RecordingArtifactRef(reference.bundleRelativePath)
+            guard let appSupportRootURL else {
+                return .failed(.reveal, NSLocalizedString("Application Support directory is unavailable.", comment: ""))
+            }
+            let directory = appSupportRootURL.appendingRecordingArtifactRef(bundleRef)
+            guard FileManager.default.fileExists(atPath: directory.path) else {
+                return .failed(.reveal, NSLocalizedString("Macro Review bundle is missing from Application Support.", comment: ""))
+            }
+            NSWorkspace.shared.activateFileViewerSelecting([directory])
+            return .succeeded(.reveal, bundleRef.path)
+        } catch {
+            return .failed(
+                .reveal,
+                String(format: NSLocalizedString("Could not reveal Macro Review bundle: %@", comment: ""), String(describing: error))
+            )
+        }
+    }
+
     static func previewState(
         applying result: SemanticRecordingReviewDraftPatchResult,
         to workflow: AutomationWorkflow?,

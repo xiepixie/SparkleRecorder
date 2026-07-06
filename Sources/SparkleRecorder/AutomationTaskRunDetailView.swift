@@ -19,6 +19,7 @@ struct AutomationTaskRunDetailView: View {
     @State private var semanticReviewErrorMessage = ""
     @State private var isOpeningSemanticReview = false
     @State private var semanticReviewRequestRunID: UUID?
+    @State private var semanticReviewBundleFeedback: SemanticRecordingReviewArtifactActionFeedback?
     @Environment(\.automationTaskRunEvidenceMacroPackageBaseURL) private var macroPackageBaseURL
     @Environment(\.automationTaskRunEvidenceAutoload) private var shouldAutoloadEvidence
     @Environment(\.automationTaskRunEvidenceInitialActionFeedback) private var initialEvidenceActionFeedback
@@ -187,6 +188,15 @@ struct AutomationTaskRunDetailView: View {
                 .disabled(isOpeningSemanticReview)
 
                 if linkedSemanticRecording != nil {
+                    Button("", systemImage: "arrow.up.right.square") {
+                        revealLinkedSemanticReviewBundle()
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                    .disabled(isOpeningSemanticReview)
+                    .help(NSLocalizedString("Reveal linked Macro Review bundle", comment: ""))
+                    .accessibilityLabel(NSLocalizedString("Reveal linked Macro Review bundle", comment: ""))
+
                     Button("", systemImage: "folder") {
                         chooseSemanticReviewBundle()
                     }
@@ -203,6 +213,10 @@ struct AutomationTaskRunDetailView: View {
                 .foregroundStyle(.tertiary)
                 .fixedSize(horizontal: false, vertical: true)
 
+            if let linkedSemanticRecording {
+                linkedSemanticRecordingDetails(linkedSemanticRecording.reference)
+            }
+
             if isOpeningSemanticReview {
                 HStack(spacing: 8) {
                     ProgressView()
@@ -217,6 +231,10 @@ struct AutomationTaskRunDetailView: View {
                     .foregroundStyle(Brand.sigAmber)
                     .fixedSize(horizontal: false, vertical: true)
             }
+
+            if let semanticReviewBundleFeedback {
+                macroReviewFeedback(semanticReviewBundleFeedback)
+            }
         }
         .padding(8)
         .background(
@@ -227,6 +245,80 @@ struct AutomationTaskRunDetailView: View {
                         .strokeBorder(Color.primary.opacity(0.075), lineWidth: 0.6)
                 )
         )
+    }
+
+    private func linkedSemanticRecordingDetails(
+        _ reference: MacroSemanticRecordingReference
+    ) -> some View {
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: 5) {
+                macroReviewBadge(
+                    title: NSLocalizedString("Recording", comment: ""),
+                    value: shortID(reference.recordingID)
+                )
+                macroReviewBadge(
+                    title: NSLocalizedString("Events", comment: ""),
+                    value: "\(reference.eventCount)"
+                )
+                macroReviewBadge(
+                    title: NSLocalizedString("Captured", comment: ""),
+                    value: compactDate(reference.capturedAt)
+                )
+                macroReviewBadge(
+                    title: NSLocalizedString("Manifest", comment: ""),
+                    value: compactPath(reference.manifestRelativePath)
+                )
+            }
+            VStack(alignment: .leading, spacing: 5) {
+                macroReviewBadge(
+                    title: NSLocalizedString("Recording", comment: ""),
+                    value: shortID(reference.recordingID)
+                )
+                macroReviewBadge(
+                    title: NSLocalizedString("Events", comment: ""),
+                    value: "\(reference.eventCount)"
+                )
+                macroReviewBadge(
+                    title: NSLocalizedString("Captured", comment: ""),
+                    value: compactDate(reference.capturedAt)
+                )
+                macroReviewBadge(
+                    title: NSLocalizedString("Manifest", comment: ""),
+                    value: compactPath(reference.manifestRelativePath)
+                )
+            }
+        }
+    }
+
+    private func macroReviewBadge(title: String, value: String) -> some View {
+        HStack(spacing: 4) {
+            Text(title)
+                .foregroundStyle(.tertiary)
+            Text(value)
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+        }
+        .font(.caption2)
+        .padding(.horizontal, 6)
+        .padding(.vertical, 3)
+        .background(
+            RoundedRectangle(cornerRadius: 6)
+                .fill(Color.primary.opacity(0.035))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 6)
+                        .strokeBorder(Color.primary.opacity(0.07), lineWidth: 0.5)
+                )
+        )
+    }
+
+    private func macroReviewFeedback(
+        _ feedback: SemanticRecordingReviewArtifactActionFeedback
+    ) -> some View {
+        let presentation = semanticReviewFeedbackPresentation(feedback)
+        return Label(presentation.message, systemImage: presentation.systemImage)
+            .font(.caption)
+            .foregroundStyle(presentation.tint)
+            .fixedSize(horizontal: false, vertical: true)
     }
 
     private var reviewButtonTitle: String {
@@ -259,6 +351,37 @@ struct AutomationTaskRunDetailView: View {
             return nil
         }
         return (macro, reference)
+    }
+
+    private func semanticReviewFeedbackPresentation(
+        _ feedback: SemanticRecordingReviewArtifactActionFeedback
+    ) -> (message: String, systemImage: String, tint: Color) {
+        switch feedback {
+        case .succeeded(.open, let path):
+            return (
+                String(format: NSLocalizedString("Opened %@", comment: ""), compactPath(path)),
+                "checkmark.circle",
+                .secondary
+            )
+        case .succeeded(.reveal, let path):
+            return (
+                String(format: NSLocalizedString("Revealed %@", comment: ""), compactPath(path)),
+                "checkmark.circle",
+                .secondary
+            )
+        case .failed(.open, let message):
+            return (
+                String(format: NSLocalizedString("Open failed: %@", comment: ""), message),
+                "exclamationmark.triangle",
+                Brand.sigAmber
+            )
+        case .failed(.reveal, let message):
+            return (
+                String(format: NSLocalizedString("Reveal failed: %@", comment: ""), message),
+                "exclamationmark.triangle",
+                Brand.sigAmber
+            )
+        }
     }
 
     private var attemptSummary: String {
@@ -360,6 +483,18 @@ struct AutomationTaskRunDetailView: View {
         String(id.uuidString.prefix(8)).uppercased()
     }
 
+    private func compactDate(_ date: Date) -> String {
+        date.formatted(date: .abbreviated, time: .shortened)
+    }
+
+    private func compactPath(_ path: String) -> String {
+        let parts = path.split(separator: "/").map(String.init)
+        guard parts.count > 2 else {
+            return path
+        }
+        return parts.suffix(2).joined(separator: "/")
+    }
+
     private func loadEvidence() {
         guard run.macroID != nil else {
             evidencePayload = nil
@@ -402,6 +537,7 @@ struct AutomationTaskRunDetailView: View {
     }
 
     private func openSemanticReview() {
+        semanticReviewBundleFeedback = nil
         if let linkedSemanticRecording {
             openLinkedSemanticReview(linkedSemanticRecording)
         } else {
@@ -414,6 +550,7 @@ struct AutomationTaskRunDetailView: View {
         semanticReviewRequestRunID = requestedRunID
         isOpeningSemanticReview = true
         semanticReviewErrorMessage = ""
+        semanticReviewBundleFeedback = nil
         SemanticRecordingReviewPresenter.openBundle { result in
             guard semanticReviewRequestRunID == requestedRunID else {
                 return
@@ -432,6 +569,16 @@ struct AutomationTaskRunDetailView: View {
         }
     }
 
+    private func revealLinkedSemanticReviewBundle() {
+        guard let linkedSemanticRecording else {
+            return
+        }
+        semanticReviewErrorMessage = ""
+        semanticReviewBundleFeedback = SemanticRecordingReviewPresenter.revealBundle(
+            from: linkedSemanticRecording.reference
+        )
+    }
+
     private func openLinkedSemanticReview(
         _ linked: (macro: SavedMacro, reference: MacroSemanticRecordingReference)
     ) {
@@ -439,6 +586,7 @@ struct AutomationTaskRunDetailView: View {
         semanticReviewRequestRunID = requestedRunID
         isOpeningSemanticReview = true
         semanticReviewErrorMessage = ""
+        semanticReviewBundleFeedback = nil
         Task {
             do {
                 let state = try await SemanticRecordingReviewPresenter.reviewState(
@@ -487,6 +635,7 @@ struct AutomationTaskRunDetailView: View {
         semanticReviewErrorMessage = ""
         isOpeningSemanticReview = false
         semanticReviewRequestRunID = nil
+        semanticReviewBundleFeedback = nil
     }
 }
 
