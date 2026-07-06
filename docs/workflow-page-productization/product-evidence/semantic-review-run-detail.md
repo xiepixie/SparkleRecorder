@@ -15,6 +15,7 @@
 - The selected run resolves the `Upload report` saved macro and its `SavedMacro.semanticRecording` reference.
 - Run Detail shows the Macro Review entry before opening the sheet, including Open, Reveal and manual bundle controls.
 - The Macro Review section now exposes readiness chips for `Source`, `Scope`, `Run`, `Target`, `Evidence` and `Fallback`, making the current scope explicit: the fixture resolves saved-macro linked evidence at macro level, aligns the failed run to `Event #3` / `Failure report`, while per-run semantic bundle binding is still not available.
+- The companion `semantic-review-run-target.png` shows the opened Review sheet explaining the target selection after this Run Detail entry is used.
 - The linked Macro Review details show recording id, event count, captured date and manifest ref.
 - Reveal is routed through `SemanticRecordingReviewPresenter.revealBundle(from:)`, so SwiftUI does not construct App Support paths directly.
 - This artifact proves the fixture Run Detail linked metadata state; it does not claim live semantic recording capture or installed-app product completion.

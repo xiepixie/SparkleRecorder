@@ -491,4 +491,58 @@ struct SemanticRecordingReviewProjectionTests {
         #expect(target.reason == SemanticRecordingReviewRunTarget.Reason.conditionCandidate)
     }
 
+
+    @Test("Run target presentation explains failed event targeting")
+    func runTargetPresentationExplainsFailedEventTargeting() {
+        let presentation = SemanticRecordingReviewRunTargetPresentation.make(
+            target: SemanticRecordingReviewRunTarget(
+                selectedEventID: nil,
+                selectedFrameID: nil,
+                reason: .failedRecordedEventIndex(2)
+            )
+        )
+
+        #expect(presentation.title == "Review starts at failed event")
+        #expect(presentation.detail == "Run Detail opened the recorded event reported by playback failure evidence.")
+        #expect(presentation.badges == [
+            .init(title: "Target", value: "Event #3"),
+            .init(title: "Evidence", value: "Failure report")
+        ])
+    }
+
+    @Test("Run target presentation explains nearest event fallback")
+    func runTargetPresentationExplainsNearestEventFallback() {
+        let presentation = SemanticRecordingReviewRunTargetPresentation.make(
+            target: SemanticRecordingReviewRunTarget(
+                selectedEventID: nil,
+                selectedFrameID: nil,
+                reason: .nearestRecordedEventIndex(requested: 8, matched: 2)
+            )
+        )
+
+        #expect(presentation.title == "Review starts near failed event")
+        #expect(presentation.detail.contains("not present in this bundle"))
+        #expect(presentation.badges == [
+            .init(title: "Requested", value: "Event #9"),
+            .init(title: "Matched", value: "Event #3"),
+            .init(title: "Evidence", value: "Nearest event")
+        ])
+    }
+
+    @Test("Run target presentation explains condition targeting")
+    func runTargetPresentationExplainsConditionTargeting() {
+        let presentation = SemanticRecordingReviewRunTargetPresentation.make(
+            target: SemanticRecordingReviewRunTarget(
+                selectedEventID: nil,
+                selectedFrameID: nil,
+                reason: .conditionCandidate
+            )
+        )
+
+        #expect(presentation.title == "Review starts at condition evidence")
+        #expect(presentation.badges == [
+            .init(title: "Target", value: "Condition"),
+            .init(title: "Evidence", value: "Run outcome")
+        ])
+    }
 }

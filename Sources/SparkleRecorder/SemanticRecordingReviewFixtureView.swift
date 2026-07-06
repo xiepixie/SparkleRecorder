@@ -10,6 +10,7 @@ struct SemanticRecordingReviewFixtureView: View {
     private let workflow: AutomationWorkflow?
     private let macros: [SavedMacro]
     private let onImportWorkflow: (AutomationWorkflow, URL?) -> Void
+    private let runTargetPresentation: SemanticRecordingReviewRunTargetPresentation?
 
     @State private var selectedEventID: UUID?
     @State private var selectedFrameID: UUID?
@@ -36,6 +37,7 @@ struct SemanticRecordingReviewFixtureView: View {
         self.workflow = nil
         self.macros = []
         self.onImportWorkflow = { _, _ in }
+        self.runTargetPresentation = nil
     }
 
     init(
@@ -48,7 +50,8 @@ struct SemanticRecordingReviewFixtureView: View {
         initialPixelColorHexes: [String: String] = [:],
         initialAcceptedSuggestionID: UUID? = nil,
         initialRejectedSuggestionID: UUID? = nil,
-        initialDraftPreviewActionPresentations: [SemanticRecordingReviewActionPresentation] = []
+        initialDraftPreviewActionPresentations: [SemanticRecordingReviewActionPresentation] = [],
+        initialRunTargetPresentation: SemanticRecordingReviewRunTargetPresentation? = nil
     ) {
         let projection = SemanticRecordingReviewProjection(
             bundle: bundle,
@@ -63,6 +66,7 @@ struct SemanticRecordingReviewFixtureView: View {
         self.workflow = nil
         self.macros = []
         self.onImportWorkflow = { _, _ in }
+        self.runTargetPresentation = initialRunTargetPresentation
         _selectedEventID = State(initialValue: selectedEventID)
         _selectedFrameID = State(initialValue: selectedFrameID)
         _selectedCandidateID = State(initialValue: initialDraftPatchCandidateID)
@@ -90,6 +94,7 @@ struct SemanticRecordingReviewFixtureView: View {
         selectedEventID: UUID? = nil,
         selectedFrameID: UUID? = nil,
         initialDraftPatchCandidateID: String? = nil,
+        initialRunTargetPresentation: SemanticRecordingReviewRunTargetPresentation? = nil,
         onImportWorkflow: @escaping (AutomationWorkflow, URL?) -> Void = { _, _ in }
     ) {
         let projection = SemanticRecordingReviewProjection(
@@ -105,6 +110,7 @@ struct SemanticRecordingReviewFixtureView: View {
         self.workflow = workflow
         self.macros = macros
         self.onImportWorkflow = onImportWorkflow
+        self.runTargetPresentation = initialRunTargetPresentation
         _selectedEventID = State(initialValue: selectedEventID)
         _selectedFrameID = State(initialValue: selectedFrameID)
         _selectedCandidateID = State(initialValue: initialDraftPatchCandidateID)
@@ -502,6 +508,7 @@ struct SemanticRecordingReviewFixtureView: View {
     private var inspector: some View {
         ScrollView(.vertical, showsIndicators: false) {
             VStack(alignment: .leading, spacing: 14) {
+                runTargetSection
                 bundleHealthSection
                 conditionCandidates
                 regionSelectionSection
@@ -514,6 +521,32 @@ struct SemanticRecordingReviewFixtureView: View {
         }
         .frame(width: 380, alignment: .topLeading)
         .clipped()
+    }
+
+    @ViewBuilder
+    private var runTargetSection: some View {
+        if let runTargetPresentation {
+            VStack(alignment: .leading, spacing: 10) {
+                sectionTitle("Run Target")
+                inspectorRow(
+                    title: runTargetPresentation.title,
+                    subtitle: NSLocalizedString("Opened from Run Detail", comment: ""),
+                    detail: runTargetPresentation.detail,
+                    accent: Color(red: 0.34, green: 0.72, blue: 0.95)
+                )
+
+                VStack(alignment: .leading, spacing: 6) {
+                    ForEach(Array(runTargetPresentation.badges.enumerated()), id: \.offset) { _, badge in
+                        bundleHealthInfoRow(
+                            title: badge.title,
+                            value: badge.value,
+                            systemImage: "scope",
+                            tint: Color(red: 0.34, green: 0.72, blue: 0.95)
+                        )
+                    }
+                }
+            }
+        }
     }
 
     @ViewBuilder

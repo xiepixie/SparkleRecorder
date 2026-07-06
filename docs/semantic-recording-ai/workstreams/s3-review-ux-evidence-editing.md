@@ -1,7 +1,7 @@
 # S3 Review UX And Evidence Editing
 
-更新时间：2026-07-06
-状态：Macro Review integration + linked Run Detail opener + Draft Preview handoff + selected-region draft selection + Review action semantics / S4 evidence alignment first pass + Bundle Health first pass; live product evidence open
+更新时间：2026-07-07
+状态：Macro Review integration + linked Run Detail opener + Draft Preview handoff + selected-region draft selection + Review action semantics / S4 evidence alignment first pass + Bundle Health / Run Target first passes done; live product evidence open
 Owner：S3, Review UX / Evidence Editing
 并行对象：S0 Workflow Evidence Closure, S1 Contract/Core, S2 App Capture/Visual Index, S4 CLI/AI
 
@@ -45,6 +45,7 @@ S3 does not own:
 - Review source/runtime/diff evidence drill-in tiles
 - Review Bundle Health inspector for validation issues, artifact availability and suppression alignment
 - Candidate-level `review.draftCandidate` / `review.draftSelection` action semantics before the user creates a patch
+- Run Detail target explanation inside the opened Macro Review sheet
 - Run Detail Macro Review entry: `AutomationTaskRunDetailView`
 - Run Detail Macro Review source-scope projection: `AutomationMacroReviewSourcePresentation`
 - Run Detail linked Macro Review metadata and bundle Reveal action
@@ -55,6 +56,7 @@ S3 does not own:
 - Product evidence snapshot scenario: `workflow product-evidence snapshot semantic-review-stored-bundle`
 - Product evidence snapshot scenario: `workflow product-evidence snapshot semantic-review-missing-artifacts`
 - Product evidence snapshot scenario: `workflow product-evidence snapshot semantic-review-run-detail`
+- Product evidence snapshot scenario: `workflow product-evidence snapshot semantic-review-run-target`
 - Product evidence snapshot scenario: `workflow product-evidence snapshot semantic-review-draft-preview`
 - Product evidence snapshot scenario: `workflow product-evidence snapshot semantic-review-pixel-color`
 - Product evidence snapshot scenario: `workflow product-evidence snapshot semantic-review-materialized-actions`
@@ -86,7 +88,9 @@ S3 does not own:
 - Run Detail 的 Review source/scope now comes from `AutomationMacroReviewSourcePresentation` instead of ad hoc SwiftUI conditionals. The projection resolves direct `AutomationTaskRun.macroID` and workflow task macro fallback, exposes saved-macro vs manual bundle source, keeps `Scope: Macro-level` separate from `Run: Not bound`, and is covered by `AutomationViewProjectionTests`.
 - Run Detail 的 linked Macro Review 区现在会在打开前显示 recording id、event count、captured date 和 manifest ref，并通过 `SemanticRecordingReviewPresenter.revealBundle(from:)` 提供 Reveal Linked Bundle 操作。SwiftUI 仍不直接拼 App Support 路径；路径解析留在 presenter。
 - Run Detail -> Macro Review now computes an initial review target from `AutomationTaskRun` plus the loaded bundle before presenting the sheet. Failed runs prefer the exact `recordedEventIndex`, fall back to the nearest recorded event when older reports use a shifted index, and timeout / condition-not-matched runs open on condition-candidate evidence. This is still macro-level targeting, not a per-run semantic recording id.
+- Opened Macro Review sheets now show a `Run Target` inspector block when they come from Run Detail. The block explains why Review selected the initial event/frame, including failed event, nearest-event fallback, condition evidence, first-event and timeline fallback reasons, so users do not see a preselected frame without provenance.
 - `semantic-review-run-detail` fixture snapshot 现在会把带 `SavedMacro.semanticRecording` 的 `Upload report` macro 注入 Run Detail，证明 linked Macro Review metadata、Open/Reveal/manual bundle controls 在真实 Workflow inspector surface 中可见。
+- `semantic-review-run-target` fixture snapshot renders the opened Macro Review state with `Run Target` context for a failed run, proving the target explanation is visible before Teach/Draft actions.
 - Review -> Draft Preview 现在会把 image/template 和 baseline 候选引用的 semantic bundle artifact 复制到 app-managed `ReviewVisualAssets/<digest>/assets/images|baselines`，并把 patch 中的 `visualAssets.images/baselines.path` 重写成 package-local safe refs。确认导入后，既有 `AutomationMainContentView.importWorkflowFromDraftPreview` 会把该 package directory 写入 visual asset package-root manifest，而不是把 workflow 绑定到可能被 retention 清理的 semantic bundle。
 - 当用户在 Review frame 上手动画框并生成 image/template 或 baseline condition 时，`SemanticRecordingReviewDraftPatchResult.assetExtractions` 会记录从 source frame image 裁剪的计划；`SemanticRecordingReviewPresenter` 在打开 Draft Preview 前用 ImageIO/AppKit 从 frame PNG 裁出新的 package-local PNG，并用裁剪后的 bytes 计算 SHA-256。`AutomationWorkflowDraftVisualImageAsset` 也会保留 source frame id、surface id、source artifact path、crop bounds 和 bounds space，方便之后做 evidence drill-in。
 - Draft Preview 的 visual asset rows 现在会把 Review-generated crop 的 frame id、crop bounds、source artifact、surface 和 hash 摘要显示成 provenance badges。用户确认 import 前可以看到 image/template 或 baseline 资产来自哪一帧、哪块区域，而不是只看到 package-local path。
@@ -163,6 +167,7 @@ S4 coordination update:
 - S4 fixture/stored/live suggestion payloads should expose these semantics as `reviewActions`; when a user-facing CLI/AI surface needs rows, it should expose a lossless `reviewActionPresentations` projection before calling stored/live suggestions product-ready.
 - No S4 schema change is required for the current S3 Bundle Health / candidate-action polish. S4 should keep using the existing Codable `SemanticRecordingReviewActionSemantics` / `SemanticRecordingReviewActionPresentation` for actions, and treat artifact availability, validation issues and suppression rows as evidence context until a future S4 source deliberately adds an availability/status payload.
 - If S4 later exposes stored/live suggestion availability, it should preserve S3's artifact refs and missing/available meaning rather than minting alternate evidence identifiers or modeling missing artifacts as rejected suggestions.
+- Run Target is provenance, not mutation. S4 can reuse `SemanticRecordingReviewRunTarget` / `SemanticRecordingReviewRunTargetPresentation` when summarizing why a Run Detail entry opens a specific Review event/frame, but it should not emit a new `review.*` mutation action for target selection or invent alternate failure/condition evidence ids.
 
 ## Verification
 
@@ -176,19 +181,21 @@ swift run SparkleRecorder workflow product-evidence snapshot semantic-review-sto
 swift run SparkleRecorder workflow product-evidence snapshot semantic-review-missing-artifacts --output docs/workflow-page-productization/product-evidence/semantic-review-missing-artifacts.png
 swift run SparkleRecorder workflow product-evidence snapshot semantic-review-pixel-color --output docs/workflow-page-productization/product-evidence/semantic-review-pixel-color.png
 swift run SparkleRecorder workflow product-evidence snapshot semantic-review-run-detail --output docs/workflow-page-productization/product-evidence/semantic-review-run-detail.png
+swift run SparkleRecorder workflow product-evidence snapshot semantic-review-run-target --output docs/workflow-page-productization/product-evidence/semantic-review-run-target.png
 swift run SparkleRecorder workflow product-evidence snapshot semantic-review-draft-preview --output docs/workflow-page-productization/product-evidence/semantic-review-draft-preview.png
 swift run SparkleRecorder workflow product-evidence snapshot semantic-review-materialized-actions --output docs/workflow-page-productization/product-evidence/semantic-review-materialized-actions.png
 ```
 
-Observed status on 2026-07-06:
+Observed status on 2026-07-07:
 
-- S3 targeted tests: passed across `AutomationViewProjectionTests`, `SemanticRecordingReviewActionSemanticsTests` and `SemanticRecordingReviewProjectionTests`; coverage includes OCR wait patch, image appeared patch, visual asset upsert operations, package-local materialization path rewriting, manual frame region override, manual frame crop extraction data flow, user-picked pixel color -> `pixelMatched` patch, shared suggestion evidence refs, Codable S4-aligned Review action semantics from raw `RecordingSuggestion` values, row-level presentation evidence from raw S4 suggestions, Run Detail Macro Review source/scope projection and run-outcome initial Review targeting.
+- S3 targeted tests: passed across `AutomationViewProjectionTests`, `SemanticRecordingReviewActionSemanticsTests` and `SemanticRecordingReviewProjectionTests`; coverage includes OCR wait patch, image appeared patch, visual asset upsert operations, package-local materialization path rewriting, manual frame region override, manual frame crop extraction data flow, user-picked pixel color -> `pixelMatched` patch, shared suggestion evidence refs, Codable S4-aligned Review action semantics from raw `RecordingSuggestion` values, row-level presentation evidence from raw S4 suggestions, Run Detail Macro Review source/scope projection, run-outcome initial Review targeting and visible Run Target presentation copy.
 - Swift 6 build: passed.
 - Product evidence snapshot: generated `docs/workflow-page-productization/product-evidence/semantic-review-timeline.png` with sidecar `semantic-review-timeline.md`; current artifact includes the selected-region inspector, `Draft Selection`, candidate-level `review.draftSelection`, source/runtime/diff evidence tiles, suggestion evidence refs, S4-aligned Review Actions contract, `Accept` / `Reject` controls, accepted status, evidence-backed staged patch explanation and an Undo review-decision control.
 - Stored bundle product evidence snapshot: generated `docs/workflow-page-productization/product-evidence/semantic-review-stored-bundle.png` with sidecar `semantic-review-stored-bundle.md`; current artifact persists a checkout bundle manifest plus PNG artifact refs and renders Bundle Health, file-backed `Available` source/runtime/diff thumbnails and candidate-level `review.draftCandidate` from `SemanticRecordingReviewState`.
 - Missing artifact product evidence snapshot: generated `docs/workflow-page-productization/product-evidence/semantic-review-missing-artifacts.png` with sidecar `semantic-review-missing-artifacts.md`; current artifact renders a stored bundle whose frame PNGs exist while source/runtime/diff/candidate artifacts are missing, proving Bundle Health counts missing refs, the Review inspector keeps refs visible, labels them `Missing file`, and explains unavailable Open/Reveal actions.
 - Pixel color product evidence snapshot: generated `docs/workflow-page-productization/product-evidence/semantic-review-pixel-color.png` with sidecar `semantic-review-pixel-color.md`; current artifact shows Review-side color picking for `pixelMatched`, selected `#2BC66A`, and a staged review-only pixel draft patch before Draft Preview import.
 - Run Detail product evidence snapshot: generated `docs/workflow-page-productization/product-evidence/semantic-review-run-detail.png` with sidecar `semantic-review-run-detail.md`; current artifact shows linked Macro Review metadata, Open/Reveal/manual bundle controls, and explicit `Source` / `Scope` / `Run` / `Fallback` review-source chips from the Workflow inspector.
+- Run Target product evidence snapshot: generated `docs/workflow-page-productization/product-evidence/semantic-review-run-target.png` with sidecar `semantic-review-run-target.md`; current artifact opens Macro Review from deterministic failed run evidence and shows `Run Target` context before Teach/Draft actions.
 - Draft Preview product evidence snapshot: generated `docs/workflow-page-productization/product-evidence/semantic-review-draft-preview.png` with sidecar `semantic-review-draft-preview.md`; current artifact shows Review-generated package-local image asset provenance before confirmed import.
 - Materialized action product evidence snapshot: generated `docs/workflow-page-productization/product-evidence/semantic-review-materialized-actions.png` with sidecar `semantic-review-materialized-actions.md`; current artifact shows Macro Review action rows after Draft Preview handoff with source artifact, package-local artifact, digest and draft task/condition evidence.
 
@@ -229,3 +236,4 @@ Observed status on 2026-07-06:
 - 2026-07-06: Added Run Detail Macro Review source/scope projection. `AutomationMacroReviewSourcePresentation` makes saved-macro linked evidence, macro-level scope, unbound per-run evidence and manual bundle fallback a tested core projection; `AutomationTaskRunDetailView` now renders those chips from projection instead of local conditional text.
 - 2026-07-06: Added run-outcome initial Review targeting. `SemanticRecordingReviewRunTarget` maps failed `recordedEventIndex`, nearest legacy index fallback and timeout/condition outcomes to initial Review event/frame ids before Run Detail presents the Macro Review sheet.
 - 2026-07-06: Added Review Bundle Health and candidate-action evidence alignment. Stored-bundle Review now shows validation, available/missing artifact counts and suppression detail before Teach/Draft actions, and Teach System candidates show `review.draftCandidate` / `review.draftSelection` with frame/source/artifact/bounds evidence before any patch is created.
+- 2026-07-07: Added visible Run Detail target context inside Macro Review. `SemanticRecordingReviewRunTargetPresentation` explains failed-event, nearest-event fallback, condition-evidence and timeline fallback targeting; Run Detail passes that presentation into the sheet, and `semantic-review-run-target` proves the explanation is visible before Teach/Draft actions.

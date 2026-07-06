@@ -159,6 +159,85 @@ public struct SemanticRecordingReviewRunTarget: Equatable, Sendable {
     }
 }
 
+public struct SemanticRecordingReviewRunTargetPresentation: Equatable, Sendable {
+    public struct Badge: Equatable, Sendable {
+        public var title: String
+        public var value: String
+
+        public init(title: String, value: String) {
+            self.title = title
+            self.value = value
+        }
+    }
+
+    public var title: String
+    public var detail: String
+    public var badges: [Badge]
+
+    public init(
+        title: String,
+        detail: String,
+        badges: [Badge]
+    ) {
+        self.title = title
+        self.detail = detail
+        self.badges = badges
+    }
+
+    public static func make(
+        target: SemanticRecordingReviewRunTarget
+    ) -> SemanticRecordingReviewRunTargetPresentation {
+        switch target.reason {
+        case .failedRecordedEventIndex(let index):
+            return SemanticRecordingReviewRunTargetPresentation(
+                title: "Review starts at failed event",
+                detail: "Run Detail opened the recorded event reported by playback failure evidence.",
+                badges: [
+                    Badge(title: "Target", value: "Event #\(index + 1)"),
+                    Badge(title: "Evidence", value: "Failure report")
+                ]
+            )
+        case .nearestRecordedEventIndex(let requested, let matched):
+            return SemanticRecordingReviewRunTargetPresentation(
+                title: "Review starts near failed event",
+                detail: "Failure evidence referenced an event index that is not present in this bundle, so Review selected the nearest recorded event.",
+                badges: [
+                    Badge(title: "Requested", value: "Event #\(requested + 1)"),
+                    Badge(title: "Matched", value: "Event #\(matched + 1)"),
+                    Badge(title: "Evidence", value: "Nearest event")
+                ]
+            )
+        case .conditionCandidate:
+            return SemanticRecordingReviewRunTargetPresentation(
+                title: "Review starts at condition evidence",
+                detail: "The run outcome points to wait or condition evidence, so Review selected the first matching condition candidate.",
+                badges: [
+                    Badge(title: "Target", value: "Condition"),
+                    Badge(title: "Evidence", value: "Run outcome")
+                ]
+            )
+        case .firstRecordedEvent:
+            return SemanticRecordingReviewRunTargetPresentation(
+                title: "Review starts at first recorded event",
+                detail: "No run-specific semantic bundle target was available, so Review starts from the first recorded macro event.",
+                badges: [
+                    Badge(title: "Target", value: "First event"),
+                    Badge(title: "Evidence", value: "Macro-level")
+                ]
+            )
+        case .defaultTimeline:
+            return SemanticRecordingReviewRunTargetPresentation(
+                title: "Review starts at timeline beginning",
+                detail: "No recorded macro event target was available, so Review starts from the earliest bundle evidence.",
+                badges: [
+                    Badge(title: "Target", value: "Timeline"),
+                    Badge(title: "Evidence", value: "Fallback")
+                ]
+            )
+        }
+    }
+}
+
 private extension AutomationTaskRun {
     var failedEventIndex: Int? {
         guard case .failed(let report) = outcome else {
