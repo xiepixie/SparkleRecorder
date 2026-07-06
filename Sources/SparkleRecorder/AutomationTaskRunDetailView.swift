@@ -19,6 +19,8 @@ struct AutomationTaskRunDetailView: View {
     @State private var semanticReviewErrorMessage = ""
     @State private var isOpeningSemanticReview = false
     @State private var semanticReviewRequestRunID: UUID?
+    @State private var semanticReviewInitialEventID: UUID?
+    @State private var semanticReviewInitialFrameID: UUID?
     @State private var semanticReviewBundleFeedback: SemanticRecordingReviewArtifactActionFeedback?
     @Environment(\.automationTaskRunEvidenceMacroPackageBaseURL) private var macroPackageBaseURL
     @Environment(\.automationTaskRunEvidenceAutoload) private var shouldAutoloadEvidence
@@ -164,6 +166,8 @@ struct AutomationTaskRunDetailView: View {
                 state: state,
                 workflow: workflow,
                 macros: macros,
+                selectedEventID: semanticReviewInitialEventID,
+                selectedFrameID: semanticReviewInitialFrameID,
                 onImportWorkflow: onImportWorkflowFromDraftPreview
             )
                 .frame(minWidth: 1_180, idealWidth: 1_280, minHeight: 760, idealHeight: 820)
@@ -552,7 +556,7 @@ struct AutomationTaskRunDetailView: View {
             isOpeningSemanticReview = false
             switch result {
             case .success(let state):
-                semanticReviewState = state
+                presentSemanticReview(state)
             case .failure(let error):
                 semanticReviewState = nil
                 semanticReviewErrorMessage = String(
@@ -596,7 +600,7 @@ struct AutomationTaskRunDetailView: View {
                         return
                     }
                     isOpeningSemanticReview = false
-                    semanticReviewState = state
+                    presentSemanticReview(state)
                 }
             } catch {
                 await MainActor.run {
@@ -612,6 +616,16 @@ struct AutomationTaskRunDetailView: View {
                 }
             }
         }
+    }
+
+    private func presentSemanticReview(_ state: SemanticRecordingReviewState) {
+        let target = SemanticRecordingReviewRunTarget.make(
+            run: run,
+            bundle: state.bundle
+        )
+        semanticReviewInitialEventID = target.selectedEventID
+        semanticReviewInitialFrameID = target.selectedFrameID
+        semanticReviewState = state
     }
 
     private var noEvidenceMessage: String {
@@ -633,6 +647,8 @@ struct AutomationTaskRunDetailView: View {
         semanticReviewErrorMessage = ""
         isOpeningSemanticReview = false
         semanticReviewRequestRunID = nil
+        semanticReviewInitialEventID = nil
+        semanticReviewInitialFrameID = nil
         semanticReviewBundleFeedback = nil
     }
 }

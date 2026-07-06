@@ -1,5 +1,183 @@
 import Foundation
 
+public struct SemanticRecordingReviewRunTarget: Equatable, Sendable {
+    public enum Reason: Equatable, Sendable {
+        case failedRecordedEventIndex(Int)
+        case nearestRecordedEventIndex(requested: Int, matched: Int)
+        case conditionCandidate
+        case firstRecordedEvent
+        case defaultTimeline
+    }
+
+    public var selectedEventID: UUID?
+    public var selectedFrameID: UUID?
+    public var reason: Reason
+
+    public init(
+        selectedEventID: UUID?,
+        selectedFrameID: UUID?,
+        reason: Reason
+    ) {
+        self.selectedEventID = selectedEventID
+        self.selectedFrameID = selectedFrameID
+        self.reason = reason
+    }
+
+    public static func make(
+        run: AutomationTaskRun,
+        bundle: SemanticRecordingBundle
+    ) -> SemanticRecordingReviewRunTarget {
+        let sortedEvents = bundle.timelineEvents.sorted(by: timelineSort)
+        let sortedFrames = bundle.frames.sorted(by: frameSort)
+
+        if let failedEventIndex = run.failedEventIndex {
+            if let exactEvent = sortedEvents.first(where: { $0.recordedEventIndex == failedEventIndex }) {
+                return SemanticRecordingReviewRunTarget(
+                    selectedEventID: exactEvent.id,
+                    selectedFrameID: frameID(for: exactEvent, bundle: bundle, sortedFrames: sortedFrames),
+                    reason: .failedRecordedEventIndex(failedEventIndex)
+                )
+            }
+
+            if let nearest = nearestRecordedEvent(
+                to: failedEventIndex,
+                in: sortedEvents
+            ), let matchedIndex = nearest.recordedEventIndex {
+                return SemanticRecordingReviewRunTarget(
+                    selectedEventID: nearest.id,
+                    selectedFrameID: frameID(for: nearest, bundle: bundle, sortedFrames: sortedFrames),
+                    reason: .nearestRecordedEventIndex(
+                        requested: failedEventIndex,
+                        matched: matchedIndex
+                    )
+                )
+            }
+        }
+
+        if run.prefersConditionReviewTarget,
+           let conditionEvent = bundle.semanticEvents
+            .sorted(by: semanticEventSort)
+            .first(where: { $0.kind == .conditionCandidate || $0.kind == .wait }),
+           let timelineEventID = conditionEvent.timelineEventID,
+           sortedEvents.contains(where: { $0.id == timelineEventID }) {
+            return SemanticRecordingReviewRunTarget(
+                selectedEventID: timelineEventID,
+                selectedFrameID: conditionEvent.frameID ?? conditionEvent.evidenceFrameIDs.first,
+                reason: .conditionCandidate
+            )
+        }
+
+        if let recordedEvent = sortedEvents.first(where: { $0.kind == .recordedEvent }) {
+            return SemanticRecordingReviewRunTarget(
+                selectedEventID: recordedEvent.id,
+                selectedFrameID: frameID(for: recordedEvent, bundle: bundle, sortedFrames: sortedFrames),
+                reason: .firstRecordedEvent
+            )
+        }
+
+        let fallbackEvent = sortedEvents.first
+        return SemanticRecordingReviewRunTarget(
+            selectedEventID: fallbackEvent?.id,
+            selectedFrameID: fallbackEvent
+                .flatMap { frameID(for: $0, bundle: bundle, sortedFrames: sortedFrames) }
+                ?? sortedFrames.first?.id,
+            reason: .defaultTimeline
+        )
+    }
+
+    private static func nearestRecordedEvent(
+        to recordedEventIndex: Int,
+        in events: [RecordingTimelineEvent]
+    ) -> RecordingTimelineEvent? {
+        events
+            .filter { $0.recordedEventIndex != nil }
+            .min { left, right in
+                let leftDistance = abs((left.recordedEventIndex ?? recordedEventIndex) - recordedEventIndex)
+                let rightDistance = abs((right.recordedEventIndex ?? recordedEventIndex) - recordedEventIndex)
+                if leftDistance == rightDistance {
+                    return timelineSort(left, right)
+                }
+                return leftDistance < rightDistance
+            }
+    }
+
+    private static func frameID(
+        for event: RecordingTimelineEvent,
+        bundle: SemanticRecordingBundle,
+        sortedFrames: [RecordingFrameReference]
+    ) -> UUID? {
+        event.frameID ??
+            bundle.semanticEvents
+                .sorted(by: semanticEventSort)
+                .first { $0.timelineEventID == event.id }
+                .flatMap { $0.frameID ?? $0.evidenceFrameIDs.first } ??
+            nearestFrame(to: event.recordingTime, in: sortedFrames)?.id
+    }
+
+    private static func nearestFrame(
+        to recordingTime: TimeInterval,
+        in frames: [RecordingFrameReference]
+    ) -> RecordingFrameReference? {
+        frames.min { left, right in
+            let leftDistance = abs(left.recordingTime - recordingTime)
+            let rightDistance = abs(right.recordingTime - recordingTime)
+            if leftDistance == rightDistance {
+                return frameSort(left, right)
+            }
+            return leftDistance < rightDistance
+        }
+    }
+
+    private static func timelineSort(
+        _ left: RecordingTimelineEvent,
+        _ right: RecordingTimelineEvent
+    ) -> Bool {
+        if left.recordingTime == right.recordingTime {
+            return left.id.uuidString < right.id.uuidString
+        }
+        return left.recordingTime < right.recordingTime
+    }
+
+    private static func frameSort(
+        _ left: RecordingFrameReference,
+        _ right: RecordingFrameReference
+    ) -> Bool {
+        if left.recordingTime == right.recordingTime {
+            return left.id.uuidString < right.id.uuidString
+        }
+        return left.recordingTime < right.recordingTime
+    }
+
+    private static func semanticEventSort(
+        _ left: RecordingSemanticEvent,
+        _ right: RecordingSemanticEvent
+    ) -> Bool {
+        if left.recordingTime == right.recordingTime {
+            return left.id.uuidString < right.id.uuidString
+        }
+        return left.recordingTime < right.recordingTime
+    }
+}
+
+private extension AutomationTaskRun {
+    var failedEventIndex: Int? {
+        guard case .failed(let report) = outcome else {
+            return nil
+        }
+        return report?.failedEventIndex
+    }
+
+    var prefersConditionReviewTarget: Bool {
+        switch outcome {
+        case .timedOut, .conditionNotMatched:
+            return true
+        case .succeeded, .failed, .cancelled, .resourceConflict, .permissionDenied,
+             .conditionMatched, .missingMacro, .rejected, nil:
+            return false
+        }
+    }
+}
+
 public struct SemanticRecordingReviewProjection: Equatable, Sendable {
     public var recordingID: UUID
     public var title: String

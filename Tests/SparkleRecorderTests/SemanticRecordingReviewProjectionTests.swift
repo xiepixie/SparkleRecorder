@@ -428,4 +428,67 @@ struct SemanticRecordingReviewProjectionTests {
         #expect(task.condition == result.condition)
         #expect(regions == [region])
     }
+
+    @Test("Run target selects exact failed recorded event when available")
+    func runTargetSelectsExactFailedRecordedEventWhenAvailable() throws {
+        let bundle = SemanticRecordingFixture.checkoutBundle()
+        let run = AutomationTaskRun(
+            workflowID: UUID(),
+            taskID: UUID(),
+            outcome: .failed(report: RunReport(
+                runID: UUID(),
+                startTime: bundle.createdAt,
+                duration: 4,
+                isSuccess: false,
+                failedEventIndex: 4,
+                errorMessage: "Click target moved"
+            ))
+        )
+
+        let target = SemanticRecordingReviewRunTarget.make(run: run, bundle: bundle)
+
+        #expect(target.selectedEventID == SemanticRecordingFixture.clickEventID)
+        #expect(target.selectedFrameID == SemanticRecordingFixture.beforeClickFrameID)
+        #expect(target.reason == .failedRecordedEventIndex(4))
+    }
+
+    @Test("Run target falls back to nearest recorded event when failed index is not present")
+    func runTargetFallsBackToNearestRecordedEventWhenFailedIndexIsNotPresent() throws {
+        let bundle = SemanticRecordingFixture.checkoutBundle()
+        let run = AutomationTaskRun(
+            workflowID: UUID(),
+            taskID: UUID(),
+            outcome: .failed(report: RunReport(
+                runID: UUID(),
+                startTime: bundle.createdAt,
+                duration: 4,
+                isSuccess: false,
+                failedEventIndex: 2,
+                errorMessage: "Fixture macro report used an older event index"
+            ))
+        )
+
+        let target = SemanticRecordingReviewRunTarget.make(run: run, bundle: bundle)
+
+        #expect(target.selectedEventID == SemanticRecordingFixture.clickEventID)
+        #expect(target.selectedFrameID == SemanticRecordingFixture.beforeClickFrameID)
+        #expect(target.reason == .nearestRecordedEventIndex(requested: 2, matched: 4))
+    }
+
+    @Test("Run target sends timeout outcomes to condition candidate evidence")
+    func runTargetSendsTimeoutOutcomesToConditionCandidateEvidence() throws {
+        let bundle = SemanticRecordingFixture.checkoutBundle()
+        let run = AutomationTaskRun(
+            workflowID: UUID(),
+            taskID: UUID(),
+            outcome: .timedOut(deadline: nil)
+        )
+
+        let target = SemanticRecordingReviewRunTarget.make(run: run, bundle: bundle)
+
+        #expect(target.selectedEventID == SemanticRecordingFixture.waitEventID)
+        #expect(target.selectedFrameID == SemanticRecordingFixture.afterClickFrameID)
+        #expect(target.reason == SemanticRecordingReviewRunTarget.Reason.conditionCandidate)
+    }
+
 }
