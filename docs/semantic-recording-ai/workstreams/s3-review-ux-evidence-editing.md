@@ -45,6 +45,7 @@ S3 does not own:
 - Pixel sample color picking UI for `pixelMatched` candidates
 - Suggestion accept/reject local review state
 - Product evidence snapshot scenario: `workflow product-evidence snapshot semantic-review-timeline`
+- Product evidence snapshot scenario: `workflow product-evidence snapshot semantic-review-draft-preview`
 - Unit tests: `SemanticRecordingReviewProjectionTests`
 
 当前 first pass 证明：
@@ -63,6 +64,7 @@ S3 does not own:
 - Review -> Draft Preview 现在会把 image/template 和 baseline 候选引用的 semantic bundle artifact 复制到 app-managed `ReviewVisualAssets/<digest>/assets/images|baselines`，并把 patch 中的 `visualAssets.images/baselines.path` 重写成 package-local safe refs。确认导入后，既有 `AutomationMainContentView.importWorkflowFromDraftPreview` 会把该 package directory 写入 visual asset package-root manifest，而不是把 workflow 绑定到可能被 retention 清理的 semantic bundle。
 - 当用户在 Review frame 上手动画框并生成 image/template 或 baseline condition 时，`SemanticRecordingReviewDraftPatchResult.assetExtractions` 会记录从 source frame image 裁剪的计划；`SemanticRecordingReviewPresenter` 在打开 Draft Preview 前用 ImageIO/AppKit 从 frame PNG 裁出新的 package-local PNG，并用裁剪后的 bytes 计算 SHA-256。`AutomationWorkflowDraftVisualImageAsset` 也会保留 source frame id、surface id、source artifact path、crop bounds 和 bounds space，方便之后做 evidence drill-in。
 - Draft Preview 的 visual asset rows 现在会把 Review-generated crop 的 frame id、crop bounds、source artifact、surface 和 hash 摘要显示成 provenance badges。用户确认 import 前可以看到 image/template 或 baseline 资产来自哪一帧、哪块区域，而不是只看到 package-local path。
+- `semantic-review-draft-preview` fixture snapshot 现在会从 checkout bundle 生成 `imageAppeared` review patch、apply 到真实 draft document，并渲染 `AutomationWorkflowDraftPreviewSheet`，证明 provenance badges 出现在确认 import 前的真实 Draft Preview surface。
 - SwiftUI Review 只消费 presenter 解析好的 artifact statuses，不在 view body 内运行 Vision/AX/ScreenCaptureKit，也不自己拼 raw bundle paths。
 
 尚未完成：
@@ -121,6 +123,7 @@ Current targeted verification:
 swift test --scratch-path .build-test --enable-swift-testing --disable-xctest --filter 'SemanticRecordingReviewProjectionTests'
 swift build -Xswiftc -swift-version -Xswiftc 6
 swift run SparkleRecorder workflow product-evidence snapshot semantic-review-timeline --output docs/workflow-page-productization/product-evidence/semantic-review-timeline.png
+swift run SparkleRecorder workflow product-evidence snapshot semantic-review-draft-preview --output docs/workflow-page-productization/product-evidence/semantic-review-draft-preview.png
 ```
 
 Observed status on 2026-07-06:
@@ -128,6 +131,7 @@ Observed status on 2026-07-06:
 - `SemanticRecordingReviewProjectionTests`: 9 tests passed; coverage includes OCR wait patch, image appeared patch, visual asset upsert operations, package-local materialization path rewriting, manual frame region override, manual frame crop extraction data flow and user-picked pixel color -> `pixelMatched` patch.
 - Swift 6 build: passed.
 - Product evidence snapshot: generated `docs/workflow-page-productization/product-evidence/semantic-review-timeline.png` with sidecar `semantic-review-timeline.md`; current artifact includes suggestion evidence refs plus `Accept Patch` / `Reject` controls.
+- Draft Preview product evidence snapshot: generated `docs/workflow-page-productization/product-evidence/semantic-review-draft-preview.png` with sidecar `semantic-review-draft-preview.md`; current artifact shows Review-generated package-local image asset provenance before confirmed import.
 
 ## Next Tasks
 
@@ -148,3 +152,4 @@ Observed status on 2026-07-06:
 - 2026-07-06: Added package-local materialization for Review-generated image/template and baseline assets. `SemanticRecordingReviewAssetMaterializer` rewrites patch asset refs to `assets/images` or `assets/baselines`, computes SHA-256 from copied bytes, and `SemanticRecordingReviewPresenter.previewState` writes those files under app-managed `ReviewVisualAssets` before opening Draft Preview.
 - 2026-07-06: Added manual frame-crop extraction for Review-generated image/template and baseline assets. Manual region selections now travel as `SemanticRecordingReviewAssetExtraction` plans, Draft Preview materialization reads the selected frame artifact, crops it to PNG, writes package-local assets, and stores visual asset provenance fields for source frame, surface and crop bounds.
 - 2026-07-06: Added Draft Preview provenance badges for Review-generated visual assets, so frame id, crop bounds, source artifact, surface and hash are visible before confirmed import.
+- 2026-07-06: Added `semantic-review-draft-preview` product evidence snapshot. The snapshot command builds a Review-generated image condition patch from the checkout fixture, applies it to a real draft document, and renders `AutomationWorkflowDraftPreviewSheet` with provenance badges visible in Draft Visual Assets.

@@ -13,6 +13,7 @@ enum AutomationProductEvidenceSnapshotScenario: String, CaseIterable {
     case branchEvidence = "branch-evidence"
     case templateBaselinePreviewRefs = "template-baseline-preview-refs"
     case semanticReviewTimeline = "semantic-review-timeline"
+    case semanticReviewDraftPreview = "semantic-review-draft-preview"
 
     init?(argument: String) {
         switch argument {
@@ -36,6 +37,8 @@ enum AutomationProductEvidenceSnapshotScenario: String, CaseIterable {
             self = .templateBaselinePreviewRefs
         case "semantic-review", "semantic-review-timeline", "review-timeline":
             self = .semanticReviewTimeline
+        case "semantic-review-draft-preview", "review-draft-preview", "semantic-draft-preview":
+            self = .semanticReviewDraftPreview
         default:
             return nil
         }
@@ -63,6 +66,8 @@ enum AutomationProductEvidenceSnapshotScenario: String, CaseIterable {
             return "template-baseline-preview-refs.png"
         case .semanticReviewTimeline:
             return "semantic-review-timeline.png"
+        case .semanticReviewDraftPreview:
+            return "semantic-review-draft-preview.png"
         }
     }
 
@@ -76,6 +81,8 @@ enum AutomationProductEvidenceSnapshotScenario: String, CaseIterable {
             return 980
         case .semanticReviewTimeline:
             return 1_040
+        case .semanticReviewDraftPreview:
+            return 1_080
         case .idle, .dragLinkAuthoring, .taskReorderAuthoring, .running:
             return 940
         }
@@ -95,7 +102,7 @@ enum AutomationProductEvidenceSnapshotScenario: String, CaseIterable {
             return Self.fixedUUID("00000000-0000-0000-0000-00000000c20b")
         case .branchEvidence:
             return Self.fixedUUID("00000000-0000-0000-0000-00000000c206")
-        case .templateBaselinePreviewRefs, .semanticReviewTimeline:
+        case .templateBaselinePreviewRefs, .semanticReviewTimeline, .semanticReviewDraftPreview:
             return nil
         }
     }
@@ -109,7 +116,7 @@ enum AutomationProductEvidenceSnapshotScenario: String, CaseIterable {
         case .branchEvidence:
             return Self.fixedUUID("00000000-0000-0000-0000-00000000c406")
         case .idle, .dragLinkAuthoring, .taskReorderAuthoring, .running, .templateBaselinePreviewRefs,
-             .semanticReviewTimeline:
+             .semanticReviewTimeline, .semanticReviewDraftPreview:
             return nil
         }
     }
@@ -119,7 +126,7 @@ enum AutomationProductEvidenceSnapshotScenario: String, CaseIterable {
         case .dragLinkAuthoring:
             return Self.fixedUUID("00000000-0000-0000-0000-00000000c202")
         case .idle, .taskReorderAuthoring, .running, .failedRunDetail, .failedRunPreviewUnavailable, .visualDiagnostics, .branchEvidence,
-             .semanticReviewTimeline:
+             .semanticReviewTimeline, .semanticReviewDraftPreview:
             return nil
         case .templateBaselinePreviewRefs:
             return nil
@@ -131,7 +138,7 @@ enum AutomationProductEvidenceSnapshotScenario: String, CaseIterable {
         case .dragLinkAuthoring:
             return .onConditionMatched
         case .idle, .taskReorderAuthoring, .running, .failedRunDetail, .failedRunPreviewUnavailable, .visualDiagnostics, .branchEvidence,
-             .semanticReviewTimeline:
+             .semanticReviewTimeline, .semanticReviewDraftPreview:
             return .onSuccess
         case .templateBaselinePreviewRefs:
             return .onSuccess
@@ -143,7 +150,7 @@ enum AutomationProductEvidenceSnapshotScenario: String, CaseIterable {
         case .failedRunDetail, .failedRunPreviewUnavailable:
             return true
         case .idle, .dragLinkAuthoring, .taskReorderAuthoring, .running, .visualDiagnostics, .branchEvidence,
-             .templateBaselinePreviewRefs, .semanticReviewTimeline:
+             .templateBaselinePreviewRefs, .semanticReviewTimeline, .semanticReviewDraftPreview:
             return false
         }
     }
@@ -153,7 +160,7 @@ enum AutomationProductEvidenceSnapshotScenario: String, CaseIterable {
         case .failedRunPreviewUnavailable:
             return "fixture-macros-preview-unavailable"
         case .idle, .dragLinkAuthoring, .taskReorderAuthoring, .running, .failedRunDetail, .visualDiagnostics,
-             .branchEvidence, .templateBaselinePreviewRefs, .semanticReviewTimeline:
+             .branchEvidence, .templateBaselinePreviewRefs, .semanticReviewTimeline, .semanticReviewDraftPreview:
             return "fixture-macros"
         }
     }
@@ -167,7 +174,7 @@ enum AutomationProductEvidenceSnapshotScenario: String, CaseIterable {
             )
         case .idle, .dragLinkAuthoring, .running, .failedRunDetail,
              .failedRunPreviewUnavailable, .visualDiagnostics, .branchEvidence, .templateBaselinePreviewRefs,
-             .semanticReviewTimeline:
+             .semanticReviewTimeline, .semanticReviewDraftPreview:
             return nil
         }
     }
@@ -182,7 +189,7 @@ enum AutomationProductEvidenceSnapshotScenario: String, CaseIterable {
             return .succeeded(.revealReport)
         case .idle, .dragLinkAuthoring, .taskReorderAuthoring, .running,
              .failedRunPreviewUnavailable, .visualDiagnostics, .branchEvidence, .templateBaselinePreviewRefs,
-             .semanticReviewTimeline:
+             .semanticReviewTimeline, .semanticReviewDraftPreview:
             return nil
         }
     }
@@ -193,7 +200,7 @@ enum AutomationProductEvidenceSnapshotScenario: String, CaseIterable {
             return ["regionSampleImage": .succeeded(.reveal)]
         case .idle, .dragLinkAuthoring, .taskReorderAuthoring, .running,
              .failedRunDetail, .failedRunPreviewUnavailable, .branchEvidence, .templateBaselinePreviewRefs,
-             .semanticReviewTimeline:
+             .semanticReviewTimeline, .semanticReviewDraftPreview:
             return [:]
         }
     }
@@ -602,6 +609,30 @@ enum AutomationProductEvidenceSnapshotRenderer {
             )
             return
         }
+        if scenario == .semanticReviewDraftPreview {
+            let state = try semanticReviewDraftPreviewState(
+                now: now,
+                sourceDirectory: outputURL.deletingLastPathComponent()
+            )
+            let view = AutomationWorkflowDraftPreviewSheet(
+                state: state,
+                existingWorkflowName: "Checkout workflow",
+                onImportWorkflow: { _, _ in }
+            )
+            .frame(width: width, height: height)
+            .environment(\.colorScheme, .dark)
+            .environment(\.locale, Locale(identifier: "en_US_POSIX"))
+            .background(Color(red: 0.08, green: 0.09, blue: 0.10))
+
+            try writeSwiftUISnapshot(
+                view,
+                outputURL: outputURL,
+                width: width,
+                height: height,
+                scale: scale
+            )
+            return
+        }
 
         let state = state(for: scenario, now: now)
         let projection = AutomationViewProjection.overview(from: state)
@@ -659,6 +690,51 @@ enum AutomationProductEvidenceSnapshotRenderer {
             width: width,
             height: height,
             scale: scale
+        )
+    }
+
+    private static func semanticReviewDraftPreviewState(
+        now: Date,
+        sourceDirectory: URL?
+    ) throws -> AutomationWorkflowDraftPreviewState {
+        let bundle = SemanticRecordingFixture.checkoutBundle(createdAt: now)
+        let projection = SemanticRecordingReviewProjection(
+            bundle: bundle,
+            selectedEventID: SemanticRecordingFixture.clickEventID
+        )
+        guard let candidate = projection.selectedFrame?.conditionCandidates.first(where: { $0.kind == .imageAppeared }) else {
+            throw SnapshotError.fixturePreparationFailed("Semantic Review fixture did not expose an imageAppeared candidate.")
+        }
+
+        let patchResult = try SemanticRecordingReviewDraftPatchBuilder.makePatch(
+            bundle: bundle,
+            request: SemanticRecordingReviewDraftPatchRequest(
+                candidate: candidate,
+                newTaskKey: "wait_checkout_button",
+                threshold: 0.88
+            )
+        )
+        let materialized = try SemanticRecordingReviewAssetMaterializer.materialize(
+            patch: patchResult.patch,
+            readArtifact: { path in
+                Data("semantic-review-draft-preview:\(path)".utf8)
+            },
+            writeAsset: { _, _ in }
+        )
+        let document = AutomationWorkflowDraftDocument(
+            workflow: AutomationWorkflowDraft(name: "Checkout Review Draft")
+        )
+        let patched = try AutomationWorkflowDraftPatchApplier.apply(
+            materialized.patch,
+            to: document
+        )
+
+        return AutomationWorkflowDraftPreviewPresenter.previewState(
+            document: patched.document,
+            sourceName: "Macro Review checkout patch",
+            sourceDirectory: sourceDirectory,
+            loadedAt: now,
+            macroCatalog: []
         )
     }
 
@@ -989,6 +1065,7 @@ enum AutomationProductEvidenceSnapshotRenderer {
     enum SnapshotError: Error, CustomStringConvertible {
         case renderFailed
         case pngEncodingFailed
+        case fixturePreparationFailed(String)
 
         var description: String {
             switch self {
@@ -996,6 +1073,8 @@ enum AutomationProductEvidenceSnapshotRenderer {
                 return "Could not render Workflow fixture view."
             case .pngEncodingFailed:
                 return "Could not encode Workflow fixture snapshot as PNG."
+            case .fixturePreparationFailed(let message):
+                return message
             }
         }
     }
