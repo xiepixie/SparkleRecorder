@@ -432,6 +432,89 @@ public enum TextTargetAnchorFactory {
     }
 }
 
+public struct ActionGroupTextClickConversionPlan: Equatable, Sendable {
+    public var sourceEventIndex: Int?
+    public var insertedEvents: [RecordedEvent]
+    public var eventTimeShifts: [ActionGroupEventTimeShift]
+    public var liveDurationAfterConversion: TimeInterval?
+
+    public init(
+        sourceEventIndex: Int? = nil,
+        insertedEvents: [RecordedEvent] = [],
+        eventTimeShifts: [ActionGroupEventTimeShift] = [],
+        liveDurationAfterConversion: TimeInterval? = nil
+    ) {
+        self.sourceEventIndex = sourceEventIndex
+        self.insertedEvents = insertedEvents
+        self.eventTimeShifts = eventTimeShifts
+        self.liveDurationAfterConversion = liveDurationAfterConversion
+    }
+
+    public var isEmpty: Bool {
+        sourceEventIndex == nil || insertedEvents.isEmpty
+    }
+}
+
+public enum ActionGroupTextClickConversionPlanner {
+    private static let clickDuration: TimeInterval = 0.1
+
+    public static func plan(
+        for group: ActionGroup,
+        events: [RecordedEvent],
+        liveDuration: TimeInterval,
+        fallbackPolicy: LocatorFallbackPolicy = .fail
+    ) -> ActionGroupTextClickConversionPlan {
+        guard group.kind == .waitForText,
+              let sourceIndex = group.eventIndices.first,
+              events.indices.contains(sourceIndex) else {
+            return ActionGroupTextClickConversionPlan()
+        }
+
+        let sourceEvent = events[sourceIndex]
+        guard sourceEvent.kind == .waitForText else {
+            return ActionGroupTextClickConversionPlan()
+        }
+
+        let anchor = TextTargetAnchorFactory.clickableAnchor(
+            sourceEvent.textAnchor
+                ?? group.textAnchor
+                ?? TextAnchor(text: "", observedFrame: RectValue(x: 0, y: 0, width: 0, height: 0)),
+            fallbackEvent: sourceEvent
+        )
+        let insertedEvents = TextClickEventFactory.makeEvents(
+            startTime: sourceEvent.time,
+            textAnchor: anchor,
+            timeout: sourceEvent.textTimeout ?? group.textTimeout ?? 10.0,
+            fallbackPolicy: sourceEvent.locatorFallbackPolicy ?? fallbackPolicy,
+            surfaceId: sourceEvent.surfaceId
+        )
+
+        let clickEndTime = insertedEvents.map(\.time).max() ?? (sourceEvent.time + clickDuration)
+        let followingIndices = events.indices.filter { $0 > sourceIndex }
+        let earliestFollowingTime = followingIndices.map { events[$0].time }.min()
+        let shiftDelta = earliestFollowingTime.map { max(0, clickEndTime - $0) } ?? 0
+        let eventTimeShifts = shiftDelta > 0
+            ? [ActionGroupEventTimeShift(eventIndices: Array(followingIndices), delta: shiftDelta)]
+            : []
+
+        let liveDurationAfterConversion: TimeInterval?
+        if shiftDelta > 0 {
+            liveDurationAfterConversion = max(clickEndTime, liveDuration + shiftDelta)
+        } else if liveDuration < clickEndTime {
+            liveDurationAfterConversion = clickEndTime
+        } else {
+            liveDurationAfterConversion = nil
+        }
+
+        return ActionGroupTextClickConversionPlan(
+            sourceEventIndex: sourceIndex,
+            insertedEvents: insertedEvents,
+            eventTimeShifts: eventTimeShifts,
+            liveDurationAfterConversion: liveDurationAfterConversion
+        )
+    }
+}
+
 public struct ActionGroupDeletionPlan: Equatable, Sendable {
     public var eventTimeShifts: [ActionGroupEventTimeShift]
     public var eventIndices: [Int]
@@ -468,6 +551,87 @@ public struct ActionGroupEventTimeShift: Equatable, Sendable {
     public init(eventIndices: [Int], delta: TimeInterval) {
         self.eventIndices = eventIndices
         self.delta = delta
+    }
+}
+
+public struct ActionGroupPassiveWaitDuplicationPlan: Equatable, Sendable {
+    public var eventTimeShifts: [ActionGroupEventTimeShift]
+    public var liveDurationAfterDuplication: TimeInterval?
+
+    public init(
+        eventTimeShifts: [ActionGroupEventTimeShift] = [],
+        liveDurationAfterDuplication: TimeInterval? = nil
+    ) {
+        self.eventTimeShifts = eventTimeShifts
+        self.liveDurationAfterDuplication = liveDurationAfterDuplication
+    }
+
+    public var isEmpty: Bool {
+        eventTimeShifts.isEmpty && liveDurationAfterDuplication == nil
+    }
+}
+
+public enum ActionGroupPassiveWaitDuplicationPlanner {
+    public static func plan(
+        for groups: [ActionGroup],
+        events: [RecordedEvent],
+        liveDuration: TimeInterval
+    ) -> ActionGroupPassiveWaitDuplicationPlan {
+        var waitExtensions: [(endTime: TimeInterval, duration: TimeInterval)] = []
+        var trailingWaitDelta: TimeInterval = 0
+
+        for group in groups where group.kind == .wait {
+            let waitDuration = max(0, group.endTime - group.startTime)
+            guard waitDuration > 0 else { continue }
+
+            let hasEventsAfter = events.contains { $0.time >= group.endTime }
+            if hasEventsAfter {
+                waitExtensions.append((endTime: group.endTime, duration: waitDuration))
+            } else {
+                trailingWaitDelta += waitDuration
+            }
+        }
+
+        let eventTimeShifts = makeEventTimeShifts(
+            waitExtensions: waitExtensions,
+            events: events
+        )
+        let totalWaitDelta = waitExtensions.reduce(trailingWaitDelta) { $0 + $1.duration }
+        let liveDurationAfterDuplication = totalWaitDelta > 0
+            ? liveDuration + totalWaitDelta
+            : nil
+
+        return ActionGroupPassiveWaitDuplicationPlan(
+            eventTimeShifts: eventTimeShifts,
+            liveDurationAfterDuplication: liveDurationAfterDuplication
+        )
+    }
+
+    private static func makeEventTimeShifts(
+        waitExtensions: [(endTime: TimeInterval, duration: TimeInterval)],
+        events: [RecordedEvent]
+    ) -> [ActionGroupEventTimeShift] {
+        guard !waitExtensions.isEmpty else { return [] }
+
+        let indexedDeltas = events.enumerated().compactMap { index, event -> (index: Int, delta: TimeInterval)? in
+            let delta = waitExtensions.reduce(TimeInterval(0)) { partial, wait in
+                event.time >= wait.endTime ? partial + wait.duration : partial
+            }
+            guard delta != 0 else { return nil }
+            return (index, delta)
+        }
+
+        let grouped = Dictionary(grouping: indexedDeltas, by: \.delta)
+        return grouped
+            .map { delta, rows in
+                ActionGroupEventTimeShift(
+                    eventIndices: rows.map(\.index).sorted(),
+                    delta: delta
+                )
+            }
+            .sorted {
+                ($0.eventIndices.first ?? Int.max) < ($1.eventIndices.first ?? Int.max)
+            }
     }
 }
 

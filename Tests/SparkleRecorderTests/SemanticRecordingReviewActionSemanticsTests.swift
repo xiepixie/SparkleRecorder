@@ -514,6 +514,64 @@ struct SemanticRecordingReviewActionSemanticsTests {
         #expect(rowsByKind[.summary]?.value == "Recorded text appeared after the checkout click.")
     }
 
+    @Test("Review visible presentation rows include mutation effect")
+    func reviewVisiblePresentationRowsIncludeMutationEffect() throws {
+        let bundle = SemanticRecordingFixture.checkoutBundle()
+        let suggestion = try #require(
+            SemanticRecordingFixture.checkoutSuggestions(bundle: bundle).first
+        )
+        let presentation = SemanticRecordingReviewActionPresentation(
+            .acceptSuggestion(suggestion)
+        )
+
+        let visibleKinds = presentation.reviewVisibleRows.map(\.kind)
+
+        #expect(visibleKinds.contains(.mutationEffect))
+        #expect(visibleKinds.contains(.suggestion))
+        #expect(visibleKinds.contains(.frame))
+        #expect(visibleKinds.contains(.artifact))
+        #expect(!visibleKinds.contains(.action))
+        #expect(!visibleKinds.contains(.mutationBoundary))
+        #expect(!visibleKinds.contains(.events))
+    }
+
+    @Test("Review action boundary and effect copy has localized catalog entries")
+    func reviewActionBoundaryAndEffectCopyHasLocalizedCatalogEntries() throws {
+        let keys = [
+            "Effect",
+            "Creates reviewed draft patch",
+            "No workflow mutation",
+            "Mutates workflow after confirmation",
+            "Review local",
+            "Package asset only",
+            "Draft patch only",
+            "Draft Preview required",
+            "Confirmed import"
+        ]
+        let catalog = try localizationCatalog()
+
+        var missingEntries: [String] = []
+        var missingEnglish: [String] = []
+        var missingSimplifiedChinese: [String] = []
+        for key in keys {
+            guard let entry = catalog[key] as? [String: Any] else {
+                missingEntries.append(key)
+                continue
+            }
+            let localizations = entry["localizations"] as? [String: Any] ?? [:]
+            if localizations["en"] == nil {
+                missingEnglish.append(key)
+            }
+            if localizations["zh-Hans"] == nil {
+                missingSimplifiedChinese.append(key)
+            }
+        }
+
+        #expect(missingEntries.isEmpty, "Missing Localizable.xcstrings entries: \(missingEntries)")
+        #expect(missingEnglish.isEmpty, "Missing English localizations: \(missingEnglish)")
+        #expect(missingSimplifiedChinese.isEmpty, "Missing Simplified Chinese localizations: \(missingSimplifiedChinese)")
+    }
+
     @Test("Review action semantics are Codable for S4 JSON payloads")
     func reviewActionSemanticsAreCodableForS4JSONPayloads() throws {
         let bundle = SemanticRecordingFixture.checkoutBundle()
@@ -533,5 +591,22 @@ struct SemanticRecordingReviewActionSemanticsTests {
         #expect(decoded.mutationBoundary.rawValue == "draftPreviewRequired")
         #expect(decoded.evidence.suggestionID == suggestion.id)
         #expect(decoded.evidence.artifactPath == suggestion.evidence.first?.artifactRef?.path)
+    }
+
+    private func localizationCatalog() throws -> [String: Any] {
+        let url = repositoryRoot()
+            .appendingPathComponent("Sources/SparkleRecorder/Localizable.xcstrings")
+        let data = try Data(contentsOf: url)
+        let rootObject = try #require(
+            try JSONSerialization.jsonObject(with: data) as? [String: Any]
+        )
+        return try #require(rootObject["strings"] as? [String: Any])
+    }
+
+    private func repositoryRoot() -> URL {
+        URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
     }
 }

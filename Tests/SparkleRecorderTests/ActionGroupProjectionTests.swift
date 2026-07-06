@@ -411,6 +411,194 @@ struct ActionGroupProjectionTests {
         #expect(anchor.coordinateFallbackContentNormalized == nil)
     }
 
+    @Test("Text click conversion planner replaces wait text with locator backed click")
+    func textClickConversionPlannerReplacesWaitTextWithClickEvents() throws {
+        var wait = RecordedEvent.make(.waitForText, time: 1.0)
+        wait.textAnchor = TextAnchor(
+            text: "Confirm",
+            observedFrame: RectValue(x: 90, y: 90, width: 80, height: 24)
+        )
+        wait.textTimeout = 7.0
+        wait.locatorFallbackPolicy = .allowCoordinateFallback
+        wait.surfaceId = "checkout"
+        let next = RecordedEvent.make(.keyDown, time: 1.05, keyCode: 36)
+        let group = ActionGroup(
+            kind: .waitForText,
+            eventIndices: [0],
+            startTime: 1.0,
+            endTime: 1.0,
+            summary: "Wait Text",
+            textAnchor: wait.textAnchor,
+            textTimeout: 7.0
+        )
+
+        let plan = ActionGroupTextClickConversionPlanner.plan(
+            for: group,
+            events: [wait, next],
+            liveDuration: 1.2
+        )
+
+        #expect(plan.sourceEventIndex == 0)
+        #expect(plan.insertedEvents.map(\.kind) == [.leftMouseDown, .leftMouseUp])
+        #expect(plan.insertedEvents.map(\.coordinateStrategy) == [.locatorOnly, .locatorOnly])
+        #expect(plan.insertedEvents.map(\.coordinateBinding) == [.targetWindow, .targetWindow])
+        #expect(plan.insertedEvents.allSatisfy { $0.textAnchor?.text == "Confirm" })
+        #expect(plan.insertedEvents.allSatisfy { $0.textTimeout == 7.0 })
+        #expect(plan.insertedEvents.allSatisfy { $0.locatorFallbackPolicy == .allowCoordinateFallback })
+        #expect(plan.insertedEvents.allSatisfy { $0.surfaceId == "checkout" })
+        #expect(plan.insertedEvents.allSatisfy { $0.textAnchor?.coordinateFallback == PointValue(x: 130, y: 102) })
+        #expect(abs(plan.insertedEvents[0].time - 1.0) < 0.000_001)
+        #expect(abs(plan.insertedEvents[1].time - 1.1) < 0.000_001)
+
+        let shift = try #require(plan.eventTimeShifts.first)
+        #expect(shift.eventIndices == [1])
+        #expect(abs(shift.delta - 0.05) < 0.000_001)
+        #expect(abs((plan.liveDurationAfterConversion ?? 0) - 1.25) < 0.000_001)
+    }
+
+    @Test("Text click conversion planner keeps later timing when click has room")
+    func textClickConversionPlannerKeepsLaterTimingWhenClickHasRoom() {
+        var wait = RecordedEvent.make(.waitForText, time: 1.0)
+        wait.textAnchor = TextAnchor(
+            text: "Confirm",
+            observedFrame: RectValue(x: 90, y: 90, width: 80, height: 24)
+        )
+        let next = RecordedEvent.make(.keyDown, time: 1.3, keyCode: 36)
+        let group = ActionGroup(
+            kind: .waitForText,
+            eventIndices: [0],
+            startTime: 1.0,
+            endTime: 1.0,
+            summary: "Wait Text",
+            textAnchor: wait.textAnchor
+        )
+
+        let plan = ActionGroupTextClickConversionPlanner.plan(
+            for: group,
+            events: [wait, next],
+            liveDuration: 1.4
+        )
+
+        #expect(!plan.isEmpty)
+        #expect(plan.eventTimeShifts.isEmpty)
+        #expect(plan.liveDurationAfterConversion == nil)
+    }
+
+    @Test("Text click conversion planner keeps incomplete wait editable as click text")
+    func textClickConversionPlannerKeepsIncompleteWaitEditableAsClickText() throws {
+        let wait = RecordedEvent.make(.waitForText, time: 1.0)
+        let group = ActionGroup(
+            kind: .waitForText,
+            eventIndices: [0],
+            startTime: 1.0,
+            endTime: 1.0,
+            summary: "Wait Text"
+        )
+
+        let plan = ActionGroupTextClickConversionPlanner.plan(
+            for: group,
+            events: [wait],
+            liveDuration: 1.0
+        )
+        let clickGroup = try #require(EventGrouper().group(plan.insertedEvents).first)
+
+        #expect(!plan.isEmpty)
+        #expect(clickGroup.kind == .click)
+        #expect(clickGroup.summary == "Click text (needs text)")
+        #expect(clickGroup.textTargetReadiness == .missingText)
+        #expect(plan.liveDurationAfterConversion == 1.1)
+    }
+
+    @Test("Passive wait duplication planner extends middle wait by shifting later events")
+    func passiveWaitDuplicationPlannerExtendsMiddleWaitByShiftingLaterEvents() {
+        let events = [
+            RecordedEvent.make(.leftMouseDown, time: 0.0, x: 10, y: 10),
+            RecordedEvent.make(.leftMouseUp, time: 0.1, x: 10, y: 10),
+            RecordedEvent.make(.leftMouseDown, time: 1.1, x: 20, y: 20),
+            RecordedEvent.make(.leftMouseUp, time: 1.2, x: 20, y: 20)
+        ]
+        let wait = ActionGroup(
+            kind: .wait,
+            eventIndices: [],
+            startTime: 0.1,
+            endTime: 1.1,
+            summary: "Wait"
+        )
+
+        let plan = ActionGroupPassiveWaitDuplicationPlanner.plan(
+            for: [wait],
+            events: events,
+            liveDuration: 1.2
+        )
+
+        #expect(plan.eventTimeShifts == [
+            ActionGroupEventTimeShift(eventIndices: [2, 3], delta: 1.0)
+        ])
+        #expect(abs((plan.liveDurationAfterDuplication ?? 0) - 2.2) < 0.000_001)
+        #expect(!plan.isEmpty)
+    }
+
+    @Test("Passive wait duplication planner applies cumulative shifts for multiple waits")
+    func passiveWaitDuplicationPlannerAppliesCumulativeShiftsForMultipleWaits() {
+        let events = [
+            RecordedEvent.make(.leftMouseDown, time: 0.2, x: 10, y: 10),
+            RecordedEvent.make(.leftMouseDown, time: 2.2, x: 20, y: 20),
+            RecordedEvent.make(.leftMouseDown, time: 5.2, x: 30, y: 30)
+        ]
+        let firstWait = ActionGroup(
+            kind: .wait,
+            eventIndices: [],
+            startTime: 0.2,
+            endTime: 2.2,
+            summary: "Wait"
+        )
+        let secondWait = ActionGroup(
+            kind: .wait,
+            eventIndices: [],
+            startTime: 2.2,
+            endTime: 5.2,
+            summary: "Wait"
+        )
+
+        let plan = ActionGroupPassiveWaitDuplicationPlanner.plan(
+            for: [firstWait, secondWait],
+            events: events,
+            liveDuration: 5.2
+        )
+
+        #expect(plan.eventTimeShifts == [
+            ActionGroupEventTimeShift(eventIndices: [1], delta: 2.0),
+            ActionGroupEventTimeShift(eventIndices: [2], delta: 5.0)
+        ])
+        #expect(abs((plan.liveDurationAfterDuplication ?? 0) - 10.2) < 0.000_001)
+        #expect(!plan.isEmpty)
+    }
+
+    @Test("Passive wait duplication planner extends trailing wait by lengthening live duration")
+    func passiveWaitDuplicationPlannerExtendsTrailingWaitByLengtheningLiveDuration() {
+        let events = [
+            RecordedEvent.make(.leftMouseDown, time: 0.0, x: 10, y: 10),
+            RecordedEvent.make(.leftMouseUp, time: 0.1, x: 10, y: 10)
+        ]
+        let trailingWait = ActionGroup(
+            kind: .wait,
+            eventIndices: [],
+            startTime: 0.1,
+            endTime: 2.1,
+            summary: "Wait"
+        )
+
+        let plan = ActionGroupPassiveWaitDuplicationPlanner.plan(
+            for: [trailingWait],
+            events: events,
+            liveDuration: 2.1
+        )
+
+        #expect(plan.eventTimeShifts.isEmpty)
+        #expect(abs((plan.liveDurationAfterDuplication ?? 0) - 4.1) < 0.000_001)
+        #expect(!plan.isEmpty)
+    }
+
     @Test("Deletion planner removes middle wait by shifting later events")
     func deletionPlannerRemovesMiddleWaitByShiftingLaterEvents() {
         let events = [

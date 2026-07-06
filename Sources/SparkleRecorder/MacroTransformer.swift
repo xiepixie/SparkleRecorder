@@ -296,6 +296,36 @@ extension Array where Element == RecordedEvent {
         }
     }
 
+    public mutating func applyTextClickConversionPlan(_ plan: ActionGroupTextClickConversionPlan) {
+        guard let sourceEventIndex = plan.sourceEventIndex,
+              self.indices.contains(sourceEventIndex),
+              !plan.insertedEvents.isEmpty else {
+            return
+        }
+
+        for shift in plan.eventTimeShifts {
+            for index in shift.eventIndices where self.indices.contains(index) {
+                self[index].time = Swift.max(0, self[index].time + shift.delta)
+            }
+        }
+
+        self.remove(at: sourceEventIndex)
+        let insertionIndex = Swift.max(0, Swift.min(sourceEventIndex, self.count))
+        self.insert(contentsOf: plan.insertedEvents, at: insertionIndex)
+        self.sortByTimePreservingOrder()
+    }
+
+    public mutating func applyPassiveWaitDuplicationPlan(_ plan: ActionGroupPassiveWaitDuplicationPlan) {
+        guard !plan.eventTimeShifts.isEmpty else { return }
+
+        for shift in plan.eventTimeShifts {
+            for index in shift.eventIndices where self.indices.contains(index) {
+                self[index].time = Swift.max(0, self[index].time + shift.delta)
+            }
+        }
+        self.sortByTimePreservingOrder()
+    }
+
     /// Drop everything before `index` and rebase remaining timestamps to start at 0.
     public mutating func trimBefore(index: Int) {
         guard self.indices.contains(index), index > 0 else { return }

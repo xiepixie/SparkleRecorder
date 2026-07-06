@@ -25,6 +25,8 @@ docs/semantic-recording-ai/live-evidence/2026-07-07-suppression-redaction/
 docs/semantic-recording-ai/live-evidence/2026-07-07-cleanup/
 ```
 
+目录入口规则维护在 [live-evidence/README.md](live-evidence/README.md)。先读该文件再保存 clip、sidecar、bundle path、hash/count/readiness 摘要或隐私说明。
+
 不要提交空 `.mov`、空 bundle、未填字段 sidecar 或含敏感内容的未脱敏录屏。不能保存真实敏感内容时，保存 sidecar、redacted refs、hash/count/readiness 结果和操作说明；真实 password/Secure Input/excluded-context evidence 仍要证明 suppression/redaction 行为发生过。
 
 ## 2. Required Capture Order

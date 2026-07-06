@@ -187,6 +187,16 @@ struct EditorSidebar: View {
                                     .buttonStyle(.bordered)
                                     .controlSize(.small)
                                     .help(NSLocalizedString("Reuse this wait target for the next text click.", comment: ""))
+
+                                    Button {
+                                        convertWaitToClickText(grp)
+                                    } label: {
+                                        Label(NSLocalizedString("Convert to Click Text", comment: ""), systemImage: "cursorarrow.click")
+                                            .frame(maxWidth: .infinity)
+                                    }
+                                    .buttonStyle(.bordered)
+                                    .controlSize(.small)
+                                    .help(NSLocalizedString("Replace this wait with a text click using the same target.", comment: ""))
                                 }
                     } else if selection.count > 1 {
                         VStack(alignment: .leading, spacing: 14) {
@@ -998,22 +1008,84 @@ struct EditorSidebar: View {
         let selectedGroups = selection.compactMap { groupID -> ActionGroup? in
             rows.first(where: { $0.id == groupID })?.group
         }
+        let waitPlan = ActionGroupPassiveWaitDuplicationPlanner.plan(
+            for: selectedGroups,
+            events: recorder.events,
+            liveDuration: recorder.liveDuration
+        )
+        let waitTargets = duplicatedWaitTargets(for: selectedGroups)
         var allIndices: [Int] = []
         for grp in selectedGroups {
             allIndices.append(contentsOf: grp.eventIndices)
         }
-        guard !allIndices.isEmpty else { return }
+        guard !allIndices.isEmpty || !waitPlan.isEmpty else { return }
         
         let sorted = allIndices.sorted()
-        let count = sorted.count
-        let afterIdx = (sorted.last! + 1)
-        let copiesRange = afterIdx ..< (afterIdx + count)
+        let copiesRange: Range<Int>? = {
+            guard let last = sorted.last else { return nil }
+            let afterIdx = last + 1
+            return afterIdx ..< (afterIdx + sorted.count)
+        }()
         
         withUndo(NSLocalizedString("Duplicate Action", comment: "")) {
-            recorder.events.duplicateEvents(at: allIndices)
+            recorder.events.applyPassiveWaitDuplicationPlan(waitPlan)
+            if let liveDuration = waitPlan.liveDurationAfterDuplication {
+                recorder.liveDuration = liveDuration
+            }
+            if !allIndices.isEmpty {
+                recorder.events.duplicateEvents(at: allIndices)
+            }
+            if let lastTime = recorder.events.last?.time {
+                recorder.liveDuration = max(recorder.liveDuration, lastTime)
+            }
         }
-        
-        selectInsertedEvents(in: copiesRange)
+
+        if let copiesRange {
+            selectInsertedEvents(in: copiesRange)
+        } else {
+            selectWaits(matching: waitTargets)
+        }
+    }
+
+    func duplicatedWaitTargets(for groups: [ActionGroup]) -> [(start: TimeInterval, end: TimeInterval)] {
+        let waits = groups
+            .filter { $0.kind == .wait && $0.duration > 0 }
+            .sorted { $0.startTime < $1.startTime }
+
+        return waits.map { group in
+            let startOffset = waits.reduce(TimeInterval(0)) { partial, wait in
+                wait.endTime <= group.startTime ? partial + wait.duration : partial
+            }
+            let endOffset = waits.reduce(TimeInterval(0)) { partial, wait in
+                wait.endTime <= group.endTime ? partial + wait.duration : partial
+            }
+            return (
+                start: group.startTime + startOffset,
+                end: group.endTime + endOffset
+            )
+        }
+    }
+
+    func selectWaits(matching targets: [(start: TimeInterval, end: TimeInterval)]) {
+        guard !targets.isEmpty else { return }
+
+        DispatchQueue.main.async {
+            let groups = self.onRefreshRows().map(\.group)
+            let matched = groups.filter { group in
+                guard group.kind == .wait else { return false }
+                return targets.contains { target in
+                    abs(group.startTime - target.start) <= 0.02 &&
+                    abs(group.endTime - target.end) <= 0.02
+                }
+            }
+            if !matched.isEmpty {
+                self.selection = Set(matched.map(\.id))
+                DispatchQueue.main.async {
+                    self.onLoadInspector()
+                    self.onUpdatePreview()
+                }
+            }
+        }
     }
 
     func deleteSelected() {
@@ -1179,6 +1251,26 @@ struct EditorSidebar: View {
         selectWaitAndInsertedTextClick(waitEventIndices: group.eventIndices, insertedRange: insertedRange)
     }
 
+    func convertWaitToClickText(_ group: ActionGroup) {
+        let plan = ActionGroupTextClickConversionPlanner.plan(
+            for: group,
+            events: recorder.events,
+            liveDuration: recorder.liveDuration,
+            fallbackPolicy: firstEvent(for: group)?.locatorFallbackPolicy ?? inspFallbackPolicy
+        )
+        guard !plan.isEmpty else { return }
+
+        let insertedEvents = plan.insertedEvents
+        withUndo(NSLocalizedString("Convert Wait to Click Text", comment: "")) {
+            recorder.events.applyTextClickConversionPlan(plan)
+            if let liveDuration = plan.liveDurationAfterConversion {
+                recorder.liveDuration = liveDuration
+            }
+        }
+
+        selectEvents(matching: insertedEvents)
+    }
+
     func selectWaitAndInsertedTextClick(waitEventIndices: [Int], insertedRange: Range<Int>) {
         DispatchQueue.main.async {
             let waitIndexSet = Set(waitEventIndices)
@@ -1196,6 +1288,34 @@ struct EditorSidebar: View {
                 }
             } else {
                 self.selectInsertedEvents(in: insertedRange)
+            }
+        }
+    }
+
+    func selectEvents(matching eventsToSelect: [RecordedEvent]) {
+        guard !eventsToSelect.isEmpty else { return }
+
+        DispatchQueue.main.async {
+            var remaining = eventsToSelect
+            var matchedEventIndices = Set<Int>()
+
+            for (index, event) in self.recorder.events.enumerated() {
+                guard let matchIndex = remaining.firstIndex(of: event) else { continue }
+                matchedEventIndices.insert(index)
+                remaining.remove(at: matchIndex)
+                if remaining.isEmpty { break }
+            }
+
+            let groups = self.onRefreshRows().map(\.group)
+            let targets = groups.filter { group in
+                group.eventIndices.contains { matchedEventIndices.contains($0) }
+            }
+            if !targets.isEmpty {
+                self.selection = Set(targets.map(\.id))
+                DispatchQueue.main.async {
+                    self.onLoadInspector()
+                    self.onUpdatePreview()
+                }
             }
         }
     }

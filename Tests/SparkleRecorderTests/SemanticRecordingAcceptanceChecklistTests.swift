@@ -43,6 +43,163 @@ struct SemanticRecordingAcceptanceChecklistTests {
         }
     }
 
+    @Test("Open live gates stay mapped to playbook and evidence intake directory")
+    func openLiveGatesStayMappedToPlaybookAndEvidenceDirectory() throws {
+        let checklist = try String(
+            contentsOf: semanticRecordingURL("acceptance-checklist.md"),
+            encoding: .utf8
+        )
+        let playbook = try String(
+            contentsOf: semanticRecordingURL("15-s2-live-evidence-playbook.md"),
+            encoding: .utf8
+        )
+        let evidenceReadme = try String(
+            contentsOf: semanticRecordingURL("live-evidence/README.md"),
+            encoding: .utf8
+        )
+        let auditSection = try #require(Self.section(named: "Current Open Gate Audit", in: checklist))
+
+        for phrase in Self.requiredPlaybookPhrases {
+            #expect(
+                playbook.contains(phrase),
+                "S2 live evidence playbook no longer contains required phrase: \(phrase)"
+            )
+        }
+        for phrase in Self.requiredEvidenceReadmePhrases {
+            #expect(
+                evidenceReadme.contains(phrase),
+                "Live evidence README no longer contains required phrase: \(phrase)"
+            )
+        }
+        for gate in Self.playbookBackedOpenGateGroups {
+            #expect(
+                auditSection.contains("| \(gate.checklistGroup) |"),
+                "Current Open Gate Audit is missing playbook-backed group: \(gate.checklistGroup)"
+            )
+            #expect(
+                playbook.contains(gate.playbookGate),
+                "S2 playbook no longer maps gate: \(gate.playbookGate)"
+            )
+            #expect(
+                evidenceReadme.contains(gate.evidenceGate),
+                "Live evidence README no longer maps gate: \(gate.evidenceGate)"
+            )
+        }
+    }
+
+    @Test("Checked checklist items carry direct evidence anchors")
+    func checkedChecklistItemsCarryDirectEvidenceAnchors() throws {
+        let checklist = try String(
+            contentsOf: semanticRecordingURL("acceptance-checklist.md"),
+            encoding: .utf8
+        )
+        let missingEvidence = Self.checkedChecklistItems(in: checklist).filter { item in
+            !Self.acceptedCheckedEvidenceMarkers.contains { marker in
+                item.text.contains(marker)
+            }
+        }
+
+        #expect(
+            missingEvidence.isEmpty,
+            "Checked semantic-recording checklist items must cite direct evidence or an accepted contract: \(missingEvidence.map { "\($0.line): \($0.text)" })"
+        )
+    }
+
+    @Test("Unchecked checklist items describe required evidence or current blocker")
+    func uncheckedChecklistItemsDescribeRequiredEvidenceOrCurrentBlocker() throws {
+        let checklist = try String(
+            contentsOf: semanticRecordingURL("acceptance-checklist.md"),
+            encoding: .utf8
+        )
+        let missingCriteria = Self.uncheckedChecklistItemBlocks(in: checklist).filter { item in
+            !Self.acceptedUncheckedCriteriaMarkers.contains { marker in
+                item.block.contains(marker)
+            }
+        }
+
+        #expect(
+            missingCriteria.isEmpty,
+            "Unchecked semantic-recording checklist items must describe required evidence, current proof, or remaining blocker: \(missingCriteria.map { "\($0.line): \($0.title)" })"
+        )
+    }
+
+    @Test("Semantic recording documentation keeps local markdown links resolvable")
+    func semanticRecordingDocumentationKeepsLocalMarkdownLinksResolvable() throws {
+        let root = repositoryRoot()
+        let docs = try Self.semanticRecordingDocumentationURLs(repositoryRoot: root)
+        let missingLinks = try docs.flatMap { sourceURL in
+            let markdown = try String(contentsOf: sourceURL, encoding: .utf8)
+            return Self.localMarkdownLinks(in: markdown).compactMap { target -> String? in
+                guard !Self.isExternalMarkdownTarget(target) else {
+                    return nil
+                }
+                let path = Self.pathTargetWithoutFragment(target)
+                guard !path.isEmpty else {
+                    return nil
+                }
+                let resolvedURL = Self.resolvedMarkdownTarget(
+                    path,
+                    sourceURL: sourceURL,
+                    repositoryRoot: root
+                )
+                guard FileManager.default.fileExists(atPath: resolvedURL.path) else {
+                    return "\(Self.relativePath(sourceURL, repositoryRoot: root)) -> \(target)"
+                }
+                return nil
+            }
+        }
+
+        #expect(
+            missingLinks.isEmpty,
+            "Semantic recording docs contain broken local markdown links: \(missingLinks)"
+        )
+    }
+
+    @Test("Live evidence directory rejects placeholder artifacts")
+    func liveEvidenceDirectoryRejectsPlaceholderArtifacts() throws {
+        let root = repositoryRoot()
+        let evidenceRoot = semanticRecordingURL("live-evidence")
+        let directContents = try FileManager.default.contentsOfDirectory(
+            at: evidenceRoot,
+            includingPropertiesForKeys: [.isDirectoryKey, .fileSizeKey]
+        )
+        let invalidRootFiles = directContents.filter { url in
+            guard !Self.isDirectory(url) else { return false }
+            return url.lastPathComponent != "README.md" && !Self.isIgnoredEvidenceFile(url)
+        }
+        #expect(
+            invalidRootFiles.isEmpty,
+            "Live evidence files must live inside a reviewed run directory, not the intake root: \(invalidRootFiles.map { Self.relativePath($0, repositoryRoot: root) })"
+        )
+
+        let evidenceFiles = try Self.filesUnder(evidenceRoot)
+            .filter { $0.lastPathComponent != "README.md" }
+            .filter { !Self.isIgnoredEvidenceFile($0) }
+        let emptyArtifacts = evidenceFiles.filter { Self.fileSize($0) == 0 }
+        let placeholderSidecars = try evidenceFiles.filter { url in
+            guard url.pathExtension == "md" else { return false }
+            let text = try String(contentsOf: url, encoding: .utf8)
+            return !Self.requiredEvidenceSidecarMarkers.allSatisfy { text.contains($0) }
+        }
+        let emptyVideos = evidenceFiles.filter { url in
+            Self.liveEvidenceVideoExtensions.contains(url.pathExtension.lowercased()) &&
+                Self.fileSize(url) < Self.minimumLiveEvidenceVideoBytes
+        }
+
+        #expect(
+            emptyArtifacts.isEmpty,
+            "Live evidence artifacts must not be empty placeholders: \(emptyArtifacts.map { Self.relativePath($0, repositoryRoot: root) })"
+        )
+        #expect(
+            placeholderSidecars.isEmpty,
+            "Live evidence sidecars must include checklist/gate and remaining-gate markers: \(placeholderSidecars.map { Self.relativePath($0, repositoryRoot: root) })"
+        )
+        #expect(
+            emptyVideos.isEmpty,
+            "Live evidence video clips must not be zero-byte or tiny placeholders: \(emptyVideos.map { Self.relativePath($0, repositoryRoot: root) })"
+        )
+    }
+
     private static let expectedGateGroups: [String] = [
         "S2 authorized live bundle",
         "S2 ordinary Recorder bridge",
@@ -115,6 +272,113 @@ struct SemanticRecordingAcceptanceChecklistTests {
         "AI cleanup suggestion screenshot with evidence explanation."
     ]
 
+    private static let requiredPlaybookPhrases: [String] = [
+        "docs/semantic-recording-ai/live-evidence/",
+        "Do not check a live-product box",
+        "fixture evidence",
+        "blocked preflight evidence",
+        "explicit temp bundle path only",
+        "synthetic redaction rehearsal only",
+        "S3/S4 handoff"
+    ]
+
+    private static let requiredEvidenceReadmePhrases: [String] = [
+        "no live gate is closed by files in this directory alone",
+        "s2-preflight.md",
+        "s2-live-smoke.md",
+        "s2-recorder-bridge.md",
+        "s3-frame-to-condition.mov",
+        "s4-live-query.md",
+        "explicit statement of which gates remain open",
+        "fixture evidence",
+        "blocked preflight evidence",
+        "explicit temp bundle path only",
+        "synthetic redaction rehearsal only"
+    ]
+
+    private static let playbookBackedOpenGateGroups: [(
+        checklistGroup: String,
+        playbookGate: String,
+        evidenceGate: String
+    )] = [
+        (
+            "S2 authorized live bundle",
+            "S2 authorized live bundle",
+            "S2 authorized live bundle"
+        ),
+        (
+            "S2 ordinary Recorder bridge",
+            "S2 ordinary Recorder bridge",
+            "S2 ordinary Recorder bridge"
+        ),
+        (
+            "S2 safety/privacy/cleanup",
+            "S2 safety/privacy/cleanup",
+            "S2 safety/privacy/cleanup"
+        ),
+        (
+            "S2 root/id policy",
+            "S2 root/id policy",
+            "S2 root/id policy"
+        ),
+        (
+            "S3 live Review and frame-to-condition",
+            "S3 installed-app Review",
+            "S3 installed-app Review"
+        ),
+        (
+            "S4 product-ready live AI",
+            "S4 product-ready live query",
+            "S4 product-ready live query"
+        )
+    ]
+
+    private static let acceptedCheckedEvidenceMarkers: [String] = [
+        "Evidence:",
+        "Accepted contract:"
+    ]
+
+    private static let acceptedUncheckedCriteriaMarkers: [String] = [
+        "Required evidence:",
+        "Current ",
+        "Partial ",
+        "Product acceptance",
+        "Live ",
+        "First-pass",
+        "first pass",
+        "remaining",
+        "remain",
+        "open",
+        "future",
+        "blocked",
+        "gated"
+    ]
+
+    private static let requiredEvidenceSidecarMarkers: [String] = [
+        "Checklist item:",
+        "Gates remain open:"
+    ]
+
+    private static let liveEvidenceVideoExtensions: Set<String> = [
+        "mov",
+        "mp4"
+    ]
+
+    private static let minimumLiveEvidenceVideoBytes = 1_024
+
+    private static func checkedChecklistItems(in markdown: String) -> [(line: Int, text: String)] {
+        markdown
+            .split(separator: "\n", omittingEmptySubsequences: false)
+            .enumerated()
+            .compactMap { offset, line -> (line: Int, text: String)? in
+                let marker = "- [x] "
+                guard line.hasPrefix(marker) else {
+                    return nil
+                }
+                return (offset + 1, String(line.dropFirst(marker.count)))
+            }
+    }
+
     private static func uncheckedChecklistItems(in markdown: String) -> [String] {
         markdown
             .split(separator: "\n", omittingEmptySubsequences: false)
@@ -125,6 +389,44 @@ struct SemanticRecordingAcceptanceChecklistTests {
                 }
                 return String(line.dropFirst(marker.count))
             }
+    }
+
+    private static func uncheckedChecklistItemBlocks(
+        in markdown: String
+    ) -> [(line: Int, title: String, block: String)] {
+        let lines = markdown.split(separator: "\n", omittingEmptySubsequences: false)
+        var results: [(line: Int, title: String, block: String)] = []
+        var currentLine: Int?
+        var currentTitle: String?
+        var currentBlock: [String] = []
+
+        func flush() {
+            guard let line = currentLine, let title = currentTitle else { return }
+            results.append((line, title, currentBlock.joined(separator: "\n")))
+            currentLine = nil
+            currentTitle = nil
+            currentBlock = []
+        }
+
+        for (offset, rawLine) in lines.enumerated() {
+            let line = String(rawLine)
+            if line.hasPrefix("- [ ] ") {
+                flush()
+                currentLine = offset + 1
+                currentTitle = String(line.dropFirst("- [ ] ".count))
+                currentBlock = [line]
+                continue
+            }
+            if line.hasPrefix("- [x] ") || line.hasPrefix("## ") {
+                flush()
+                continue
+            }
+            if currentLine != nil {
+                currentBlock.append(line)
+            }
+        }
+        flush()
+        return results
     }
 
     private static func section(named heading: String, in markdown: String) -> String? {
@@ -138,9 +440,102 @@ struct SemanticRecordingAcceptanceChecklistTests {
         return rest[..<end].joined(separator: "\n")
     }
 
+    private static func semanticRecordingDocumentationURLs(repositoryRoot: URL) throws -> [URL] {
+        let docsRoot = repositoryRoot.appendingPathComponent("docs/semantic-recording-ai")
+        let enumerator = try #require(FileManager.default.enumerator(
+            at: docsRoot,
+            includingPropertiesForKeys: nil
+        ))
+        let semanticDocs = enumerator
+            .compactMap { $0 as? URL }
+            .filter { $0.pathExtension == "md" }
+        return semanticDocs + [
+            repositoryRoot.appendingPathComponent("docs/DOCUMENTATION_STATUS.md")
+        ]
+    }
+
+    private static func localMarkdownLinks(in markdown: String) -> [String] {
+        let pattern = #"\[[^\]]+\]\(([^)]+)\)"#
+        guard let regex = try? NSRegularExpression(pattern: pattern) else {
+            return []
+        }
+        let range = NSRange(markdown.startIndex..<markdown.endIndex, in: markdown)
+        return regex.matches(in: markdown, range: range).compactMap { match in
+            guard let targetRange = Range(match.range(at: 1), in: markdown) else {
+                return nil
+            }
+            return String(markdown[targetRange])
+        }
+    }
+
+    private static func isExternalMarkdownTarget(_ target: String) -> Bool {
+        target.contains("://") ||
+            target.hasPrefix("mailto:") ||
+            target.hasPrefix("#")
+    }
+
+    private static func pathTargetWithoutFragment(_ target: String) -> String {
+        var path = target.split(separator: "#", maxSplits: 1).first.map(String.init) ?? ""
+        if path.hasPrefix("<"), path.hasSuffix(">") {
+            path.removeFirst()
+            path.removeLast()
+        }
+        return path
+    }
+
+    private static func resolvedMarkdownTarget(
+        _ target: String,
+        sourceURL: URL,
+        repositoryRoot: URL
+    ) -> URL {
+        if target.hasPrefix("/") {
+            return URL(fileURLWithPath: target)
+        }
+        return sourceURL
+            .deletingLastPathComponent()
+            .appendingPathComponent(target)
+            .standardizedFileURL
+    }
+
+    private static func relativePath(_ url: URL, repositoryRoot: URL) -> String {
+        let rootPath = repositoryRoot.standardizedFileURL.path
+        let path = url.standardizedFileURL.path
+        guard path.hasPrefix(rootPath + "/") else {
+            return path
+        }
+        return String(path.dropFirst(rootPath.count + 1))
+    }
+
+    private static func filesUnder(_ directory: URL) throws -> [URL] {
+        let enumerator = try #require(FileManager.default.enumerator(
+            at: directory,
+            includingPropertiesForKeys: [.isDirectoryKey, .fileSizeKey]
+        ))
+        return enumerator
+            .compactMap { $0 as? URL }
+            .filter { !isDirectory($0) }
+    }
+
+    private static func isDirectory(_ url: URL) -> Bool {
+        (try? url.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true
+    }
+
+    private static func fileSize(_ url: URL) -> Int {
+        (try? url.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0
+    }
+
+    private static func isIgnoredEvidenceFile(_ url: URL) -> Bool {
+        url.lastPathComponent == ".DS_Store"
+    }
+
     private func acceptanceChecklistURL() -> URL {
+        semanticRecordingURL("acceptance-checklist.md")
+    }
+
+    private func semanticRecordingURL(_ relativePath: String) -> URL {
         repositoryRoot()
-            .appendingPathComponent("docs/semantic-recording-ai/acceptance-checklist.md")
+            .appendingPathComponent("docs/semantic-recording-ai")
+            .appendingPathComponent(relativePath)
     }
 
     private func repositoryRoot() -> URL {

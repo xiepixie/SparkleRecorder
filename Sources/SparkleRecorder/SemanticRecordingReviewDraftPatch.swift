@@ -436,11 +436,39 @@ public struct SemanticRecordingReviewActionPresentation: Codable, Equatable, Sen
     public var summary: String
     public var rows: [Row]
 
+    public var reviewVisibleRows: [Row] {
+        rows.filter { Self.isReviewVisibleRowKind($0.kind) }
+    }
+
     public init(_ semantics: SemanticRecordingReviewActionSemantics) {
         self.actionName = semantics.actionName
         self.title = semantics.title
         self.summary = Self.summary(for: semantics)
         self.rows = Self.rows(for: semantics)
+    }
+
+    public static func isReviewVisibleRowKind(_ kind: RowKind) -> Bool {
+        switch kind {
+        case .artifact,
+             .bounds,
+             .draftCondition,
+             .draftTask,
+             .frame,
+             .materializedArtifact,
+             .materializedDigest,
+             .mutationEffect,
+             .observations,
+             .sourcePreview,
+             .suggestion,
+             .summary,
+             .visualAsset,
+             .visualRegion:
+            return true
+        case .action,
+             .events,
+             .mutationBoundary:
+            return false
+        }
     }
 
     public static func rows(

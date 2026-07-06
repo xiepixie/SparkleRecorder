@@ -501,7 +501,16 @@ struct ActionListView: View {
         } label: {
             Label(NSLocalizedString("Duplicate Action", comment: ""), systemImage: "plus.square.on.square")
         }
-        .disabled(snapshot.eventIndices.isEmpty)
+        .disabled(snapshot.eventIndices.isEmpty && passiveWaitDuplicationPlan(anchor: row).isEmpty)
+
+        if row.group.kind == .waitForText {
+            Button {
+                convertWaitToClickText(anchor: row)
+            } label: {
+                Label(NSLocalizedString("Convert to Click Text", comment: ""), systemImage: "cursorarrow.click")
+            }
+            .disabled(textClickConversionPlan(anchor: row).isEmpty)
+        }
         
         Button(role: .destructive) {
             deleteRows(anchor: row)
@@ -556,24 +565,113 @@ struct ActionListView: View {
             liveDuration: recorder.liveDuration
         )
     }
+
+    func textClickConversionPlan(anchor row: ActionRow) -> ActionGroupTextClickConversionPlan {
+        ActionGroupTextClickConversionPlanner.plan(
+            for: row.group,
+            events: recorder.events,
+            liveDuration: recorder.liveDuration
+        )
+    }
+
+    func passiveWaitDuplicationPlan(anchor row: ActionRow) -> ActionGroupPassiveWaitDuplicationPlan {
+        ActionGroupPassiveWaitDuplicationPlanner.plan(
+            for: contextRows(anchor: row).map(\.group),
+            events: recorder.events,
+            liveDuration: recorder.liveDuration
+        )
+    }
     
     func duplicateRows(anchor row: ActionRow) {
-        let indices = contextSnapshot(anchor: row).eventIndices
-        guard !indices.isEmpty else { return }
-        let afterIdx = indices.last! + 1
-        let copiesRange = afterIdx..<(afterIdx + indices.count)
+        let snapshot = contextSnapshot(anchor: row)
+        let indices = snapshot.eventIndices
+        let waitGroups = contextRows(anchor: row).map(\.group)
+        let waitPlan = passiveWaitDuplicationPlan(anchor: row)
+        let waitTargets = duplicatedWaitTargets(for: waitGroups)
+        guard !indices.isEmpty || !waitPlan.isEmpty else { return }
+
+        let copiesRange: Range<Int>? = {
+            guard let last = indices.last else { return nil }
+            let afterIdx = last + 1
+            return afterIdx..<(afterIdx + indices.count)
+        }()
         
         withUndo(NSLocalizedString("Duplicate Action", comment: "")) {
-            recorder.events.duplicateEvents(at: indices)
+            recorder.events.applyPassiveWaitDuplicationPlan(waitPlan)
+            if let liveDuration = waitPlan.liveDurationAfterDuplication {
+                recorder.liveDuration = liveDuration
+            }
+            if !indices.isEmpty {
+                recorder.events.duplicateEvents(at: indices)
+            }
+            if let lastTime = recorder.events.last?.time {
+                recorder.liveDuration = max(recorder.liveDuration, lastTime)
+            }
         }
         
         DispatchQueue.main.async {
-            let copied = self.rows.filter { item in
-                item.group.eventIndices.contains(where: { copiesRange.contains($0) })
+            if let copiesRange {
+                let copied = self.onRefreshRows().filter { item in
+                    item.group.eventIndices.contains(where: { copiesRange.contains($0) })
+                }
+                if !copied.isEmpty {
+                    self.selection = Set(copied.map(\.id))
+                }
+            } else {
+                self.selectWaits(matching: waitTargets)
             }
-            if !copied.isEmpty {
-                self.selection = Set(copied.map(\.id))
+        }
+    }
+
+    func duplicatedWaitTargets(for groups: [ActionGroup]) -> [(start: TimeInterval, end: TimeInterval)] {
+        let waits = groups
+            .filter { $0.kind == .wait && $0.duration > 0 }
+            .sorted { $0.startTime < $1.startTime }
+
+        return waits.map { group in
+            let startOffset = waits.reduce(TimeInterval(0)) { partial, wait in
+                wait.endTime <= group.startTime ? partial + wait.duration : partial
             }
+            let endOffset = waits.reduce(TimeInterval(0)) { partial, wait in
+                wait.endTime <= group.endTime ? partial + wait.duration : partial
+            }
+            return (
+                start: group.startTime + startOffset,
+                end: group.endTime + endOffset
+            )
+        }
+    }
+
+    func selectWaits(matching targets: [(start: TimeInterval, end: TimeInterval)]) {
+        guard !targets.isEmpty else { return }
+
+        let matched = onRefreshRows().filter { row in
+            guard row.group.kind == .wait else { return false }
+            return targets.contains { target in
+                abs(row.group.startTime - target.start) <= 0.02 &&
+                abs(row.group.endTime - target.end) <= 0.02
+            }
+        }
+        if !matched.isEmpty {
+            selection = Set(matched.map(\.id))
+            lastAnchor = matched.first?.id
+        }
+    }
+
+    func convertWaitToClickText(anchor row: ActionRow) {
+        let plan = textClickConversionPlan(anchor: row)
+        guard !plan.isEmpty else { return }
+
+        let insertedEvents = plan.insertedEvents
+        withUndo(NSLocalizedString("Convert Wait to Click Text", comment: "")) {
+            recorder.events.applyTextClickConversionPlan(plan)
+            if let liveDuration = plan.liveDurationAfterConversion {
+                recorder.liveDuration = liveDuration
+            }
+        }
+
+        DispatchQueue.main.async {
+            self.selectMovedEvents(matching: insertedEvents)
         }
     }
     
