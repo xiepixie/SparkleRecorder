@@ -245,6 +245,7 @@ let package = Package(
                 "SemanticRecordingCapture.swift",
                 "SemanticRecordingLifecycle.swift",
                 "SemanticRecordingPreflight.swift",
+                "SemanticRecordingSuppression.swift",
                 "SemanticRecordingBundle.swift",
                 "SemanticRecordingFixture.swift",
                 "RunEvidence.swift"
@@ -335,6 +336,7 @@ let package = Package(
                 "SemanticRecordingCapture.swift",
                 "SemanticRecordingLifecycle.swift",
                 "SemanticRecordingPreflight.swift",
+                "SemanticRecordingSuppression.swift",
                 "SemanticRecordingBundle.swift",
                 "SemanticRecordingFixture.swift",
                 "RunEvidence.swift"

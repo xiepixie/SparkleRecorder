@@ -27,17 +27,20 @@ struct LiveSemanticRecordingFinishResult: Equatable {
 struct LiveSemanticRecordingSessionDependencies: @unchecked Sendable {
     var store: RecordingBundleStore
     var preflightClient: SemanticRecordingPreflightClient
+    var suppressionProducer: SemanticRecordingSuppressionProducer
     var makeCaptureClient: @Sendable (URL) -> SemanticRecordingCaptureClient
 
     init(
         store: RecordingBundleStore = RecordingBundleStore(),
         preflightClient: SemanticRecordingPreflightClient = .live,
+        suppressionProducer: SemanticRecordingSuppressionProducer = SemanticRecordingSuppressionProducer(),
         makeCaptureClient: @escaping @Sendable (URL) -> SemanticRecordingCaptureClient = { directory in
             LiveSemanticCaptureClient.live(bundleDirectory: directory)
         }
     ) {
         self.store = store
         self.preflightClient = preflightClient
+        self.suppressionProducer = suppressionProducer
         self.makeCaptureClient = makeCaptureClient
     }
 }
@@ -108,6 +111,17 @@ actor LiveSemanticRecordingSession {
 
     func addSuppression(_ suppression: RecordingSuppressionRecord) async throws {
         try await requireLifecycle().addSuppression(suppression)
+    }
+
+    @discardableResult
+    func addSuppressions(
+        for context: SemanticRecordingSuppressionContext
+    ) async throws -> [RecordingSuppressionRecord] {
+        let suppressions = dependencies.suppressionProducer.records(for: context)
+        for suppression in suppressions {
+            try await addSuppression(suppression)
+        }
+        return suppressions
     }
 
     func finish(recordingTime: TimeInterval) async throws -> LiveSemanticRecordingFinishResult {
