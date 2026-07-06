@@ -4,6 +4,157 @@ import Testing
 
 @Suite("Automation View Projection Tests")
 struct AutomationViewProjectionTests {
+    @Test("Macro Review source presentation exposes saved macro scope")
+    func macroReviewSourcePresentationExposesSavedMacroScope() throws {
+        let workflowID = UUID()
+        let taskID = UUID()
+        let macroID = UUID()
+        let recordingID = UUID()
+        let capturedAt = Date(timeIntervalSince1970: 1_800_000_000)
+        let workflow = AutomationWorkflow(
+            id: workflowID,
+            name: "Review flow",
+            tasks: [
+                AutomationTask(
+                    id: taskID,
+                    name: "Upload report",
+                    kind: .macro(macroID: macroID)
+                )
+            ]
+        )
+        let reference = MacroSemanticRecordingReference(
+            recordingID: recordingID,
+            bundleRelativePath: "SemanticRecordings/demo",
+            manifestRelativePath: "SemanticRecordings/demo/manifest.json",
+            capturedAt: capturedAt,
+            eventCount: 4
+        )
+        let macro = SavedMacro(
+            id: macroID,
+            name: "Upload report",
+            events: [TestFixtures.clickEvent()],
+            semanticRecording: reference
+        )
+        let run = AutomationTaskRun(
+            workflowID: workflowID,
+            taskID: taskID,
+            macroID: macroID
+        )
+
+        let presentation = AutomationMacroReviewSourcePresentation.make(
+            run: run,
+            workflow: workflow,
+            macros: [macro]
+        )
+
+        #expect(presentation.sourceKind == .savedMacro)
+        #expect(presentation.macroID == macroID)
+        #expect(presentation.macroName == "Upload report")
+        #expect(presentation.recordingReference == reference)
+        #expect(presentation.canRevealLinkedBundle)
+        #expect(presentation.buttonTitle(isOpening: false) == "Open Linked Review")
+        #expect(presentation.buttonTitle(isOpening: true) == "Opening")
+        #expect(presentation.summary == "Open the semantic recording captured with Upload report. It includes 4 timeline events; this run does not carry a separate semantic bundle yet.")
+        #expect(presentation.readinessBadges == [
+            .init(title: "Source", value: "Saved Macro"),
+            .init(title: "Scope", value: "Macro-level"),
+            .init(title: "Run", value: "Not bound"),
+            .init(title: "Fallback", value: "Bundle Picker")
+        ])
+    }
+
+    @Test("Macro Review source presentation resolves macro from workflow task")
+    func macroReviewSourcePresentationResolvesMacroFromWorkflowTask() throws {
+        let workflowID = UUID()
+        let taskID = UUID()
+        let macroID = UUID()
+        let workflow = AutomationWorkflow(
+            id: workflowID,
+            name: "Review flow",
+            tasks: [
+                AutomationTask(
+                    id: taskID,
+                    name: "Upload report",
+                    kind: .macro(macroID: macroID)
+                )
+            ]
+        )
+        let reference = MacroSemanticRecordingReference(
+            recordingID: UUID(),
+            bundleRelativePath: "SemanticRecordings/demo",
+            manifestRelativePath: "SemanticRecordings/demo/manifest.json",
+            eventCount: 2
+        )
+        let macro = SavedMacro(
+            id: macroID,
+            name: "Upload report",
+            events: [TestFixtures.clickEvent()],
+            semanticRecording: reference
+        )
+        let run = AutomationTaskRun(
+            workflowID: workflowID,
+            taskID: taskID
+        )
+
+        let presentation = AutomationMacroReviewSourcePresentation.make(
+            run: run,
+            workflow: workflow,
+            macros: [macro]
+        )
+
+        #expect(presentation.sourceKind == .savedMacro)
+        #expect(presentation.macroID == macroID)
+        #expect(presentation.recordingReference == reference)
+    }
+
+    @Test("Macro Review source presentation keeps manual fallback explicit")
+    func macroReviewSourcePresentationKeepsManualFallbackExplicit() throws {
+        let workflowID = UUID()
+        let taskID = UUID()
+        let macroID = UUID()
+        let workflow = AutomationWorkflow(
+            id: workflowID,
+            name: "Review flow",
+            tasks: [
+                AutomationTask(
+                    id: taskID,
+                    name: "Upload report",
+                    kind: .macro(macroID: macroID)
+                )
+            ]
+        )
+        let macro = SavedMacro(
+            id: macroID,
+            name: "Upload report",
+            events: [TestFixtures.clickEvent()]
+        )
+        let run = AutomationTaskRun(
+            workflowID: workflowID,
+            taskID: taskID,
+            macroID: macroID
+        )
+
+        let presentation = AutomationMacroReviewSourcePresentation.make(
+            run: run,
+            workflow: workflow,
+            macros: [macro]
+        )
+
+        #expect(presentation.sourceKind == .manualBundle)
+        #expect(presentation.macroID == macroID)
+        #expect(presentation.macroName == "Upload report")
+        #expect(presentation.recordingReference == nil)
+        #expect(!presentation.canRevealLinkedBundle)
+        #expect(presentation.buttonTitle(isOpening: false) == "Open Review")
+        #expect(presentation.summary == "Open a semantic recording bundle for frame timeline, visual evidence, region selection, and review-only draft patch generation.")
+        #expect(presentation.readinessBadges == [
+            .init(title: "Source", value: "Manual"),
+            .init(title: "Scope", value: "User-picked"),
+            .init(title: "Run", value: "Not bound"),
+            .init(title: "Fallback", value: "Bundle Picker")
+        ])
+    }
+
     @Test("Owner C fixture exposes all first milestone statuses")
     func ownerCFixtureExposesAllFirstMilestoneStatuses() {
         let projection = AutomationOverviewProjection.ownerCFixture()

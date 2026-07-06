@@ -180,14 +180,14 @@ struct AutomationTaskRunDetailView: View {
 
                 Spacer(minLength: 0)
 
-                Button(reviewButtonTitle, systemImage: "rectangle.stack.badge.play") {
+                Button(macroReviewPresentation.buttonTitle(isOpening: isOpeningSemanticReview), systemImage: "rectangle.stack.badge.play") {
                     openSemanticReview()
                 }
                 .buttonStyle(.bordered)
                 .controlSize(.small)
                 .disabled(isOpeningSemanticReview)
 
-                if linkedSemanticRecording != nil {
+                if macroReviewPresentation.canRevealLinkedBundle {
                     Button("", systemImage: "arrow.up.right.square") {
                         revealLinkedSemanticReviewBundle()
                     }
@@ -208,15 +208,15 @@ struct AutomationTaskRunDetailView: View {
                 }
             }
 
-            Text(macroReviewSummary)
+            Text(macroReviewPresentation.summary)
                 .font(.caption)
                 .foregroundStyle(.tertiary)
                 .fixedSize(horizontal: false, vertical: true)
 
             macroReviewReadiness
 
-            if let linkedSemanticRecording {
-                linkedSemanticRecordingDetails(linkedSemanticRecording.reference)
+            if let reference = macroReviewPresentation.recordingReference {
+                linkedSemanticRecordingDetails(reference)
             }
 
             if isOpeningSemanticReview {
@@ -250,38 +250,17 @@ struct AutomationTaskRunDetailView: View {
     }
 
     private var macroReviewReadiness: some View {
-        ViewThatFits(in: .horizontal) {
+        let badges = macroReviewPresentation.readinessBadges
+        return ViewThatFits(in: .horizontal) {
             HStack(spacing: 5) {
-                macroReviewBadge(
-                    title: NSLocalizedString("Source", comment: ""),
-                    value: linkedSemanticRecording == nil
-                        ? NSLocalizedString("Manual", comment: "")
-                        : NSLocalizedString("Saved Macro", comment: "")
-                )
-                macroReviewBadge(
-                    title: NSLocalizedString("Run", comment: ""),
-                    value: NSLocalizedString("Not bound", comment: "")
-                )
-                macroReviewBadge(
-                    title: NSLocalizedString("Fallback", comment: ""),
-                    value: NSLocalizedString("Bundle Picker", comment: "")
-                )
+                ForEach(Array(badges.enumerated()), id: \.offset) { _, badge in
+                    macroReviewBadge(title: badge.title, value: badge.value)
+                }
             }
             VStack(alignment: .leading, spacing: 5) {
-                macroReviewBadge(
-                    title: NSLocalizedString("Source", comment: ""),
-                    value: linkedSemanticRecording == nil
-                        ? NSLocalizedString("Manual", comment: "")
-                        : NSLocalizedString("Saved Macro", comment: "")
-                )
-                macroReviewBadge(
-                    title: NSLocalizedString("Run", comment: ""),
-                    value: NSLocalizedString("Not bound", comment: "")
-                )
-                macroReviewBadge(
-                    title: NSLocalizedString("Fallback", comment: ""),
-                    value: NSLocalizedString("Bundle Picker", comment: "")
-                )
+                ForEach(Array(badges.enumerated()), id: \.offset) { _, badge in
+                    macroReviewBadge(title: badge.title, value: badge.value)
+                }
             }
         }
     }
@@ -360,36 +339,12 @@ struct AutomationTaskRunDetailView: View {
             .fixedSize(horizontal: false, vertical: true)
     }
 
-    private var reviewButtonTitle: String {
-        if isOpeningSemanticReview {
-            return NSLocalizedString("Opening", comment: "")
-        }
-        return linkedSemanticRecording == nil
-            ? NSLocalizedString("Open Review", comment: "")
-            : NSLocalizedString("Open Linked Review", comment: "")
-    }
-
-    private var macroReviewSummary: String {
-        if let linkedSemanticRecording {
-            return String(
-                format: NSLocalizedString("Open the semantic recording captured with %@. It includes %d timeline events; this run does not carry a separate semantic bundle yet.", comment: ""),
-                linkedSemanticRecording.macro.name,
-                linkedSemanticRecording.reference.eventCount
-            )
-        }
-        return NSLocalizedString("Open a semantic recording bundle for frame timeline, visual evidence, region selection, and review-only draft patch generation.", comment: "")
-    }
-
-    private var linkedSemanticRecording: (
-        macro: SavedMacro,
-        reference: MacroSemanticRecordingReference
-    )? {
-        guard let macroID = run.macroID ?? workflow.tasks.first(where: { $0.id == run.taskID })?.kind.macroID,
-              let macro = macros.first(where: { $0.id == macroID }),
-              let reference = macro.semanticRecording else {
-            return nil
-        }
-        return (macro, reference)
+    private var macroReviewPresentation: AutomationMacroReviewSourcePresentation {
+        AutomationMacroReviewSourcePresentation.make(
+            run: run,
+            workflow: workflow,
+            macros: macros
+        )
     }
 
     private func semanticReviewFeedbackPresentation(
@@ -577,8 +532,8 @@ struct AutomationTaskRunDetailView: View {
 
     private func openSemanticReview() {
         semanticReviewBundleFeedback = nil
-        if let linkedSemanticRecording {
-            openLinkedSemanticReview(linkedSemanticRecording)
+        if macroReviewPresentation.recordingReference != nil {
+            openLinkedSemanticReview(macroReviewPresentation)
         } else {
             chooseSemanticReviewBundle()
         }
@@ -609,18 +564,22 @@ struct AutomationTaskRunDetailView: View {
     }
 
     private func revealLinkedSemanticReviewBundle() {
-        guard let linkedSemanticRecording else {
+        guard let reference = macroReviewPresentation.recordingReference else {
             return
         }
         semanticReviewErrorMessage = ""
         semanticReviewBundleFeedback = SemanticRecordingReviewPresenter.revealBundle(
-            from: linkedSemanticRecording.reference
+            from: reference
         )
     }
 
     private func openLinkedSemanticReview(
-        _ linked: (macro: SavedMacro, reference: MacroSemanticRecordingReference)
+        _ presentation: AutomationMacroReviewSourcePresentation
     ) {
+        guard let reference = presentation.recordingReference else {
+            chooseSemanticReviewBundle()
+            return
+        }
         let requestedRunID = run.id
         semanticReviewRequestRunID = requestedRunID
         isOpeningSemanticReview = true
@@ -629,8 +588,8 @@ struct AutomationTaskRunDetailView: View {
         Task {
             do {
                 let state = try await SemanticRecordingReviewPresenter.reviewState(
-                    from: linked.reference,
-                    sourceName: linked.macro.name
+                    from: reference,
+                    sourceName: presentation.macroName ?? NSLocalizedString("Macro Review", comment: "")
                 )
                 await MainActor.run {
                     guard semanticReviewRequestRunID == requestedRunID else {
