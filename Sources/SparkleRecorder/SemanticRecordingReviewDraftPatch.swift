@@ -268,6 +268,16 @@ public struct SemanticRecordingReviewActionSemantics: Codable, Equatable, Sendab
             summary: selectedRegion?.label ?? candidate.summary
         )
     }
+
+    public static func evidenceAlignment(
+        _ candidate: SemanticRecordingReviewProjection.ConditionCandidateRow,
+        frame: RecordingFrameReference,
+        regionSelection: SemanticRecordingFrameRegionSelection? = nil
+    ) -> EvidenceAlignment {
+        var evidence = evidenceAlignment(candidate, regionSelection: regionSelection)
+        evidence.eventIDs = frame.relatedEventIDs
+        return evidence
+    }
 }
 
 public enum SemanticRecordingReviewDraftPatchError: Error, Equatable, Sendable {
@@ -822,6 +832,7 @@ public enum SemanticRecordingReviewDraftPatchBuilder {
             assetExtractions: assetExtractions,
             actionEvidence: SemanticRecordingReviewActionSemantics.evidenceAlignment(
                 candidate,
+                frame: frame,
                 regionSelection: request.regionSelection
             ),
             appliesToExistingTask: appliesToExistingTask

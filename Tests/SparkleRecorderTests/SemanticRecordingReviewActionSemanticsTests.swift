@@ -124,6 +124,7 @@ struct SemanticRecordingReviewActionSemanticsTests {
         let importAction = SemanticRecordingReviewActionSemantics.importDraft(result)
 
         #expect(result.actionEvidence.frameID == SemanticRecordingFixture.beforeClickFrameID)
+        #expect(result.actionEvidence.eventIDs == [SemanticRecordingFixture.clickEventID])
         #expect(result.actionEvidence.sourcePreviewRefID == SemanticRecordingFixture.sourceTemplateRefID)
         #expect(result.actionEvidence.observationIDs.isEmpty)
         #expect(result.actionEvidence.artifactPath == "visual-index/templates/checkout-button.png")
