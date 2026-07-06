@@ -44,6 +44,7 @@ struct SemanticRecordingReviewFixtureView: View {
         selectedFrameID: UUID? = nil,
         initialDraftPatchCandidateID: String? = nil,
         initialRegionSelection: SemanticRecordingFrameRegionSelection? = nil,
+        initialPixelColorHexes: [String: String] = [:],
         initialAcceptedSuggestionID: UUID? = nil,
         initialRejectedSuggestionID: UUID? = nil
     ) {
@@ -64,11 +65,13 @@ struct SemanticRecordingReviewFixtureView: View {
         _selectedFrameID = State(initialValue: selectedFrameID)
         _selectedCandidateID = State(initialValue: initialDraftPatchCandidateID)
         _regionSelection = State(initialValue: initialRegionSelection)
+        _pixelColorHexes = State(initialValue: initialPixelColorHexes)
         _draftPatchResult = State(initialValue: Self.initialDraftPatchResult(
             bundle: bundle,
             projection: projection,
             candidateID: initialDraftPatchCandidateID,
-            regionSelection: initialRegionSelection
+            regionSelection: initialRegionSelection,
+            pixelColorHexes: initialPixelColorHexes
         ))
         _draftPatchSourceSuggestionID = State(initialValue: initialAcceptedSuggestionID)
         _suggestionReviewDecisions = State(initialValue: Self.initialSuggestionReviewDecisions(
@@ -107,7 +110,8 @@ struct SemanticRecordingReviewFixtureView: View {
         bundle: SemanticRecordingBundle,
         projection: SemanticRecordingReviewProjection,
         candidateID: String?,
-        regionSelection: SemanticRecordingFrameRegionSelection? = nil
+        regionSelection: SemanticRecordingFrameRegionSelection? = nil,
+        pixelColorHexes: [String: String] = [:]
     ) -> SemanticRecordingReviewDraftPatchResult? {
         guard let candidateID,
               let candidate = projection.selectedFrame?.conditionCandidates.first(where: { $0.id == candidateID }) else {
@@ -118,7 +122,10 @@ struct SemanticRecordingReviewFixtureView: View {
             bundle: bundle,
             request: SemanticRecordingReviewDraftPatchRequest(
                 candidate: candidate,
-                regionSelection: regionSelection
+                regionSelection: regionSelection,
+                pixelColorHex: candidate.kind == .pixelMatched
+                    ? pixelColorHexes[candidate.id]
+                    : nil
             )
         )
     }

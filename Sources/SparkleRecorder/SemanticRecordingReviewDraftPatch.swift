@@ -2,7 +2,7 @@ import CoreGraphics
 import CryptoKit
 import Foundation
 
-public struct SemanticRecordingReviewActionSemantics: Equatable, Sendable {
+public struct SemanticRecordingReviewActionSemantics: Codable, Equatable, Sendable {
     public enum ActionName: String, Codable, Equatable, Sendable {
         case draftCandidate = "review.draftCandidate"
         case draftSelection = "review.draftSelection"
@@ -20,7 +20,7 @@ public struct SemanticRecordingReviewActionSemantics: Equatable, Sendable {
         case confirmedImport = "confirmedImport"
     }
 
-    public struct EvidenceAlignment: Equatable, Sendable {
+    public struct EvidenceAlignment: Codable, Equatable, Sendable {
         public var suggestionID: UUID?
         public var frameID: UUID?
         public var eventIDs: [UUID]
@@ -77,18 +77,50 @@ public struct SemanticRecordingReviewActionSemantics: Equatable, Sendable {
     public static func acceptSuggestion(
         _ suggestion: SemanticRecordingReviewProjection.SuggestionRow
     ) -> SemanticRecordingReviewActionSemantics {
+        acceptSuggestion(
+            evidence: evidenceAlignment(suggestion)
+        )
+    }
+
+    public static func acceptSuggestion(
+        _ suggestion: RecordingSuggestion
+    ) -> SemanticRecordingReviewActionSemantics {
+        acceptSuggestion(
+            evidence: evidenceAlignment(suggestion)
+        )
+    }
+
+    private static func acceptSuggestion(
+        evidence: EvidenceAlignment
+    ) -> SemanticRecordingReviewActionSemantics {
         SemanticRecordingReviewActionSemantics(
             actionName: .acceptSuggestion,
             title: "Accept suggestion",
             mutationBoundary: .draftPreviewRequired,
             createsDraftPatch: true,
             mutatesWorkflow: false,
-            evidence: evidenceAlignment(suggestion)
+            evidence: evidence
         )
     }
 
     public static func rejectSuggestion(
         _ suggestion: SemanticRecordingReviewProjection.SuggestionRow
+    ) -> SemanticRecordingReviewActionSemantics {
+        rejectSuggestion(
+            evidence: evidenceAlignment(suggestion)
+        )
+    }
+
+    public static func rejectSuggestion(
+        _ suggestion: RecordingSuggestion
+    ) -> SemanticRecordingReviewActionSemantics {
+        rejectSuggestion(
+            evidence: evidenceAlignment(suggestion)
+        )
+    }
+
+    private static func rejectSuggestion(
+        evidence: EvidenceAlignment
     ) -> SemanticRecordingReviewActionSemantics {
         SemanticRecordingReviewActionSemantics(
             actionName: .rejectSuggestion,
@@ -96,12 +128,28 @@ public struct SemanticRecordingReviewActionSemantics: Equatable, Sendable {
             mutationBoundary: .reviewLocal,
             createsDraftPatch: false,
             mutatesWorkflow: false,
-            evidence: evidenceAlignment(suggestion)
+            evidence: evidence
         )
     }
 
     public static func clearDecision(
         _ suggestion: SemanticRecordingReviewProjection.SuggestionRow
+    ) -> SemanticRecordingReviewActionSemantics {
+        clearDecision(
+            evidence: evidenceAlignment(suggestion)
+        )
+    }
+
+    public static func clearDecision(
+        _ suggestion: RecordingSuggestion
+    ) -> SemanticRecordingReviewActionSemantics {
+        clearDecision(
+            evidence: evidenceAlignment(suggestion)
+        )
+    }
+
+    private static func clearDecision(
+        evidence: EvidenceAlignment
     ) -> SemanticRecordingReviewActionSemantics {
         SemanticRecordingReviewActionSemantics(
             actionName: .clearDecision,
@@ -109,7 +157,7 @@ public struct SemanticRecordingReviewActionSemantics: Equatable, Sendable {
             mutationBoundary: .reviewLocal,
             createsDraftPatch: false,
             mutatesWorkflow: false,
-            evidence: evidenceAlignment(suggestion)
+            evidence: evidence
         )
     }
 
@@ -167,6 +215,21 @@ public struct SemanticRecordingReviewActionSemantics: Equatable, Sendable {
             eventIDs: primaryEvidence?.eventIDs ?? [],
             observationIDs: primaryEvidence?.observationIDs ?? [],
             artifactPath: primaryEvidence?.artifactPath,
+            bounds: primaryEvidence?.bounds,
+            summary: primaryEvidence?.summary ?? suggestion.summary
+        )
+    }
+
+    private static func evidenceAlignment(
+        _ suggestion: RecordingSuggestion
+    ) -> EvidenceAlignment {
+        let primaryEvidence = suggestion.evidence.first
+        return EvidenceAlignment(
+            suggestionID: suggestion.id,
+            frameID: primaryEvidence?.frameID,
+            eventIDs: primaryEvidence?.eventIDs ?? [],
+            observationIDs: primaryEvidence?.observationIDs ?? [],
+            artifactPath: primaryEvidence?.artifactRef?.path,
             bounds: primaryEvidence?.bounds,
             summary: primaryEvidence?.summary ?? suggestion.summary
         )

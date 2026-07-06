@@ -64,4 +64,62 @@ struct SemanticRecordingReviewActionSemanticsTests {
         #expect(draftSelection.evidence.bounds == selection.bounds)
         #expect(draftSelection.evidence.summary == "S4 reviewed region")
     }
+
+    @Test("Review action semantics can be generated from raw S4 suggestions")
+    func reviewActionSemanticsCanBeGeneratedFromRawS4Suggestions() throws {
+        let bundle = SemanticRecordingFixture.checkoutBundle()
+        let suggestion = try #require(
+            SemanticRecordingFixture.checkoutSuggestions(bundle: bundle).first
+        )
+
+        let accept = SemanticRecordingReviewActionSemantics.acceptSuggestion(suggestion)
+        let reject = SemanticRecordingReviewActionSemantics.rejectSuggestion(suggestion)
+        let clear = SemanticRecordingReviewActionSemantics.clearDecision(suggestion)
+
+        #expect(accept.actionName == .acceptSuggestion)
+        #expect(accept.mutationBoundary == .draftPreviewRequired)
+        #expect(accept.createsDraftPatch)
+        #expect(!accept.mutatesWorkflow)
+        #expect(accept.evidence.suggestionID == SemanticRecordingFixture.suggestionID)
+        #expect(accept.evidence.frameID == SemanticRecordingFixture.afterClickFrameID)
+        #expect(accept.evidence.eventIDs == [
+            SemanticRecordingFixture.clickEventID,
+            SemanticRecordingFixture.waitEventID
+        ])
+        #expect(accept.evidence.observationIDs == [SemanticRecordingFixture.ocrObservationID])
+        #expect(accept.evidence.artifactPath == "visual-index/ocr/confirmation-region.png")
+
+        #expect(reject.actionName == .rejectSuggestion)
+        #expect(reject.mutationBoundary == .reviewLocal)
+        #expect(!reject.createsDraftPatch)
+        #expect(!reject.mutatesWorkflow)
+        #expect(reject.evidence == accept.evidence)
+
+        #expect(clear.actionName == .clearDecision)
+        #expect(clear.mutationBoundary == .reviewLocal)
+        #expect(!clear.createsDraftPatch)
+        #expect(!clear.mutatesWorkflow)
+        #expect(clear.evidence == accept.evidence)
+    }
+
+    @Test("Review action semantics are Codable for S4 JSON payloads")
+    func reviewActionSemanticsAreCodableForS4JSONPayloads() throws {
+        let bundle = SemanticRecordingFixture.checkoutBundle()
+        let suggestion = try #require(
+            SemanticRecordingFixture.checkoutSuggestions(bundle: bundle).first
+        )
+        let action = SemanticRecordingReviewActionSemantics.acceptSuggestion(suggestion)
+
+        let data = try JSONEncoder().encode(action)
+        let decoded = try JSONDecoder().decode(
+            SemanticRecordingReviewActionSemantics.self,
+            from: data
+        )
+
+        #expect(decoded == action)
+        #expect(decoded.actionName.rawValue == "review.acceptSuggestion")
+        #expect(decoded.mutationBoundary.rawValue == "draftPreviewRequired")
+        #expect(decoded.evidence.suggestionID == suggestion.id)
+        #expect(decoded.evidence.artifactPath == suggestion.evidence.first?.artifactRef?.path)
+    }
 }
