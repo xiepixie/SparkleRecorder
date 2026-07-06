@@ -140,6 +140,57 @@ struct SemanticRecordingReviewActionSemanticsTests {
         #expect(preview.evidence == result.actionEvidence)
     }
 
+    @Test("Suggestion patch resolver keeps reviewed selection bounds")
+    func suggestionPatchResolverKeepsReviewedSelectionBounds() throws {
+        let bundle = SemanticRecordingFixture.checkoutBundle()
+        let suggestions = SemanticRecordingFixture.checkoutSuggestions(bundle: bundle)
+        let projection = SemanticRecordingReviewProjection(
+            bundle: bundle,
+            suggestions: suggestions,
+            selectedEventID: SemanticRecordingFixture.waitEventID
+        )
+        let reviewSuggestion = try #require(projection.suggestionRows.first)
+        let selection = SemanticRecordingFrameRegionSelection(
+            frameID: SemanticRecordingFixture.afterClickFrameID,
+            surfaceID: SemanticRecordingFixture.surfaceID,
+            bounds: RecordingBounds(
+                rect: RecordingRect(x: 720, y: 226, width: 180, height: 34),
+                coordinateSpace: .windowPixels
+            ),
+            imageSize: RecordingImageSize(width: 1_440, height: 900),
+            label: "Reviewed confirmation crop",
+            candidateKind: .ocrWait,
+            sourcePreviewRefID: SemanticRecordingFixture.sourceOCRRefID,
+            observationID: SemanticRecordingFixture.ocrObservationID,
+            artifactPath: "visual-index/ocr/confirmation-region.png"
+        )
+
+        let match = try #require(
+            SemanticRecordingReviewSuggestionPatchResolver.makeRequest(
+                suggestion: reviewSuggestion,
+                bundle: bundle,
+                regionSelection: selection
+            )
+        )
+        let result = try SemanticRecordingReviewDraftPatchBuilder.makePatch(
+            bundle: bundle,
+            request: match.request
+        )
+
+        #expect(match.request.sourceSuggestionID == SemanticRecordingFixture.suggestionID)
+        #expect(match.request.regionSelection == selection)
+        #expect(result.actionEvidence.suggestionID == SemanticRecordingFixture.suggestionID)
+        #expect(result.actionEvidence.eventIDs == [
+            SemanticRecordingFixture.clickEventID,
+            SemanticRecordingFixture.waitEventID
+        ])
+        #expect(result.actionEvidence.observationIDs == [SemanticRecordingFixture.ocrObservationID])
+        #expect(result.actionEvidence.sourcePreviewRefID == SemanticRecordingFixture.sourceOCRRefID)
+        #expect(result.actionEvidence.artifactPath == "visual-index/ocr/confirmation-region.png")
+        #expect(result.actionEvidence.bounds == selection.bounds)
+        #expect(result.actionEvidence.summary == "Reviewed confirmation crop")
+    }
+
     @Test("Preview and import draft actions preserve staged patch evidence")
     func previewAndImportDraftActionsPreserveStagedPatchEvidence() throws {
         let bundle = SemanticRecordingFixture.checkoutBundle()

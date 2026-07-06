@@ -946,6 +946,12 @@ public enum SemanticRecordingReviewDraftPatchBuilder {
         evidence.artifactPath = evidence.artifactPath ?? candidateEvidence.artifactPath
         evidence.bounds = evidence.bounds ?? candidateEvidence.bounds
         evidence.summary = evidence.summary ?? candidateEvidence.summary
+        if request.regionSelection != nil {
+            evidence.sourcePreviewRefID = candidateEvidence.sourcePreviewRefID ?? evidence.sourcePreviewRefID
+            evidence.artifactPath = candidateEvidence.artifactPath ?? evidence.artifactPath
+            evidence.bounds = candidateEvidence.bounds ?? evidence.bounds
+            evidence.summary = candidateEvidence.summary ?? evidence.summary
+        }
         return evidence
     }
 
