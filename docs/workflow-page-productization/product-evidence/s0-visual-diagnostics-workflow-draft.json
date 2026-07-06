@@ -1,0 +1,47 @@
+{
+  "schema": "sparkle.workflow.draft.v1",
+  "workflow": {
+    "name": "S0 Visual Diagnostics Live Gate",
+    "tasks": [
+      {
+        "key": "ocr_diagnostic_sample",
+        "name": "OCR diagnostic sample miss",
+        "type": "condition",
+        "condition": {
+          "type": "ocrText",
+          "text": "S0_VISUAL_DIAGNOSTIC_SENTINEL_DO_NOT_MATCH_20260706",
+          "matchMode": "contains",
+          "regionRef": "main_display_sample",
+          "requireVisible": true
+        },
+        "schedule": {
+          "type": "manual"
+        },
+        "resource": "screenCapture",
+        "pollingSeconds": 0.25,
+        "graphPosition": {
+          "x": 260,
+          "y": 180
+        }
+      }
+    ],
+    "dependencies": []
+  },
+  "visualAssets": {
+    "regions": [
+      {
+        "key": "main_display_sample",
+        "label": "Main display sample region",
+        "bounds": {
+          "x": 0.05,
+          "y": 0.05,
+          "width": 0.5,
+          "height": 0.45
+        },
+        "space": "displayNormalized"
+      }
+    ],
+    "images": [],
+    "baselines": []
+  }
+}

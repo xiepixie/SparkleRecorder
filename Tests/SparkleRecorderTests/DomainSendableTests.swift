@@ -47,6 +47,10 @@ struct DomainSendableTests {
         assertSendable(RecordingDragSamplingConfiguration.default)
         assertSendable(RecordingDragSample(location: CGPoint(x: 1, y: 2), time: 0.1))
         assertSendable(RawInputEvent(kind: .leftMouseDown, timestamp: 1, location: CGPoint(x: 1, y: 2)))
+        assertSendable(RecordingEngineDiagnostic(
+            kind: .eventTapDisabledByUserInput,
+            detail: "Secure Input"
+        ))
         assertSendable(RecordingEventBuffer())
         assertSendable(RecordingEventBufferSnapshot(events: [event], surfaces: [TestFixtures.surfaceId: surface]))
         assertSendable(RecordingSessionProcessor())

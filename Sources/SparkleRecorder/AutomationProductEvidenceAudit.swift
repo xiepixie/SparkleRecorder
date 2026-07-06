@@ -53,11 +53,23 @@ public struct AutomationProductEvidenceAuditItem: Codable, Equatable, Sendable {
     }
 }
 
+public enum AutomationProductEvidenceClipContainer: String, Codable, Equatable, Sendable {
+    case isoBaseMedia
+    case unsupported
+    case unknown
+
+    public var isSupported: Bool {
+        self == .isoBaseMedia
+    }
+}
+
 public struct AutomationProductEvidenceAuditFile: Codable, Equatable, Sendable {
     public var path: String
     public var exists: Bool
     public var byteCount: Int64?
     public var minimumByteCount: Int64?
+    public var clipContainer: AutomationProductEvidenceClipContainer?
+    public var requiresSupportedClipContainer: Bool
     public var missingRequiredPhrases: [String]
 
     public init(
@@ -65,12 +77,16 @@ public struct AutomationProductEvidenceAuditFile: Codable, Equatable, Sendable {
         exists: Bool,
         byteCount: Int64? = nil,
         minimumByteCount: Int64? = nil,
+        clipContainer: AutomationProductEvidenceClipContainer? = nil,
+        requiresSupportedClipContainer: Bool = false,
         missingRequiredPhrases: [String] = []
     ) {
         self.path = path
         self.exists = exists
         self.byteCount = byteCount
         self.minimumByteCount = minimumByteCount
+        self.clipContainer = clipContainer
+        self.requiresSupportedClipContainer = requiresSupportedClipContainer
         self.missingRequiredPhrases = missingRequiredPhrases
     }
 
@@ -84,8 +100,18 @@ public struct AutomationProductEvidenceAuditFile: Codable, Equatable, Sendable {
         return byteCount >= minimumByteCount
     }
 
+    public var hasSupportedClipContainer: Bool {
+        guard requiresSupportedClipContainer else {
+            return true
+        }
+        guard let clipContainer else {
+            return false
+        }
+        return clipContainer.isSupported
+    }
+
     public var satisfied: Bool {
-        exists && missingRequiredPhrases.isEmpty && meetsMinimumByteCount
+        exists && missingRequiredPhrases.isEmpty && meetsMinimumByteCount && hasSupportedClipContainer
     }
 }
 
@@ -244,8 +270,10 @@ public struct AutomationProductEvidenceCapturePlanOption: Codable, Equatable, Se
     public var clipPathCandidates: [String]
     public var missingPaths: [String]
     public var undersizedPaths: [String]
+    public var invalidClipContainerPaths: [String]
     public var incompleteSidecarLabels: [String]
     public var sidecarTemplateCommand: String
+    public var sidecarCompletionCommand: String
     public var acceptanceFocus: String
 
     public init(
@@ -253,16 +281,20 @@ public struct AutomationProductEvidenceCapturePlanOption: Codable, Equatable, Se
         clipPathCandidates: [String],
         missingPaths: [String],
         undersizedPaths: [String] = [],
+        invalidClipContainerPaths: [String] = [],
         incompleteSidecarLabels: [String],
         sidecarTemplateCommand: String,
+        sidecarCompletionCommand: String,
         acceptanceFocus: String
     ) {
         self.sidecarPath = sidecarPath
         self.clipPathCandidates = clipPathCandidates
         self.missingPaths = missingPaths
         self.undersizedPaths = undersizedPaths
+        self.invalidClipContainerPaths = invalidClipContainerPaths
         self.incompleteSidecarLabels = incompleteSidecarLabels
         self.sidecarTemplateCommand = sidecarTemplateCommand
+        self.sidecarCompletionCommand = sidecarCompletionCommand
         self.acceptanceFocus = acceptanceFocus
     }
 }
@@ -429,6 +461,7 @@ public enum AutomationProductEvidenceAudit {
         existingPaths: Set<String>,
         sidecarContents: [String: String] = [:],
         fileByteCounts: [String: Int64] = [:],
+        clipContainers: [String: AutomationProductEvidenceClipContainer] = [:],
         specs: [AutomationProductEvidenceAuditSpec] = defaultSpecs
     ) -> AutomationProductEvidenceAuditPayload {
         let items = specs.map { spec -> AutomationProductEvidenceAuditItem in
@@ -437,18 +470,26 @@ public enum AutomationProductEvidenceAudit {
                 return group.map { path in
                     let exists = existingPaths.contains(path)
                     let minimumByteCount = minimumByteCount(for: path, in: spec)
+                    let requiresSupportedClipContainer = requiresSupportedClipContainer(
+                        for: path,
+                        in: spec
+                    )
                     let missingRequiredPhrases = Self.missingRequiredPhrases(
                         path: path,
                         exists: exists,
                         contents: sidecarContents[path],
                         requiredPhrases: spec.sidecarRequiredPhrases,
-                        validClipPaths: groupClipPaths
+                        validClipPaths: groupClipPaths,
+                        expectedChecklistTitle: spec.title,
+                        expectedChecklistID: spec.id
                     )
                     return AutomationProductEvidenceAuditFile(
                         path: path,
                         exists: exists,
                         byteCount: exists ? fileByteCounts[path] : nil,
                         minimumByteCount: minimumByteCount,
+                        clipContainer: exists ? clipContainers[path] : nil,
+                        requiresSupportedClipContainer: requiresSupportedClipContainer,
                         missingRequiredPhrases: missingRequiredPhrases
                     )
                 }
@@ -561,6 +602,7 @@ public enum AutomationProductEvidenceAudit {
         existingPaths: Set<String>,
         sidecarContents: [String: String] = [:],
         fileByteCounts: [String: Int64] = [:],
+        clipContainers: [String: AutomationProductEvidenceClipContainer] = [:],
         specs: [AutomationProductEvidenceAuditSpec] = defaultSpecs
     ) -> AutomationProductEvidenceCapturePlanPayload {
         let audit = evaluate(
@@ -568,6 +610,7 @@ public enum AutomationProductEvidenceAudit {
             existingPaths: existingPaths,
             sidecarContents: sidecarContents,
             fileByteCounts: fileByteCounts,
+            clipContainers: clipContainers,
             specs: specs
         )
         let liveSpecs = specs.filter { !$0.sidecarRequiredPhrases.isEmpty }
@@ -602,22 +645,39 @@ public enum AutomationProductEvidenceAudit {
                         return byteCount < minimumByteCount
                     }
                     .sorted()
+                let invalidClipContainerPaths = groupFiles
+                    .filter { path in
+                        guard existingPaths.contains(path),
+                              requiresSupportedClipContainer(for: path, in: spec) else {
+                            return false
+                        }
+                        return clipContainers[path]?.isSupported != true
+                    }
+                    .sorted()
                 let incompleteLabels = missingRequiredPhrases(
                     path: sidecarPath,
                     exists: existingPaths.contains(sidecarPath),
                     contents: sidecarContents[sidecarPath],
                     requiredPhrases: spec.sidecarRequiredPhrases,
-                    validClipPaths: template.clipPathCandidates
+                    validClipPaths: template.clipPathCandidates,
+                    expectedChecklistTitle: spec.title,
+                    expectedChecklistID: spec.id
                 )
                 return AutomationProductEvidenceCapturePlanOption(
                     sidecarPath: sidecarPath,
                     clipPathCandidates: template.clipPathCandidates,
                     missingPaths: missingPaths,
                     undersizedPaths: undersizedPaths,
+                    invalidClipContainerPaths: invalidClipContainerPaths,
                     incompleteSidecarLabels: incompleteLabels,
                     sidecarTemplateCommand: sidecarTemplateCommand(
                         id: spec.id,
                         sidecarPath: sidecarPaths.count > 1 ? sidecarPath : nil
+                    ),
+                    sidecarCompletionCommand: sidecarCompletionCommand(
+                        id: spec.id,
+                        sidecarPath: sidecarPaths.count > 1 ? sidecarPath : nil,
+                        clipPath: template.clipPathCandidates.first ?? "<clip>"
                     ),
                     acceptanceFocus: spec.note
                 )
@@ -644,6 +704,7 @@ public enum AutomationProductEvidenceAudit {
         existingPaths: Set<String>,
         sidecarContents: [String: String] = [:],
         fileByteCounts: [String: Int64] = [:],
+        clipContainers: [String: AutomationProductEvidenceClipContainer] = [:],
         includeSatisfied: Bool = false,
         specs: [AutomationProductEvidenceAuditSpec] = defaultSpecs
     ) -> AutomationProductEvidenceSidecarDraftsPayload {
@@ -652,6 +713,7 @@ public enum AutomationProductEvidenceAudit {
             existingPaths: existingPaths,
             sidecarContents: sidecarContents,
             fileByteCounts: fileByteCounts,
+            clipContainers: clipContainers,
             specs: specs
         )
         var seenSidecars = Set<String>()
@@ -683,7 +745,9 @@ public enum AutomationProductEvidenceAudit {
         exists: Bool,
         contents: String?,
         requiredPhrases: [String],
-        validClipPaths: [String] = []
+        validClipPaths: [String] = [],
+        expectedChecklistTitle: String? = nil,
+        expectedChecklistID: String? = nil
     ) -> [String] {
         guard exists, path.hasSuffix(".md"), !requiredPhrases.isEmpty else {
             return []
@@ -697,6 +761,12 @@ public enum AutomationProductEvidenceAudit {
                 return true
             }
             switch label {
+            case "Checklist item:":
+                return !sidecarChecklistValue(
+                    value,
+                    matchesTitle: expectedChecklistTitle,
+                    id: expectedChecklistID
+                )
             case "Clip file:":
                 return !sidecarClipValue(value, matchesOneOf: validClipPaths)
             case "Evidence source:":
@@ -711,11 +781,17 @@ public enum AutomationProductEvidenceAudit {
         for path: String,
         in spec: AutomationProductEvidenceAuditSpec
     ) -> Int64? {
-        guard !spec.sidecarRequiredPhrases.isEmpty,
-              isLiveClipPath(path) else {
+        guard requiresSupportedClipContainer(for: path, in: spec) else {
             return nil
         }
         return minimumLiveClipByteCount
+    }
+
+    private static func requiresSupportedClipContainer(
+        for path: String,
+        in spec: AutomationProductEvidenceAuditSpec
+    ) -> Bool {
+        !spec.sidecarRequiredPhrases.isEmpty && isLiveClipPath(path)
     }
 
     private static func isLiveClipPath(_ path: String) -> Bool {
@@ -750,6 +826,19 @@ public enum AutomationProductEvidenceAudit {
         return !["fixture", "mock", "synthetic", "placeholder"].contains { disallowed in
             normalized.contains(disallowed)
         }
+    }
+
+    private static func sidecarChecklistValue(
+        _ value: String,
+        matchesTitle expectedTitle: String?,
+        id expectedID: String?
+    ) -> Bool {
+        guard let expectedTitle, let expectedID else {
+            return true
+        }
+        let normalized = value.lowercased()
+        return normalized.contains(expectedTitle.lowercased()) &&
+            normalized.contains(expectedID.lowercased())
     }
 
     private static func filenames(
@@ -845,6 +934,26 @@ public enum AutomationProductEvidenceAudit {
         if let sidecarPath {
             command += " --sidecar \(sidecarPath)"
         }
+        return command
+    }
+
+    private static func sidecarCompletionCommand(
+        id: String,
+        sidecarPath: String?,
+        clipPath: String
+    ) -> String {
+        var command = "SparkleRecorder workflow product-evidence complete-sidecar \(id)"
+        if let sidecarPath {
+            command += " --sidecar \(sidecarPath)"
+        }
+        command += " --clip \(clipPath)"
+        command += " --capture-date YYYY-MM-DD"
+        command += " --worktree-note \"branch, commit, dirty-state\""
+        command += " --app-build \"installed app path or local build\""
+        command += " --workflow \"workflow id/name and package\""
+        command += " --user-action \"captured user action\""
+        command += " --known-gaps \"none or remaining limitation\""
+        command += " --evidence-source \"live App recording\""
         return command
     }
 

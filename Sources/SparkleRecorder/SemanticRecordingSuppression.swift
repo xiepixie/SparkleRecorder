@@ -75,6 +75,101 @@ public struct SemanticRecordingSuppressionRules: Codable, Equatable, Sendable {
     }
 }
 
+public struct SemanticRecordingSuppressionSettings: Codable, Equatable, Sendable {
+    public var excludedApplicationBundleIDs: [String]
+    public var excludedWindowTitleFragments: [String]
+    public var excludedDomains: [String]
+    public var maximumArtifactByteCount: Int?
+
+    public init(
+        excludedApplicationBundleIDs: [String] = [],
+        excludedWindowTitleFragments: [String] = [],
+        excludedDomains: [String] = [],
+        maximumArtifactByteCount: Int? = nil
+    ) {
+        self.excludedApplicationBundleIDs = Self.normalizedUnique(
+            excludedApplicationBundleIDs,
+            normalizer: Self.normalizedIdentifier
+        )
+        self.excludedWindowTitleFragments = Self.normalizedUnique(
+            excludedWindowTitleFragments,
+            normalizer: Self.normalizedTitleFragment
+        )
+        self.excludedDomains = Self.normalizedUnique(
+            excludedDomains,
+            normalizer: Self.normalizedDomain
+        )
+        self.maximumArtifactByteCount = maximumArtifactByteCount.flatMap { bytes in
+            let clamped = max(0, bytes)
+            return clamped == 0 ? nil : clamped
+        }
+    }
+
+    public var rules: SemanticRecordingSuppressionRules {
+        SemanticRecordingSuppressionRules(
+            excludedApplicationBundleIDs: Set(excludedApplicationBundleIDs),
+            excludedWindowTitleFragments: excludedWindowTitleFragments,
+            excludedDomains: Set(excludedDomains),
+            maximumArtifactByteCount: maximumArtifactByteCount
+        )
+    }
+
+    public static func parseListText(_ value: String) -> [String] {
+        value
+            .split { character in
+                character == "," ||
+                    character == ";" ||
+                    character == "\n" ||
+                    character == "\r" ||
+                    character == "\t"
+            }
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+    }
+
+    public static func listText(_ values: [String]) -> String {
+        values.joined(separator: ", ")
+    }
+
+    private static func normalizedUnique(
+        _ values: [String],
+        normalizer: (String) -> String
+    ) -> [String] {
+        var seen = Set<String>()
+        var output: [String] = []
+        for value in values {
+            let normalized = normalizer(value)
+            guard !normalized.isEmpty, !seen.contains(normalized) else {
+                continue
+            }
+            seen.insert(normalized)
+            output.append(normalized)
+        }
+        return output
+    }
+
+    private static func normalizedIdentifier(_ value: String) -> String {
+        value.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+    }
+
+    private static func normalizedTitleFragment(_ value: String) -> String {
+        value.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+    }
+
+    private static func normalizedDomain(_ value: String) -> String {
+        var domain = value.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        if domain.hasPrefix("http://") || domain.hasPrefix("https://"),
+           let url = URL(string: domain),
+           let host = url.host {
+            domain = host
+        }
+        if domain.hasPrefix("www.") {
+            domain.removeFirst(4)
+        }
+        return domain.trimmingCharacters(in: CharacterSet(charactersIn: "."))
+    }
+}
+
 public struct SemanticRecordingSuppressionContext: Equatable, Sendable {
     public var recordingTime: TimeInterval?
     public var timeRange: RecordingTimeRange?
@@ -118,6 +213,39 @@ public struct SemanticRecordingSuppressionContext: Equatable, Sendable {
     }
 }
 
+public struct SemanticRecordingCaptureSuppressionDecision: Equatable, Sendable {
+    public var reasons: [RecordingSuppressionReason]
+
+    public var shouldSuppressCapture: Bool {
+        !reasons.isEmpty
+    }
+
+    public init(reasons: [RecordingSuppressionReason] = []) {
+        self.reasons = reasons
+    }
+
+    public static let allow = SemanticRecordingCaptureSuppressionDecision()
+}
+
+public extension RecordingSuppressionReason {
+    var redactsSemanticEvidence: Bool {
+        switch self {
+        case .secureInput,
+             .passwordField,
+             .excludedApplication,
+             .excludedWindow,
+             .excludedDomain,
+             .privateRegion,
+             .userDeleted,
+             .unknown:
+            return true
+
+        case .oversizedArtifact:
+            return false
+        }
+    }
+}
+
 public struct SemanticRecordingSuppressionProducer: @unchecked Sendable {
     public var rules: SemanticRecordingSuppressionRules
     public var ids: SemanticRecordingCaptureIDProvider
@@ -134,58 +262,105 @@ public struct SemanticRecordingSuppressionProducer: @unchecked Sendable {
         for context: SemanticRecordingSuppressionContext
     ) -> [RecordingSuppressionRecord] {
         var records: [RecordingSuppressionRecord] = []
-        append(
-            &records,
-            reason: context.secureInputEnabled ? .secureInput : nil,
-            detail: "Secure Input was active; keyboard and visual evidence were withheld.",
-            context: context
-        )
-        append(
-            &records,
-            reason: context.passwordFieldFocused ? .passwordField : nil,
-            detail: "A password or secure text field was focused; typed content and frame evidence were withheld.",
-            context: context
-        )
-        append(
-            &records,
-            reason: rules.excludes(applicationBundleID: context.target.appBundleIdentifier) ? .excludedApplication : nil,
-            detail: "The target application is excluded from semantic recording evidence.",
-            context: context
-        )
-        append(
-            &records,
-            reason: rules.excludes(windowTitle: context.target.windowTitle) ? .excludedWindow : nil,
-            detail: "The target window title matched an excluded semantic recording pattern.",
-            context: context
-        )
-        append(
-            &records,
-            reason: rules.excludes(domain: context.domain) ? .excludedDomain : nil,
-            detail: "The target domain is excluded from semantic recording evidence.",
-            context: context
-        )
-        append(
-            &records,
-            reason: context.privateRegion ? .privateRegion : nil,
-            detail: "The selected frame region was marked private and withheld.",
-            context: context
-        )
-        append(
-            &records,
-            reason: rules.exceedsArtifactLimit(byteCount: context.artifactByteCount) ? .oversizedArtifact : nil,
-            detail: "The captured artifact exceeded the semantic recording retention size limit.",
-            context: context
-        )
+        for match in suppressionMatches(for: context) {
+            append(
+                &records,
+                reason: match.reason,
+                detail: match.detail,
+                context: context
+            )
+        }
         return records
+    }
+
+    public func captureSuppressionDecision(
+        for context: SemanticRecordingSuppressionContext
+    ) -> SemanticRecordingCaptureSuppressionDecision {
+        let reasons = suppressionMatches(for: context)
+            .map(\.reason)
+            .filter(Self.reasonSuppressesCapture)
+        return SemanticRecordingCaptureSuppressionDecision(reasons: reasons)
+    }
+
+    private func suppressionMatches(
+        for context: SemanticRecordingSuppressionContext
+    ) -> [SemanticRecordingSuppressionMatch] {
+        var matches: [SemanticRecordingSuppressionMatch] = []
+        append(
+            &matches,
+            reason: context.secureInputEnabled ? .secureInput : nil,
+            detail: "Secure Input was active; keyboard and visual evidence were withheld."
+        )
+        append(
+            &matches,
+            reason: context.passwordFieldFocused ? .passwordField : nil,
+            detail: "A password or secure text field was focused; typed content and frame evidence were withheld."
+        )
+        append(
+            &matches,
+            reason: rules.excludes(applicationBundleID: context.target.appBundleIdentifier) ? .excludedApplication : nil,
+            detail: "The target application is excluded from semantic recording evidence."
+        )
+        append(
+            &matches,
+            reason: rules.excludes(windowTitle: context.target.windowTitle) ? .excludedWindow : nil,
+            detail: "The target window title matched an excluded semantic recording pattern."
+        )
+        append(
+            &matches,
+            reason: rules.excludes(domain: context.domain) ? .excludedDomain : nil,
+            detail: "The target domain is excluded from semantic recording evidence."
+        )
+        append(
+            &matches,
+            reason: context.privateRegion ? .privateRegion : nil,
+            detail: "The selected frame region was marked private and withheld."
+        )
+        append(
+            &matches,
+            reason: rules.exceedsArtifactLimit(byteCount: context.artifactByteCount) ? .oversizedArtifact : nil,
+            detail: "The captured artifact exceeded the semantic recording retention size limit."
+        )
+        return matches
+    }
+
+    private static func reasonSuppressesCapture(
+        _ reason: RecordingSuppressionReason
+    ) -> Bool {
+        switch reason {
+        case .secureInput,
+             .passwordField,
+             .excludedApplication,
+             .excludedWindow,
+             .excludedDomain,
+             .privateRegion:
+            return true
+
+        case .oversizedArtifact,
+             .userDeleted,
+             .unknown:
+            return false
+        }
+    }
+
+    private func append(
+        _ matches: inout [SemanticRecordingSuppressionMatch],
+        reason: RecordingSuppressionReason?,
+        detail: String
+    ) {
+        guard let reason else { return }
+        matches.append(SemanticRecordingSuppressionMatch(
+            reason: reason,
+            detail: detail
+        ))
     }
 
     private func append(
         _ records: inout [RecordingSuppressionRecord],
-        reason: RecordingSuppressionReason?,
+        reason: RecordingSuppressionReason,
         detail: String,
         context: SemanticRecordingSuppressionContext
     ) {
-        guard let reason else { return }
         records.append(RecordingSuppressionRecord(
             id: ids.next(.suppression),
             reason: reason,
@@ -200,4 +375,9 @@ public struct SemanticRecordingSuppressionProducer: @unchecked Sendable {
             createdAt: context.createdAt
         ))
     }
+}
+
+private struct SemanticRecordingSuppressionMatch {
+    var reason: RecordingSuppressionReason
+    var detail: String
 }

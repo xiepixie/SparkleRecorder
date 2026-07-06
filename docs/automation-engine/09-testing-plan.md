@@ -73,6 +73,15 @@
 - 每个测试建立自己的 workflow fixture。
 - 不使用真实 `Player`、`CGEvent`、`Vision`、文件系统 Application Support。
 
+## Live Acceptance Commands
+
+`workflow acceptance bound-window` is an operator/product acceptance command, not a unit-test harness.
+
+- Static mode may be used as a smoke check because it only loads workflow/macro metadata and emits `AutomationWorkflowBoundWindowAcceptancePayload`.
+- `--activate-target` and `--confirm-launch` may foreground or launch real target apps.
+- `--confirm-playback --handoff app` may cause the running SparkleRecorder App host to move real mouse/keyboard input through the production Player path.
+- Swift Testing should cover the payload contract, JSON round trip, App-host handoff command shape, and workflow/run status readback. It must not launch Cookie Run Kingdom, activate user apps, or post input events.
+
 ## 验收条件
 
 - Reducer 测试可以单独编译并在 Swift Testing runner 中通过。
@@ -92,4 +101,5 @@
 - 测试能覆盖 repository refresh state 的 loading/error/previous snapshot handoff。
 - 测试能覆盖 workflow package codec 和 import validation。
 - 测试能覆盖 App-host handoff payload/status 语义，包括 pending/dispatched/failed/missing、receipt run IDs、repository-backed `runs` snapshots / `workflowStatus` readback，以及旧 status JSON 缺少这些新字段时的兼容解码。
+- 测试能覆盖 bound-window acceptance payload 的 workflow/task/macro/surface context、coordinate mode、activation summary 和 handoff next-action 语义；真实 activation/playback 只由 reviewed live acceptance 执行。
 - 测试能覆盖 `SavedMacro` 与 `AutomationTaskRun` 分离。

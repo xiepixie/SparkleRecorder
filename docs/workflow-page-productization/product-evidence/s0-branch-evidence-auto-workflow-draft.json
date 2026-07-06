@@ -1,0 +1,50 @@
+{
+  "schema": "sparkle.workflow.draft.v1",
+  "workflow": {
+    "name": "S0 Branch Evidence Auto Live Gate",
+    "tasks": [
+      {
+        "key": "source_previous_outcome_misses",
+        "name": "Source previous-outcome miss",
+        "type": "condition",
+        "condition": {
+          "type": "previousOutcome",
+          "outcome": "success"
+        },
+        "resource": "none",
+        "schedule": {
+          "type": "manual"
+        },
+        "graphPosition": {
+          "x": 160,
+          "y": 120
+        }
+      },
+      {
+        "key": "target_previous_outcome_matches",
+        "name": "Target previous-outcome match",
+        "type": "condition",
+        "condition": {
+          "type": "previousOutcome",
+          "outcome": "conditionNotMatched"
+        },
+        "resource": "none",
+        "schedule": {
+          "type": "manual"
+        },
+        "graphPosition": {
+          "x": 520,
+          "y": 120
+        }
+      }
+    ],
+    "dependencies": [
+      {
+        "key": "source_to_target_when_not_matched",
+        "from": "source_previous_outcome_misses",
+        "to": "target_previous_outcome_matches",
+        "trigger": "conditionNotMatched"
+      }
+    ]
+  }
+}

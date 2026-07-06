@@ -82,6 +82,1080 @@ public struct AutomationCLIEmptyPayload: Codable, Equatable, Sendable {
     public init() {}
 }
 
+public enum SemanticRecordingCLICatalogSource: String, Codable, Equatable, Sendable {
+    case fixture
+    case storedBundle
+}
+
+public struct SemanticRecordingCLICatalogEntry: Codable, Equatable, Sendable, Identifiable {
+    public var id: UUID { recordingID }
+    public var recordingID: UUID
+    public var source: SemanticRecordingCLICatalogSource
+    public var fixture: String?
+    public var modifiedAt: Date?
+    public var manifestAvailable: Bool
+
+    public init(
+        recordingID: UUID,
+        source: SemanticRecordingCLICatalogSource,
+        fixture: String? = nil,
+        modifiedAt: Date? = nil,
+        manifestAvailable: Bool = true
+    ) {
+        self.recordingID = recordingID
+        self.source = source
+        self.fixture = fixture
+        self.modifiedAt = modifiedAt
+        self.manifestAvailable = manifestAvailable
+    }
+}
+
+public struct SemanticRecordingCLIListPayload: Codable, Equatable, Sendable {
+    public var fixtureMode: Bool
+    public var fixture: String?
+    public var recordingsRoot: String?
+    public var count: Int
+    public var recordings: [SemanticRecordingCLICatalogEntry]
+
+    public init(
+        recordings: [SemanticRecordingCLICatalogEntry],
+        fixture: String? = nil,
+        recordingsRoot: String? = nil
+    ) {
+        self.fixtureMode = fixture != nil
+        self.fixture = fixture
+        self.recordingsRoot = recordingsRoot
+        self.count = recordings.count
+        self.recordings = recordings
+    }
+}
+
+public struct SemanticRecordingCLICaptureTargetSummary: Codable, Equatable, Sendable {
+    public var kind: RecordingCaptureTargetKind
+    public var surfaceID: String?
+    public var displayID: UInt32?
+    public var windowID: UInt32?
+    public var appBundleIdentifier: String?
+    public var appName: String?
+    public var windowTitle: String?
+
+    public init(target: RecordingCaptureTarget) {
+        self.kind = target.kind
+        self.surfaceID = target.surfaceID
+        self.displayID = target.displayID
+        self.windowID = target.windowID
+        self.appBundleIdentifier = target.appBundleIdentifier
+        self.appName = target.appName
+        self.windowTitle = target.windowTitle
+    }
+}
+
+public struct SemanticRecordingCLISuppressionReasonCount: Codable, Equatable, Sendable {
+    public var reason: RecordingSuppressionReason
+    public var count: Int
+
+    public init(reason: RecordingSuppressionReason, count: Int) {
+        self.reason = reason
+        self.count = count
+    }
+}
+
+public struct SemanticRecordingCLISuppressionSummary: Codable, Equatable, Sendable {
+    public var recordCount: Int
+    public var totalSuppressedCount: Int
+    public var reasons: [SemanticRecordingCLISuppressionReasonCount]
+
+    public init(records: [RecordingSuppressionRecord]) {
+        self.recordCount = records.count
+        self.totalSuppressedCount = records.reduce(0) { total, record in
+            total + record.count
+        }
+        let reasonCounts = Dictionary(grouping: records, by: \.reason)
+            .map { reason, records in
+                SemanticRecordingCLISuppressionReasonCount(
+                    reason: reason,
+                    count: records.reduce(0) { total, record in total + record.count }
+                )
+            }
+            .sorted { $0.reason.rawValue < $1.reason.rawValue }
+        self.reasons = reasonCounts
+    }
+}
+
+public struct SemanticRecordingCLIArtifactAvailability: Codable, Equatable, Sendable {
+    public var videoRefs: [RecordingArtifactRef]
+    public var redactedVideoRefs: [RecordingArtifactRef]
+    public var frameRefs: [RecordingArtifactRef]
+    public var redactedFrameRefs: [RecordingArtifactRef]
+    public var sourcePreviewRefs: [RecordingArtifactRef]
+    public var runtimeSampleRefs: [RecordingArtifactRef]
+    public var diffRefs: [RecordingArtifactRef]
+
+    public init(bundle: SemanticRecordingBundle) {
+        self.videoRefs = bundle.videoSegments.map(\.artifactRef)
+        self.redactedVideoRefs = bundle.redactedVideos.map(\.redactedVideoRef)
+        self.frameRefs = bundle.frames.map(\.imageRef)
+        self.redactedFrameRefs = bundle.redactedFrames.map(\.redactedImageRef)
+        self.sourcePreviewRefs = bundle.sourcePreviews.compactMap(\.artifactRef)
+        self.runtimeSampleRefs = bundle.runtimeSamples.map(\.artifactRef)
+        self.diffRefs = bundle.previewComparisons.compactMap(\.diffArtifactRef)
+    }
+}
+
+public struct SemanticRecordingCLIFrameSummary: Codable, Equatable, Sendable, Identifiable {
+    public var id: UUID
+    public var recordingTime: TimeInterval
+    public var videoSegmentID: UUID?
+    public var videoTime: TimeInterval?
+    public var source: RecordingFrameCaptureSource
+    public var surfaceID: String?
+    public var relatedEventIDs: [UUID]
+    public var imageRef: RecordingArtifactRef
+    public var effectiveImageRef: RecordingArtifactRef
+    public var redactedImageRef: RecordingArtifactRef?
+    public var imageSize: RecordingImageSize?
+    public var observationIDs: [UUID]
+
+    public init(
+        frame: RecordingFrameReference,
+        redactedFrame: SemanticRecordingRenderedFrameRedaction? = nil,
+        observationIDs: [UUID] = []
+    ) {
+        self.id = frame.id
+        self.recordingTime = frame.recordingTime
+        self.videoSegmentID = frame.videoSegmentID
+        self.videoTime = frame.videoTime
+        self.source = frame.source
+        self.surfaceID = frame.surfaceID
+        self.relatedEventIDs = frame.relatedEventIDs
+        self.imageRef = frame.imageRef
+        self.effectiveImageRef = redactedFrame?.redactedImageRef ?? frame.imageRef
+        self.redactedImageRef = redactedFrame?.redactedImageRef
+        self.imageSize = frame.imageSize
+        self.observationIDs = observationIDs
+    }
+}
+
+public struct SemanticRecordingCLIEventSummary: Codable, Equatable, Sendable, Identifiable {
+    public var id: UUID
+    public var recordingTime: TimeInterval
+    public var kind: RecordingTimelineEventKind
+    public var frameID: UUID?
+    public var videoSegmentID: UUID?
+    public var surfaceID: String?
+    public var summary: String?
+    public var relatedEventIDs: [UUID]
+    public var relatedFrameIDs: [UUID]
+
+    public init(
+        event: RecordingTimelineEvent,
+        relatedFrameIDs: [UUID] = []
+    ) {
+        self.id = event.id
+        self.recordingTime = event.recordingTime
+        self.kind = event.kind
+        self.frameID = event.frameID
+        self.videoSegmentID = event.videoSegmentID
+        self.surfaceID = event.surfaceID
+        self.summary = event.summary
+        self.relatedEventIDs = event.relatedEventIDs
+        self.relatedFrameIDs = relatedFrameIDs
+    }
+}
+
+public struct SemanticRecordingCLISummaryPayload: Codable, Equatable, Sendable {
+    public var requestedRecordingID: String
+    public var recordingID: UUID
+    public var fixtureMode: Bool
+    public var fixture: String?
+    public var schemaVersion: SemanticRecordingSchemaVersion
+    public var createdAt: Date
+    public var captureMode: RecordingCaptureMode
+    public var captureTarget: SemanticRecordingCLICaptureTargetSummary?
+    public var videoSegmentCount: Int
+    public var frameCount: Int
+    public var timelineEventCount: Int
+    public var aiSafeEventCount: Int
+    public var visualObservationCount: Int
+    public var ocrObservationCount: Int
+    public var sourcePreviewCount: Int
+    public var runtimeSampleCount: Int
+    public var previewComparisonCount: Int
+    public var videoAvailable: Bool
+    public var keyframesAvailable: Bool
+    public var suppressionSummary: SemanticRecordingCLISuppressionSummary
+    public var artifactAvailability: SemanticRecordingCLIArtifactAvailability
+
+    public init(
+        requestedRecordingID: String,
+        bundle: SemanticRecordingBundle,
+        fixture: String? = nil
+    ) {
+        self.requestedRecordingID = requestedRecordingID
+        self.recordingID = bundle.id
+        self.fixtureMode = fixture != nil
+        self.fixture = fixture
+        self.schemaVersion = bundle.schemaVersion
+        self.createdAt = bundle.createdAt
+        self.captureMode = bundle.capturePolicy.mode
+        self.captureTarget = bundle.captureTarget.map(SemanticRecordingCLICaptureTargetSummary.init(target:))
+        self.videoSegmentCount = bundle.videoSegments.count
+        self.frameCount = bundle.frames.count
+        self.timelineEventCount = bundle.timelineEvents.count
+        self.aiSafeEventCount = bundle.aiSafeEvents.count
+        self.visualObservationCount = bundle.visualObservations.count
+        self.ocrObservationCount = bundle.visualObservations.filter { $0.kind == .ocrText }.count
+        self.sourcePreviewCount = bundle.sourcePreviews.count
+        self.runtimeSampleCount = bundle.runtimeSamples.count
+        self.previewComparisonCount = bundle.previewComparisons.count
+        self.videoAvailable = !bundle.videoSegments.isEmpty
+        self.keyframesAvailable = !bundle.frames.isEmpty
+        self.suppressionSummary = SemanticRecordingCLISuppressionSummary(records: bundle.suppressions)
+        self.artifactAvailability = SemanticRecordingCLIArtifactAvailability(bundle: bundle)
+    }
+}
+
+public struct SemanticRecordingCLIExplainKeyPoint: Codable, Equatable, Sendable, Identifiable {
+    public var id: UUID
+    public var kind: RecordingSemanticEventKind
+    public var recordingTime: TimeInterval
+    public var title: String
+    public var summary: String?
+    public var risk: String?
+    public var frameID: UUID?
+    public var timelineEventID: UUID?
+    public var evidenceFrameIDs: [UUID]
+    public var observationIDs: [UUID]
+    public var evidence: [RecordingEvidenceReference]
+
+    public init(event: RecordingSemanticEvent, bundle: SemanticRecordingBundle) {
+        self.id = event.id
+        self.kind = event.kind
+        self.recordingTime = event.recordingTime
+        self.title = event.title
+        self.summary = event.summary
+        self.risk = event.risk
+        self.frameID = event.frameID
+        self.timelineEventID = event.timelineEventID
+        self.evidenceFrameIDs = event.evidenceFrameIDs
+        self.observationIDs = event.observationIDs
+        self.evidence = Self.evidenceReferences(event: event, bundle: bundle)
+    }
+
+    private static func evidenceReferences(
+        event: RecordingSemanticEvent,
+        bundle: SemanticRecordingBundle
+    ) -> [RecordingEvidenceReference] {
+        let observations = event.observationIDs.compactMap { observationID in
+            bundle.visualObservations.first { $0.id == observationID }
+        }
+        let frameIDs = semanticRecordingCLIUniqueUUIDs(
+            event.evidenceFrameIDs + [event.frameID].compactMap { $0 } + observations.compactMap(\.frameID)
+        )
+
+        var references: [RecordingEvidenceReference] = frameIDs.compactMap { frameID in
+            guard let frame = bundle.frames.first(where: { $0.id == frameID }) else {
+                return nil
+            }
+            let frameObservations = observations.filter { $0.frameID == frameID }
+            let primaryObservation = frameObservations.first
+            let eventIDs = semanticRecordingCLIUniqueUUIDs(
+                [event.timelineEventID].compactMap { $0 } + frame.relatedEventIDs
+            )
+            return RecordingEvidenceReference(
+                frameID: frame.id,
+                eventIDs: eventIDs,
+                observationIDs: frameObservations.map(\.id),
+                artifactRef: primaryObservation?.artifactRef ?? bundle.preferredImageRef(for: frame),
+                bounds: primaryObservation?.bounds ?? frame.windowBounds,
+                summary: event.summary ?? event.title
+            )
+        }
+
+        let referencedObservationIDs = Set(references.flatMap(\.observationIDs))
+        for observation in observations where !referencedObservationIDs.contains(observation.id) {
+            references.append(
+                RecordingEvidenceReference(
+                    frameID: observation.frameID,
+                    eventIDs: [event.timelineEventID].compactMap { $0 },
+                    observationIDs: [observation.id],
+                    artifactRef: observation.artifactRef,
+                    bounds: observation.bounds,
+                    summary: event.summary ?? event.title
+                )
+            )
+        }
+
+        if references.isEmpty {
+            references.append(
+                RecordingEvidenceReference(
+                    frameID: event.frameID,
+                    eventIDs: [event.timelineEventID].compactMap { $0 },
+                    observationIDs: event.observationIDs,
+                    summary: event.summary ?? event.title
+                )
+            )
+        }
+
+        return references
+    }
+}
+
+public struct SemanticRecordingCLIExplainObservation: Codable, Equatable, Sendable, Identifiable {
+    public var id: UUID
+    public var kind: RecordingVisualObservationKind
+    public var recordingTime: TimeInterval
+    public var frameID: UUID?
+    public var sourcePreviewRefID: UUID?
+    public var text: String?
+    public var confidence: Double?
+    public var score: Double?
+    public var provider: String
+    public var labels: [String]
+    public var artifactRef: RecordingArtifactRef?
+    public var bounds: RecordingBounds?
+
+    public init(observation: RecordingVisualObservation) {
+        self.id = observation.id
+        self.kind = observation.kind
+        self.recordingTime = observation.recordingTime
+        self.frameID = observation.frameID
+        self.sourcePreviewRefID = observation.sourcePreviewRefID
+        self.text = observation.text
+        self.confidence = observation.confidence
+        self.score = observation.score ?? observation.confidence
+        self.provider = observation.provider
+        self.labels = observation.labels
+        self.artifactRef = observation.artifactRef
+        self.bounds = observation.bounds
+    }
+}
+
+public struct SemanticRecordingCLIExplainPayload: Codable, Equatable, Sendable {
+    public var requestedRecordingID: String
+    public var recordingID: UUID
+    public var fixtureMode: Bool
+    public var fixture: String?
+    public var summary: SemanticRecordingCLISummaryPayload
+    public var keyPointCount: Int
+    public var keyPoints: [SemanticRecordingCLIExplainKeyPoint]
+    public var visualEvidenceCount: Int
+    public var visualEvidence: [SemanticRecordingCLIExplainObservation]
+    public var evidenceNotes: [String]
+    public var mutationPolicy: String
+
+    public init(
+        requestedRecordingID: String,
+        bundle: SemanticRecordingBundle,
+        fixture: String? = nil
+    ) {
+        let keyPoints = bundle.semanticEvents
+            .sorted { left, right in
+                if left.recordingTime != right.recordingTime {
+                    return left.recordingTime < right.recordingTime
+                }
+                return left.title < right.title
+            }
+            .map { event in
+                SemanticRecordingCLIExplainKeyPoint(event: event, bundle: bundle)
+            }
+        let visualEvidence = bundle.visualObservations
+            .sorted { left, right in
+                if left.recordingTime != right.recordingTime {
+                    return left.recordingTime < right.recordingTime
+                }
+                return left.kind.rawValue < right.kind.rawValue
+            }
+            .map(SemanticRecordingCLIExplainObservation.init(observation:))
+
+        self.requestedRecordingID = requestedRecordingID
+        self.recordingID = bundle.id
+        self.fixtureMode = fixture != nil
+        self.fixture = fixture
+        self.summary = SemanticRecordingCLISummaryPayload(
+            requestedRecordingID: requestedRecordingID,
+            bundle: bundle,
+            fixture: fixture
+        )
+        self.keyPointCount = keyPoints.count
+        self.keyPoints = keyPoints
+        self.visualEvidenceCount = visualEvidence.count
+        self.visualEvidence = visualEvidence
+        self.evidenceNotes = Self.makeEvidenceNotes(bundle: bundle)
+        self.mutationPolicy = "Explain output is read-only evidence. Workflow changes still require Review, Draft Preview, validate and import."
+    }
+
+    private static func makeEvidenceNotes(bundle: SemanticRecordingBundle) -> [String] {
+        var notes: [String] = []
+        if !bundle.schemaVersion.isSupportedByCurrentApp {
+            notes.append("Bundle schema is not supported by the current app version.")
+        }
+        if bundle.frames.isEmpty {
+            notes.append("No keyframes are available; frame-level evidence cannot be reviewed.")
+        }
+        if bundle.videoSegments.isEmpty {
+            notes.append("No video segments are available; use keyframes and timeline events for review.")
+        }
+        if bundle.semanticEvents.isEmpty {
+            notes.append("No semantic events are available; use raw frames/events/search before drafting.")
+        }
+        if bundle.visualObservations.isEmpty {
+            notes.append("No visual observations are available; OCR/visual search and suggestions will be limited.")
+        }
+        if !bundle.suppressions.isEmpty {
+            notes.append("Suppressed evidence is present; use redacted refs or Macro Review before drafting or sharing frames.")
+        }
+        if !bundle.redactedFrames.isEmpty || !bundle.redactedVideos.isEmpty {
+            notes.append("Redacted artifact refs are available and should be preferred over source frame/video refs.")
+        }
+        return notes
+    }
+}
+
+public struct SemanticRecordingCLIFramesPayload: Codable, Equatable, Sendable {
+    public var requestedRecordingID: String
+    public var recordingID: UUID
+    public var fixtureMode: Bool
+    public var fixture: String?
+    public var count: Int
+    public var frames: [SemanticRecordingCLIFrameSummary]
+
+    public init(
+        requestedRecordingID: String,
+        bundle: SemanticRecordingBundle,
+        fixture: String? = nil,
+        frames selectedFrames: [RecordingFrameReference]? = nil
+    ) {
+        let frames = (selectedFrames ?? bundle.frames)
+            .sorted { $0.recordingTime < $1.recordingTime }
+        self.requestedRecordingID = requestedRecordingID
+        self.recordingID = bundle.id
+        self.fixtureMode = fixture != nil
+        self.fixture = fixture
+        self.count = frames.count
+        self.frames = frames.map { frame in
+            SemanticRecordingCLIFrameSummary(
+                frame: frame,
+                redactedFrame: bundle.redactedFrame(frameID: frame.id),
+                observationIDs: bundle.observations(frameID: frame.id).map(\.id)
+            )
+        }
+    }
+}
+
+public struct SemanticRecordingCLIEventsNearQuery: Codable, Equatable, Sendable {
+    public var time: TimeInterval
+    public var window: TimeInterval
+
+    public init(time: TimeInterval, window: TimeInterval) {
+        self.time = max(0, time)
+        self.window = max(0, window)
+    }
+}
+
+public struct SemanticRecordingCLIEventsNearPayload: Codable, Equatable, Sendable {
+    public var requestedRecordingID: String
+    public var recordingID: UUID
+    public var fixtureMode: Bool
+    public var fixture: String?
+    public var query: SemanticRecordingCLIEventsNearQuery
+    public var eventCount: Int
+    public var frameCount: Int
+    public var events: [SemanticRecordingCLIEventSummary]
+    public var frames: [SemanticRecordingCLIFrameSummary]
+
+    public init(
+        requestedRecordingID: String,
+        bundle: SemanticRecordingBundle,
+        fixture: String? = nil,
+        time: TimeInterval,
+        window: TimeInterval
+    ) {
+        let query = SemanticRecordingCLIEventsNearQuery(time: time, window: window)
+        let matchingEvents = bundle.timelineEvents
+            .filter { abs($0.recordingTime - query.time) <= query.window }
+            .sorted { $0.recordingTime < $1.recordingTime }
+        let eventIDs = Set(matchingEvents.map(\.id))
+        let eventFrameIDs = Set(matchingEvents.compactMap(\.frameID))
+        let matchingFrames = bundle.frames
+            .filter { frame in
+                if abs(frame.recordingTime - query.time) <= query.window {
+                    return true
+                }
+                if eventFrameIDs.contains(frame.id) {
+                    return true
+                }
+                return frame.relatedEventIDs.contains { eventIDs.contains($0) }
+            }
+            .sorted { $0.recordingTime < $1.recordingTime }
+
+        self.requestedRecordingID = requestedRecordingID
+        self.recordingID = bundle.id
+        self.fixtureMode = fixture != nil
+        self.fixture = fixture
+        self.query = query
+        self.eventCount = matchingEvents.count
+        self.frameCount = matchingFrames.count
+        self.events = matchingEvents.map { event in
+            let relatedFrameIDs = semanticRecordingCLIUniqueUUIDs(
+                [event.frameID].compactMap { $0 } +
+                    bundle.frames(relatedToEventID: event.id).map(\.id)
+            )
+            return SemanticRecordingCLIEventSummary(
+                event: event,
+                relatedFrameIDs: relatedFrameIDs
+            )
+        }
+        self.frames = matchingFrames.map { frame in
+            SemanticRecordingCLIFrameSummary(
+                frame: frame,
+                redactedFrame: bundle.redactedFrame(frameID: frame.id),
+                observationIDs: bundle.observations(frameID: frame.id).map(\.id)
+            )
+        }
+    }
+}
+
+public struct SemanticRecordingCLIOCRSearchQuery: Codable, Equatable, Sendable {
+    public var text: String
+    public var matchMode: TextMatchMode
+
+    public init(text: String, matchMode: TextMatchMode = .contains) {
+        self.text = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        self.matchMode = matchMode
+    }
+}
+
+public struct SemanticRecordingCLIOCRSearchResult: Codable, Equatable, Sendable, Identifiable {
+    public var id: UUID
+    public var observationID: UUID
+    public var queryResultIDs: [UUID]
+    public var recordingTime: TimeInterval
+    public var frameID: UUID?
+    public var sourcePreviewRefID: UUID?
+    public var text: String
+    public var confidence: Double?
+    public var score: Double?
+    public var provider: String
+    public var providerVersion: String?
+    public var labels: [String]
+    public var artifactRef: RecordingArtifactRef?
+    public var bounds: RecordingBounds?
+    public var evidence: [RecordingEvidenceReference]
+
+    public init(
+        observation: RecordingVisualObservation,
+        queryResults: [RecordingQueryResult],
+        bundle: SemanticRecordingBundle
+    ) {
+        let matchingQueryResults = queryResults
+            .filter { result in
+                result.kind == .ocrText &&
+                    result.evidence.contains { evidence in
+                        evidence.observationIDs.contains(observation.id)
+                    }
+            }
+            .sorted { $0.title < $1.title }
+        let evidence = matchingQueryResults.flatMap(\.evidence)
+
+        self.id = observation.id
+        self.observationID = observation.id
+        self.queryResultIDs = matchingQueryResults.map(\.id)
+        self.recordingTime = observation.recordingTime
+        self.frameID = observation.frameID
+        self.sourcePreviewRefID = observation.sourcePreviewRefID
+        self.text = observation.text ?? ""
+        self.confidence = observation.confidence
+        self.score = observation.score ?? observation.confidence ?? matchingQueryResults.first?.score
+        self.provider = observation.provider
+        self.providerVersion = observation.providerVersion
+        self.labels = observation.labels
+        self.artifactRef = observation.artifactRef
+        self.bounds = observation.bounds
+        self.evidence = evidence.isEmpty
+            ? Self.evidenceFallback(observation: observation, bundle: bundle)
+            : evidence
+    }
+
+    private static func evidenceFallback(
+        observation: RecordingVisualObservation,
+        bundle: SemanticRecordingBundle
+    ) -> [RecordingEvidenceReference] {
+        let eventIDs = observation.frameID.flatMap { frameID in
+            bundle.frames.first { $0.id == frameID }?.relatedEventIDs
+        } ?? []
+        return [
+            RecordingEvidenceReference(
+                frameID: observation.frameID,
+                eventIDs: eventIDs,
+                observationIDs: [observation.id],
+                artifactRef: observation.artifactRef,
+                bounds: observation.bounds,
+                summary: "OCR observation matched the search text."
+            )
+        ]
+    }
+}
+
+public struct SemanticRecordingCLIOCRSearchPayload: Codable, Equatable, Sendable {
+    public var requestedRecordingID: String
+    public var recordingID: UUID
+    public var fixtureMode: Bool
+    public var fixture: String?
+    public var availability: SemanticRecordingQueryAvailability
+    public var query: SemanticRecordingCLIOCRSearchQuery
+    public var unavailableReason: String?
+    public var count: Int
+    public var results: [SemanticRecordingCLIOCRSearchResult]
+
+    public init(
+        requestedRecordingID: String,
+        bundle: SemanticRecordingBundle,
+        fixture: String? = nil,
+        text: String,
+        matchMode: TextMatchMode = .contains,
+        queryResults: [RecordingQueryResult] = []
+    ) {
+        let query = SemanticRecordingCLIOCRSearchQuery(text: text, matchMode: matchMode)
+        let searchQuery = SemanticRecordingOCRSearchQuery(
+            text: query.text,
+            matchMode: query.matchMode
+        )
+        let searchResult: SemanticRecordingOCRSearchResult
+        if let fixture {
+            searchResult = SemanticRecordingQueryEngine
+                .deterministicOCRSearch(
+                    for: bundle,
+                    fixture: fixture,
+                    query: searchQuery
+                )
+        } else {
+            searchResult = SemanticRecordingQueryEngine.persistedOCRSearch(
+                for: bundle,
+                query: searchQuery,
+                queryResults: queryResults
+            )
+        }
+        let results = searchResult.matches.map { match in
+            SemanticRecordingCLIOCRSearchResult(
+                observation: match.observation,
+                queryResults: match.queryResults,
+                bundle: bundle
+            )
+        }
+
+        self.requestedRecordingID = requestedRecordingID
+        self.recordingID = bundle.id
+        self.fixtureMode = fixture != nil
+        self.fixture = fixture
+        self.availability = searchResult.availability
+        self.query = query
+        self.unavailableReason = searchResult.unavailableReason
+        self.count = results.count
+        self.results = results
+    }
+}
+
+public struct SemanticRecordingCLIVisualSearchQuery: Codable, Equatable, Sendable {
+    public var text: String?
+    public var matchMode: TextMatchMode
+    public var kind: RecordingVisualObservationKind?
+    public var label: String?
+
+    public init(
+        text: String? = nil,
+        matchMode: TextMatchMode = .contains,
+        kind: RecordingVisualObservationKind? = nil,
+        label: String? = nil
+    ) {
+        let trimmedText = text?.trimmingCharacters(in: .whitespacesAndNewlines)
+        self.text = trimmedText?.isEmpty == true ? nil : trimmedText
+        self.matchMode = matchMode
+        self.kind = kind
+        let trimmedLabel = label?.trimmingCharacters(in: .whitespacesAndNewlines)
+        self.label = trimmedLabel?.isEmpty == true ? nil : trimmedLabel
+    }
+}
+
+public struct SemanticRecordingCLIVisualSearchResult: Codable, Equatable, Sendable, Identifiable {
+    public var id: UUID
+    public var observationID: UUID
+    public var kind: RecordingVisualObservationKind
+    public var recordingTime: TimeInterval
+    public var frameID: UUID?
+    public var sourcePreviewRefID: UUID?
+    public var text: String?
+    public var confidence: Double?
+    public var score: Double?
+    public var provider: String
+    public var providerVersion: String?
+    public var labels: [String]
+    public var artifactRef: RecordingArtifactRef?
+    public var bounds: RecordingBounds?
+    public var evidence: [RecordingEvidenceReference]
+
+    public init(
+        match: SemanticRecordingVisualSearchMatch,
+        bundle: SemanticRecordingBundle
+    ) {
+        let observation = match.observation
+        self.id = observation.id
+        self.observationID = observation.id
+        self.kind = observation.kind
+        self.recordingTime = observation.recordingTime
+        self.frameID = observation.frameID
+        self.sourcePreviewRefID = observation.sourcePreviewRefID
+        self.text = observation.text
+        self.confidence = observation.confidence
+        self.score = observation.score ?? observation.confidence
+        self.provider = observation.provider
+        self.providerVersion = observation.providerVersion
+        self.labels = observation.labels
+        self.artifactRef = observation.artifactRef
+        self.bounds = observation.bounds
+        self.evidence = Self.evidenceFallback(observation: observation, bundle: bundle)
+    }
+
+    private static func evidenceFallback(
+        observation: RecordingVisualObservation,
+        bundle: SemanticRecordingBundle
+    ) -> [RecordingEvidenceReference] {
+        let eventIDs = observation.frameID.flatMap { frameID in
+            bundle.frames.first { $0.id == frameID }?.relatedEventIDs
+        } ?? []
+        return [
+            RecordingEvidenceReference(
+                frameID: observation.frameID,
+                eventIDs: eventIDs,
+                observationIDs: [observation.id],
+                artifactRef: observation.artifactRef,
+                bounds: observation.bounds,
+                summary: "Visual observation matched the search filters."
+            )
+        ]
+    }
+}
+
+public struct SemanticRecordingCLIVisualSearchPayload: Codable, Equatable, Sendable {
+    public var requestedRecordingID: String
+    public var recordingID: UUID
+    public var fixtureMode: Bool
+    public var fixture: String?
+    public var query: SemanticRecordingCLIVisualSearchQuery
+    public var count: Int
+    public var results: [SemanticRecordingCLIVisualSearchResult]
+
+    public init(
+        requestedRecordingID: String,
+        bundle: SemanticRecordingBundle,
+        fixture: String? = nil,
+        text: String? = nil,
+        matchMode: TextMatchMode = .contains,
+        kind: RecordingVisualObservationKind? = nil,
+        label: String? = nil
+    ) {
+        let query = SemanticRecordingCLIVisualSearchQuery(
+            text: text,
+            matchMode: matchMode,
+            kind: kind,
+            label: label
+        )
+        let results = SemanticRecordingQueryEngine.visualSearch(
+            bundle: bundle,
+            query: SemanticRecordingVisualSearchQuery(
+                text: query.text,
+                matchMode: query.matchMode,
+                kind: query.kind,
+                label: query.label
+            )
+        )
+        .map { match in
+            SemanticRecordingCLIVisualSearchResult(
+                match: match,
+                bundle: bundle
+            )
+        }
+
+        self.requestedRecordingID = requestedRecordingID
+        self.recordingID = bundle.id
+        self.fixtureMode = fixture != nil
+        self.fixture = fixture
+        self.query = query
+        self.count = results.count
+        self.results = results
+    }
+}
+
+public enum SemanticRecordingCLIAssetExtractionKind: String, Codable, Equatable, Sendable {
+    case imageTemplate
+    case image
+    case baseline
+
+    public var materializedKind: SemanticRecordingReviewMaterializedAssetKind {
+        switch self {
+        case .imageTemplate, .image:
+            return .image
+        case .baseline:
+            return .baseline
+        }
+    }
+}
+
+public struct SemanticRecordingCLIAssetExtractionQuery: Codable, Equatable, Sendable {
+    public var frameID: UUID
+    public var region: RecordingBounds
+    public var kind: SemanticRecordingCLIAssetExtractionKind
+    public var name: String
+    public var assetKey: String
+
+    public init(
+        frameID: UUID,
+        region: RecordingBounds,
+        kind: SemanticRecordingCLIAssetExtractionKind,
+        name: String,
+        assetKey: String
+    ) {
+        self.frameID = frameID
+        self.region = region
+        self.kind = kind
+        self.name = name
+        self.assetKey = assetKey
+    }
+}
+
+public struct SemanticRecordingCLIAssetExtractionPayload: Codable, Equatable, Sendable {
+    public var requestedRecordingID: String
+    public var recordingID: UUID
+    public var fixtureMode: Bool
+    public var fixture: String?
+    public var query: SemanticRecordingCLIAssetExtractionQuery
+    public var sourceArtifactRef: RecordingArtifactRef
+    public var outputRoot: String
+    public var materializedAsset: SemanticRecordingReviewMaterializedAsset
+    public var visualAsset: AutomationWorkflowDraftVisualImageAsset
+    public var visualAssets: AutomationWorkflowDraftVisualAssets
+    public var evidence: [RecordingEvidenceReference]
+
+    public init(
+        requestedRecordingID: String,
+        recordingID: UUID,
+        fixture: String? = nil,
+        query: SemanticRecordingCLIAssetExtractionQuery,
+        sourceArtifactRef: RecordingArtifactRef,
+        outputRoot: String,
+        materializedAsset: SemanticRecordingReviewMaterializedAsset,
+        visualAsset: AutomationWorkflowDraftVisualImageAsset,
+        evidence: [RecordingEvidenceReference]
+    ) {
+        self.requestedRecordingID = requestedRecordingID
+        self.recordingID = recordingID
+        self.fixtureMode = fixture != nil
+        self.fixture = fixture
+        self.query = query
+        self.sourceArtifactRef = sourceArtifactRef
+        self.outputRoot = outputRoot
+        self.materializedAsset = materializedAsset
+        self.visualAsset = visualAsset
+        switch query.kind.materializedKind {
+        case .image:
+            self.visualAssets = AutomationWorkflowDraftVisualAssets(images: [visualAsset])
+        case .baseline:
+            self.visualAssets = AutomationWorkflowDraftVisualAssets(baselines: [visualAsset])
+        }
+        self.evidence = evidence
+    }
+}
+
+public struct AutomationWorkflowDraftFromRecordingPayload: Codable, Equatable, Sendable {
+    public var requestedRecordingID: String
+    public var recordingID: UUID
+    public var fixtureMode: Bool
+    public var fixture: String?
+    public var sourceOption: String?
+    public var wrotePath: String?
+    public var result: SemanticRecordingWorkflowDraftBuildResult
+
+    public init(
+        requestedRecordingID: String,
+        recordingID: UUID,
+        fixture: String? = nil,
+        sourceOption: String? = nil,
+        wrotePath: String? = nil,
+        result: SemanticRecordingWorkflowDraftBuildResult
+    ) {
+        self.requestedRecordingID = requestedRecordingID
+        self.recordingID = recordingID
+        self.fixtureMode = fixture != nil
+        self.fixture = fixture
+        self.sourceOption = sourceOption
+        self.wrotePath = wrotePath
+        self.result = result
+    }
+}
+
+public enum SemanticRecordingCLISuggestionCategory: String, Codable, Equatable, Sendable {
+    case waits
+    case locators
+    case conditions
+    case cleanup
+    case all
+
+    public var suggestionKinds: [RecordingSuggestionKind] {
+        switch self {
+        case .waits:
+            return [.waitCleanup, .conditionCandidate]
+        case .locators:
+            return [.locatorReplacement, .fragileClick, .visualAssetExtraction]
+        case .conditions:
+            return [.conditionCandidate]
+        case .cleanup:
+            return [.waitCleanup, .locatorReplacement, .conditionCandidate, .fragileClick]
+        case .all:
+            return [
+                .waitCleanup,
+                .locatorReplacement,
+                .conditionCandidate,
+                .visualAssetExtraction,
+                .fragileClick,
+                .draftGeneration
+            ]
+        }
+    }
+}
+
+public struct SemanticRecordingCLISuggestionSummary: Codable, Equatable, Sendable, Identifiable {
+    public var id: UUID
+    public var kind: RecordingSuggestionKind
+    public var title: String
+    public var summary: String
+    public var confidence: Double
+    public var risk: String?
+    public var fallback: String
+    public var mutationPolicy: String
+    public var evidence: [RecordingEvidenceReference]
+    public var reviewActions: [SemanticRecordingReviewActionSemantics]
+    public var reviewActionPresentations: [SemanticRecordingReviewActionPresentation]
+
+    private static let missingEvidenceConfidenceCap = 0.49
+
+    public init(suggestion: RecordingSuggestion) {
+        self.id = suggestion.id
+        self.kind = suggestion.kind
+        self.title = suggestion.title
+        self.summary = suggestion.summary
+        self.confidence = suggestion.evidence.isEmpty
+            ? min(suggestion.confidence, Self.missingEvidenceConfidenceCap)
+            : suggestion.confidence
+        self.risk = Self.risk(suggestion.risk, evidence: suggestion.evidence)
+        self.fallback = Self.fallback(for: suggestion.kind)
+        self.mutationPolicy = "Review required; no workflow or macro mutation until accepted."
+        self.evidence = suggestion.evidence
+        let reviewActions: [SemanticRecordingReviewActionSemantics] = [
+            .acceptSuggestion(suggestion),
+            .rejectSuggestion(suggestion),
+            .clearDecision(suggestion)
+        ]
+        self.reviewActions = reviewActions
+        self.reviewActionPresentations = reviewActions.map(SemanticRecordingReviewActionPresentation.init)
+    }
+
+    private static func risk(
+        _ risk: String?,
+        evidence: [RecordingEvidenceReference]
+    ) -> String? {
+        guard evidence.isEmpty else {
+            return risk
+        }
+        let missingEvidenceRisk = "Missing recording evidence refs; keep this suggestion low confidence until cited evidence is available."
+        guard let risk, !risk.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            return missingEvidenceRisk
+        }
+        return "\(risk) \(missingEvidenceRisk)"
+    }
+
+    private static func fallback(for kind: RecordingSuggestionKind) -> String {
+        switch kind {
+        case .waitCleanup:
+            return "Keep the original recorded wait until the user accepts a reviewed replacement."
+        case .locatorReplacement:
+            return "Keep the original playable click or keystroke if the locator is not accepted."
+        case .conditionCandidate:
+            return "Keep the original playable macro wait until the user accepts a reviewed condition."
+        case .visualAssetExtraction:
+            return "Keep existing recording evidence refs until an asset is explicitly extracted."
+        case .fragileClick:
+            return "Keep coordinate playback as the fallback path while a better locator is reviewed."
+        case .draftGeneration:
+            return "Keep the generated workflow as a draft only; validate and import explicitly."
+        }
+    }
+}
+
+public struct SemanticRecordingCLISuggestionsPayload: Codable, Equatable, Sendable {
+    public var requestedRecordingID: String
+    public var recordingID: UUID
+    public var fixtureMode: Bool
+    public var fixture: String?
+    public var category: SemanticRecordingCLISuggestionCategory
+    public var availability: SemanticRecordingSuggestionAvailability
+    public var query: SemanticRecordingSuggestionQuery
+    public var unavailableReason: String?
+    public var count: Int
+    public var suggestions: [SemanticRecordingCLISuggestionSummary]
+
+    public init(
+        requestedRecordingID: String,
+        bundle: SemanticRecordingBundle,
+        fixture: String? = nil,
+        category: SemanticRecordingCLISuggestionCategory,
+        suggestions: [RecordingSuggestion]
+    ) {
+        let availability: SemanticRecordingSuggestionAvailability = fixture == nil
+            ? .unavailable
+            : .deterministicFixture
+        self.init(
+            requestedRecordingID: requestedRecordingID,
+            bundle: bundle,
+            fixture: fixture,
+            category: category,
+            suggestionResult: SemanticRecordingSuggestionResult(
+                availability: availability,
+                query: .kinds(category.suggestionKinds),
+                suggestions: suggestions,
+                unavailableReason: availability == .unavailable
+                    ? "Stored bundle suggestion synthesis is not implemented yet; this payload only includes caller-provided suggestions."
+                    : nil
+            )
+        )
+    }
+
+    public init(
+        requestedRecordingID: String,
+        bundle: SemanticRecordingBundle,
+        fixture: String? = nil,
+        category: SemanticRecordingCLISuggestionCategory,
+        suggestionResult: SemanticRecordingSuggestionResult
+    ) {
+        let selectedSuggestions = SemanticRecordingQueryEngine
+            .filterAndSort(
+                suggestions: suggestionResult.suggestions,
+                allowedKinds: suggestionResult.query.allowedKinds
+            )
+            .map(SemanticRecordingCLISuggestionSummary.init(suggestion:))
+
+        self.requestedRecordingID = requestedRecordingID
+        self.recordingID = bundle.id
+        self.fixtureMode = fixture != nil
+        self.fixture = fixture
+        self.category = category
+        self.availability = suggestionResult.availability
+        self.query = suggestionResult.query
+        self.unavailableReason = suggestionResult.unavailableReason
+        self.count = selectedSuggestions.count
+        self.suggestions = selectedSuggestions
+    }
+}
+
 public extension AutomationCLIResultEnvelope {
     static func failure(
         command: String,
@@ -102,6 +1176,492 @@ public extension AutomationCLIResultEnvelope {
             ]
         )
     }
+}
+
+public extension AutomationCLIResultEnvelope where Value == SemanticRecordingCLIListPayload {
+    static func semanticRecordingList(
+        command: String,
+        recordings: [SemanticRecordingCLICatalogEntry],
+        fixture: String? = nil,
+        recordingsRoot: String? = nil,
+        sourceOption: String? = nil
+    ) -> AutomationCLIResultEnvelope<SemanticRecordingCLIListPayload> {
+        let sourceArgument = semanticRecordingCLISourceOption(
+            fixture: fixture,
+            sourceOption: sourceOption
+        )
+        let nextActions = recordings.prefix(1).map { recording in
+            AutomationCLINextAction(
+                command: "SparkleRecorder recording show \(recording.recordingID.uuidString)\(sourceArgument) --json",
+                reason: "Open the latest listed semantic recording before narrowing frames, OCR or suggestions."
+            )
+        }
+        return AutomationCLIResultEnvelope<SemanticRecordingCLIListPayload>(
+            ok: true,
+            command: command,
+            data: SemanticRecordingCLIListPayload(
+                recordings: recordings,
+                fixture: fixture,
+                recordingsRoot: recordingsRoot
+            ),
+            warnings: semanticRecordingCLIFixtureWarnings(fixture),
+            nextActions: nextActions
+        )
+    }
+}
+
+public extension AutomationCLIResultEnvelope where Value == SemanticRecordingCLISummaryPayload {
+    static func semanticRecordingShow(
+        command: String,
+        requestedRecordingID: String,
+        bundle: SemanticRecordingBundle,
+        fixture: String? = nil,
+        sourceOption: String? = nil
+    ) -> AutomationCLIResultEnvelope<SemanticRecordingCLISummaryPayload> {
+        let sourceArgument = semanticRecordingCLISourceOption(
+            fixture: fixture,
+            sourceOption: sourceOption
+        )
+        return AutomationCLIResultEnvelope<SemanticRecordingCLISummaryPayload>(
+            ok: true,
+            command: command,
+            data: SemanticRecordingCLISummaryPayload(
+                requestedRecordingID: requestedRecordingID,
+                bundle: bundle,
+                fixture: fixture
+            ),
+            warnings: semanticRecordingCLIFixtureWarnings(fixture),
+            nextActions: [
+                AutomationCLINextAction(
+                    command: "SparkleRecorder recording frames \(requestedRecordingID)\(sourceArgument) --json",
+                    reason: "List event-aligned keyframes and safe artifact refs without reading image bytes."
+                ),
+                AutomationCLINextAction(
+                    command: "SparkleRecorder recording events-near \(requestedRecordingID) --time <seconds> --window 1.0\(sourceArgument) --json",
+                    reason: "Ask for nearby events and frames before drafting a condition or locator suggestion."
+                )
+            ]
+        )
+    }
+}
+
+public extension AutomationCLIResultEnvelope where Value == SemanticRecordingCLIExplainPayload {
+    static func semanticRecordingExplain(
+        command: String,
+        requestedRecordingID: String,
+        bundle: SemanticRecordingBundle,
+        fixture: String? = nil,
+        sourceOption: String? = nil
+    ) -> AutomationCLIResultEnvelope<SemanticRecordingCLIExplainPayload> {
+        let sourceArgument = semanticRecordingCLISourceOption(
+            fixture: fixture,
+            sourceOption: sourceOption
+        )
+        return AutomationCLIResultEnvelope<SemanticRecordingCLIExplainPayload>(
+            ok: true,
+            command: command,
+            data: SemanticRecordingCLIExplainPayload(
+                requestedRecordingID: requestedRecordingID,
+                bundle: bundle,
+                fixture: fixture
+            ),
+            warnings: semanticRecordingCLIFixtureWarnings(fixture),
+            nextActions: [
+                AutomationCLINextAction(
+                    command: "SparkleRecorder recording frames \(requestedRecordingID)\(sourceArgument) --json",
+                    reason: "Inspect cited frame refs before accepting any generated edits."
+                ),
+                AutomationCLINextAction(
+                    command: "SparkleRecorder recording ocr search \(requestedRecordingID) --text <text>\(sourceArgument) --json",
+                    reason: "Narrow explanation evidence to local OCR observations without invoking Vision."
+                ),
+                AutomationCLINextAction(
+                    command: "SparkleRecorder workflow draft from-recording \(requestedRecordingID)\(sourceArgument) --json",
+                    reason: "Generate a review-only workflow draft after checking the cited evidence."
+                )
+            ]
+        )
+    }
+}
+
+public extension AutomationCLIResultEnvelope where Value == SemanticRecordingCLIFramesPayload {
+    static func semanticRecordingFrames(
+        command: String,
+        requestedRecordingID: String,
+        bundle: SemanticRecordingBundle,
+        fixture: String? = nil,
+        sourceOption: String? = nil
+    ) -> AutomationCLIResultEnvelope<SemanticRecordingCLIFramesPayload> {
+        let sourceArgument = semanticRecordingCLISourceOption(
+            fixture: fixture,
+            sourceOption: sourceOption
+        )
+        return AutomationCLIResultEnvelope<SemanticRecordingCLIFramesPayload>(
+            ok: true,
+            command: command,
+            data: SemanticRecordingCLIFramesPayload(
+                requestedRecordingID: requestedRecordingID,
+                bundle: bundle,
+                fixture: fixture
+            ),
+            warnings: semanticRecordingCLIFixtureWarnings(fixture),
+            nextActions: [
+                AutomationCLINextAction(
+                    command: "SparkleRecorder recording events-near \(requestedRecordingID) --time <seconds> --window 1.0\(sourceArgument) --json",
+                    reason: "Narrow the frame list around a click, wait or visual observation before making a reviewable edit."
+                )
+            ]
+        )
+    }
+
+    static func semanticRecordingFrameShow(
+        command: String,
+        requestedRecordingID: String,
+        bundle: SemanticRecordingBundle,
+        frame: RecordingFrameReference,
+        fixture: String? = nil,
+        sourceOption: String? = nil
+    ) -> AutomationCLIResultEnvelope<SemanticRecordingCLIFramesPayload> {
+        let sourceArgument = semanticRecordingCLISourceOption(
+            fixture: fixture,
+            sourceOption: sourceOption
+        )
+        return AutomationCLIResultEnvelope<SemanticRecordingCLIFramesPayload>(
+            ok: true,
+            command: command,
+            data: SemanticRecordingCLIFramesPayload(
+                requestedRecordingID: requestedRecordingID,
+                bundle: bundle,
+                fixture: fixture,
+                frames: [frame]
+            ),
+            warnings: semanticRecordingCLIFixtureWarnings(fixture),
+            nextActions: [
+                AutomationCLINextAction(
+                    command: "SparkleRecorder recording events-near \(requestedRecordingID) --time \(frame.recordingTime) --window 1.0\(sourceArgument) --json",
+                    reason: "Inspect nearby timeline events before turning this frame into a reviewable draft edit."
+                )
+            ]
+        )
+    }
+}
+
+public extension AutomationCLIResultEnvelope where Value == SemanticRecordingCLIEventsNearPayload {
+    static func semanticRecordingEventsNear(
+        command: String,
+        requestedRecordingID: String,
+        bundle: SemanticRecordingBundle,
+        fixture: String? = nil,
+        sourceOption: String? = nil,
+        time: TimeInterval,
+        window: TimeInterval
+    ) -> AutomationCLIResultEnvelope<SemanticRecordingCLIEventsNearPayload> {
+        return AutomationCLIResultEnvelope<SemanticRecordingCLIEventsNearPayload>(
+            ok: true,
+            command: command,
+            data: SemanticRecordingCLIEventsNearPayload(
+                requestedRecordingID: requestedRecordingID,
+                bundle: bundle,
+                fixture: fixture,
+                time: time,
+                window: window
+            ),
+            warnings: semanticRecordingCLIFixtureWarnings(fixture),
+            nextActions: [
+                AutomationCLINextAction(
+                    command: "Open the cited frame IDs in Macro Review before accepting AI-generated edits.",
+                    reason: "S4 fixture commands expose evidence refs; user-reviewed mutation still belongs to Review or Draft Preview."
+                )
+            ]
+        )
+    }
+}
+
+public extension AutomationCLIResultEnvelope where Value == SemanticRecordingCLIOCRSearchPayload {
+    static func semanticRecordingOCRSearch(
+        command: String,
+        requestedRecordingID: String,
+        bundle: SemanticRecordingBundle,
+        fixture: String? = nil,
+        sourceOption: String? = nil,
+        text: String,
+        matchMode: TextMatchMode = .contains,
+        queryResults: [RecordingQueryResult] = []
+    ) -> AutomationCLIResultEnvelope<SemanticRecordingCLIOCRSearchPayload> {
+        let sourceArgument = semanticRecordingCLISourceOption(
+            fixture: fixture,
+            sourceOption: sourceOption
+        )
+        return AutomationCLIResultEnvelope<SemanticRecordingCLIOCRSearchPayload>(
+            ok: true,
+            command: command,
+            data: SemanticRecordingCLIOCRSearchPayload(
+                requestedRecordingID: requestedRecordingID,
+                bundle: bundle,
+                fixture: fixture,
+                text: text,
+                matchMode: matchMode,
+                queryResults: queryResults
+            ),
+            warnings: semanticRecordingCLIFixtureWarnings(fixture),
+            nextActions: [
+                AutomationCLINextAction(
+                    command: "SparkleRecorder recording events-near \(requestedRecordingID) --time <matched-time> --window 1.0\(sourceArgument) --json",
+                    reason: "Inspect timeline context around a matched OCR observation before creating a condition."
+                ),
+                AutomationCLINextAction(
+                    command: "SparkleRecorder recording suggest conditions \(requestedRecordingID)\(sourceArgument) --json",
+                    reason: "Ask for review-only condition suggestions backed by the matched OCR evidence."
+                )
+            ]
+        )
+    }
+}
+
+public extension AutomationCLIResultEnvelope where Value == SemanticRecordingCLIVisualSearchPayload {
+    static func semanticRecordingVisualSearch(
+        command: String,
+        requestedRecordingID: String,
+        bundle: SemanticRecordingBundle,
+        fixture: String? = nil,
+        sourceOption: String? = nil,
+        text: String? = nil,
+        matchMode: TextMatchMode = .contains,
+        kind: RecordingVisualObservationKind? = nil,
+        label: String? = nil
+    ) -> AutomationCLIResultEnvelope<SemanticRecordingCLIVisualSearchPayload> {
+        let sourceArgument = semanticRecordingCLISourceOption(
+            fixture: fixture,
+            sourceOption: sourceOption
+        )
+        return AutomationCLIResultEnvelope<SemanticRecordingCLIVisualSearchPayload>(
+            ok: true,
+            command: command,
+            data: SemanticRecordingCLIVisualSearchPayload(
+                requestedRecordingID: requestedRecordingID,
+                bundle: bundle,
+                fixture: fixture,
+                text: text,
+                matchMode: matchMode,
+                kind: kind,
+                label: label
+            ),
+            warnings: semanticRecordingCLIFixtureWarnings(fixture),
+            nextActions: [
+                AutomationCLINextAction(
+                    command: "SparkleRecorder recording events-near \(requestedRecordingID) --time <matched-time> --window 1.0\(sourceArgument) --json",
+                    reason: "Inspect timeline context before turning a visual observation into a reviewed condition or asset."
+                ),
+                AutomationCLINextAction(
+                    command: "Open the cited frame IDs in Macro Review before extracting assets or accepting locators.",
+                    reason: "Visual search returns evidence proposals only; user-reviewed asset extraction remains a separate step."
+                )
+            ]
+        )
+    }
+}
+
+public extension AutomationCLIResultEnvelope where Value == SemanticRecordingCLIAssetExtractionPayload {
+    static func semanticRecordingAssetExtraction(
+        command: String,
+        payload: SemanticRecordingCLIAssetExtractionPayload
+    ) -> AutomationCLIResultEnvelope<SemanticRecordingCLIAssetExtractionPayload> {
+        AutomationCLIResultEnvelope<SemanticRecordingCLIAssetExtractionPayload>(
+            ok: true,
+            command: command,
+            data: payload,
+            warnings: semanticRecordingCLIFixtureWarnings(payload.fixture),
+            nextActions: [
+                AutomationCLINextAction(
+                    command: "Add visualAssets.\(payload.query.kind.materializedKind == .baseline ? "baselines" : "images") to a sparkle.workflow.draft.v1 document before import.",
+                    reason: "Asset extraction materializes a package-local visual asset; workflow mutation still goes through Draft Preview/import."
+                ),
+                AutomationCLINextAction(
+                    command: "Open the cited frame ID in Macro Review before accepting generated draft edits.",
+                    reason: "The extracted asset is evidence-backed but still needs user review before changing automation behavior."
+                )
+            ]
+        )
+    }
+}
+
+public extension AutomationCLIResultEnvelope where Value == AutomationWorkflowDraftFromRecordingPayload {
+    static func workflowDraftFromRecording(
+        command: String,
+        payload: AutomationWorkflowDraftFromRecordingPayload
+    ) -> AutomationCLIResultEnvelope<AutomationWorkflowDraftFromRecordingPayload> {
+        let validationWarnings = payload.result.validation.issues
+            .filter { $0.severity != .error }
+            .map(AutomationCLIMessage.init(issue:))
+        let validationErrors = payload.result.validation.issues
+            .filter { $0.severity == .error }
+            .map(AutomationCLIMessage.init(issue:))
+        let skippedWarnings = payload.result.skippedItems.map { skipped in
+            let id = skipped.suggestionID?.uuidString ?? skipped.candidateID ?? skipped.source.rawValue
+            return AutomationCLIMessage(
+                code: "draftItemSkipped",
+                message: "Skipped \(skipped.source.rawValue) '\(id)': \(skipped.reason)"
+            )
+        }
+        let fallbackWarnings: [AutomationCLIMessage]
+        if payload.result.appliedItems.contains(where: { $0.source == .conditionCandidate }) {
+            fallbackWarnings = [
+                AutomationCLIMessage(
+                    code: "draftCandidateFallback",
+                    message: "Draft tasks were generated from direct Review condition candidates, not stored/live suggestion synthesis."
+                )
+            ]
+        } else {
+            fallbackWarnings = []
+        }
+        let draftPath = payload.wrotePath ?? "<recording-draft.json>"
+        let sourceArgument = semanticRecordingCLISourceOption(
+            fixture: payload.fixture,
+            sourceOption: payload.sourceOption
+        )
+
+        return AutomationCLIResultEnvelope<AutomationWorkflowDraftFromRecordingPayload>(
+            ok: payload.result.isValid,
+            command: command,
+            data: payload,
+            warnings: semanticRecordingCLIFixtureWarnings(payload.fixture) + fallbackWarnings + validationWarnings + skippedWarnings,
+            errors: validationErrors,
+            nextActions: [
+                AutomationCLINextAction(
+                    command: "SparkleRecorder workflow draft validate \(draftPath) --json",
+                    reason: "Validate the generated draft before simulation or import."
+                ),
+                AutomationCLINextAction(
+                    command: "SparkleRecorder workflow draft simulate \(draftPath) --json",
+                    reason: "Preview condition branches and timeout behavior before import."
+                ),
+                AutomationCLINextAction(
+                    command: "SparkleRecorder recording frames \(payload.requestedRecordingID)\(sourceArgument) --json",
+                    reason: "Inspect the cited frame evidence before accepting generated draft tasks."
+                )
+            ]
+        )
+    }
+}
+
+public extension AutomationCLIResultEnvelope where Value == SemanticRecordingCLISuggestionsPayload {
+    static func semanticRecordingSuggestions(
+        command: String,
+        requestedRecordingID: String,
+        bundle: SemanticRecordingBundle,
+        fixture: String? = nil,
+        sourceOption: String? = nil,
+        category: SemanticRecordingCLISuggestionCategory,
+        suggestions: [RecordingSuggestion]
+    ) -> AutomationCLIResultEnvelope<SemanticRecordingCLISuggestionsPayload> {
+        let availability: SemanticRecordingSuggestionAvailability = fixture == nil
+            ? .unavailable
+            : .deterministicFixture
+        return semanticRecordingSuggestions(
+            command: command,
+            requestedRecordingID: requestedRecordingID,
+            bundle: bundle,
+            fixture: fixture,
+            sourceOption: sourceOption,
+            category: category,
+            suggestionResult: SemanticRecordingSuggestionResult(
+                availability: availability,
+                query: .kinds(category.suggestionKinds),
+                suggestions: suggestions,
+                unavailableReason: availability == .unavailable
+                    ? "Stored bundle suggestion synthesis is not implemented yet; this command returns only available deterministic suggestions."
+                    : nil
+            )
+        )
+    }
+
+    static func semanticRecordingSuggestions(
+        command: String,
+        requestedRecordingID: String,
+        bundle: SemanticRecordingBundle,
+        fixture: String? = nil,
+        sourceOption: String? = nil,
+        category: SemanticRecordingCLISuggestionCategory,
+        suggestionResult: SemanticRecordingSuggestionResult
+    ) -> AutomationCLIResultEnvelope<SemanticRecordingCLISuggestionsPayload> {
+        return AutomationCLIResultEnvelope<SemanticRecordingCLISuggestionsPayload>(
+            ok: true,
+            command: command,
+            data: SemanticRecordingCLISuggestionsPayload(
+                requestedRecordingID: requestedRecordingID,
+                bundle: bundle,
+                fixture: fixture,
+                category: category,
+                suggestionResult: suggestionResult
+            ),
+            warnings: semanticRecordingCLIFixtureWarnings(fixture)
+                + semanticRecordingCLISuggestionWarnings(suggestionResult),
+            nextActions: [
+                AutomationCLINextAction(
+                    command: "Open the cited frame IDs in Macro Review before accepting any suggestion.",
+                    reason: "Suggestions are non-destructive evidence proposals, not workflow mutations."
+                ),
+                AutomationCLINextAction(
+                    command: "Use Draft Preview validate/simulate/import only after user review.",
+                    reason: "S4 returns explainable suggestions; Review and Draft Preview own accepted mutations."
+                )
+            ]
+        )
+    }
+}
+
+private func semanticRecordingCLIFixtureWarnings(_ fixture: String?) -> [AutomationCLIMessage] {
+    guard let fixture else {
+        return []
+    }
+    return [
+        AutomationCLIMessage(
+            code: "fixtureMode",
+            message: "This result uses the S1 '\(fixture)' fixture, not a live semantic recording bundle."
+        )
+    ]
+}
+
+private func semanticRecordingCLISuggestionWarnings(
+    _ result: SemanticRecordingSuggestionResult
+) -> [AutomationCLIMessage] {
+    guard result.availability == .unavailable else {
+        return []
+    }
+    return [
+        AutomationCLIMessage(
+            code: "suggestionsUnavailable",
+            message: result.unavailableReason
+                ?? "Stored bundle suggestion synthesis is not implemented yet; this command returns only available deterministic suggestions."
+        )
+    ]
+}
+
+private func semanticRecordingCLIFixtureOption(_ fixture: String?) -> String {
+    guard let fixture else {
+        return ""
+    }
+    return " --fixture \(fixture)"
+}
+
+private func semanticRecordingCLISourceOption(
+    fixture: String?,
+    sourceOption: String?
+) -> String {
+    if let sourceOption {
+        return sourceOption
+    }
+    return semanticRecordingCLIFixtureOption(fixture)
+}
+
+private func semanticRecordingCLIUniqueUUIDs(_ ids: [UUID]) -> [UUID] {
+    var seen: Set<UUID> = []
+    var result: [UUID] = []
+    for id in ids where !seen.contains(id) {
+        seen.insert(id)
+        result.append(id)
+    }
+    return result
 }
 
 public struct AutomationWorkflowMacroCatalogPayload: Codable, Equatable, Sendable {
@@ -663,6 +2223,118 @@ public struct AutomationRuntimeHandoffPayload: Codable, Equatable, Sendable {
     }
 }
 
+public struct AutomationWorkflowBoundWindowSurfaceSummary: Codable, Equatable, Sendable, Identifiable {
+    public var id: String { surfaceID }
+    public var surfaceID: String
+    public var appName: String?
+    public var bundleIdentifier: String?
+    public var windowTitle: String?
+    public var recordedFrame: RectValue
+    public var recordedContentFrame: RectValue?
+
+    public init(surfaceID: String, surface: PlaybackSurface) {
+        self.surfaceID = surfaceID
+        self.appName = surface.appName
+        self.bundleIdentifier = surface.bundleIdentifier
+        self.windowTitle = surface.windowTitle
+        self.recordedFrame = surface.recordedFrame
+        self.recordedContentFrame = surface.recordedContentFrame
+    }
+}
+
+public struct AutomationWorkflowBoundWindowActivationResult: Codable, Equatable, Sendable {
+    public var bundleIdentifier: String
+    public var appName: String?
+    public var wasRunning: Bool
+    public var didLaunch: Bool
+    public var didActivate: Bool
+    public var errorMessage: String?
+
+    public init(
+        bundleIdentifier: String,
+        appName: String? = nil,
+        wasRunning: Bool,
+        didLaunch: Bool = false,
+        didActivate: Bool,
+        errorMessage: String? = nil
+    ) {
+        self.bundleIdentifier = bundleIdentifier
+        self.appName = appName
+        self.wasRunning = wasRunning
+        self.didLaunch = didLaunch
+        self.didActivate = didActivate
+        self.errorMessage = errorMessage
+    }
+}
+
+public struct AutomationWorkflowBoundWindowAcceptancePayload: Codable, Equatable, Sendable {
+    public var workflowID: UUID
+    public var workflowName: String
+    public var taskID: UUID
+    public var taskName: String
+    public var macroID: UUID
+    public var macroName: String
+    public var macroEventCount: Int
+    public var macroSurfaceCount: Int
+    public var playbackContextSurfaceCount: Int
+    public var coordinateMode: CoordinateMode
+    public var resourceRequiresForegroundInput: Bool
+    public var surfaces: [AutomationWorkflowBoundWindowSurfaceSummary]
+    public var activationRequested: Bool
+    public var launchRequested: Bool
+    public var playbackHandoffRequested: Bool
+    public var activationResults: [AutomationWorkflowBoundWindowActivationResult]
+    public var handoff: AutomationRuntimeHandoffPayload?
+    public var checkedAt: Date
+
+    public init(
+        workflow: AutomationWorkflow,
+        task: AutomationTask,
+        macro: SavedMacro,
+        activationRequested: Bool = false,
+        launchRequested: Bool = false,
+        playbackHandoffRequested: Bool = false,
+        activationResults: [AutomationWorkflowBoundWindowActivationResult] = [],
+        handoff: AutomationRuntimeHandoffPayload? = nil,
+        checkedAt: Date = Date.now
+    ) {
+        let playbackContext = macro.playbackContext
+        self.workflowID = workflow.id
+        self.workflowName = workflow.name
+        self.taskID = task.id
+        self.taskName = task.name
+        self.macroID = macro.id
+        self.macroName = macro.name
+        self.macroEventCount = macro.eventCount
+        self.macroSurfaceCount = macro.surfaces.count
+        self.playbackContextSurfaceCount = playbackContext.surfaces.count
+        self.coordinateMode = playbackContext.coordinateMode
+        self.resourceRequiresForegroundInput = task.resourceRequirement.requiresForegroundInput
+        self.surfaces = macro.surfaces
+            .map { surfaceID, surface in
+                AutomationWorkflowBoundWindowSurfaceSummary(
+                    surfaceID: surfaceID,
+                    surface: surface
+                )
+            }
+            .sorted { $0.surfaceID < $1.surfaceID }
+        self.activationRequested = activationRequested
+        self.launchRequested = launchRequested
+        self.playbackHandoffRequested = playbackHandoffRequested
+        self.activationResults = activationResults.sorted {
+            $0.bundleIdentifier < $1.bundleIdentifier
+        }
+        self.handoff = handoff
+        self.checkedAt = checkedAt
+    }
+
+    public var readyForBoundWindowPlayback: Bool {
+        macroEventCount > 0 &&
+            macroSurfaceCount > 0 &&
+            playbackContextSurfaceCount > 0
+    }
+}
+
 public enum AutomationRuntimeHandoffDeliveryState: String, Codable, Equatable, Sendable {
     case pending
     case dispatched
@@ -876,6 +2548,56 @@ public extension AutomationCLIResultEnvelope where Value == AutomationRuntimeHan
             ok: true,
             command: command,
             data: payload,
+            nextActions: nextActions
+        )
+    }
+}
+
+public extension AutomationCLIResultEnvelope where Value == AutomationWorkflowBoundWindowAcceptancePayload {
+    static func workflowBoundWindowAcceptance(
+        command: String,
+        payload: AutomationWorkflowBoundWindowAcceptancePayload
+    ) -> AutomationCLIResultEnvelope<AutomationWorkflowBoundWindowAcceptancePayload> {
+        var warnings: [AutomationCLIMessage] = []
+        if !payload.resourceRequiresForegroundInput {
+            warnings.append(AutomationCLIMessage(
+                code: "foregroundInputNotRequired",
+                message: "The selected workflow task does not require the foregroundInput resource."
+            ))
+        }
+        for result in payload.activationResults where result.errorMessage != nil || !result.didActivate {
+            warnings.append(AutomationCLIMessage(
+                code: "targetActivationIncomplete",
+                message: result.errorMessage ?? "Target app '\(result.bundleIdentifier)' was not activated."
+            ))
+        }
+
+        var nextActions: [AutomationCLINextAction] = []
+        if let handoff = payload.handoff {
+            nextActions.append(AutomationCLINextAction(
+                command: "SparkleRecorder workflow handoff status \(handoff.command.id.uuidString) --json",
+                reason: "Check whether the running App host consumed the live bound-window playback command."
+            ))
+            nextActions.append(AutomationCLINextAction(
+                command: "SparkleRecorder workflow runs \(payload.workflowID.uuidString) --json",
+                reason: "Inspect the run created by the App-host workflow playback."
+            ))
+        } else {
+            nextActions.append(AutomationCLINextAction(
+                command: "SparkleRecorder workflow acceptance bound-window \(payload.workflowID.uuidString) --task \"\(payload.taskName)\" --activate-target --json",
+                reason: "Activate the bound target app/window without enqueuing playback."
+            ))
+            nextActions.append(AutomationCLINextAction(
+                command: "SparkleRecorder workflow acceptance bound-window \(payload.workflowID.uuidString) --task \"\(payload.taskName)\" --activate-target --confirm-playback --handoff app --json",
+                reason: "Run the same bound-window workflow path through the App host after review."
+            ))
+        }
+
+        return AutomationCLIResultEnvelope<AutomationWorkflowBoundWindowAcceptancePayload>(
+            ok: payload.readyForBoundWindowPlayback && warnings.isEmpty,
+            command: command,
+            data: payload,
+            warnings: warnings,
             nextActions: nextActions
         )
     }

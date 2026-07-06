@@ -34,6 +34,198 @@ struct SemanticRecordingBundleTests {
         #expect(decoded == bundle)
     }
 
+    @Test("Bundle sidecars override manifest fields while missing sidecars preserve manifest data")
+    func bundleSidecarsOverrideManifestFields() throws {
+        let bundle = SemanticRecordingFixture.checkoutBundle()
+        let redactedFrame = SemanticRecordingRenderedFrameRedaction(
+            frameID: SemanticRecordingFixture.afterClickFrameID,
+            sourceImageRef: try RecordingArtifactRef("frames/000016-after-click.png"),
+            redactedImageRef: try RecordingArtifactRef("redacted/frames/after-click.png"),
+            renderedMaskCount: 1,
+            sourceSuppressionIDs: [SemanticRecordingFixture.suppressionID]
+        )
+        let redactedVideo = SemanticRecordingRenderedVideoRedaction(
+            videoSegmentID: SemanticRecordingFixture.videoSegmentID,
+            sourceVideoRef: try RecordingArtifactRef("video/recording.mov"),
+            redactedVideoRef: try RecordingArtifactRef("redacted/video/recording.mov"),
+            renderedRangeCount: 1,
+            sourceSuppressionIDs: [SemanticRecordingFixture.suppressionID],
+            reasons: [.passwordField]
+        )
+        var sparseManifest = bundle
+        sparseManifest.videoSegments = []
+        sparseManifest.frames = []
+        sparseManifest.timelineEvents = []
+        sparseManifest.semanticEvents = []
+        sparseManifest.visualObservations = []
+        sparseManifest.suppressions = []
+        sparseManifest.redactedFrames = []
+        sparseManifest.redactedVideos = []
+
+        let merged = sparseManifest.applyingSidecars(
+            SemanticRecordingBundleSidecars(
+                videoSegments: bundle.videoSegments,
+                frames: bundle.frames,
+                timelineEvents: bundle.timelineEvents,
+                semanticEvents: bundle.semanticEvents,
+                visualObservations: bundle.visualObservations,
+                suppressions: bundle.suppressions,
+                redactedFrames: [redactedFrame],
+                redactedVideos: [redactedVideo]
+            )
+        )
+
+        #expect(merged.videoSegments == bundle.videoSegments)
+        #expect(merged.frames == bundle.frames)
+        #expect(merged.timelineEvents == bundle.timelineEvents)
+        #expect(merged.semanticEvents == bundle.semanticEvents)
+        #expect(merged.visualObservations == bundle.visualObservations)
+        #expect(merged.suppressions == bundle.suppressions)
+        #expect(merged.redactedFrames == [redactedFrame])
+        #expect(merged.redactedVideos == [redactedVideo])
+        #expect(merged.redactedVideo(videoSegmentID: SemanticRecordingFixture.videoSegmentID) == redactedVideo)
+        let lastFrame = try #require(bundle.frames.last)
+        #expect(merged.preferredImageRef(for: lastFrame).path == "redacted/frames/after-click.png")
+        #expect(merged.sourcePreviews == bundle.sourcePreviews)
+        #expect(merged.runtimeSamples == bundle.runtimeSamples)
+        #expect(merged.previewComparisons == bundle.previewComparisons)
+
+        let preserved = bundle.applyingSidecars(SemanticRecordingBundleSidecars())
+        #expect(preserved == bundle)
+
+        let explicitlyEmptyFrames = bundle.applyingSidecars(
+            SemanticRecordingBundleSidecars(frames: [])
+        )
+        #expect(explicitlyEmptyFrames.frames.isEmpty)
+        #expect(explicitlyEmptyFrames.timelineEvents == bundle.timelineEvents)
+    }
+
+    @Test("Tolerant bundle load result preserves manifest fields when sidecars fail")
+    func tolerantBundleLoadResultPreservesManifestFieldsWhenSidecarsFail() throws {
+        let frameID = try #require(UUID(uuidString: "73000000-0000-0000-0000-000000000301"))
+        let manifestFrame = RecordingFrameReference(
+            id: frameID,
+            recordingTime: 1.0,
+            imageRef: try RecordingArtifactRef("frames/manifest-frame.png"),
+            source: .manual
+        )
+        let manifest = SemanticRecordingBundle(frames: [manifestFrame])
+        var diagnostics = SemanticRecordingBundleSidecarLoadDiagnostics()
+        diagnostics.recordFailed(
+            .frames,
+            relativePath: "frames/index.jsonl",
+            message: "Could not decode sidecar."
+        )
+        diagnostics.recordMissing(.redactedFrames)
+        diagnostics.recordMissing(.redactedFrames)
+
+        let result = SemanticRecordingBundleLoadResult(
+            manifest: manifest,
+            sidecars: SemanticRecordingBundleSidecars(
+                timelineEvents: [
+                    RecordingTimelineEvent(
+                        id: try #require(UUID(uuidString: "73000000-0000-0000-0000-000000000302")),
+                        recordingTime: 1.0,
+                        kind: .recordedEvent,
+                        frameID: frameID,
+                        summary: "Manifest frame stayed usable"
+                    )
+                ]
+            ),
+            sidecarDiagnostics: diagnostics
+        )
+
+        #expect(result.bundle.frames == [manifestFrame])
+        #expect(result.bundle.timelineEvents.count == 1)
+        #expect(result.sidecarDiagnostics.isDegraded)
+        #expect(result.sidecarDiagnostics.failedIssues.map(\.kind) == [.frames])
+        #expect(result.sidecarDiagnostics.failedIssues.first?.fallbackToManifest == true)
+        #expect(result.sidecarDiagnostics.missingKinds == [.redactedFrames])
+
+        let encoded = try JSONEncoder().encode(result)
+        let decoded = try JSONDecoder().decode(
+            SemanticRecordingBundleLoadResult.self,
+            from: encoded
+        )
+        #expect(decoded == result)
+    }
+
+    @Test("Sidecar diagnostics record loaded and missing kinds once")
+    func sidecarDiagnosticsRecordLoadedAndMissingKindsOnce() {
+        var diagnostics = SemanticRecordingBundleSidecarLoadDiagnostics(
+            loadedKinds: [.videoSegments, .videoSegments],
+            missingKinds: [.frames, .frames]
+        )
+
+        diagnostics.recordLoaded(.videoSegments)
+        diagnostics.recordLoaded(.semanticEvents)
+        diagnostics.recordMissing(.frames)
+        diagnostics.recordMissing(.visualObservations)
+
+        #expect(diagnostics.loadedKinds == [.videoSegments, .semanticEvents])
+        #expect(diagnostics.missingKinds == [.frames, .visualObservations])
+        #expect(!diagnostics.isDegraded)
+    }
+
+    @Test("Bundle directory identity accepts canonical UUID dirs and rejects mismatched manifests")
+    func bundleDirectoryIdentityValidatesUUIDDirectoryNames() throws {
+        let recordingID = try #require(UUID(uuidString: "73000000-0000-0000-0000-000000000111"))
+        let otherID = try #require(UUID(uuidString: "73000000-0000-0000-0000-000000000222"))
+        let bundle = SemanticRecordingBundle(id: recordingID)
+
+        #expect(SemanticRecordingBundleDirectoryIdentity.directoryName(for: recordingID) == recordingID.uuidString)
+        #expect(SemanticRecordingBundleDirectoryIdentity.recordingID(fromDirectoryName: recordingID.uuidString.lowercased()) == recordingID)
+        #expect(SemanticRecordingBundleDirectoryIdentity.recordingID(fromDirectoryName: "checkout-copy") == nil)
+        #expect(try SemanticRecordingBundleDirectoryIdentity.validate(
+            bundle: bundle,
+            directoryName: recordingID.uuidString
+        ) == recordingID)
+        #expect(try SemanticRecordingBundleDirectoryIdentity.validate(
+            bundle: bundle,
+            directoryName: "checkout-copy"
+        ) == recordingID)
+
+        #expect(throws: SemanticRecordingBundleDirectoryIdentityError.recordingIDMismatch(
+            directoryID: otherID,
+            bundleID: recordingID
+        )) {
+            try SemanticRecordingBundleDirectoryIdentity.validate(
+                bundle: bundle,
+                directoryName: otherID.uuidString
+            )
+        }
+    }
+
+    @Test("Legacy manifests without redacted frame refs decode with an empty redacted frame index")
+    func legacyManifestWithoutRedactedFramesDecodes() throws {
+        let json = """
+        {
+          "id": "73000000-0000-0000-0000-000000000001",
+          "schemaVersion": { "major": 0, "minor": 1 },
+          "createdAt": "2026-07-06T00:00:00Z",
+          "capturePolicy": {
+            "mode": "videoAndKeyframes",
+            "recordsVideo": true,
+            "recordsKeyframes": true,
+            "localOnly": true,
+            "allowsAIFrameExport": false
+          }
+        }
+        """
+
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        let bundle = try decoder.decode(
+            SemanticRecordingBundle.self,
+            from: Data(json.utf8)
+        )
+
+        #expect(bundle.redactedFrames.isEmpty)
+        #expect(bundle.redactedVideos.isEmpty)
+        #expect(bundle.frames.isEmpty)
+        #expect(bundle.validate().isEmpty)
+    }
+
     @Test("Artifact refs normalize safe relative paths and reject unsafe paths")
     func artifactRefsNormalizeAndRejectUnsafePaths() throws {
         let ref = try RecordingArtifactRef(" frames//000042.png\n")

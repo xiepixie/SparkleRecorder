@@ -711,16 +711,15 @@ struct EditorView: View {
     }
 
     func textTargetRowsForCurrentSelection() -> [ActionRow] {
-        rows.filter { row in
-            guard selection.contains(row.id) else { return false }
-            if row.group.kind.editsSemanticTextTarget { return true }
-            guard row.group.kind.canUseLocatorStrategy else { return false }
-            return row.group.textAnchor != nil || row.group.eventIndices.contains { index in
-                guard recorder.events.indices.contains(index) else { return false }
-                let event = recorder.events[index]
-                return event.coordinateStrategy == .locatorOnly || event.textAnchor != nil
-            }
-        }
+        let targetIDs = Set(
+            ActionGroupProjection.textTargetGroups(
+                groups: rows.map(\.group),
+                selectedGroupIDs: selection,
+                events: recorder.events
+            )
+            .map(\.id)
+        )
+        return rows.filter { targetIDs.contains($0.id) }
     }
 
 }

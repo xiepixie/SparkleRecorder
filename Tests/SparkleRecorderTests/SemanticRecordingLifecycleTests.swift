@@ -121,6 +121,28 @@ struct SemanticRecordingLifecycleTests {
         ])
     }
 
+    @Test("Lifecycle cancel stops capture without stop keyframe")
+    func lifecycleCancelStopsCaptureWithoutStopKeyframe() async throws {
+        let captureSpy = LifecycleCaptureSpy()
+        let factory = LifecycleSessionFactorySpy(captureSpy: captureSpy)
+        let lifecycle = SemanticRecordingLifecycle(
+            preflightClient: SemanticRecordingPreflightClient.fixed(.allAuthorizedForLifecycle),
+            sessionFactory: factory.factory
+        )
+
+        _ = try await lifecycle.start(recordingTime: 0.1)
+        await lifecycle.cancel(recordingTime: 0.9)
+
+        #expect(await captureSpy.operations == [
+            "startMovie:video/recording.mov",
+            "captureFrame:recordingStart",
+            "finishMovie:video/recording.mov"
+        ])
+        await #expect(throws: SemanticRecordingLifecycleError.alreadyFinished) {
+            try await lifecycle.record(recordedEvent(.leftMouseUp, time: 1.0), index: 0)
+        }
+    }
+
     @Test("Blocked start can be retried after permissions change")
     func blockedStartCanBeRetriedAfterPermissionsChange() async throws {
         let permissions = MutablePermissionSource(snapshot: SemanticRecordingPermissionSnapshot(

@@ -23,6 +23,7 @@
 - [x] `AutomationOutcome` exists and distinguishes success, failure, cancel, timeout, resource conflict, permission denied, condition matched/not matched.
 - [x] `AutomationEffect.evaluateCondition` carries prior outcomes needed for contextual conditions.
 - [x] `SavedMacro` has no workflow runtime state.
+- [ ] Workflow-level loops have an explicit contract for loop body, termination/limit and run evidence. Current DAG validation rejects self-dependencies and cycles, so loops are not accepted through dependency back-edges.
 - [x] Swift Testing covers Codable roundtrip and Sendable smoke.
 
 ## Phase 1: Reducer

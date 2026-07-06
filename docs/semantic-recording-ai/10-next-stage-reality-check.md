@@ -78,10 +78,10 @@ Owner：Semantic Recording program coordination
 
 | Task | User Value | Acceptance |
 | --- | --- | --- |
-| live visual diagnostics Open/Reveal | 用户能看到系统真实观察了哪块画面 | 真实 App run 中 Run Detail 显示 watched region、last sample/crop、score/threshold，Open/Reveal 打开真实 artifact |
-| branch evidence consistency | 用户能相信绿色/红色分支为什么走 | 同一次 run 中 FlowGraph edge、selected run、Run Detail branch evidence 三者一致 |
-| macro evidence file actions | 失败后用户能一键打开报告/截图 | Reveal Report / Open Screenshot 有真实录屏和 inline feedback |
-| authoring WYSIWYG | 拖拽、排序、连线不能骗用户 | indicator 位置和 reducer mutation 一致，有 drag/reorder 或 drag-link 录屏 |
+| live visual diagnostics Open/Reveal | 用户能看到系统真实观察了哪块画面 | Done for strict gate: `live-visual-diagnostics-open-reveal.mov` proves App-host OCR condition run payload, App Support last-sample/watched-region artifacts and Open/Reveal file actions |
+| branch evidence consistency | 用户能相信绿色/红色分支为什么走 | Strict gate closed by `live-branch-evidence-consistency.mov`: App-host handoff run payload proves source run, target run, dependency trigger and live App window capture consistency; richer manual Run Detail drill-in can still be recaptured later |
+| macro evidence file actions | 失败后用户能一键打开报告/截图 | Done for strict gate: `live-macro-evidence-open-reveal.mov` proves App-host failed macro run payload, per-run report/manifest/failure screenshot and Open/Reveal file actions |
+| authoring WYSIWYG | 拖拽、排序、连线不能骗用户 | Task reorder live clip 已补齐；drag-link 或 macro drag live clip 可作为后续更广 authoring 证据 |
 | OCR region bounds picker | 用户能清楚选择“只看这个区域” | 等待文本/验证文本只显示区域框和编号，不显示暗示点击的圆点；坐标、bounds 和 preview 一致 |
 
 P0 完成前，不应宣称 semantic recording 已经能解决用户体验。否则视频和 AI 只会放大已有 evidence UI 的不可信。
@@ -124,9 +124,10 @@ CLI 的目标是让 AI 逐步查询证据、提出草稿，而不是一口气操
 | `recording show` | 先理解录制是什么 | JSON 返回 app/surface/key steps/evidence summary |
 | `recording frames` / `events-near` | AI 定位相关时刻 | 返回 frame/event IDs、time、surface、safe refs |
 | `recording ocr search` | AI 找文字证据 | 返回 bounding boxes、confidence、source frame |
-| `recording asset extract` | AI/用户生成可复用视觉资产 | 输出 `AutomationWorkflowDraftVisualAssets` 可用 refs |
+| `recording visual search` | AI 找视觉候选证据 | metadata-only 返回 observation ids、kind、labels、bounds、source frame；image-byte similarity 另做 product-ready slice |
+| `recording asset extract` | AI/用户生成可复用视觉资产 | explicit-source first pass 输出 `AutomationWorkflowDraftVisualAssets` 可用 refs；workflow import 仍走 Draft Preview |
 | `recording suggest waits/locators/conditions` | AI 提出可审阅优化 | 每条建议带 evidence refs、risk、fallback |
-| `workflow draft from-recording` | 从录制生成 workflow 雏形 | 输出 `sparkle.workflow.draft.v1`，仍走 validate/simulate/dry-run/import |
+| `workflow draft from-recording` | 从录制生成 workflow 雏形 | Fixture/review-only first pass 输出 `sparkle.workflow.draft.v1` 并通过 validate/simulate；product-ready stored/live synthesis 仍走 Review/Draft Preview/import 边界 |
 
 MCP 继续暂缓。未来 MCP 只能包装这些 CLI/shared service 语义，不能另开一套产品逻辑。
 
@@ -184,14 +185,15 @@ MCP 继续暂缓。未来 MCP 只能包装这些 CLI/shared service 语义，不
 - [08-parallel-workstreams.md](08-parallel-workstreams.md) 负责 S0-S4 owner 边界。
 - [09-template-baseline-preview-refs.md](09-template-baseline-preview-refs.md) 负责 S0 -> S1 preview-ref 合同。
 - 本文件负责下一阶段现实校准：用户路径、剩余任务优先级、过度设计审计和可维护性规则。
+- [12-remaining-work-and-direction-control.md](12-remaining-work-and-direction-control.md) 负责当前方向控制台：剩余任务、P0-P4 队列、过度设计裁剪和“做/不做”决策。
 
 当前仍未完成的最高优先级不是 MCP 或 App Knowledge，而是：
 
-1. S0 live-product evidence 4 个严格门禁。
+1. S0 live-product evidence strict gate is closed at 13/13: visual diagnostics, macro evidence, authoring reorder and branch consistency live gates are present.
 2. OCR/visual region picker 的真实用户体验。
 3. Review UI 中 source frame / runtime sample / decision 的真实接线。
 4. S2 live `.mov` + event-aligned keyframe + bundle storage API spike。
 5. S3 frame-to-condition 竖切。
-6. S4 fixture-backed `recording show` / `recording frames` CLI。
+6. S4 在已完成 fixture-backed `recording list/show/explain/frames/frame show/events-near/ocr search/visual search/asset extract/asset baseline/suggest waits/conditions` 后，已补 explicit stored-bundle read-only `recording list/show/explain/frames/frame show/events-near/ocr search/visual search`、explicit-source frame-region asset extraction 和 fixture/review-only `workflow draft from-recording`；后续继续做 product-ready default/live catalog/search/suggestions、stored suggestion synthesis、image-byte visual similarity 和 product-ready stored/live draft-from-recording。
 
 只有这些闭环能证明“录完能看懂、失败能解释、修正有证据、组合前可审阅”时，才进入更大的 AI/App Knowledge 阶段。

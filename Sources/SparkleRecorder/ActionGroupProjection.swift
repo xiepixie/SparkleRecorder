@@ -20,6 +20,21 @@ public struct ActionGroupSelectionSnapshot: Equatable, Sendable {
     }
 }
 
+public enum TextTargetReadiness: String, Codable, Equatable, Sendable {
+    case notTextTarget
+    case missingAnchor
+    case missingText
+    case ready
+
+    public var isReady: Bool {
+        self == .ready
+    }
+
+    public var needsUserTarget: Bool {
+        self == .missingAnchor || self == .missingText
+    }
+}
+
 public enum ActionGroupProjection {
     public static func groups(
         from events: [RecordedEvent],
@@ -101,5 +116,107 @@ public enum ActionGroupProjection {
             eventIndices: eventIndices,
             containsBehavior: containsBehavior
         )
+    }
+
+    public static func textTargetGroups(
+        groups: [ActionGroup],
+        selectedGroupIDs: Set<UUID>,
+        events: [RecordedEvent],
+        includesCoordinateClickCandidates: Bool = true
+    ) -> [ActionGroup] {
+        groups.filter { group in
+            selectedGroupIDs.contains(group.id) &&
+            isTextTargetGroup(
+                group,
+                events: events,
+                includesCoordinateClickCandidates: includesCoordinateClickCandidates
+            )
+        }
+    }
+
+    public static func isTextTargetGroup(
+        _ group: ActionGroup,
+        events: [RecordedEvent],
+        includesCoordinateClickCandidates: Bool = true
+    ) -> Bool {
+        if editsSemanticTextTarget(group.kind) { return true }
+        guard canUseLocatorStrategy(group.kind) else { return false }
+
+        let hasEvent = group.eventIndices.contains { events.indices.contains($0) }
+        if group.textAnchor != nil { return hasEvent }
+        if group.eventIndices.contains(where: { index in
+            guard events.indices.contains(index) else { return false }
+            let event = events[index]
+            return event.coordinateStrategy == .locatorOnly || event.textAnchor != nil
+        }) {
+            return true
+        }
+
+        return includesCoordinateClickCandidates &&
+            hasEvent &&
+            canBecomeTextClickTarget(group.kind)
+    }
+
+    public static func textTargetReadiness(
+        for group: ActionGroup,
+        events: [RecordedEvent],
+        includesCoordinateClickCandidates: Bool = false
+    ) -> TextTargetReadiness {
+        guard isTextTargetGroup(
+            group,
+            events: events,
+            includesCoordinateClickCandidates: includesCoordinateClickCandidates
+        ) else {
+            return .notTextTarget
+        }
+
+        guard let anchor = firstTextAnchor(for: group, events: events) else {
+            return .missingAnchor
+        }
+        return textAnchorIsReady(anchor) ? .ready : .missingText
+    }
+
+    public static func textAnchorIsReady(_ anchor: TextAnchor?) -> Bool {
+        guard let anchor else { return false }
+        return !anchor.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    public static func firstTextAnchor(
+        for group: ActionGroup,
+        events: [RecordedEvent]
+    ) -> TextAnchor? {
+        for index in group.eventIndices where events.indices.contains(index) {
+            if let anchor = events[index].textAnchor {
+                return anchor
+            }
+        }
+        return group.textAnchor
+    }
+
+    private static func editsSemanticTextTarget(_ kind: ActionGroupKind) -> Bool {
+        switch kind {
+        case .waitForText, .waitForTextGone, .verifyText:
+            return true
+        default:
+            return false
+        }
+    }
+
+    private static func canUseLocatorStrategy(_ kind: ActionGroupKind) -> Bool {
+        switch kind {
+        case .click, .doubleClick, .repeatedClick, .longPress, .scroll:
+            return true
+        default:
+            return false
+        }
+    }
+
+    private static func canBecomeTextClickTarget(_ kind: ActionGroupKind) -> Bool {
+        switch kind {
+        case .click, .doubleClick, .repeatedClick, .longPress:
+            return true
+        default:
+            return false
+        }
     }
 }

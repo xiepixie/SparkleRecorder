@@ -34,6 +34,8 @@ final class MenuBarController: NSObject, NSPopoverDelegate {
     private var recordedSurface: PlaybackSurface?
     private var recorderLoadedMacroID: UUID?
     private var recorderLoadingMacroID: UUID?
+    private var pendingSemanticRecordingMacroID: UUID?
+    private var pendingRecordingStartMessage: String?
 
     override init() {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
@@ -50,12 +52,14 @@ final class MenuBarController: NSObject, NSPopoverDelegate {
         configureHUD()
         countdown = CountdownOverlayController()
         observeStateForIcon()
+        observeSemanticRecordingStatus()
         observeLibraryForHotkeys()
         observeLibrarySelectionForInitialEventLoad()
         observeAccessibilityRevocation()
         registerAllHotkeys()
         loadInitialMacroIntoRecorder()
         automationRuntimeHost?.start()
+        scheduleSemanticRecordingRetentionCleanupIfNeeded()
     }
 
     deinit {
@@ -295,7 +299,7 @@ final class MenuBarController: NSObject, NSPopoverDelegate {
     /// Stop recording and throw away the captured events without saving.
     func cancelRecording() {
         guard recorder.isRecording else { return }
-        recorder.stopRecording()
+        recorder.cancelRecording()
         recorder.clearAll()
         recorderLoadedMacroID = nil
         // Restore the previously-active macro (if any) into the recorder buffer
@@ -603,6 +607,8 @@ final class MenuBarController: NSObject, NSPopoverDelegate {
                 } else if let surface = recordedSurface {
                     library.setSurface(id: newMacro.id, surface: surface)
                 }
+                pendingSemanticRecordingMacroID = newMacro.id
+                attachSemanticRecordingIfFinished(recorder.semanticRecordingStatus)
                 state.statusMessage = "Saved \(newMacro.name) · \(count) events."
                 SoundController.shared.play(.recordStop)
             } else {
@@ -627,8 +633,45 @@ final class MenuBarController: NSObject, NSPopoverDelegate {
     private func beginRecordingFlow() {
         if player.isPlaying { player.stop() }
         persistCurrentMacroIfNeeded()
-        if popover.isShown { popover.performClose(nil) }
 
+        Task { @MainActor [weak self] in
+            await self?.prepareSemanticRecordingAndContinue()
+        }
+    }
+
+    private func prepareSemanticRecordingAndContinue() async {
+        pendingRecordingStartMessage = nil
+        state.semanticRecordingPreflightPresentation = nil
+        guard state.semanticRecordingEnabled else {
+            closePopoverForRecording()
+            startRecordingAfterPreflight()
+            return
+        }
+
+        state.statusMessage = "Checking visual recording permissions…"
+        let result = await SemanticRecordingPreflightClient.live.evaluate()
+        let presentation = SemanticRecordingPreflightPresenter.presentation(for: result)
+        state.semanticRecordingPreflightPresentation = presentation
+
+        guard presentation.canStart else {
+            state.statusMessage = "Visual recording blocked: \(semanticRecordingIssueSummary(result.blockingIssues))"
+            SoundController.shared.play(.error)
+            showSettingsWindow()
+            return
+        }
+
+        if presentation.status == .degraded {
+            pendingRecordingStartMessage = "Recording with limited visual context."
+        }
+        closePopoverForRecording()
+        startRecordingAfterPreflight()
+    }
+
+    private func closePopoverForRecording() {
+        if popover.isShown { popover.performClose(nil) }
+    }
+
+    private func startRecordingAfterPreflight() {
         let secs = state.countdownSeconds
         if secs > 0 {
             countdown?.start(seconds: secs) { [weak self] in
@@ -642,13 +685,21 @@ final class MenuBarController: NSObject, NSPopoverDelegate {
     private func actuallyStartRecording() {
         let capture = WindowSurfaceCapture()
         self.recordedSurface = try? capture.captureFrontmostWindow()
+        let semanticCaptureTarget = SemanticRecordingCaptureTargetMapper.target(
+            surface: recordedSurface
+        )
         
-        let ok = recorder.startRecording()
+        let ok = recorder.startRecording(
+            semanticRecordingEnabled: state.semanticRecordingEnabled,
+            semanticCaptureTarget: semanticCaptureTarget
+        )
         if ok {
             if state.showRecordingHUD { hud?.show() }
-            state.statusMessage = "Recording…"
+            state.statusMessage = pendingRecordingStartMessage ?? "Recording…"
+            pendingRecordingStartMessage = nil
             SoundController.shared.play(.recordStart)
         } else {
+            pendingRecordingStartMessage = nil
             state.statusMessage = "Could not start. Grant Accessibility permission."
             SoundController.shared.play(.error)
         }
@@ -663,6 +714,275 @@ final class MenuBarController: NSObject, NSPopoverDelegate {
         }
         if player.isPlaying { player.stop() }
         state.statusMessage = "Stopped."
+    }
+
+    private func observeSemanticRecordingStatus() {
+        recorder.$semanticRecordingStatus
+            .receive(on: RunLoop.main)
+            .sink { [weak self] status in
+                self?.handleSemanticRecordingStatus(status)
+            }
+            .store(in: &cancellables)
+    }
+
+    private func handleSemanticRecordingStatus(
+        _ status: SemanticRecorderBridgeStatus
+    ) {
+        switch status {
+        case .finished:
+            attachSemanticRecordingIfFinished(status)
+
+        case .blocked(let preflight):
+            pendingSemanticRecordingMacroID = nil
+            guard UserDefaults.standard.bool(forKey: "semanticRecordingEnabled") else {
+                return
+            }
+            state.statusMessage = "Visual recording blocked: \(semanticRecordingIssueSummary(preflight.blockingIssues))"
+
+        case .failed(let message):
+            pendingSemanticRecordingMacroID = nil
+            guard UserDefaults.standard.bool(forKey: "semanticRecordingEnabled") else {
+                return
+            }
+            state.statusMessage = "Visual recording failed: \(message)"
+
+        case .cancelled:
+            pendingSemanticRecordingMacroID = nil
+
+        case .suppressed(let message):
+            pendingSemanticRecordingMacroID = nil
+            guard UserDefaults.standard.bool(forKey: "semanticRecordingEnabled") else {
+                return
+            }
+            state.statusMessage = "Visual recording suppressed: \(message)"
+
+        default:
+            break
+        }
+    }
+
+    private func attachSemanticRecordingIfFinished(
+        _ status: SemanticRecorderBridgeStatus
+    ) {
+        guard case .finished(let bundleID, let bundleDirectory, let eventCount) = status,
+              let macroID = pendingSemanticRecordingMacroID else {
+            return
+        }
+
+        let bundleName = bundleDirectory.lastPathComponent
+        let bundleRelativePath = "SemanticRecordings/\(bundleName)"
+        let manifestRelativePath = "\(bundleRelativePath)/\(SemanticRecordingSchema.manifestFileName)"
+        let reference = MacroSemanticRecordingReference(
+            recordingID: bundleID,
+            bundleRelativePath: bundleRelativePath,
+            manifestRelativePath: manifestRelativePath,
+            capturedAt: Date(),
+            eventCount: eventCount
+        )
+        library.attachSemanticRecording(id: macroID, reference: reference)
+        applyPlayableSanitizationIfNeeded(
+            macroID: macroID,
+            bundleID: bundleID,
+            bundleDirectory: bundleDirectory
+        )
+        pendingSemanticRecordingMacroID = nil
+    }
+
+    private func applyPlayableSanitizationIfNeeded(
+        macroID: UUID,
+        bundleID: UUID,
+        bundleDirectory: URL
+    ) {
+        Task { @MainActor [weak self] in
+            guard let self else { return }
+            do {
+                let store = RecordingBundleStore(
+                    rootDirectory: bundleDirectory.deletingLastPathComponent()
+                )
+                let bundle = try await store.loadBundle(from: bundleDirectory)
+                guard bundle.id == bundleID else {
+                    return
+                }
+                let events = try await library.loadEvents(for: macroID)
+                let plan = SemanticRecordingPlayableSanitizationPlanner.plan(
+                    for: events,
+                    bundle: bundle
+                )
+                guard !plan.isEmpty else {
+                    return
+                }
+
+                guard let summary = await library.applyPlayableSanitization(
+                    id: macroID,
+                    plan: plan
+                ) else {
+                    return
+                }
+                if library.currentMacroID == macroID,
+                   let macro = library.macros.first(where: { $0.id == macroID }),
+                   !macro.events.isEmpty {
+                    recorder.loadEvents(macro.events)
+                }
+                if summary.sanitizedEventCount > 0,
+                   summary.reviewRequiredEventCount > 0 {
+                    state.statusMessage = String(
+                        format: "Saved visual evidence, withheld readable text from %d event(s), and left %d event(s) for Review.",
+                        summary.sanitizedEventCount,
+                        summary.reviewRequiredEventCount
+                    )
+                } else if summary.sanitizedEventCount > 0 {
+                    state.statusMessage = String(
+                        format: "Saved visual evidence and withheld readable text from %d event(s).",
+                        summary.sanitizedEventCount
+                    )
+                } else if summary.reviewRequiredEventCount > 0 {
+                    state.statusMessage = String(
+                        format: "Saved visual evidence. %d sensitive event(s) need Review before playable text can be changed.",
+                        summary.reviewRequiredEventCount
+                    )
+                }
+            } catch {
+                state.statusMessage = "Playable text sanitization skipped: \(error.localizedDescription)"
+            }
+        }
+    }
+
+    private func playbackSanitizedEventsForExport(
+        _ events: [RecordedEvent],
+        macro: SavedMacro?
+    ) async -> [RecordedEvent] {
+        guard let reference = macro?.semanticRecording else {
+            return events
+        }
+
+        do {
+            let bundle = try await RecordingBundleStore().loadBundle(
+                recordingID: reference.recordingID
+            )
+            let plan = SemanticRecordingPlayableSanitizationPlanner.plan(
+                for: events,
+                bundle: bundle
+            )
+            return plan.playbackPreservingSanitizedEvents(from: events)
+        } catch {
+            return events
+        }
+    }
+
+    private func loadedEventsForExport(
+        macro: SavedMacro
+    ) async throws -> [RecordedEvent] {
+        if macro.events.isEmpty {
+            return try await library.loadEvents(for: macro.id)
+        }
+        return macro.events
+    }
+
+    private func semanticRecordingIssueSummary(
+        _ issues: [SemanticRecordingPreflightIssue]
+    ) -> String {
+        let labels = issues.prefix(2).map(\.permission.rawValue)
+        guard !labels.isEmpty else {
+            return "permissions unavailable"
+        }
+        return labels.joined(separator: ", ")
+    }
+
+    func refreshSemanticRecordingPreflightPresentation() {
+        Task { @MainActor [weak self] in
+            guard let self else { return }
+            state.statusMessage = "Checking visual recording permissions..."
+            let result = await SemanticRecordingPreflightClient.live.evaluate()
+            state.semanticRecordingPreflightPresentation = SemanticRecordingPreflightPresenter.presentation(
+                for: result
+            )
+            if result.isReadyToStart {
+                state.statusMessage = result.isDegraded
+                    ? "Visual recording can continue with limited context."
+                    : "Visual recording is ready."
+            } else {
+                state.statusMessage = "Visual recording blocked: \(semanticRecordingIssueSummary(result.blockingIssues))"
+            }
+        }
+    }
+
+    func openSemanticRecordingPermissionSettings(
+        _ permission: SemanticRecordingPermissionKind
+    ) {
+        switch permission {
+        case .accessibility:
+            openAccessibilityPrefs()
+        case .inputMonitoring:
+            openInputMonitoringPrefs()
+        case .screenRecording:
+            openScreenCapturePrefs()
+        }
+    }
+
+    func semanticRecordingRetentionCleanupPreview() async throws -> SemanticRecordingRetentionCleanupPreview {
+        let store = RecordingBundleStore()
+        return try await store.retentionCleanupPreview(
+            settings: state.semanticRecordingRetentionSettings
+        )
+    }
+
+    func applySemanticRecordingRetentionCleanup(
+        _ preview: SemanticRecordingRetentionCleanupPreview
+    ) async throws -> [RecordingBundleRetentionApplicationResult] {
+        let store = RecordingBundleStore()
+        return try await store.applyRetentionCleanup(
+            preview,
+            dryRun: false
+        )
+    }
+
+    private func scheduleSemanticRecordingRetentionCleanupIfNeeded(
+        evaluatedAt: Date = Date()
+    ) {
+        let decision = SemanticRecordingScheduledRetentionCleanupPlanner.decision(
+            settings: state.semanticRecordingRetentionSettings,
+            lastRunAt: state.semanticRecordingLastScheduledRetentionCleanupAt,
+            evaluatedAt: evaluatedAt
+        )
+        guard decision.shouldRun else {
+            return
+        }
+
+        Task { @MainActor [weak self] in
+            await self?.runScheduledSemanticRecordingRetentionCleanup(decision: decision)
+        }
+    }
+
+    private func runScheduledSemanticRecordingRetentionCleanup(
+        decision: SemanticRecordingScheduledRetentionCleanupDecision
+    ) async {
+        let store = RecordingBundleStore()
+        do {
+            let preview = try await store.retentionCleanupPreview(
+                settings: state.semanticRecordingRetentionSettings,
+                evaluatedAt: decision.evaluatedAt
+            )
+            let results = try await store.applyRetentionCleanup(
+                preview,
+                dryRun: false
+            )
+            state.semanticRecordingLastScheduledRetentionCleanupAt = decision.evaluatedAt
+
+            guard !preview.isEmpty else {
+                return
+            }
+            let deletedArtifacts = results.reduce(0) { total, result in
+                total + result.deletedRelativePaths.count
+            }
+            let deletedBundles = results.filter(\.deletedBundleDirectory).count
+            state.statusMessage = String(
+                format: "Cleaned up %d expired visual evidence artifact(s) and %d bundle(s).",
+                deletedArtifacts,
+                deletedBundles
+            )
+        } catch {
+            state.statusMessage = "Scheduled visual evidence cleanup failed: \(error.localizedDescription)"
+        }
     }
 
     func play() {
@@ -737,7 +1057,7 @@ final class MenuBarController: NSObject, NSPopoverDelegate {
     }
 
     private func preparePlaybackContext(for macro: SavedMacro?, completion: @escaping (PlaybackContext) -> Void) {
-        guard let macro = macro, !macro.surfaces.isEmpty else {
+        guard let macro = macro else {
             completion(PlaybackContext())
             return
         }
@@ -745,13 +1065,7 @@ final class MenuBarController: NSObject, NSPopoverDelegate {
         // Return the base context immediately. Player will use WindowTracker to lazily resolve
         // the frame for each surface during playback exactly when it's needed, preventing
         // stale upfront coordinates from breaking playback if a user moves windows.
-        let context = PlaybackContext(
-            surfaces: macro.surfaces,
-            currentSurfaceFrames: [:],
-            coordinateMode: macro.followWindowOffset ? .boundWindowOffset : .screenAbsolute
-        )
-        
-        completion(context)
+        completion(macro.playbackContext)
     }
 
     /// Play a specific saved macro by id (used by per-macro hotkeys + library card buttons).
@@ -868,12 +1182,18 @@ final class MenuBarController: NSObject, NSPopoverDelegate {
         NSApp.activate(ignoringOtherApps: true)
         panel.begin { [weak self] response in
             guard response == .OK, let url = panel.url, let self else { return }
-            do {
-                let text = TextMacroFormat.export(self.recorder.events)
-                try text.write(to: url, atomically: true, encoding: .utf8)
-                self.state.statusMessage = "Exported \(url.lastPathComponent)."
-            } catch {
-                self.state.statusMessage = "Export failed: \(error.localizedDescription)"
+            Task { @MainActor in
+                do {
+                    let events = await self.playbackSanitizedEventsForExport(
+                        self.recorder.events,
+                        macro: self.library.currentMacro
+                    )
+                    let text = TextMacroFormat.export(events)
+                    try text.write(to: url, atomically: true, encoding: .utf8)
+                    self.state.statusMessage = "Exported \(url.lastPathComponent)."
+                } catch {
+                    self.state.statusMessage = "Export failed: \(error.localizedDescription)"
+                }
             }
         }
     }
@@ -891,12 +1211,19 @@ final class MenuBarController: NSObject, NSPopoverDelegate {
         NSApp.activate(ignoringOtherApps: true)
         panel.begin { [weak self] response in
             guard response == .OK, let url = panel.url, let self else { return }
-            do {
-                let text = TextMacroFormat.export(macro.events)
-                try text.write(to: url, atomically: true, encoding: .utf8)
-                self.state.statusMessage = "Exported \(url.lastPathComponent)."
-            } catch {
-                self.state.statusMessage = "Export failed: \(error.localizedDescription)"
+            Task { @MainActor in
+                do {
+                    let loadedEvents = try await self.loadedEventsForExport(macro: macro)
+                    let events = await self.playbackSanitizedEventsForExport(
+                        loadedEvents,
+                        macro: macro
+                    )
+                    let text = TextMacroFormat.export(events)
+                    try text.write(to: url, atomically: true, encoding: .utf8)
+                    self.state.statusMessage = "Exported \(url.lastPathComponent)."
+                } catch {
+                    self.state.statusMessage = "Export failed: \(error.localizedDescription)"
+                }
             }
         }
     }
@@ -937,40 +1264,48 @@ final class MenuBarController: NSObject, NSPopoverDelegate {
         NSApp.activate(ignoringOtherApps: true)
         panel.begin { [weak self] response in
             guard response == .OK, let url = panel.url, let self else { return }
-            do {
-                // Embed the full v3 SavedMacro so name/speed/loops survive the
-                // round-trip. Hotkey and chain are meaningless outside this
-                // library, so strip them.
-                var payload: SavedMacro
-                if let current = self.library.currentMacro {
-                    payload = current
-                    payload.events = self.recorder.events
-                } else {
-                    payload = SavedMacro(name: self.defaultMacroName(), events: self.recorder.events)
+            Task { @MainActor in
+                do {
+                    // Embed the full v3 SavedMacro so name/speed/loops survive the
+                    // round-trip. Hotkey and chain are meaningless outside this
+                    // library, so strip them.
+                    var payload: SavedMacro
+                    if let current = self.library.currentMacro {
+                        payload = current
+                        payload.events = await self.playbackSanitizedEventsForExport(
+                            self.recorder.events,
+                            macro: current
+                        )
+                    } else {
+                        payload = SavedMacro(
+                            name: self.defaultMacroName(),
+                            events: self.recorder.events
+                        )
+                    }
+                    payload.hotkey = nil
+                    payload.chainTo = nil
+                    let json = try JSONEncoder().encode(payload)
+                    let exec = Bundle.main.executablePath ?? "/Applications/SparkleRecorder.app/Contents/MacOS/SparkleRecorder"
+                    let macroLine = json.base64EncodedString()
+                    let script = """
+                    #!/bin/bash
+                    # SparkleRecorder self-running macro
+                    EXEC="\(exec)"
+                    if [ ! -x "$EXEC" ]; then
+                        echo "SparkleRecorder binary not found at $EXEC. Please install SparkleRecorder."
+                        exit 1
+                    fi
+                    TMP=$(mktemp -t tinyrec).json
+                    echo "\(macroLine)" | base64 -D > "$TMP"
+                    "$EXEC" --play "$TMP"
+                    rm -f "$TMP"
+                    """
+                    try script.write(to: url, atomically: true, encoding: .utf8)
+                    try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: url.path)
+                    self.state.statusMessage = "Exported \(url.lastPathComponent)."
+                } catch {
+                    self.state.statusMessage = "Export failed: \(error.localizedDescription)"
                 }
-                payload.hotkey = nil
-                payload.chainTo = nil
-                let json = try JSONEncoder().encode(payload)
-                let exec = Bundle.main.executablePath ?? "/Applications/SparkleRecorder.app/Contents/MacOS/SparkleRecorder"
-                let macroLine = json.base64EncodedString()
-                let script = """
-                #!/bin/bash
-                # SparkleRecorder self-running macro
-                EXEC="\(exec)"
-                if [ ! -x "$EXEC" ]; then
-                    echo "SparkleRecorder binary not found at $EXEC. Please install SparkleRecorder."
-                    exit 1
-                fi
-                TMP=$(mktemp -t tinyrec).json
-                echo "\(macroLine)" | base64 -D > "$TMP"
-                "$EXEC" --play "$TMP"
-                rm -f "$TMP"
-                """
-                try script.write(to: url, atomically: true, encoding: .utf8)
-                try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: url.path)
-                self.state.statusMessage = "Exported \(url.lastPathComponent)."
-            } catch {
-                self.state.statusMessage = "Export failed: \(error.localizedDescription)"
             }
         }
     }
@@ -988,14 +1323,22 @@ final class MenuBarController: NSObject, NSPopoverDelegate {
         NSApp.activate(ignoringOtherApps: true)
         panel.begin { [weak self] response in
             guard response == .OK, let url = panel.url, let self else { return }
-            do {
-                let enc = JSONEncoder()
-                enc.outputFormatting = [.prettyPrinted]
-                let data = try enc.encode(macro)
-                try data.write(to: url)
-                self.state.statusMessage = "Exported \(url.lastPathComponent)."
-            } catch {
-                self.state.statusMessage = "Export failed: \(error.localizedDescription)"
+            Task { @MainActor in
+                do {
+                    var payload = macro
+                    let loadedEvents = try await self.loadedEventsForExport(macro: macro)
+                    payload.events = await self.playbackSanitizedEventsForExport(
+                        loadedEvents,
+                        macro: macro
+                    )
+                    let enc = JSONEncoder()
+                    enc.outputFormatting = [.prettyPrinted]
+                    let data = try enc.encode(payload)
+                    try data.write(to: url)
+                    self.state.statusMessage = "Exported \(url.lastPathComponent)."
+                } catch {
+                    self.state.statusMessage = "Export failed: \(error.localizedDescription)"
+                }
             }
         }
     }

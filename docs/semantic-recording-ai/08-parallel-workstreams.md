@@ -24,9 +24,15 @@ Owner：Semantic Recording program coordination
 | `08-parallel-workstreams.md` | Work split | 本文件，并行 owner 和接口边界 |
 | `09-template-baseline-preview-refs.md` | Accepted interface contract | S0 对 S1 的 source-frame/runtime-sample preview refs 需求；S1 已接受 first-pass core contract |
 | `10-next-stage-reality-check.md` | Direction guard | 用户行为逻辑、剩余任务 P0-P4、过度设计审计、可行性和可维护性规则 |
+| `11-user-logic-roadmap-and-scope-audit.md` | Direction guard | 从用户行为、剩余任务、动作词汇、CLI-first/MCP-deferred 和 App Knowledge later 角度审查下一阶段 |
+| `12-remaining-work-and-direction-control.md` | Direction control | 当前剩余任务、P0-P4 队列、过度设计裁剪、可维护性规则和“做/不做”决策的一页式控制台 |
+| `13-direction-decision-and-remaining-slices.md` | Direction decision | 本轮方向纠偏记录；按 Slice A-E 固定当前剩余任务、用户行为逻辑、过度设计边界和维护状态 |
+| `14-s0-s4-final-gap-alignment.md` | Stage closeout / UI focus | S3 first pass 暂停后的 S0-S4 最终差距、S2 live-evidence blocker、验收姿态和后续 UI/UX owner 聚焦 |
 | `workstreams/s0-workflow-evidence.md` | Active workstream | S0 当前任务、证据缺口、S1 接口请求和实施日志 |
 | `workstreams/s1-contract-core.md` | Active workstream | S1 core schema v0、safe refs、timeline/events/suppression 和 preview comparison 合同 |
-| `workstreams/s2-app-capture-visual-index.md` | Active workstream | S2 core session + app-edge ScreenCaptureKit/Vision/store/preflight skeleton first pass、录制生命周期接线、AX/suppression、retention 和产品证据剩余任务 |
+| `workstreams/s2-app-capture-visual-index.md` | Active workstream | S2 core session、app-edge ScreenCaptureKit/Vision/store/preflight skeleton、experimental Recorder bridge、Settings preflight panel、live suppression context ingestion、Secure Input diagnostics、capture-level suppression、AI-safe semantic/OCR text redaction、playback-preserving playable macro save/export/status sanitization、pure frame/video redaction planning、app-edge redacted frame PNG writing hook、app-edge redacted `.mov` renderer/store hook、live finish redaction application、Review/CLI redacted-frame preference、retention settings/manual cleanup/scheduled cleanup first pass、pure retention confirmation projection、macro metadata link 和 cancel/failure cleanup first pass；live product evidence、default rollout、redacted frame/video product evidence、reviewed text-anchor mutation 和 live cleanup product evidence 仍 open |
+| `workstreams/s3-review-ux-evidence-editing.md` | Active workstream | S3 fixture review timeline first pass、before/after frame navigation、overlay/source-runtime projection、condition candidates 和真实 Review UI 剩余任务 |
+| `workstreams/s4-cli-ai-app-knowledge.md` | Active workstream | S4 fixture-first `recording` CLI、AI evidence query、suggestion、draft-from-recording 和 later App Knowledge；fixture `recording list/show/explain/frames/frame show/events-near/ocr search/visual search/asset extract/asset baseline/suggest waits/conditions`、fixture/review-only `workflow draft from-recording`、explicit stored-bundle read-only `recording list/show/explain/frames/frame show/events-near/ocr search/visual search` 和 explicit-source frame-region asset extraction 已实现，product-ready default/live root、stored suggestion synthesis、image-byte visual similarity 和 product-ready stored/live draft-from-recording 仍未实现 |
 | `acceptance-checklist.md` | Acceptance | 只记录可验收事实，不把规划当完成 |
 
 已接受的产品基线：
@@ -57,7 +63,7 @@ S4 CLI AI And App Knowledge
   -> exposes low-token queries, suggestions, draft generation and later app knowledge
 ```
 
-S1 core schema v0 has a first pass. S2 core session/client spine and app-edge ScreenCaptureKit/Vision/store/preflight skeletons also have a first pass, so the next S2 work is recorder lifecycle wiring, failure handling, permission/degraded UX surfacing, AX/suppression and live product evidence, not more schema invention. S3 should begin with fixtures from S1 before depending on live capture. S4 should wait for bundle fixtures and stable query contracts before implementing user-facing commands.
+S1 core schema v0 has a first pass. S2 core session/client spine, app-edge ScreenCaptureKit/Vision/store/preflight skeletons, experimental Recorder bridge, Settings preflight panel, recording-start guidance, live suppression context ingestion, Secure Input diagnostics, capture-level suppression, AI-safe semantic/OCR text redaction, playback-preserving playable macro save/export/status sanitization, pure frame/video redaction planning, app-edge redacted frame PNG writing hook, app-edge redacted `.mov` renderer/store hook, live finish redaction application, Review/CLI redacted-frame preference, sidecar-aware bundle loading/catalog, retention settings/manual cleanup/scheduled cleanup first pass, pure retention confirmation projection, macro metadata link and cancel/failure cleanup also have a first pass, so the next S2 work is live authorized product evidence, recording-start guidance evidence, redacted frame/video product evidence, reviewed text-anchor mutation and live cleanup product evidence, not more schema invention. S3 should continue fixture/live-presenter work without depending on live capture. S4 now has fixture `recording list/show/explain/frames/frame show/events-near/ocr search/visual search/asset extract/asset baseline/suggest waits/conditions`, fixture/review-only `workflow draft from-recording`, explicit stored-bundle read-only `recording list/show/explain/frames/frame show/events-near/ocr search/visual search` and explicit-source frame-region asset extraction; product-ready default/live root, stored suggestion synthesis, image-byte visual similarity, product-ready stored/live draft-from-recording and MCP wrappers remain later.
 
 ## S0 Workflow Evidence Closure
 
@@ -66,10 +72,10 @@ Purpose: close the existing Workflow evidence trust gap before semantic recordin
 Owns:
 
 - live visual diagnostics Open/Reveal product evidence
-- branch evidence real-run consistency product evidence
-- macro evidence Reveal Report / Open Screenshot product evidence
+- branch evidence real-run consistency product evidence, satisfied for strict audit by `live-branch-evidence-consistency.mov`; richer manual Run Detail drill-in can still be recaptured later
+- macro evidence Reveal Report / Open Screenshot product evidence, satisfied for strict audit by `live-macro-evidence-open-reveal.mov`
 - template/baseline preview refs design note
-- real drag/reorder or drag-link WYSIWYG product evidence
+- authoring WYSIWYG product evidence status/history; task reorder live clip is done, drag-link remains optional/future
 
 Does not own:
 
@@ -130,6 +136,8 @@ Owns:
 - AX/window metadata snapshots through app-edge adapter
 - permission preflight and degraded-mode UX hooks
 - suppression record production for sensitive or excluded evidence
+- pure redaction planning from suppression records to frame masks and video ranges
+- app-edge redacted frame PNG writing from redaction plans
 - product evidence for live `.mov` + keyframe capture
 
 Does not own:
@@ -142,8 +150,10 @@ Does not own:
 Deliverables:
 
 - pure `SemanticRecordingCaptureSession` and fake-client tests: first pass done in `SemanticRecordingCapture.swift` / `SemanticRecordingCaptureTests`
-- app-edge ScreenCaptureKit/Vision/store skeletons: first pass done in `ScreenCaptureKitSemanticCapture.swift`, `VisionRecordingIndexer.swift`, `RecordingBundleStore.swift` and `RecordingArtifactURL.swift`
+- app-edge ScreenCaptureKit/Vision/store skeletons and sidecar-aware bundle loading/catalog: first pass done in `ScreenCaptureKitSemanticCapture.swift`, `VisionRecordingIndexer.swift`, `RecordingBundleStore.swift`, `RecordingArtifactURL.swift` and `SemanticRecordingBundleSidecars`
 - semantic recording preflight contract and live PermissionCenter bridge: first pass done in `SemanticRecordingPreflight.swift` / `LiveSemanticRecordingPreflight.swift`
+- semantic recording frame/video redaction planner: first pass done in `SemanticRecordingRedaction.swift` / `SemanticRecordingRedactionTests`
+- app-edge redacted frame PNG renderer/store hook, redacted `.mov` renderer/store hook, live finish application and Review/CLI redacted-frame preference: first pass done in `SemanticRecordingFrameRedactionRenderer.swift`, `SemanticRecordingVideoRedactionRenderer.swift`, `RecordingBundleStore.applyRedactionPlan`, `LiveSemanticRecordingSession.finish`, `SemanticRecordingReviewProjection` and S4 frame payloads; live product evidence remains open
 - live smoke proving `.mov` plus event-aligned keyframes from the installed App on macOS 15+: adapter compiles; ordinary recording lifecycle wiring and live product evidence still open
 - fake-client tests for alignment/indexing, storage and failure paths
 - live app-edge smoke/product evidence
@@ -174,6 +184,11 @@ Does not own:
 Deliverables:
 
 - fixture-based Review UI first
+- core review projection and fixture snapshot scenario: first pass implemented in `SemanticRecordingReviewProjection`, `SemanticRecordingReviewFixtureView` and `workflow product-evidence snapshot semantic-review-timeline`
+- Macro Review / Run Detail first integration: `AutomationTaskRunDetailView` opens real bundle directories through `SemanticRecordingReviewPresenter`; Review shows available keyframe artifacts, source/runtime/diff refs, before/after frame chips and frame drag region selection
+- frame-to-condition draft patch first pass: `SemanticRecordingReviewDraftPatchBuilder` generates review-only `AutomationWorkflowDraftPatchDocument` values with visual asset upsert ops before `addTask` / `setCondition`
+- Draft Preview handoff first pass: Review-generated patches open `AutomationWorkflowDraftPreviewSheet` and import only through existing confirmed import callbacks
+- pixel color picking first pass: Review renders `AutomationVisualColorPickerView` for `pixelMatched` candidates and passes user-reviewed `pixelColorHex` into draft patch generation
 - product evidence screenshot/clip for frame-to-condition
 - integration with existing `AutomationWorkflowDraftVisualAssets` and artifact presenters
 - updated UX docs when review behavior changes
@@ -204,6 +219,11 @@ Does not own:
 
 Deliverables:
 
+- fixture-backed `recording show` / `recording frames` / `recording frame show` / `recording events-near`: first pass done over `SemanticRecordingFixture.checkoutBundle()`, with `sparkle.cli.result.v1`, fixture-mode warning, evidence ids and safe artifact refs
+- fixture-backed `recording ocr search` and deterministic `recording suggest waits/conditions`: first pass done over `SemanticRecordingFixture.checkoutQueryResults()` and `checkoutSuggestions()`, with OCR observation ids, bounds, confidence, safe refs, suggestion confidence/risk/fallback and review-only mutation policy
+- fixture-backed and explicit stored-bundle metadata-only `recording visual search`: first pass done over persisted `RecordingVisualObservation` kind/label/text filters, with observation ids, bounds, confidence/score and safe refs
+- explicit-source `recording asset extract` / `recording asset baseline`: first pass done over selected frame artifacts and caller-supplied regions, writing package-local PNG refs compatible with `AutomationWorkflowDraftVisualAssets`
+- explicit stored-bundle read-only `recording list` / `recording show` / `recording explain` / `recording frames` / `recording frame show` / `recording events-near` / `recording ocr search` / `recording visual search`: first pass done through S2 `RecordingBundleStore` with `--recordings-root <path>` and `--bundle-path <dir>` source options; default/live root policy, stored suggestion synthesis and missing/deleted artifact status remain open
 - CLI fixtures and transcript evidence
 - deterministic local query/suggestion tests
 - draft generation that still goes through validate/simulate/dry-run/import
@@ -217,9 +237,9 @@ Recommended order:
 2. S1 freezes bundle v0 contracts and fixture bundle shape.
 3. S2 runs macOS 15+ ScreenCaptureKit API spike against S1 draft contracts.
 4. S3 builds Review UI against S1 fixtures, then swaps to S2 live evidence.
-5. S4 starts `recording show` and `recording frames` after S1 fixtures exist.
-6. S2 adds OCR/AX observation production; S4 adds OCR search after fixture data exists.
-7. S3 ships frame-to-condition; S4 ships suggestion commands that cite the same evidence refs.
+5. S4 first slice exposes fixture `recording show`, `frames`, `frame show` and `events-near` after S1 fixtures exist; this first slice is done.
+6. S2 adds OCR/AX/visual observation production; S4 fixture OCR search, metadata-only visual search and deterministic suggestion query are done from fixture data, and explicit stored-bundle read-only queries consume the S2 sidecar-aware loader.
+7. S3 ships frame-to-condition; S4 live suggestion commands should cite the same evidence refs after live bundle loading is stable.
 8. App Knowledge remains future work until CLI explain/search/draft-from-recording are stable.
 
 ## Cross-Owner Rules
@@ -230,21 +250,23 @@ Recommended order:
 - S4 consumes the same services as UI; it must not create a second private understanding of bundles.
 - Every AI suggestion must cite frame/event/evidence IDs, confidence, risk and fallback.
 - Every live capability needs fake-client tests first and product evidence before being marked complete.
-- If a task cannot improve “录完能看懂、失败能解释、修正有证据、组合前可审阅”, it is not next-phase priority. Use [10-next-stage-reality-check.md](10-next-stage-reality-check.md) when a proposed task feels like MCP/App Knowledge/AI-agent overreach.
+- If a task cannot improve “录完能看懂、失败能解释、修正有证据、组合前可审阅”, it is not next-phase priority. Use [10-next-stage-reality-check.md](10-next-stage-reality-check.md) and [12-remaining-work-and-direction-control.md](12-remaining-work-and-direction-control.md) when a proposed task feels like MCP/App Knowledge/AI-agent overreach.
+- Use [13-direction-decision-and-remaining-slices.md](13-direction-decision-and-remaining-slices.md) when deciding whether a remaining task belongs to Workflow trust, Review and Teach, live capture, CLI/AI collaboration, or workflow packaging/import boundaries.
 
 ## Next Target
 
-After the current commit, the next target should be:
+From the current worktree, the next target should be:
 
 ```text
-Phase 0 semantic recording contract + macOS 15 ScreenCaptureKit API spike
+S0 live evidence closure + S2 authorized live bundle smoke + S4 product-ready default/live catalog policy after live bundle evidence
 ```
 
 Minimum accepted result:
 
 - S1 bundle v0 contract remains green and fixture-backed through `SemanticRecordingFixture.checkoutBundle()`.
-- S2 proves one `.mov` plus event-aligned keyframes.
-- S3 can open a fixture review timeline.
-- S4 can run `recording show` / `recording frames` against a fixture bundle.
+- S0 remains at 13/13 live-product evidence after visual diagnostics and macro evidence clips; rerun strict audit if any product-evidence files change.
+- S2 proves one authorized `.mov` plus event-aligned keyframes and keeps retention/suppression boundaries documented.
+- S3 can open a real bound bundle from Run Detail without an open panel before claiming user-facing Review completion.
+- S4 fixture OCR/visual/explain query, suggestion commands, fixture/review-only draft-from-recording and explicit stored-bundle read-only catalog/query/explain commands are done on top of S1 fixtures plus S2 sidecar-aware loader/catalog APIs; S4 product-ready default/live catalog still waits for authorized live bundle evidence, root/id policy, stored suggestion synthesis and artifact status surfacing.
 
-That is enough to start implementation without pretending the full AI/app-knowledge vision is already solved.
+That is enough to keep implementation moving without pretending the full AI/App Knowledge vision is already solved.

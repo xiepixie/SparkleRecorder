@@ -97,10 +97,17 @@ struct ActionRowView: View {
 
             Group {
                 if let ocrText = g.textAnchor?.text {
-                    Text("\"\(ocrText)\"")
-                        .lineLimit(1)
-                        .truncationMode(.tail)
-                        .foregroundStyle(Brand.sigAmber)
+                    if ActionGroupProjection.textAnchorIsReady(g.textAnchor) {
+                        Text("\"\(ocrText)\"")
+                            .lineLimit(1)
+                            .truncationMode(.tail)
+                            .foregroundStyle(Brand.sigAmber)
+                    } else {
+                        Text(NSLocalizedString("No target text", comment: ""))
+                            .lineLimit(1)
+                            .truncationMode(.tail)
+                            .foregroundStyle(Brand.sigAmber)
+                    }
                 } else if g.kind.previewsPointSequence {
                     Text(String(format: NSLocalizedString("%d points", comment: ""), max(g.path.count, g.clickCount)))
                 } else if let sp = g.startPoint {

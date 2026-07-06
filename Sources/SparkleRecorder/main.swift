@@ -1,4 +1,5 @@
 import Cocoa
+import CryptoKit
 import SparkleRecorderCore
 
 // CLI playback mode: ./SparkleRecorder --play /path/to/macro.tinyrec
@@ -52,6 +53,7 @@ private struct WorkflowProductEvidenceCompleteSidecarPayload: Codable, Equatable
     var clipPath: String
     var clipExists: Bool
     var clipMeetsMinimumByteCount: Bool
+    var clipHasSupportedContainer: Bool
     var action: String
     var sidecarCompleteAfterWrite: Bool
     var incompleteSidecarLabels: [String]
@@ -67,25 +69,192 @@ private enum SemanticRecordingDebugSmokeStatus: String, Codable, Equatable, Send
 private struct SemanticRecordingDebugSmokePayload: Codable, Equatable, Sendable {
     var status: SemanticRecordingDebugSmokeStatus
     var recordingID: UUID
+    var commandPlan: SemanticRecordingDebugSmokeCommandPlan?
     var capturePolicy: RecordingCapturePolicy
     var captureTarget: RecordingCaptureTarget
     var preflight: SemanticRecordingPreflightResult
+    var preflightPresentation: SemanticRecordingPreflightPresentation
     var bundleDirectory: String?
     var manifestPath: String?
+    var evidenceSidecarPath: String?
     var videoSegmentCount: Int
     var frameCount: Int
     var timelineEventCount: Int
     var aiSafeEventCount: Int
     var visualObservationCount: Int
     var suppressionCount: Int
+    var syntheticSuppressionCount: Int
+    var syntheticRedactionReason: RecordingSuppressionReason?
+    var bundleReadinessPolicy: SemanticRecordingBundleReadinessPolicy
+    var bundleReadinessStatus: SemanticRecordingBundleReadinessStatus?
+    var bundleReadinessIssueCount: Int
+    var bundleReadinessBlockingIssueCount: Int
+    var bundleReadinessDegradedIssueCount: Int
+    var bundleReadinessIssues: [SemanticRecordingBundleReadinessIssue]
+    var bundleReadinessFollowUps: [String]
+    var redactedFrameCount: Int
+    var redactedFrameIndexPath: String?
+    var redactedVideoCount: Int
+    var redactedVideoIndexPath: String?
+    var pendingVideoRangeRedactionCount: Int
+    var persistedBundleLoad: SemanticRecordingDebugSmokePersistedBundleLoadEvidence?
+    var persistedBundleCountCheck: SemanticRecordingDebugSmokePersistedBundleCountCheck
+}
+
+private struct RecordingCLIBundle {
+    var requestedRecordingID: String
+    var fixture: String?
+    var sourceOption: String?
+    var bundleDirectory: URL?
+    var bundle: SemanticRecordingBundle
 }
 
 if args.count >= 2, args[1] == "workflow" {
     runWorkflowCLI(args)
 }
 
+if args.count >= 2, args[1] == "recording" {
+    runRecordingCLI(args)
+}
+
 if args.count >= 2, args[1] == "semantic-recording" {
     runSemanticRecordingDebugCLI(args)
+}
+
+private func runRecordingCLI(_ args: [String]) -> Never {
+    let recordingArgs = Array(args.dropFirst(2))
+    let wantsJSON = recordingArgs.contains("--json")
+    let command = recordingCommandName(recordingArgs)
+
+    do {
+        guard !recordingArgs.isEmpty else {
+            throw WorkflowCLIError(
+                "unsupportedCommand",
+                "Expected a recording command, such as 'recording show checkout-demo --fixture checkout --json'."
+            )
+        }
+
+        if recordingArgs[0] == "list" {
+            let exitCode = try runRecordingList(
+                Array(recordingArgs.dropFirst()),
+                command: "recording.list",
+                wantsJSON: wantsJSON
+            )
+            exit(Int32(exitCode))
+        }
+
+        if recordingArgs[0] == "show" {
+            let exitCode = try runRecordingShow(
+                Array(recordingArgs.dropFirst()),
+                command: "recording.show",
+                wantsJSON: wantsJSON
+            )
+            exit(Int32(exitCode))
+        }
+
+        if recordingArgs[0] == "explain" {
+            let exitCode = try runRecordingExplain(
+                Array(recordingArgs.dropFirst()),
+                command: "recording.explain",
+                wantsJSON: wantsJSON
+            )
+            exit(Int32(exitCode))
+        }
+
+        if recordingArgs[0] == "frames" {
+            let exitCode = try runRecordingFrames(
+                Array(recordingArgs.dropFirst()),
+                command: "recording.frames",
+                wantsJSON: wantsJSON
+            )
+            exit(Int32(exitCode))
+        }
+
+        if recordingArgs.count >= 2,
+           recordingArgs[0] == "frame",
+           recordingArgs[1] == "show" {
+            let exitCode = try runRecordingFrameShow(
+                Array(recordingArgs.dropFirst(2)),
+                command: "recording.frame.show",
+                wantsJSON: wantsJSON
+            )
+            exit(Int32(exitCode))
+        }
+
+        if recordingArgs[0] == "events-near" {
+            let exitCode = try runRecordingEventsNear(
+                Array(recordingArgs.dropFirst()),
+                command: "recording.eventsNear",
+                wantsJSON: wantsJSON
+            )
+            exit(Int32(exitCode))
+        }
+
+        if recordingArgs.count >= 2,
+           recordingArgs[0] == "ocr",
+           recordingArgs[1] == "search" {
+            let exitCode = try runRecordingOCRSearch(
+                Array(recordingArgs.dropFirst(2)),
+                command: "recording.ocr.search",
+                wantsJSON: wantsJSON
+            )
+            exit(Int32(exitCode))
+        }
+
+        if recordingArgs.count >= 2,
+           recordingArgs[0] == "visual",
+           recordingArgs[1] == "search" {
+            let exitCode = try runRecordingVisualSearch(
+                Array(recordingArgs.dropFirst(2)),
+                command: "recording.visual.search",
+                wantsJSON: wantsJSON
+            )
+            exit(Int32(exitCode))
+        }
+
+        if recordingArgs.count >= 2,
+           recordingArgs[0] == "asset",
+           (recordingArgs[1] == "extract" || recordingArgs[1] == "baseline") {
+            let exitCode = try runRecordingAssetExtract(
+                Array(recordingArgs.dropFirst(2)),
+                command: recordingArgs[1] == "baseline" ? "recording.asset.baseline" : "recording.asset.extract",
+                wantsJSON: wantsJSON,
+                defaultKind: recordingArgs[1] == "baseline" ? .baseline : .imageTemplate
+            )
+            exit(Int32(exitCode))
+        }
+
+        if recordingArgs[0] == "suggest" {
+            let exitCode = try runRecordingSuggest(
+                Array(recordingArgs.dropFirst()),
+                command: recordingCommandName(recordingArgs),
+                wantsJSON: wantsJSON
+            )
+            exit(Int32(exitCode))
+        }
+
+        throw WorkflowCLIError(
+            "unsupportedCommand",
+            "Unsupported recording command '\(recordingArgs.joined(separator: " "))'."
+        )
+    } catch {
+        let cliError = error as? WorkflowCLIError ?? WorkflowCLIError(
+            "commandFailed",
+            String(describing: error)
+        )
+        let envelope = AutomationCLIResultEnvelope<AutomationCLIEmptyPayload>.failure(
+            command: command,
+            code: cliError.code,
+            message: cliError.message,
+            path: cliError.path
+        )
+        if wantsJSON {
+            writeWorkflowJSON(envelope)
+        } else {
+            writeWorkflowError("SparkleRecorder: \(cliError.message)")
+        }
+        exit(1)
+    }
 }
 
 private func runSemanticRecordingDebugCLI(_ args: [String]) -> Never {
@@ -249,6 +418,17 @@ private func runWorkflowCLI(_ args: [String]) -> Never {
             exit(Int32(exitCode))
         }
 
+        if workflowArgs.count >= 2,
+           workflowArgs[0] == "acceptance",
+           workflowArgs[1] == "bound-window" {
+            let exitCode = try runWorkflowAcceptanceBoundWindow(
+                Array(workflowArgs.dropFirst(2)),
+                command: "workflow acceptance bound-window",
+                wantsJSON: wantsJSON
+            )
+            exit(Int32(exitCode))
+        }
+
         if workflowArgs[0] == "cancel" {
             let exitCode = try runWorkflowCancel(
                 Array(workflowArgs.dropFirst()),
@@ -341,6 +521,15 @@ private func runWorkflowCLI(_ args: [String]) -> Never {
             let exitCode = try runWorkflowDraftNormalize(
                 Array(workflowArgs.dropFirst(2)),
                 command: "workflow draft normalize",
+                wantsJSON: wantsJSON
+            )
+            exit(Int32(exitCode))
+        }
+
+        if workflowArgs[0] == "draft", workflowArgs[1] == "from-recording" {
+            let exitCode = try runWorkflowDraftFromRecording(
+                Array(workflowArgs.dropFirst(2)),
+                command: "workflow draft from-recording",
                 wantsJSON: wantsJSON
             )
             exit(Int32(exitCode))
@@ -476,7 +665,7 @@ private func runWorkflowProductEvidenceSnapshot(
           !scenarioArgument.hasPrefix("--") else {
         throw WorkflowCLIError(
             "missingArgument",
-                "Expected a snapshot scenario: idle, drag-link-authoring, task-reorder-authoring, running, failed-run-detail, failed-run-preview-unavailable, visual-diagnostics-drill-in, branch-evidence, or template-baseline-preview-refs."
+                "Expected a snapshot scenario: idle, drag-link-authoring, task-reorder-authoring, running, failed-run-detail, failed-run-preview-unavailable, visual-diagnostics-drill-in, branch-evidence, template-baseline-preview-refs, or semantic-review-timeline."
         )
     }
 
@@ -595,6 +784,10 @@ private func runWorkflowProductEvidenceAudit(
         in: resolvedDirectoryURL,
         existingPaths: existingPaths
     )
+    let clipContainers = try productEvidenceClipContainers(
+        in: resolvedDirectoryURL,
+        existingPaths: existingPaths
+    )
     let sidecarContents = try productEvidenceSidecarContents(
         in: resolvedDirectoryURL,
         existingPaths: existingPaths
@@ -603,7 +796,8 @@ private func runWorkflowProductEvidenceAudit(
         directory: resolvedDirectoryURL.path,
         existingPaths: existingPaths,
         sidecarContents: sidecarContents,
-        fileByteCounts: fileByteCounts
+        fileByteCounts: fileByteCounts,
+        clipContainers: clipContainers
     )
     let missingMessages = payload.items
         .filter { $0.required && !$0.satisfied }
@@ -680,6 +874,10 @@ private func runWorkflowProductEvidenceCapturePlan(
         in: resolvedDirectoryURL,
         existingPaths: existingPaths
     )
+    let clipContainers = try productEvidenceClipContainers(
+        in: resolvedDirectoryURL,
+        existingPaths: existingPaths
+    )
     let sidecarContents = try productEvidenceSidecarContents(
         in: resolvedDirectoryURL,
         existingPaths: existingPaths
@@ -688,7 +886,8 @@ private func runWorkflowProductEvidenceCapturePlan(
         directory: resolvedDirectoryURL.path,
         existingPaths: existingPaths,
         sidecarContents: sidecarContents,
-        fileByteCounts: fileByteCounts
+        fileByteCounts: fileByteCounts,
+        clipContainers: clipContainers
     )
     let warnings = payload.items
         .filter { !$0.satisfied }
@@ -711,8 +910,8 @@ private func runWorkflowProductEvidenceCapturePlan(
             )
         ] : [
             AutomationCLINextAction(
-                command: "Use the sidecarTemplateCommand from each missing item, fill the sidecar, save the live clip, then rerun capture-plan.",
-                reason: "The plan keeps capture preparation separate from the strict completion gate."
+                command: "Use sidecarTemplateCommand before recording, then sidecarCompletionCommand after saving the live clip.",
+                reason: "The plan keeps preparation, reviewed metadata entry and strict completion separate."
             ),
             AutomationCLINextAction(
                 command: "SparkleRecorder workflow product-evidence audit --require-live --json",
@@ -734,11 +933,15 @@ private func runWorkflowProductEvidenceCapturePlan(
                 FileHandle.standardOutput.write(Data(("  option sidecar: \(option.sidecarPath)\n").utf8))
                 FileHandle.standardOutput.write(Data(("    clips: \(option.clipPathCandidates.joined(separator: ", "))\n").utf8))
                 FileHandle.standardOutput.write(Data(("    template: \(option.sidecarTemplateCommand)\n").utf8))
+                FileHandle.standardOutput.write(Data(("    complete: \(option.sidecarCompletionCommand)\n").utf8))
                 if !option.missingPaths.isEmpty {
                     FileHandle.standardOutput.write(Data(("    missing: \(option.missingPaths.joined(separator: ", "))\n").utf8))
                 }
                 if !option.undersizedPaths.isEmpty {
                     FileHandle.standardOutput.write(Data(("    undersized: \(option.undersizedPaths.joined(separator: ", "))\n").utf8))
+                }
+                if !option.invalidClipContainerPaths.isEmpty {
+                    FileHandle.standardOutput.write(Data(("    invalid clip container: \(option.invalidClipContainerPaths.joined(separator: ", "))\n").utf8))
                 }
                 if !option.incompleteSidecarLabels.isEmpty {
                     FileHandle.standardOutput.write(Data(("    incomplete labels: \(option.incompleteSidecarLabels.joined(separator: ", "))\n").utf8))
@@ -794,6 +997,10 @@ private func runWorkflowProductEvidencePrepareLiveCapture(
         in: resolvedDirectoryURL,
         existingPaths: existingPaths
     )
+    let clipContainers = try productEvidenceClipContainers(
+        in: resolvedDirectoryURL,
+        existingPaths: existingPaths
+    )
     let sidecarContents = try productEvidenceSidecarContents(
         in: resolvedDirectoryURL,
         existingPaths: existingPaths
@@ -803,6 +1010,7 @@ private func runWorkflowProductEvidencePrepareLiveCapture(
         existingPaths: existingPaths,
         sidecarContents: sidecarContents,
         fileByteCounts: fileByteCounts,
+        clipContainers: clipContainers,
         includeSatisfied: includeSatisfied
     )
 
@@ -988,6 +1196,10 @@ private func runWorkflowProductEvidenceCompleteSidecar(
         in: resolvedDirectoryURL,
         existingPaths: existingPaths
     )
+    let existingClipContainers = try productEvidenceClipContainers(
+        in: resolvedDirectoryURL,
+        existingPaths: existingPaths
+    )
     let existingSidecarContents = try productEvidenceSidecarContents(
         in: resolvedDirectoryURL,
         existingPaths: existingPaths
@@ -996,7 +1208,8 @@ private func runWorkflowProductEvidenceCompleteSidecar(
         directory: resolvedDirectoryURL.path,
         existingPaths: existingPaths,
         sidecarContents: existingSidecarContents,
-        fileByteCounts: existingByteCounts
+        fileByteCounts: existingByteCounts,
+        clipContainers: existingClipContainers
     )
     let existingOption = existingPlan.items
         .first { $0.id == completed.id }?
@@ -1024,6 +1237,10 @@ private func runWorkflowProductEvidenceCompleteSidecar(
         in: resolvedDirectoryURL,
         existingPaths: refreshedPaths
     )
+    let refreshedClipContainers = try productEvidenceClipContainers(
+        in: resolvedDirectoryURL,
+        existingPaths: refreshedPaths
+    )
     let refreshedContents = try productEvidenceSidecarContents(
         in: resolvedDirectoryURL,
         existingPaths: refreshedPaths
@@ -1032,7 +1249,8 @@ private func runWorkflowProductEvidenceCompleteSidecar(
         directory: resolvedDirectoryURL.path,
         existingPaths: refreshedPaths,
         sidecarContents: refreshedContents,
-        fileByteCounts: refreshedByteCounts
+        fileByteCounts: refreshedByteCounts,
+        clipContainers: refreshedClipContainers
     )
     let refreshedItem = refreshedPlan.items.first { $0.id == completed.id }
     let refreshedOption = refreshedItem?.options.first { $0.sidecarPath == completed.sidecarPath }
@@ -1040,6 +1258,7 @@ private func runWorkflowProductEvidenceCompleteSidecar(
     let clipExists = refreshedPaths.contains(completed.clipPath)
     let clipMeetsMinimumByteCount = clipExists &&
         (refreshedByteCounts[completed.clipPath] ?? 0) >= AutomationProductEvidenceAudit.minimumLiveClipByteCount
+    let clipHasSupportedContainer = refreshedClipContainers[completed.clipPath]?.isSupported == true
     let action = existedBeforeWrite ? (overwrite ? "overwritten" : "completedDraft") : "written"
     let payload = WorkflowProductEvidenceCompleteSidecarPayload(
         directory: resolvedDirectoryURL.path,
@@ -1049,6 +1268,7 @@ private func runWorkflowProductEvidenceCompleteSidecar(
         clipPath: completed.clipPath,
         clipExists: clipExists,
         clipMeetsMinimumByteCount: clipMeetsMinimumByteCount,
+        clipHasSupportedContainer: clipHasSupportedContainer,
         action: action,
         sidecarCompleteAfterWrite: incompleteSidecarLabels.isEmpty,
         incompleteSidecarLabels: incompleteSidecarLabels,
@@ -1073,29 +1293,52 @@ private func runWorkflowProductEvidenceCompleteSidecar(
             message: "\(completed.clipPath) is present but empty or size-unknown; replace it with the real live recording.",
             path: completed.clipPath
         )
+    } else if !clipHasSupportedContainer {
+        warning = AutomationCLIMessage(
+            code: "invalidLiveClipContainer",
+            message: "\(completed.clipPath) is present but does not look like a supported .mov/.mp4 video container.",
+            path: completed.clipPath
+        )
     } else {
         warning = nil
     }
-    let envelope = AutomationCLIResultEnvelope<WorkflowProductEvidenceCompleteSidecarPayload>(
-        ok: true,
-        command: command,
-        data: payload,
-        warnings: warning.map { [$0] } ?? [],
-        nextActions: payload.targetSatisfiedAfterWrite ? [
+    let nextActions: [AutomationCLINextAction]
+    if payload.targetSatisfiedAfterWrite {
+        nextActions = [
             AutomationCLINextAction(
                 command: "SparkleRecorder workflow product-evidence audit --require-live --json",
                 reason: "This item now has a matching clip and completed sidecar; rerun the strict gate."
             )
-        ] : [
+        ]
+    } else if !payload.sidecarCompleteAfterWrite {
+        nextActions = [
             AutomationCLINextAction(
-                command: "Save the live clip as \(completed.clipPath), then rerun capture-plan.",
-                reason: "S0 live evidence requires both the clip and completed sidecar."
+                command: "Review \(completed.sidecarPath), fix invalid labels, then rerun capture-plan.",
+                reason: "S0 live sidecars must name one accepted clip, include worktree context, and identify a live recording source."
             ),
             AutomationCLINextAction(
                 command: "SparkleRecorder workflow product-evidence audit --require-live --json",
                 reason: "Strict S0 audit must stay red until every live gate is satisfied."
             )
         ]
+    } else {
+        nextActions = [
+            AutomationCLINextAction(
+                command: "Save or replace the live clip as \(completed.clipPath), then rerun capture-plan.",
+                reason: "S0 live evidence requires both the completed sidecar and a non-empty supported .mov/.mp4 recording."
+            ),
+            AutomationCLINextAction(
+                command: "SparkleRecorder workflow product-evidence audit --require-live --json",
+                reason: "Strict S0 audit must stay red until every live gate is satisfied."
+            )
+        ]
+    }
+    let envelope = AutomationCLIResultEnvelope<WorkflowProductEvidenceCompleteSidecarPayload>(
+        ok: true,
+        command: command,
+        data: payload,
+        warnings: warning.map { [$0] } ?? [],
+        nextActions: nextActions
     )
 
     if wantsJSON {
@@ -1105,6 +1348,7 @@ private func runWorkflowProductEvidenceCompleteSidecar(
         SparkleRecorder: completed sidecar \(payload.sidecarPath) [\(payload.action)].
         - clip: \(payload.clipPath) \(payload.clipExists ? "present" : "missing")
         - clip non-empty: \(payload.clipMeetsMinimumByteCount ? "yes" : "no")
+        - clip video container: \(payload.clipHasSupportedContainer ? "yes" : "no")
         - sidecar labels complete: \(payload.sidecarCompleteAfterWrite ? "yes" : "no")
         - incomplete labels: \(payload.incompleteSidecarLabels.isEmpty ? "none" : payload.incompleteSidecarLabels.joined(separator: ", "))
         - live gate satisfied: \(payload.targetSatisfiedAfterWrite ? "yes" : "no")
@@ -1204,6 +1448,46 @@ private func productEvidenceFileByteCounts(
     return byteCounts
 }
 
+private func productEvidenceClipContainers(
+    in directoryURL: URL,
+    existingPaths: Set<String>
+) throws -> [String: AutomationProductEvidenceClipContainer] {
+    var containers: [String: AutomationProductEvidenceClipContainer] = [:]
+    for path in existingPaths where path.hasSuffix(".mov") || path.hasSuffix(".mp4") {
+        let url = directoryURL.appendingPathComponent(path, isDirectory: false)
+        containers[path] = try productEvidenceClipContainer(at: url)
+    }
+    return containers
+}
+
+private func productEvidenceClipContainer(
+    at url: URL
+) throws -> AutomationProductEvidenceClipContainer {
+    let handle = try FileHandle(forReadingFrom: url)
+    defer {
+        try? handle.close()
+    }
+    let data = try handle.read(upToCount: 64) ?? Data()
+    return productEvidenceClipContainer(from: data)
+}
+
+private func productEvidenceClipContainer(
+    from data: Data
+) -> AutomationProductEvidenceClipContainer {
+    let bytes = Array(data)
+    guard bytes.count >= 8 else {
+        return .unsupported
+    }
+    let atomType = String(bytes: bytes[4..<8], encoding: .ascii) ?? ""
+    if atomType == "ftyp" {
+        return .isoBaseMedia
+    }
+    if ["moov", "mdat", "wide", "free"].contains(atomType) {
+        return .isoBaseMedia
+    }
+    return .unsupported
+}
+
 private func productEvidenceSidecarContents(
     in directoryURL: URL,
     existingPaths: Set<String>
@@ -1230,6 +1514,1118 @@ private func productEvidenceRequiredCompletionValue(
     return trimmed
 }
 
+private func runRecordingShow(
+    _ arguments: [String],
+    command: String,
+    wantsJSON: Bool
+) throws -> Int {
+    let recordingBundle = try loadRecordingCLIBundle(arguments)
+    let envelope = AutomationCLIResultEnvelope<SemanticRecordingCLISummaryPayload>
+        .semanticRecordingShow(
+            command: command,
+            requestedRecordingID: recordingBundle.requestedRecordingID,
+            bundle: recordingBundle.bundle,
+            fixture: recordingBundle.fixture,
+            sourceOption: recordingBundle.sourceOption
+        )
+
+    if wantsJSON {
+        writeWorkflowJSON(envelope)
+    } else {
+        writeRecordingShowSummary(envelope.data)
+    }
+    return 0
+}
+
+private func runRecordingExplain(
+    _ arguments: [String],
+    command: String,
+    wantsJSON: Bool
+) throws -> Int {
+    let recordingBundle = try loadRecordingCLIBundle(arguments)
+    let envelope = AutomationCLIResultEnvelope<SemanticRecordingCLIExplainPayload>
+        .semanticRecordingExplain(
+            command: command,
+            requestedRecordingID: recordingBundle.requestedRecordingID,
+            bundle: recordingBundle.bundle,
+            fixture: recordingBundle.fixture,
+            sourceOption: recordingBundle.sourceOption
+        )
+
+    if wantsJSON {
+        writeWorkflowJSON(envelope)
+    } else {
+        writeRecordingExplainSummary(envelope.data)
+    }
+    return 0
+}
+
+private func runRecordingList(
+    _ arguments: [String],
+    command: String,
+    wantsJSON: Bool
+) throws -> Int {
+    var fixture: String?
+    var recordingsRoot: URL?
+    var index = 0
+    while index < arguments.count {
+        let token = arguments[index]
+        switch token {
+        case "--json":
+            break
+        case "--fixture":
+            guard index + 1 < arguments.count else {
+                throw WorkflowCLIError("missingArgument", "--fixture requires a fixture name.", path: token)
+            }
+            fixture = arguments[index + 1]
+            index += 1
+        case "--recordings-root":
+            guard index + 1 < arguments.count else {
+                throw WorkflowCLIError("missingArgument", "--recordings-root requires a path.", path: token)
+            }
+            recordingsRoot = URL(fileURLWithPath: arguments[index + 1], isDirectory: true)
+                .standardizedFileURL
+            index += 1
+        default:
+            if token.hasPrefix("--") {
+                throw WorkflowCLIError("unsupportedOption", "Unsupported option '\(token)'.", path: token)
+            }
+            throw WorkflowCLIError("unexpectedArgument", "Unexpected argument '\(token)'.", path: token)
+        }
+        index += 1
+    }
+
+    switch (fixture, recordingsRoot) {
+    case let (fixture?, nil):
+        try validateRecordingCLIFixture(fixture)
+        let entry = SemanticRecordingCLICatalogEntry(
+            recordingID: SemanticRecordingFixture.recordingID,
+            source: .fixture,
+            fixture: fixture,
+            manifestAvailable: true
+        )
+        let envelope = AutomationCLIResultEnvelope<SemanticRecordingCLIListPayload>
+            .semanticRecordingList(
+                command: command,
+                recordings: [entry],
+                fixture: fixture
+            )
+        if wantsJSON {
+            writeWorkflowJSON(envelope)
+        } else {
+            writeRecordingListSummary(envelope.data)
+        }
+        return 0
+    case let (nil, recordingsRoot?):
+        let store = RecordingBundleStore(rootDirectory: recordingsRoot)
+        let catalog = try waitForWorkflowCLIAsync {
+            try await store.listBundleCatalog()
+        }
+        let entries = catalog.map { entry in
+            SemanticRecordingCLICatalogEntry(
+                recordingID: entry.recordingID,
+                source: .storedBundle,
+                modifiedAt: entry.modifiedAt,
+                manifestAvailable: true
+            )
+        }
+        let envelope = AutomationCLIResultEnvelope<SemanticRecordingCLIListPayload>
+            .semanticRecordingList(
+                command: command,
+                recordings: entries,
+                recordingsRoot: recordingsRoot.path,
+                sourceOption: recordingCLISourceOption("--recordings-root", url: recordingsRoot)
+            )
+        if wantsJSON {
+            writeWorkflowJSON(envelope)
+        } else {
+            writeRecordingListSummary(envelope.data)
+        }
+        return 0
+    case (.some, .some):
+        throw WorkflowCLIError(
+            "conflictingRecordingSource",
+            "Use only one recording source: --fixture or --recordings-root.",
+            path: "--recordings-root"
+        )
+    case (nil, nil):
+        throw WorkflowCLIError(
+            "missingArgument",
+            "recording list requires --recordings-root <path> or --fixture checkout.",
+            path: "--recordings-root"
+        )
+    }
+}
+
+private func runRecordingFrames(
+    _ arguments: [String],
+    command: String,
+    wantsJSON: Bool
+) throws -> Int {
+    let recordingBundle = try loadRecordingCLIBundle(arguments)
+    let envelope = AutomationCLIResultEnvelope<SemanticRecordingCLIFramesPayload>
+        .semanticRecordingFrames(
+            command: command,
+            requestedRecordingID: recordingBundle.requestedRecordingID,
+            bundle: recordingBundle.bundle,
+            fixture: recordingBundle.fixture,
+            sourceOption: recordingBundle.sourceOption
+        )
+
+    if wantsJSON {
+        writeWorkflowJSON(envelope)
+    } else {
+        writeRecordingFramesSummary(envelope.data)
+    }
+    return 0
+}
+
+private func runRecordingFrameShow(
+    _ arguments: [String],
+    command: String,
+    wantsJSON: Bool
+) throws -> Int {
+    var frameID: UUID?
+    let recordingBundle = try loadRecordingCLIBundle(arguments) { token, index, arguments in
+        switch token {
+        case "--frame":
+            guard index + 1 < arguments.count else {
+                throw WorkflowCLIError("missingArgument", "--frame requires a frame UUID.", path: token)
+            }
+            frameID = try parseWorkflowCLIUUID(arguments[index + 1], path: token)
+            return 1
+        default:
+            return nil
+        }
+    }
+    guard let frameID else {
+        throw WorkflowCLIError("missingArgument", "recording frame show requires --frame <uuid>.", path: "--frame")
+    }
+    guard let frame = recordingBundle.bundle.frames.first(where: { $0.id == frameID }) else {
+        throw WorkflowCLIError("unknownFrame", "Recording bundle does not contain frame '\(frameID.uuidString)'.", path: "--frame")
+    }
+
+    let envelope = AutomationCLIResultEnvelope<SemanticRecordingCLIFramesPayload>
+        .semanticRecordingFrameShow(
+            command: command,
+            requestedRecordingID: recordingBundle.requestedRecordingID,
+            bundle: recordingBundle.bundle,
+            frame: frame,
+            fixture: recordingBundle.fixture,
+            sourceOption: recordingBundle.sourceOption
+        )
+
+    if wantsJSON {
+        writeWorkflowJSON(envelope)
+    } else {
+        writeRecordingFramesSummary(envelope.data)
+    }
+    return 0
+}
+
+private func runRecordingEventsNear(
+    _ arguments: [String],
+    command: String,
+    wantsJSON: Bool
+) throws -> Int {
+    var time: TimeInterval?
+    var window: TimeInterval = 1.0
+    let recordingBundle = try loadRecordingCLIBundle(arguments) { token, index, arguments in
+        switch token {
+        case "--time":
+            guard index + 1 < arguments.count,
+                  let parsedTime = TimeInterval(arguments[index + 1]),
+                  parsedTime >= 0 else {
+                throw WorkflowCLIError("invalidArgument", "--time requires a non-negative number of seconds.", path: token)
+            }
+            time = parsedTime
+            return 1
+        case "--window":
+            guard index + 1 < arguments.count,
+                  let parsedWindow = TimeInterval(arguments[index + 1]),
+                  parsedWindow >= 0 else {
+                throw WorkflowCLIError("invalidArgument", "--window requires a non-negative number of seconds.", path: token)
+            }
+            window = parsedWindow
+            return 1
+        default:
+            return nil
+        }
+    }
+    guard let time else {
+        throw WorkflowCLIError("missingArgument", "recording events-near requires --time <seconds>.", path: "--time")
+    }
+
+    let envelope = AutomationCLIResultEnvelope<SemanticRecordingCLIEventsNearPayload>
+        .semanticRecordingEventsNear(
+            command: command,
+            requestedRecordingID: recordingBundle.requestedRecordingID,
+            bundle: recordingBundle.bundle,
+            fixture: recordingBundle.fixture,
+            sourceOption: recordingBundle.sourceOption,
+            time: time,
+            window: window
+        )
+
+    if wantsJSON {
+        writeWorkflowJSON(envelope)
+    } else {
+        writeRecordingEventsNearSummary(envelope.data)
+    }
+    return 0
+}
+
+private func runRecordingOCRSearch(
+    _ arguments: [String],
+    command: String,
+    wantsJSON: Bool
+) throws -> Int {
+    var text: String?
+    var matchMode: TextMatchMode = .contains
+    let recordingBundle = try loadRecordingCLIBundle(arguments) { token, index, arguments in
+        switch token {
+        case "--text":
+            guard index + 1 < arguments.count else {
+                throw WorkflowCLIError("missingArgument", "--text requires search text.", path: token)
+            }
+            text = arguments[index + 1]
+            return 1
+        case "--match":
+            guard index + 1 < arguments.count else {
+                throw WorkflowCLIError("missingArgument", "--match requires contains or exact.", path: token)
+            }
+            matchMode = try parseWorkflowCLITextMatchMode(arguments[index + 1], path: token)
+            return 1
+        default:
+            return nil
+        }
+    }
+    let trimmedText = text?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+    guard !trimmedText.isEmpty else {
+        throw WorkflowCLIError(
+            "missingArgument",
+            "recording ocr search requires --text <text>.",
+            path: "--text"
+        )
+    }
+
+    let envelope = AutomationCLIResultEnvelope<SemanticRecordingCLIOCRSearchPayload>
+        .semanticRecordingOCRSearch(
+            command: command,
+            requestedRecordingID: recordingBundle.requestedRecordingID,
+            bundle: recordingBundle.bundle,
+            fixture: recordingBundle.fixture,
+            sourceOption: recordingBundle.sourceOption,
+            text: trimmedText,
+            matchMode: matchMode,
+            queryResults: recordingCLIQueryResults(for: recordingBundle)
+        )
+
+    if wantsJSON {
+        writeWorkflowJSON(envelope)
+    } else {
+        writeRecordingOCRSearchSummary(envelope.data)
+    }
+    return 0
+}
+
+private func runRecordingVisualSearch(
+    _ arguments: [String],
+    command: String,
+    wantsJSON: Bool
+) throws -> Int {
+    var text: String?
+    var matchMode: TextMatchMode = .contains
+    var kind: RecordingVisualObservationKind?
+    var label: String?
+    let recordingBundle = try loadRecordingCLIBundle(arguments) { token, index, arguments in
+        switch token {
+        case "--text":
+            guard index + 1 < arguments.count else {
+                throw WorkflowCLIError("missingArgument", "--text requires search text.", path: token)
+            }
+            text = arguments[index + 1]
+            return 1
+        case "--match":
+            guard index + 1 < arguments.count else {
+                throw WorkflowCLIError("missingArgument", "--match requires contains or exact.", path: token)
+            }
+            matchMode = try parseWorkflowCLITextMatchMode(arguments[index + 1], path: token)
+            return 1
+        case "--kind":
+            guard index + 1 < arguments.count else {
+                throw WorkflowCLIError("missingArgument", "--kind requires a visual observation kind.", path: token)
+            }
+            kind = try parseRecordingVisualObservationKind(arguments[index + 1], path: token)
+            return 1
+        case "--label":
+            guard index + 1 < arguments.count else {
+                throw WorkflowCLIError("missingArgument", "--label requires a label.", path: token)
+            }
+            label = arguments[index + 1]
+            return 1
+        default:
+            return nil
+        }
+    }
+
+    let envelope = AutomationCLIResultEnvelope<SemanticRecordingCLIVisualSearchPayload>
+        .semanticRecordingVisualSearch(
+            command: command,
+            requestedRecordingID: recordingBundle.requestedRecordingID,
+            bundle: recordingBundle.bundle,
+            fixture: recordingBundle.fixture,
+            sourceOption: recordingBundle.sourceOption,
+            text: text,
+            matchMode: matchMode,
+            kind: kind,
+            label: label
+        )
+
+    if wantsJSON {
+        writeWorkflowJSON(envelope)
+    } else {
+        writeRecordingVisualSearchSummary(envelope.data)
+    }
+    return 0
+}
+
+private func runRecordingAssetExtract(
+    _ arguments: [String],
+    command: String,
+    wantsJSON: Bool,
+    defaultKind: SemanticRecordingCLIAssetExtractionKind
+) throws -> Int {
+    var frameID: UUID?
+    var region: RecordingBounds?
+    var regionSpace: RecordingCoordinateSpace = .framePixels
+    var kind = defaultKind
+    var name: String?
+    var outputRoot: URL?
+    var sourceRoot: URL?
+
+    let recordingBundle = try loadRecordingCLIBundle(arguments) { token, index, arguments in
+        switch token {
+        case "--frame":
+            guard index + 1 < arguments.count else {
+                throw WorkflowCLIError("missingArgument", "--frame requires a frame UUID.", path: token)
+            }
+            frameID = try parseWorkflowCLIUUID(arguments[index + 1], path: token)
+            return 1
+        case "--region":
+            guard index + 1 < arguments.count else {
+                throw WorkflowCLIError("missingArgument", "--region requires x,y,width,height.", path: token)
+            }
+            region = try parseRecordingCLIRegion(arguments[index + 1], coordinateSpace: regionSpace, path: token)
+            return 1
+        case "--region-space":
+            guard index + 1 < arguments.count else {
+                throw WorkflowCLIError("missingArgument", "--region-space requires a coordinate space.", path: token)
+            }
+            regionSpace = try parseRecordingCLIRegionSpace(arguments[index + 1], path: token)
+            if let existingRegion = region {
+                region = RecordingBounds(rect: existingRegion.rect, coordinateSpace: regionSpace)
+            }
+            return 1
+        case "--kind":
+            guard index + 1 < arguments.count else {
+                throw WorkflowCLIError("missingArgument", "--kind requires imageTemplate, image, or baseline.", path: token)
+            }
+            kind = try parseRecordingCLIAssetExtractionKind(arguments[index + 1], path: token)
+            return 1
+        case "--name":
+            guard index + 1 < arguments.count else {
+                throw WorkflowCLIError("missingArgument", "--name requires an asset name.", path: token)
+            }
+            name = arguments[index + 1]
+            return 1
+        case "--output-root", "--assets-root":
+            guard index + 1 < arguments.count else {
+                throw WorkflowCLIError("missingArgument", "\(token) requires a directory path.", path: token)
+            }
+            outputRoot = URL(fileURLWithPath: arguments[index + 1], isDirectory: true)
+                .standardizedFileURL
+            return 1
+        case "--source-root", "--artifact-root":
+            guard index + 1 < arguments.count else {
+                throw WorkflowCLIError("missingArgument", "\(token) requires a directory path.", path: token)
+            }
+            sourceRoot = URL(fileURLWithPath: arguments[index + 1], isDirectory: true)
+                .standardizedFileURL
+            return 1
+        default:
+            return nil
+        }
+    }
+
+    guard let frameID else {
+        throw WorkflowCLIError("missingArgument", "recording asset extract requires --frame <uuid>.", path: "--frame")
+    }
+    guard let region else {
+        throw WorkflowCLIError("missingArgument", "recording asset extract requires --region x,y,width,height.", path: "--region")
+    }
+    let trimmedName = name?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+    guard !trimmedName.isEmpty else {
+        throw WorkflowCLIError("missingArgument", "recording asset extract requires --name <asset-name>.", path: "--name")
+    }
+    guard let outputRoot else {
+        throw WorkflowCLIError("missingArgument", "recording asset extract requires --output-root <draft-package-dir>.", path: "--output-root")
+    }
+    let bundle = recordingBundle.bundle
+    guard let frame = bundle.frames.first(where: { $0.id == frameID }) else {
+        throw WorkflowCLIError("unknownFrame", "Recording bundle does not contain frame '\(frameID.uuidString)'.", path: "--frame")
+    }
+    guard let sourceRoot = sourceRoot ?? recordingBundle.bundleDirectory else {
+        throw WorkflowCLIError(
+            "artifactRootRequired",
+            "Fixture asset extraction requires --source-root <fixture-artifact-dir>; stored bundles use their bundle directory by default.",
+            path: "--source-root"
+        )
+    }
+
+    let sourceArtifactRef = bundle.redactedFrame(frameID: frame.id)?.redactedImageRef ?? frame.imageRef
+    let sourceURL = try recordingCLIArtifactURL(
+        ref: sourceArtifactRef,
+        root: sourceRoot,
+        optionPath: "--source-root"
+    )
+    guard FileManager.default.fileExists(atPath: sourceURL.path) else {
+        throw WorkflowCLIError(
+            "missingSourceArtifact",
+            "Source frame artifact '\(sourceArtifactRef.path)' was not found under '\(sourceRoot.path)'.",
+            path: sourceArtifactRef.path
+        )
+    }
+
+    let sourceImage = try recordingCLICGImage(at: sourceURL)
+    let cropRect = try recordingCLICropRect(for: region, image: sourceImage)
+    guard let croppedImage = sourceImage.cropping(to: cropRect) else {
+        throw WorkflowCLIError("invalidRegion", "Could not crop the requested region from the source frame.", path: "--region")
+    }
+    let pngData = try recordingCLIPNGData(for: croppedImage)
+    let digest = recordingCLISHA256(pngData)
+    let assetKey = recordingCLIAssetKey(
+        name: trimmedName,
+        recordingID: bundle.id,
+        kind: kind
+    )
+    let destinationPath = "assets/\(kind.materializedKind.directoryName)/\(assetKey).png"
+    guard AutomationWorkflowDraftVisualAssets.normalizedRelativeAssetPath(destinationPath) == destinationPath else {
+        throw WorkflowCLIError("unsafeDestinationPath", "Unsafe asset destination '\(destinationPath)'.", path: destinationPath)
+    }
+    let destinationURL = try recordingCLIOutputURL(
+        root: outputRoot,
+        relativePath: destinationPath,
+        optionPath: "--output-root"
+    )
+    try FileManager.default.createDirectory(
+        at: destinationURL.deletingLastPathComponent(),
+        withIntermediateDirectories: true
+    )
+    try pngData.write(to: destinationURL, options: .atomic)
+
+    let visualAsset = AutomationWorkflowDraftVisualImageAsset(
+        key: assetKey,
+        label: trimmedName,
+        path: destinationPath,
+        sha256: digest,
+        sourceFrameID: frame.id,
+        sourceSurfaceID: frame.surfaceID,
+        sourceArtifactPath: sourceArtifactRef.path,
+        sourceBounds: recordingCLIDraftRect(region.rect),
+        sourceBoundsSpace: recordingCLIDraftRegionSpace(region.coordinateSpace)
+    )
+    let materializedAsset = SemanticRecordingReviewMaterializedAsset(
+        kind: kind.materializedKind,
+        key: assetKey,
+        sourcePath: sourceArtifactRef.path,
+        destinationPath: destinationPath,
+        sha256: digest
+    )
+    let query = SemanticRecordingCLIAssetExtractionQuery(
+        frameID: frame.id,
+        region: region,
+        kind: kind,
+        name: trimmedName,
+        assetKey: assetKey
+    )
+    let evidence = [
+        RecordingEvidenceReference(
+            frameID: frame.id,
+            eventIDs: frame.relatedEventIDs,
+            observationIDs: [],
+            artifactRef: sourceArtifactRef,
+            bounds: region,
+            summary: "Frame region was extracted as a draft-compatible visual asset."
+        )
+    ]
+    let payload = SemanticRecordingCLIAssetExtractionPayload(
+        requestedRecordingID: recordingBundle.requestedRecordingID,
+        recordingID: bundle.id,
+        fixture: recordingBundle.fixture,
+        query: query,
+        sourceArtifactRef: sourceArtifactRef,
+        outputRoot: outputRoot.path,
+        materializedAsset: materializedAsset,
+        visualAsset: visualAsset,
+        evidence: evidence
+    )
+    let envelope = AutomationCLIResultEnvelope<SemanticRecordingCLIAssetExtractionPayload>
+        .semanticRecordingAssetExtraction(command: command, payload: payload)
+
+    if wantsJSON {
+        writeWorkflowJSON(envelope)
+    } else {
+        writeRecordingAssetExtractionSummary(envelope.data)
+    }
+    return 0
+}
+
+private func runRecordingSuggest(
+    _ arguments: [String],
+    command: String,
+    wantsJSON: Bool
+) throws -> Int {
+    guard let categoryToken = arguments.first,
+          !categoryToken.hasPrefix("--") else {
+        throw WorkflowCLIError(
+            "missingArgument",
+            "recording suggest requires a category: waits, locators, conditions, cleanup, or all."
+        )
+    }
+    guard let category = SemanticRecordingCLISuggestionCategory(rawValue: categoryToken) else {
+        throw WorkflowCLIError(
+            "unsupportedSuggestionCategory",
+            "Unsupported suggestion category '\(categoryToken)'. Use waits, locators, conditions, cleanup, or all.",
+            path: categoryToken
+        )
+    }
+
+    let recordingBundle = try loadRecordingCLIBundle(Array(arguments.dropFirst()))
+    let suggestionResult = recordingCLISuggestionResult(
+        for: recordingBundle,
+        category: category
+    )
+    let envelope = AutomationCLIResultEnvelope<SemanticRecordingCLISuggestionsPayload>
+        .semanticRecordingSuggestions(
+            command: command,
+            requestedRecordingID: recordingBundle.requestedRecordingID,
+            bundle: recordingBundle.bundle,
+            fixture: recordingBundle.fixture,
+            sourceOption: recordingBundle.sourceOption,
+            category: category,
+            suggestionResult: suggestionResult
+        )
+
+    if wantsJSON {
+        writeWorkflowJSON(envelope)
+    } else {
+        writeRecordingSuggestionsSummary(envelope.data)
+    }
+    return 0
+}
+
+private func loadRecordingCLIBundle(
+    _ arguments: [String],
+    additionalOptionHandler: ((String, Int, [String]) throws -> Int?)? = nil
+) throws -> RecordingCLIBundle {
+    guard let requestedRecordingID = arguments.first,
+          !requestedRecordingID.hasPrefix("--") else {
+        throw WorkflowCLIError(
+            "missingArgument",
+            "Expected a recording id, such as 'checkout-demo'."
+        )
+    }
+
+    var fixture: String?
+    var recordingsRoot: URL?
+    var bundlePath: URL?
+    var index = 1
+    while index < arguments.count {
+        let token = arguments[index]
+        switch token {
+        case "--json":
+            break
+        case "--fixture":
+            guard index + 1 < arguments.count else {
+                throw WorkflowCLIError("missingArgument", "--fixture requires a fixture name.", path: token)
+            }
+            fixture = arguments[index + 1]
+            index += 1
+        case "--recordings-root":
+            guard index + 1 < arguments.count else {
+                throw WorkflowCLIError("missingArgument", "--recordings-root requires a path.", path: token)
+            }
+            recordingsRoot = URL(fileURLWithPath: arguments[index + 1], isDirectory: true)
+                .standardizedFileURL
+            index += 1
+        case "--bundle-path", "--bundle-dir":
+            guard index + 1 < arguments.count else {
+                throw WorkflowCLIError("missingArgument", "\(token) requires a path.", path: token)
+            }
+            bundlePath = URL(fileURLWithPath: arguments[index + 1], isDirectory: true)
+                .standardizedFileURL
+            index += 1
+        default:
+            if let consumed = try additionalOptionHandler?(token, index, arguments) {
+                index += consumed
+            } else if token.hasPrefix("--") {
+                throw WorkflowCLIError("unsupportedOption", "Unsupported option '\(token)'.", path: token)
+            } else {
+                throw WorkflowCLIError("unexpectedArgument", "Unexpected argument '\(token)'.", path: token)
+            }
+        }
+        index += 1
+    }
+
+    let sourceCount = [fixture != nil, recordingsRoot != nil, bundlePath != nil].filter { $0 }.count
+    guard sourceCount == 1 else {
+        if sourceCount == 0 {
+            throw WorkflowCLIError(
+                "missingArgument",
+                "recording commands require --fixture checkout, --recordings-root <path>, or --bundle-path <path>.",
+                path: "--recordings-root"
+            )
+        }
+        throw WorkflowCLIError(
+            "conflictingRecordingSource",
+            "Use only one recording source: --fixture, --recordings-root, or --bundle-path.",
+            path: "--recordings-root"
+        )
+    }
+
+    if let fixture {
+        try validateRecordingCLIFixture(fixture)
+        try validateRecordingCLIFixtureRecordingID(requestedRecordingID)
+        return RecordingCLIBundle(
+            requestedRecordingID: requestedRecordingID,
+            fixture: fixture,
+            sourceOption: nil,
+            bundleDirectory: nil,
+            bundle: SemanticRecordingFixture.checkoutBundle()
+        )
+    }
+
+    let requestedUUID = try parseWorkflowCLIUUID(requestedRecordingID, path: "recording-id")
+    if let recordingsRoot {
+        let store = RecordingBundleStore(rootDirectory: recordingsRoot)
+        let bundle = try waitForWorkflowCLIAsync {
+            try await store.loadBundle(recordingID: requestedUUID)
+        }
+        return RecordingCLIBundle(
+            requestedRecordingID: requestedRecordingID,
+            fixture: nil,
+            sourceOption: recordingCLISourceOption("--recordings-root", url: recordingsRoot),
+            bundleDirectory: recordingsRoot.appendingPathComponent(requestedUUID.uuidString, isDirectory: true),
+            bundle: bundle
+        )
+    }
+
+    guard let bundlePath else {
+        throw WorkflowCLIError("missingArgument", "Missing recording source.", path: "recording-id")
+    }
+    let store = RecordingBundleStore(rootDirectory: bundlePath.deletingLastPathComponent())
+    let bundle = try waitForWorkflowCLIAsync {
+        try await store.loadBundle(from: bundlePath)
+    }
+    guard bundle.id == requestedUUID else {
+        throw WorkflowCLIError(
+            "recordingMismatch",
+            "Bundle at '\(bundlePath.path)' contains recording '\(bundle.id.uuidString)', not '\(requestedUUID.uuidString)'.",
+            path: "--bundle-path"
+        )
+    }
+    return RecordingCLIBundle(
+        requestedRecordingID: requestedRecordingID,
+        fixture: nil,
+        sourceOption: recordingCLISourceOption("--bundle-path", url: bundlePath),
+        bundleDirectory: bundlePath,
+        bundle: bundle
+    )
+}
+
+private func validateRecordingCLIFixture(_ fixture: String) throws {
+    guard fixture == "checkout" else {
+        throw WorkflowCLIError(
+            "unsupportedFixture",
+            "Unsupported recording fixture '\(fixture)'. Use '--fixture checkout'.",
+            path: fixture
+        )
+    }
+}
+
+private func validateRecordingCLIFixtureRecordingID(_ requestedRecordingID: String) throws {
+    let acceptedRecordingIDs = Set([
+        "checkout-demo",
+        "recording-checkout-demo",
+        SemanticRecordingFixture.recordingID.uuidString.lowercased()
+    ])
+    guard acceptedRecordingIDs.contains(requestedRecordingID.lowercased()) else {
+        throw WorkflowCLIError(
+            "unknownRecording",
+            "Fixture 'checkout' exposes recording id 'checkout-demo'.",
+            path: requestedRecordingID
+        )
+    }
+}
+
+private func recordingCLIQueryResults(for loadedBundle: RecordingCLIBundle) -> [RecordingQueryResult] {
+    SemanticRecordingQueryEngine.deterministicQueryResults(
+        for: loadedBundle.bundle,
+        fixture: loadedBundle.fixture
+    )
+}
+
+private func recordingCLISuggestionResult(
+    for loadedBundle: RecordingCLIBundle,
+    category: SemanticRecordingCLISuggestionCategory
+) -> SemanticRecordingSuggestionResult {
+    SemanticRecordingQueryEngine.deterministicSuggestions(
+        for: loadedBundle.bundle,
+        fixture: loadedBundle.fixture,
+        query: .kinds(category.suggestionKinds)
+    )
+}
+
+private func recordingCLISourceOption(_ option: String, url: URL) -> String {
+    " \(option) \(workflowCLIShellQuote(url.path))"
+}
+
+private func recordingCLIArtifactURL(
+    ref: RecordingArtifactRef,
+    root: URL,
+    optionPath: String
+) throws -> URL {
+    let rootURL = root.standardizedFileURL.resolvingSymlinksInPath()
+    let artifactURL = root
+        .appendingRecordingArtifactRef(ref)
+        .standardizedFileURL
+    let artifactPath = artifactURL.resolvingSymlinksInPath().path
+    let rootPath = rootURL.path
+    guard artifactPath == rootPath || artifactPath.hasPrefix(rootPath + "/") else {
+        throw WorkflowCLIError(
+            "unsafeSourceArtifactPath",
+            "Artifact ref '\(ref.path)' escapes source root '\(root.path)'.",
+            path: optionPath
+        )
+    }
+    return artifactURL
+}
+
+private func recordingCLIOutputURL(
+    root: URL,
+    relativePath: String,
+    optionPath: String
+) throws -> URL {
+    guard AutomationWorkflowDraftVisualAssets.normalizedRelativeAssetPath(relativePath) == relativePath else {
+        throw WorkflowCLIError("unsafeDestinationPath", "Unsafe output asset path '\(relativePath)'.", path: relativePath)
+    }
+    let rootURL = root.standardizedFileURL.resolvingSymlinksInPath()
+    let outputURL = relativePath
+        .split(separator: "/")
+        .map(String.init)
+        .reduce(root.standardizedFileURL) { partial, component in
+            partial.appendingPathComponent(component, isDirectory: false)
+        }
+    let outputPath = outputURL.deletingLastPathComponent()
+        .resolvingSymlinksInPath()
+        .appendingPathComponent(outputURL.lastPathComponent)
+        .path
+    let rootPath = rootURL.path
+    guard outputPath == rootPath || outputPath.hasPrefix(rootPath + "/") else {
+        throw WorkflowCLIError(
+            "unsafeOutputPath",
+            "Output path '\(relativePath)' escapes output root '\(root.path)'.",
+            path: optionPath
+        )
+    }
+    return outputURL
+}
+
+private func recordingCLICGImage(at url: URL) throws -> CGImage {
+    guard let image = NSImage(contentsOf: url),
+          let cgImage = image.cgImage(forProposedRect: nil, context: nil, hints: nil) else {
+        throw WorkflowCLIError(
+            "unreadableSourceImage",
+            "Could not decode source frame image at '\(url.path)'.",
+            path: url.path
+        )
+    }
+    return cgImage
+}
+
+private func recordingCLICropRect(
+    for bounds: RecordingBounds,
+    image: CGImage
+) throws -> CGRect {
+    let imageBounds = CGRect(x: 0, y: 0, width: image.width, height: image.height)
+    let requested: CGRect
+    switch bounds.coordinateSpace {
+    case .normalizedFrame:
+        requested = CGRect(
+            x: CGFloat(bounds.rect.x * Double(image.width)),
+            y: CGFloat(bounds.rect.y * Double(image.height)),
+            width: CGFloat(bounds.rect.width * Double(image.width)),
+            height: CGFloat(bounds.rect.height * Double(image.height))
+        )
+    case .screenPixels, .displayPixels, .windowPixels, .contentPixels, .framePixels:
+        requested = CGRect(
+            x: CGFloat(bounds.rect.x),
+            y: CGFloat(bounds.rect.y),
+            width: CGFloat(bounds.rect.width),
+            height: CGFloat(bounds.rect.height)
+        )
+    }
+
+    let clipped = requested.integral.intersection(imageBounds)
+    guard !clipped.isNull,
+          clipped.width >= 1,
+          clipped.height >= 1 else {
+        throw WorkflowCLIError(
+            "regionOutsideFrame",
+            "Requested region does not overlap the source frame.",
+            path: "--region"
+        )
+    }
+    return clipped
+}
+
+private func recordingCLIPNGData(for image: CGImage) throws -> Data {
+    let representation = NSBitmapImageRep(cgImage: image)
+    guard let data = representation.representation(using: .png, properties: [:]) else {
+        throw WorkflowCLIError("pngEncodingFailed", "Could not encode extracted asset as PNG.")
+    }
+    return data
+}
+
+private func recordingCLISHA256(_ data: Data) -> String {
+    SHA256.hash(data: data)
+        .map { String(format: "%02x", $0) }
+        .joined()
+}
+
+private func recordingCLIAssetKey(
+    name: String,
+    recordingID: UUID,
+    kind: SemanticRecordingCLIAssetExtractionKind
+) -> String {
+    let suffix = kind == .baseline ? "baseline" : "template"
+    return "sr_\(recordingCLIShortID(recordingID))_\(recordingCLISafeStem(name))_\(suffix)"
+}
+
+private func recordingCLIShortID(_ id: UUID) -> String {
+    String(id.uuidString.prefix(8)).lowercased()
+}
+
+private func recordingCLISafeStem(_ value: String) -> String {
+    let stem = value
+        .lowercased()
+        .map { character in
+            character.isLetter || character.isNumber ? character : "_"
+        }
+        .reduce(into: "") { partial, character in
+            if partial.last == "_" && character == "_" {
+                return
+            }
+            partial.append(character)
+        }
+        .trimmingCharacters(in: CharacterSet(charactersIn: "_"))
+    return stem.isEmpty ? "asset" : stem
+}
+
+private func recordingCLIDraftRect(_ rect: RecordingRect) -> RectValue {
+    RectValue(
+        x: CGFloat(rect.x),
+        y: CGFloat(rect.y),
+        width: CGFloat(rect.width),
+        height: CGFloat(rect.height)
+    )
+}
+
+private func recordingCLIDraftRegionSpace(
+    _ space: RecordingCoordinateSpace
+) -> AutomationOCRSearchRegionSpace {
+    switch space {
+    case .screenPixels, .displayPixels, .framePixels:
+        return .displayAbsolute
+    case .windowPixels:
+        return .windowLocal
+    case .contentPixels:
+        return .contentLocal
+    case .normalizedFrame:
+        return .displayNormalized
+    }
+}
+
+private func workflowCLIShellQuote(_ value: String) -> String {
+    let safeScalars = CharacterSet(charactersIn: "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_./:-")
+    guard !value.isEmpty else {
+        return "''"
+    }
+    if value.unicodeScalars.allSatisfy({ safeScalars.contains($0) }) {
+        return value
+    }
+    return "'" + value.replacingOccurrences(of: "'", with: "'\\''") + "'"
+}
+
+private func writeRecordingListSummary(_ payload: SemanticRecordingCLIListPayload?) {
+    guard let payload else {
+        return
+    }
+    var lines = [
+        "SparkleRecorder: semantic recordings [\(payload.fixtureMode ? "fixture" : "stored")].",
+        "- recordings: \(payload.count)"
+    ]
+    for recording in payload.recordings {
+        let modifiedAt = recording.modifiedAt.map(workflowCLIISO8601String) ?? "unknown"
+        lines.append("- \(recording.recordingID.uuidString) source=\(recording.source.rawValue) modifiedAt=\(modifiedAt)")
+    }
+    FileHandle.standardOutput.write(Data((lines.joined(separator: "\n") + "\n").utf8))
+}
+
+private func writeRecordingShowSummary(_ payload: SemanticRecordingCLISummaryPayload?) {
+    guard let payload else {
+        return
+    }
+    let target = payload.captureTarget?.appName ?? payload.captureTarget?.appBundleIdentifier ?? "unknown app"
+    let surface = payload.captureTarget?.surfaceID ?? "unknown surface"
+    FileHandle.standardOutput.write(Data("""
+    SparkleRecorder: semantic recording \(payload.requestedRecordingID) [\(payload.fixtureMode ? "fixture" : "live")].
+    - recording: \(payload.recordingID.uuidString)
+    - target: \(target) / \(surface)
+    - video segments: \(payload.videoSegmentCount), frames: \(payload.frameCount), AI-safe events: \(payload.aiSafeEventCount)
+    - visual observations: \(payload.visualObservationCount), OCR: \(payload.ocrObservationCount)
+    - suppressions: \(payload.suppressionSummary.totalSuppressedCount)
+
+    """.utf8))
+}
+
+private func writeRecordingExplainSummary(_ payload: SemanticRecordingCLIExplainPayload?) {
+    guard let payload else {
+        return
+    }
+    let target = payload.summary.captureTarget?.appName ??
+        payload.summary.captureTarget?.appBundleIdentifier ??
+        "unknown app"
+    var lines = [
+        "SparkleRecorder: semantic recording explanation \(payload.requestedRecordingID) [\(payload.fixtureMode ? "fixture" : "stored")].",
+        "- recording: \(payload.recordingID.uuidString)",
+        "- target: \(target)",
+        "- key points: \(payload.keyPointCount), visual evidence: \(payload.visualEvidenceCount)"
+    ]
+    for point in payload.keyPoints.prefix(5) {
+        let risk = point.risk.map { " risk=\($0)" } ?? ""
+        lines.append("- \(point.kind.rawValue) t=\(point.recordingTime)s: \(point.title)\(risk)")
+    }
+    for note in payload.evidenceNotes {
+        lines.append("- note: \(note)")
+    }
+    FileHandle.standardOutput.write(Data((lines.joined(separator: "\n") + "\n").utf8))
+}
+
+private func writeRecordingFramesSummary(_ payload: SemanticRecordingCLIFramesPayload?) {
+    guard let payload else {
+        return
+    }
+    var lines = [
+        "SparkleRecorder: semantic recording frames \(payload.requestedRecordingID) [\(payload.fixtureMode ? "fixture" : "live")].",
+        "- frames: \(payload.count)"
+    ]
+    for frame in payload.frames {
+        lines.append(
+            "- \(frame.id.uuidString) t=\(frame.recordingTime)s source=\(frame.source.rawValue) ref=\(frame.effectiveImageRef.path)"
+        )
+    }
+    FileHandle.standardOutput.write(Data((lines.joined(separator: "\n") + "\n").utf8))
+}
+
+private func writeRecordingEventsNearSummary(_ payload: SemanticRecordingCLIEventsNearPayload?) {
+    guard let payload else {
+        return
+    }
+    var lines = [
+        "SparkleRecorder: semantic recording events near \(payload.query.time)s +/- \(payload.query.window)s.",
+        "- events: \(payload.eventCount), frames: \(payload.frameCount)"
+    ]
+    for event in payload.events {
+        lines.append(
+            "- \(event.id.uuidString) t=\(event.recordingTime)s kind=\(event.kind.rawValue) summary=\(event.summary ?? "")"
+        )
+    }
+    for frame in payload.frames {
+        lines.append(
+            "- frame \(frame.id.uuidString) t=\(frame.recordingTime)s ref=\(frame.effectiveImageRef.path)"
+        )
+    }
+    FileHandle.standardOutput.write(Data((lines.joined(separator: "\n") + "\n").utf8))
+}
+
+private func writeRecordingOCRSearchSummary(_ payload: SemanticRecordingCLIOCRSearchPayload?) {
+    guard let payload else {
+        return
+    }
+    var lines = [
+        "SparkleRecorder: OCR search '\(payload.query.text)' [\(payload.fixtureMode ? "fixture" : "live")].",
+        "- matches: \(payload.count)"
+    ]
+    for result in payload.results {
+        let ref = result.artifactRef?.path ?? "no artifact ref"
+        lines.append(
+            "- \(result.observationID.uuidString) t=\(result.recordingTime)s text=\"\(result.text)\" ref=\(ref)"
+        )
+    }
+    FileHandle.standardOutput.write(Data((lines.joined(separator: "\n") + "\n").utf8))
+}
+
+private func writeRecordingVisualSearchSummary(_ payload: SemanticRecordingCLIVisualSearchPayload?) {
+    guard let payload else {
+        return
+    }
+    let label = payload.query.label.map { " label='\($0)'" } ?? ""
+    let kind = payload.query.kind.map { " kind=\($0.rawValue)" } ?? ""
+    let text = payload.query.text.map { " text='\($0)'" } ?? ""
+    var lines = [
+        "SparkleRecorder: visual search\(kind)\(label)\(text) [\(payload.fixtureMode ? "fixture" : "live")].",
+        "- matches: \(payload.count)"
+    ]
+    for result in payload.results {
+        let ref = result.artifactRef?.path ?? "no artifact ref"
+        lines.append(
+            "- \(result.observationID.uuidString) t=\(result.recordingTime)s kind=\(result.kind.rawValue) ref=\(ref)"
+        )
+    }
+    FileHandle.standardOutput.write(Data((lines.joined(separator: "\n") + "\n").utf8))
+}
+
+private func writeRecordingAssetExtractionSummary(_ payload: SemanticRecordingCLIAssetExtractionPayload?) {
+    guard let payload else {
+        return
+    }
+    let lines = [
+        "SparkleRecorder: extracted \(payload.query.kind.rawValue) asset \(payload.query.assetKey) [\(payload.fixtureMode ? "fixture" : "stored")].",
+        "- source: \(payload.sourceArtifactRef.path)",
+        "- output: \(payload.materializedAsset.destinationPath)",
+        "- sha256: \(payload.materializedAsset.sha256)"
+    ]
+    FileHandle.standardOutput.write(Data((lines.joined(separator: "\n") + "\n").utf8))
+}
+
+private func writeRecordingSuggestionsSummary(_ payload: SemanticRecordingCLISuggestionsPayload?) {
+    guard let payload else {
+        return
+    }
+    var lines = [
+        "SparkleRecorder: recording suggestions \(payload.category.rawValue) [\(payload.fixtureMode ? "fixture" : "live")].",
+        "- suggestions: \(payload.count)"
+    ]
+    for suggestion in payload.suggestions {
+        lines.append(
+            "- \(suggestion.id.uuidString) \(suggestion.kind.rawValue) confidence=\(suggestion.confidence): \(suggestion.title)"
+        )
+    }
+    FileHandle.standardOutput.write(Data((lines.joined(separator: "\n") + "\n").utf8))
+}
+
 private func runSemanticRecordingDebugSmoke(
     _ arguments: [String],
     command: String,
@@ -1244,6 +2640,10 @@ private func runSemanticRecordingDebugSmoke(
     var windowID: UInt32?
     var appBundleIdentifier: String?
     var windowTitle: String?
+    var evidenceSidecarURL: URL?
+    var syntheticRedactionReason: RecordingSuppressionReason?
+    var requiresOCRReadiness = false
+    var requiresWindowOrAXReadiness = false
     var index = 0
 
     while index < arguments.count {
@@ -1270,6 +2670,10 @@ private func runSemanticRecordingDebugSmoke(
             keyframesOnly = true
         case "--preflight-only":
             preflightOnly = true
+        case "--require-ocr":
+            requiresOCRReadiness = true
+        case "--require-window-or-ax":
+            requiresWindowOrAXReadiness = true
         case "--display-id":
             guard index + 1 < arguments.count,
                   let parsedDisplayID = UInt32(arguments[index + 1]) else {
@@ -1296,6 +2700,28 @@ private func runSemanticRecordingDebugSmoke(
             }
             windowTitle = arguments[index + 1]
             index += 1
+        case "--evidence-sidecar":
+            guard index + 1 < arguments.count else {
+                throw WorkflowCLIError("missingArgument", "--evidence-sidecar requires a path.", path: token)
+            }
+            evidenceSidecarURL = URL(fileURLWithPath: arguments[index + 1])
+            index += 1
+        case "--synthetic-redaction":
+            syntheticRedactionReason = syntheticRedactionReason ?? .privateRegion
+        case "--synthetic-redaction-reason":
+            guard index + 1 < arguments.count else {
+                throw WorkflowCLIError("missingArgument", "--synthetic-redaction-reason requires a suppression reason.", path: token)
+            }
+            guard let reason = RecordingSuppressionReason(rawValue: arguments[index + 1]),
+                  reason.redactsSemanticEvidence else {
+                throw WorkflowCLIError(
+                    "invalidArgument",
+                    "--synthetic-redaction-reason requires a redacting suppression reason.",
+                    path: arguments[index + 1]
+                )
+            }
+            syntheticRedactionReason = reason
+            index += 1
         default:
             if token.hasPrefix("--") {
                 throw WorkflowCLIError("unsupportedOption", "Unsupported option '\(token)'.", path: token)
@@ -1314,19 +2740,38 @@ private func runSemanticRecordingDebugSmoke(
     let policy = RecordingCapturePolicy(
         mode: keyframesOnly ? .keyframesOnly : .videoAndKeyframes
     )
+    let readinessPolicy = SemanticRecordingBundleReadinessPolicy(
+        capturePolicy: policy,
+        requiresOCRObservations: requiresOCRReadiness,
+        requiresWindowOrAXObservations: requiresWindowOrAXReadiness
+    )
     let resolvedRecordingID = recordingID
     let resolvedDuration = duration
     let resolvedRootDirectory = rootDirectory
     let resolvedPreflightOnly = preflightOnly
+    let resolvedSyntheticRedactionReason = syntheticRedactionReason
+    let resolvedReadinessPolicy = readinessPolicy
+    let commandPlan = semanticRecordingDebugSmokeCommandPlan(arguments)
 
-    let payload = try waitForWorkflowCLIAsync {
+    var payload = try waitForWorkflowCLIAsync {
         try await semanticRecordingDebugSmokePayload(
             recordingID: resolvedRecordingID,
             duration: resolvedDuration,
             capturePolicy: policy,
             captureTarget: target,
             rootDirectory: resolvedRootDirectory,
-            preflightOnly: resolvedPreflightOnly
+            preflightOnly: resolvedPreflightOnly,
+            syntheticRedactionReason: resolvedSyntheticRedactionReason,
+            readinessPolicy: resolvedReadinessPolicy
+        )
+    }
+    payload.commandPlan = commandPlan
+    if let evidenceSidecarURL {
+        payload.evidenceSidecarPath = evidenceSidecarURL.path
+        try writeSemanticRecordingDebugSmokeEvidenceSidecar(
+            payload,
+            command: semanticRecordingDebugSmokeCommandLine(arguments),
+            to: evidenceSidecarURL
         )
     }
     let envelope = AutomationCLIResultEnvelope<SemanticRecordingDebugSmokePayload>(
@@ -1357,6 +2802,8 @@ private func semanticRecordingDebugSmokePayload(
     captureTarget: RecordingCaptureTarget,
     rootDirectory: URL?,
     preflightOnly: Bool,
+    syntheticRedactionReason: RecordingSuppressionReason? = nil,
+    readinessPolicy: SemanticRecordingBundleReadinessPolicy,
     preflightClient: SemanticRecordingPreflightClient = .liveCommandLine
 ) async throws -> SemanticRecordingDebugSmokePayload {
     let preflightPolicy = SemanticRecordingPreflightPolicy(capturePolicy: capturePolicy)
@@ -1365,17 +2812,36 @@ private func semanticRecordingDebugSmokePayload(
         return SemanticRecordingDebugSmokePayload(
             status: preflight.isReadyToStart ? .preflightReady : .blocked,
             recordingID: recordingID,
+            commandPlan: nil,
             capturePolicy: capturePolicy,
             captureTarget: captureTarget,
             preflight: preflight,
+            preflightPresentation: SemanticRecordingPreflightPresenter.presentation(for: preflight),
             bundleDirectory: nil,
             manifestPath: nil,
+            evidenceSidecarPath: nil,
             videoSegmentCount: 0,
             frameCount: 0,
             timelineEventCount: 0,
             aiSafeEventCount: 0,
             visualObservationCount: 0,
-            suppressionCount: 0
+            suppressionCount: 0,
+            syntheticSuppressionCount: 0,
+            syntheticRedactionReason: syntheticRedactionReason,
+            bundleReadinessPolicy: readinessPolicy,
+            bundleReadinessStatus: nil,
+            bundleReadinessIssueCount: 0,
+            bundleReadinessBlockingIssueCount: 0,
+            bundleReadinessDegradedIssueCount: 0,
+            bundleReadinessIssues: [],
+            bundleReadinessFollowUps: [],
+            redactedFrameCount: 0,
+            redactedFrameIndexPath: nil,
+            redactedVideoCount: 0,
+            redactedVideoIndexPath: nil,
+            pendingVideoRangeRedactionCount: 0,
+            persistedBundleLoad: nil,
+            persistedBundleCountCheck: .none
         )
     }
 
@@ -1400,17 +2866,36 @@ private func semanticRecordingDebugSmokePayload(
         return SemanticRecordingDebugSmokePayload(
             status: .blocked,
             recordingID: recordingID,
+            commandPlan: nil,
             capturePolicy: capturePolicy,
             captureTarget: captureTarget,
             preflight: start.preflight,
+            preflightPresentation: SemanticRecordingPreflightPresenter.presentation(for: start.preflight),
             bundleDirectory: nil,
             manifestPath: nil,
+            evidenceSidecarPath: nil,
             videoSegmentCount: 0,
             frameCount: 0,
             timelineEventCount: 0,
             aiSafeEventCount: 0,
             visualObservationCount: 0,
-            suppressionCount: 0
+            suppressionCount: 0,
+            syntheticSuppressionCount: 0,
+            syntheticRedactionReason: syntheticRedactionReason,
+            bundleReadinessPolicy: readinessPolicy,
+            bundleReadinessStatus: nil,
+            bundleReadinessIssueCount: 0,
+            bundleReadinessBlockingIssueCount: 0,
+            bundleReadinessDegradedIssueCount: 0,
+            bundleReadinessIssues: [],
+            bundleReadinessFollowUps: [],
+            redactedFrameCount: 0,
+            redactedFrameIndexPath: nil,
+            redactedVideoCount: 0,
+            redactedVideoIndexPath: nil,
+            pendingVideoRangeRedactionCount: 0,
+            persistedBundleLoad: nil,
+            persistedBundleCountCheck: .none
         )
     }
 
@@ -1423,26 +2908,203 @@ private func semanticRecordingDebugSmokePayload(
         ),
         index: 0
     )
+    var syntheticSuppressionCount = 0
+    if let syntheticRedactionReason {
+        let suppression = SemanticRecordingDebugSmokeSyntheticRedaction(
+            reason: syntheticRedactionReason,
+            eventTime: eventTime,
+            totalDuration: duration,
+            target: captureTarget
+        )
+        try await session.addSuppression(suppression.suppressionRecord)
+        syntheticSuppressionCount = 1
+    }
     try await semanticRecordingDebugSmokeSleep(seconds: max(0, duration - eventTime))
 
     let finish = try await session.finish(recordingTime: duration)
-    return SemanticRecordingDebugSmokePayload(
-        status: .finished,
-        recordingID: recordingID,
-        capturePolicy: capturePolicy,
-        captureTarget: captureTarget,
-        preflight: preflight,
-        bundleDirectory: finish.bundleDirectory.path,
-        manifestPath: finish.bundleDirectory
-            .appendingPathComponent(SemanticRecordingSchema.manifestFileName)
-            .path,
+    let persistedBundleLoadResult = try await store.loadBundleTolerant(from: finish.bundleDirectory)
+    let persistedBundleLoad = SemanticRecordingDebugSmokePersistedBundleLoadEvidence(
+        loadResult: persistedBundleLoadResult
+    )
+    let readiness = SemanticRecordingBundleReadiness.evaluate(
+        persistedBundleLoadResult.bundle,
+        policy: readinessPolicy
+    )
+    let readinessFollowUps = semanticRecordingDebugSmokeReadinessFollowUps(readiness)
+    let persistedBundleCountCheck = SemanticRecordingDebugSmokePersistedBundleCountCheck.evaluate(
         videoSegmentCount: finish.bundle.videoSegments.count,
         frameCount: finish.bundle.frames.count,
         timelineEventCount: finish.bundle.timelineEvents.count,
         aiSafeEventCount: finish.bundle.aiSafeEvents.count,
         visualObservationCount: finish.bundle.visualObservations.count,
-        suppressionCount: finish.bundle.suppressions.count
+        suppressionCount: finish.bundle.suppressions.count,
+        redactedFrameCount: finish.redactionResult?.renderedFrameRelativePaths.count ?? 0,
+        redactedVideoCount: finish.redactionResult?.renderedVideoRelativePaths.count ?? 0,
+        persistedBundleLoad: persistedBundleLoad
     )
+    return SemanticRecordingDebugSmokePayload(
+        status: .finished,
+        recordingID: recordingID,
+        commandPlan: nil,
+        capturePolicy: capturePolicy,
+        captureTarget: captureTarget,
+        preflight: preflight,
+        preflightPresentation: SemanticRecordingPreflightPresenter.presentation(for: preflight),
+        bundleDirectory: finish.bundleDirectory.path,
+        manifestPath: finish.bundleDirectory
+            .appendingPathComponent(SemanticRecordingSchema.manifestFileName)
+            .path,
+        evidenceSidecarPath: nil,
+        videoSegmentCount: finish.bundle.videoSegments.count,
+        frameCount: finish.bundle.frames.count,
+        timelineEventCount: finish.bundle.timelineEvents.count,
+        aiSafeEventCount: finish.bundle.aiSafeEvents.count,
+        visualObservationCount: finish.bundle.visualObservations.count,
+        suppressionCount: finish.bundle.suppressions.count,
+        syntheticSuppressionCount: syntheticSuppressionCount,
+        syntheticRedactionReason: syntheticRedactionReason,
+        bundleReadinessPolicy: readinessPolicy,
+        bundleReadinessStatus: readiness.status,
+        bundleReadinessIssueCount: readiness.issues.count,
+        bundleReadinessBlockingIssueCount: readiness.blockingIssueCount,
+        bundleReadinessDegradedIssueCount: readiness.degradedIssueCount,
+        bundleReadinessIssues: readiness.issues,
+        bundleReadinessFollowUps: readinessFollowUps,
+        redactedFrameCount: finish.redactionResult?.renderedFrameRelativePaths.count ?? 0,
+        redactedFrameIndexPath: semanticRecordingDebugSmokeRedactedFrameIndexPath(
+            finish.redactionResult,
+            bundleDirectory: finish.bundleDirectory
+        ),
+        redactedVideoCount: finish.redactionResult?.renderedVideoRelativePaths.count ?? 0,
+        redactedVideoIndexPath: semanticRecordingDebugSmokeRedactedVideoIndexPath(
+            finish.redactionResult,
+            bundleDirectory: finish.bundleDirectory
+        ),
+        pendingVideoRangeRedactionCount: finish.redactionResult?.pendingVideoRangeRedactions.count ?? 0,
+        persistedBundleLoad: persistedBundleLoad,
+        persistedBundleCountCheck: persistedBundleCountCheck
+    )
+}
+
+private func semanticRecordingDebugSmokeRedactedFrameIndexPath(
+    _ result: RecordingBundleRedactionApplicationResult?,
+    bundleDirectory: URL
+) -> String? {
+    guard let result,
+          let ref = try? RecordingArtifactRef(result.frameIndexRelativePath) else {
+        return nil
+    }
+    return bundleDirectory.appendingRecordingArtifactRef(ref).path
+}
+
+private func semanticRecordingDebugSmokeRedactedVideoIndexPath(
+    _ result: RecordingBundleRedactionApplicationResult?,
+    bundleDirectory: URL
+) -> String? {
+    guard let result,
+          let ref = try? RecordingArtifactRef(result.videoIndexRelativePath) else {
+        return nil
+    }
+    return bundleDirectory.appendingRecordingArtifactRef(ref).path
+}
+
+private func writeSemanticRecordingDebugSmokeEvidenceSidecar(
+    _ payload: SemanticRecordingDebugSmokePayload,
+    command: String,
+    to url: URL
+) throws {
+    let input = SemanticRecordingDebugSmokeEvidenceInput(
+        status: payload.status.rawValue,
+        command: command,
+        commandPlan: payload.commandPlan,
+        generatedAt: Date(),
+        recordingID: payload.recordingID,
+        capturePolicy: payload.capturePolicy,
+        captureTarget: payload.captureTarget,
+        preflight: payload.preflight,
+        bundleDirectory: payload.bundleDirectory,
+        manifestPath: payload.manifestPath,
+        evidenceSidecarPath: payload.evidenceSidecarPath,
+        videoSegmentCount: payload.videoSegmentCount,
+        frameCount: payload.frameCount,
+        timelineEventCount: payload.timelineEventCount,
+        aiSafeEventCount: payload.aiSafeEventCount,
+        visualObservationCount: payload.visualObservationCount,
+        suppressionCount: payload.suppressionCount,
+        syntheticSuppressionCount: payload.syntheticSuppressionCount,
+        syntheticRedactionReason: payload.syntheticRedactionReason,
+        bundleReadinessPolicy: payload.bundleReadinessPolicy,
+        bundleReadinessStatus: payload.bundleReadinessStatus,
+        bundleReadinessIssueCount: payload.bundleReadinessIssueCount,
+        bundleReadinessBlockingIssueCount: payload.bundleReadinessBlockingIssueCount,
+        bundleReadinessDegradedIssueCount: payload.bundleReadinessDegradedIssueCount,
+        bundleReadinessIssues: payload.bundleReadinessIssues,
+        bundleReadinessFollowUps: payload.bundleReadinessFollowUps,
+        redactedFrameCount: payload.redactedFrameCount,
+        redactedFrameIndexPath: payload.redactedFrameIndexPath,
+        redactedVideoCount: payload.redactedVideoCount,
+        redactedVideoIndexPath: payload.redactedVideoIndexPath,
+        pendingVideoRangeRedactionCount: payload.pendingVideoRangeRedactionCount,
+        persistedBundleLoad: payload.persistedBundleLoad
+    )
+    let parent = url.deletingLastPathComponent()
+    if !parent.path.isEmpty {
+        try FileManager.default.createDirectory(
+            at: parent,
+            withIntermediateDirectories: true
+        )
+    }
+    try SemanticRecordingDebugSmokeEvidenceSidecar
+        .markdown(for: input)
+        .write(to: url, atomically: true, encoding: .utf8)
+}
+
+private func semanticRecordingDebugSmokeCommandLine(
+    _ arguments: [String]
+) -> String {
+    (["semantic-recording", "debug-smoke"] + arguments)
+        .map(shellQuoted)
+        .joined(separator: " ")
+}
+
+private func semanticRecordingDebugSmokeCommandPlan(
+    _ arguments: [String]
+) -> SemanticRecordingDebugSmokeCommandPlan {
+    SemanticRecordingDebugSmokeCommandPlan(
+        invocationCommand: semanticRecordingDebugSmokeCommandLine(arguments),
+        preflightCommand: semanticRecordingDebugSmokeCommandLine(
+            semanticRecordingDebugSmokeArguments(
+                arguments,
+                settingPreflightOnly: true
+            )
+        ),
+        liveCaptureCommand: semanticRecordingDebugSmokeCommandLine(
+            semanticRecordingDebugSmokeArguments(
+                arguments,
+                settingPreflightOnly: false
+            )
+        )
+    )
+}
+
+private func semanticRecordingDebugSmokeArguments(
+    _ arguments: [String],
+    settingPreflightOnly enabled: Bool
+) -> [String] {
+    var updated = arguments.filter { $0 != "--preflight-only" }
+    if enabled {
+        updated.append("--preflight-only")
+    }
+    return updated
+}
+
+private func shellQuoted(_ value: String) -> String {
+    guard !value.isEmpty,
+          value.rangeOfCharacter(from: .whitespacesAndNewlines) == nil,
+          !value.contains("'") else {
+        return "'\(value.replacingOccurrences(of: "'", with: "'\\''"))'"
+    }
+    return value
 }
 
 private func semanticRecordingDebugSmokeTarget(
@@ -1506,16 +3168,40 @@ private func semanticRecordingDebugSmokeNextActions(
 ) -> [AutomationCLINextAction] {
     switch payload.status {
     case .finished:
-        return [
+        var actions = [
             AutomationCLINextAction(
                 command: "Open the manifest path printed by this command and inspect video/segments.json plus frames/index.jsonl.",
                 reason: "This smoke path proves live S2 capture wrote a semantic recording bundle, but it is not product evidence by itself."
             )
         ]
+        actions += payload.bundleReadinessFollowUps.map { followUp in
+            AutomationCLINextAction(
+                command: followUp,
+                reason: "Bundle readiness reported a missing or degraded S2 evidence requirement."
+            )
+        }
+        if payload.persistedBundleLoad?.degraded == true {
+            actions.append(
+                AutomationCLINextAction(
+                    command: "Inspect the persisted bundle failed sidecars in the debug-smoke JSON or evidence sidecar, then rerun semantic-recording debug-smoke after repairing the capture path.",
+                    reason: "The bundle was written, but at least one persisted sidecar could not be decoded during the post-write reload audit."
+                )
+            )
+        }
+        if payload.persistedBundleCountCheck.status == .mismatched {
+            actions.append(
+                AutomationCLINextAction(
+                    command: "Compare persistedBundleCountCheck.mismatches with manifest and sidecar writers before using this bundle as live S2 product evidence.",
+                    reason: "The in-memory finish result and the just-reloaded bundle disagree on persisted evidence counts: \(payload.persistedBundleCountCheck.summary)."
+                )
+            )
+        }
+        return actions
     case .preflightReady:
         return [
             AutomationCLINextAction(
-                command: "Rerun semantic-recording debug-smoke --json without --preflight-only when the screen is safe to capture.",
+                command: payload.commandPlan?.liveCaptureCommand ??
+                    "semantic-recording debug-smoke --json",
                 reason: "Preflight-only mode proves S2 capture readiness without creating a bundle or touching ScreenCaptureKit."
             )
         ]
@@ -1524,6 +3210,11 @@ private func semanticRecordingDebugSmokeNextActions(
             AutomationCLINextAction(
                 command: "Grant Input Monitoring and Screen Recording permissions, then rerun semantic-recording debug-smoke --json.",
                 reason: "S2 capture is blocked before bundle creation when required permissions are missing."
+            ),
+            AutomationCLINextAction(
+                command: payload.commandPlan?.preflightCommand ??
+                    "semantic-recording debug-smoke --preflight-only --json",
+                reason: "Use the same target/root/readiness options to verify preflight again before attempting live capture."
             )
         ]
     }
@@ -1538,10 +3229,30 @@ private func writeSemanticRecordingDebugSmokeSummary(
         SparkleRecorder: semantic recording debug smoke finished.
         - bundle: \(payload.bundleDirectory ?? "(missing)")
         - manifest: \(payload.manifestPath ?? "(missing)")
+        - evidence sidecar: \(payload.evidenceSidecarPath ?? "(not written)")
         - video segments: \(payload.videoSegmentCount)
         - frames: \(payload.frameCount)
         - timeline events: \(payload.timelineEventCount)
         - AI-safe events: \(payload.aiSafeEventCount)
+        - suppressions: \(payload.suppressionCount)
+        - synthetic suppressions: \(payload.syntheticSuppressionCount)
+        - synthetic redaction reason: \(payload.syntheticRedactionReason?.rawValue ?? "none")
+        - preflight guidance: \(payload.preflightPresentation.status.rawValue) - \(payload.preflightPresentation.title)
+        - preflight primary action: \(semanticRecordingDebugSmokePreflightActionSummary(payload.preflightPresentation.primaryAction))
+        - bundle readiness policy: \(semanticRecordingDebugSmokeReadinessPolicySummary(payload.bundleReadinessPolicy))
+        - bundle readiness: \(payload.bundleReadinessStatus?.rawValue ?? "none")
+        - bundle readiness issues: \(payload.bundleReadinessIssueCount) (blocking: \(payload.bundleReadinessBlockingIssueCount), degraded: \(payload.bundleReadinessDegradedIssueCount))
+        - bundle readiness issue codes: \(semanticRecordingDebugSmokeReadinessIssueCodes(payload.bundleReadinessIssues))
+        - bundle readiness follow-up: \(semanticRecordingDebugSmokeReadinessFollowUpSummary(payload.bundleReadinessFollowUps))
+        - persisted bundle reload: \(semanticRecordingDebugSmokePersistedBundleReloadSummary(payload.persistedBundleLoad))
+        - persisted bundle counts: \(semanticRecordingDebugSmokePersistedBundleCountSummary(payload.persistedBundleLoad))
+        - persisted bundle count match: \(payload.persistedBundleCountCheck.summary)
+        - persisted bundle loaded sidecars: \(semanticRecordingDebugSmokeSidecarKindSummary(payload.persistedBundleLoad?.sidecarDiagnostics.loadedKinds ?? []))
+        - persisted bundle missing sidecars: \(semanticRecordingDebugSmokeSidecarKindSummary(payload.persistedBundleLoad?.sidecarDiagnostics.missingKinds ?? []))
+        - persisted bundle failed sidecars: \(semanticRecordingDebugSmokeFailedSidecarSummary(payload.persistedBundleLoad?.sidecarDiagnostics.failedIssues ?? []))
+        - redacted frames: \(payload.redactedFrameCount)
+        - redacted videos: \(payload.redactedVideoCount)
+        - pending video redactions: \(payload.pendingVideoRangeRedactionCount)
 
         """.utf8))
     case .preflightReady:
@@ -1551,6 +3262,10 @@ private func writeSemanticRecordingDebugSmokeSummary(
         let degradedText = degraded.isEmpty ? "- none" : degraded
         FileHandle.standardOutput.write(Data("""
         SparkleRecorder: semantic recording debug smoke preflight ready.
+        - evidence sidecar: \(payload.evidenceSidecarPath ?? "(not written)")
+        - synthetic redaction reason: \(payload.syntheticRedactionReason?.rawValue ?? "none")
+        - preflight guidance: \(payload.preflightPresentation.status.rawValue) - \(payload.preflightPresentation.title)
+        - preflight primary action: \(semanticRecordingDebugSmokePreflightActionSummary(payload.preflightPresentation.primaryAction))
         - degraded issues:
         \(degradedText)
 
@@ -1561,10 +3276,154 @@ private func writeSemanticRecordingDebugSmokeSummary(
             .joined(separator: "\n")
         FileHandle.standardOutput.write(Data("""
         SparkleRecorder: semantic recording debug smoke blocked by preflight.
+        - evidence sidecar: \(payload.evidenceSidecarPath ?? "(not written)")
+        - synthetic redaction reason: \(payload.syntheticRedactionReason?.rawValue ?? "none")
+        - preflight guidance: \(payload.preflightPresentation.status.rawValue) - \(payload.preflightPresentation.title)
+        - preflight primary action: \(semanticRecordingDebugSmokePreflightActionSummary(payload.preflightPresentation.primaryAction))
         \(issues)
 
         """.utf8))
     }
+}
+
+private func semanticRecordingDebugSmokeReadinessIssueCodes(
+    _ issues: [SemanticRecordingBundleReadinessIssue]
+) -> String {
+    guard !issues.isEmpty else {
+        return "none"
+    }
+    return issues
+        .map { "\($0.code.rawValue):\($0.severity.rawValue)" }
+        .joined(separator: ", ")
+}
+
+private func semanticRecordingDebugSmokePreflightActionSummary(
+    _ action: SemanticRecordingPreflightPresentationAction
+) -> String {
+    [
+        "kind=\(action.kind.rawValue)",
+        "label=\(action.label)",
+        "permission=\(action.permission?.rawValue ?? "none")"
+    ].joined(separator: " ")
+}
+
+private func semanticRecordingDebugSmokeReadinessFollowUps(
+    _ readiness: SemanticRecordingBundleReadiness
+) -> [String] {
+    let codes = readiness.issues.map(\.code)
+    var followUps: [String] = []
+
+    func add(_ followUp: String) {
+        guard !followUps.contains(followUp) else { return }
+        followUps.append(followUp)
+    }
+
+    if codes.contains(.missingVideoSegment) ||
+        codes.contains(.frameMissingVideoSegment) ||
+        codes.contains(.frameMissingVideoTime) {
+        add("Rerun semantic-recording debug-smoke without --keyframes-only and inspect video/segments.json plus frames/index.jsonl.")
+    }
+    if codes.contains(.missingKeyframe) ||
+        codes.contains(.timelineEventMissingFrame) ||
+        codes.contains(.semanticEventMissingFrame) {
+        add("Inspect frames/index.jsonl and timeline.jsonl; verify event-aligned keyframes are written around recorded events.")
+    }
+    if codes.contains(.missingTimelineEvent) ||
+        codes.contains(.missingAISafeEvent) {
+        add("Inspect timeline.jsonl and events.jsonl; verify the recorder emitted playable events before finish.")
+    }
+    if codes.contains(.missingOCRObservation) {
+        add("Rerun on a safe text-bearing target with Screen Recording allowed, then inspect ocr/observations.jsonl.")
+    }
+    if codes.contains(.missingWindowOrAXObservation) {
+        add("Grant Accessibility and target a real window with --window-id or --app-bundle-id, then inspect window/AX observations.")
+    }
+    if codes.contains(.redactingSuppressionMissingFrameRedaction) ||
+        codes.contains(.redactingSuppressionMissingVideoRedaction) {
+        add("Inspect redacted/frames/index.json and redacted/video/index.json; rerun with --synthetic-redaction on safe content if the redaction renderer needs rehearsal.")
+    }
+    if codes.contains(.redactingSuppressionHasNoVisualEvidence) {
+        add("Inspect suppressed.jsonl, frames/index.jsonl and video/segments.json; verify the sensitive suppression overlaps captured visual evidence.")
+    }
+    if codes.contains(.invalidBundle) {
+        add("Run recording show with the finished bundle path and inspect manifest plus sidecar reference consistency.")
+    }
+
+    return followUps
+}
+
+private func semanticRecordingDebugSmokeReadinessFollowUpSummary(
+    _ followUps: [String]
+) -> String {
+    guard !followUps.isEmpty else {
+        return "none"
+    }
+    return followUps.joined(separator: " | ")
+}
+
+private func semanticRecordingDebugSmokePersistedBundleReloadSummary(
+    _ evidence: SemanticRecordingDebugSmokePersistedBundleLoadEvidence?
+) -> String {
+    guard let evidence else {
+        return "none"
+    }
+    return evidence.degraded ? "degraded" : "loaded"
+}
+
+private func semanticRecordingDebugSmokePersistedBundleCountSummary(
+    _ evidence: SemanticRecordingDebugSmokePersistedBundleLoadEvidence?
+) -> String {
+    guard let evidence else {
+        return "none"
+    }
+    return [
+        "video=\(evidence.videoSegmentCount)",
+        "frames=\(evidence.frameCount)",
+        "timeline=\(evidence.timelineEventCount)",
+        "aiSafe=\(evidence.aiSafeEventCount)",
+        "observations=\(evidence.visualObservationCount)",
+        "suppressions=\(evidence.suppressionCount)",
+        "redactedFrames=\(evidence.redactedFrameCount)",
+        "redactedVideos=\(evidence.redactedVideoCount)"
+    ].joined(separator: ", ")
+}
+
+private func semanticRecordingDebugSmokeSidecarKindSummary(
+    _ kinds: [SemanticRecordingBundleSidecarKind]
+) -> String {
+    guard !kinds.isEmpty else {
+        return "none"
+    }
+    return kinds
+        .map(\.rawValue)
+        .joined(separator: ", ")
+}
+
+private func semanticRecordingDebugSmokeFailedSidecarSummary(
+    _ issues: [SemanticRecordingBundleSidecarLoadIssue]
+) -> String {
+    guard !issues.isEmpty else {
+        return "none"
+    }
+    return issues
+        .map { issue in
+            "\(issue.kind.rawValue)=failed path=\(issue.relativePath) fallback=\(issue.fallbackToManifest)"
+        }
+        .joined(separator: " | ")
+}
+
+private func semanticRecordingDebugSmokeReadinessPolicySummary(
+    _ policy: SemanticRecordingBundleReadinessPolicy
+) -> String {
+    [
+        "video=\(policy.requiresVideoSegments)",
+        "keyframes=\(policy.requiresEventAlignedKeyframes)",
+        "timeline=\(policy.requiresTimelineEvents)",
+        "aiSafe=\(policy.requiresAISafeEvents)",
+        "ocr=\(policy.requiresOCRObservations)",
+        "windowOrAX=\(policy.requiresWindowOrAXObservations)",
+        "redactions=\(policy.requiresRedactionSidecars)"
+    ].joined(separator: ", ")
 }
 
 private func parsePositiveDoubleOption(
@@ -1890,6 +3749,118 @@ private func runWorkflowRun(
         writeWorkflowJSON(envelope)
     } else {
         writeWorkflowRunSummary(payload)
+    }
+    return envelope.ok ? 0 : 1
+}
+
+private func runWorkflowAcceptanceBoundWindow(
+    _ arguments: [String],
+    command: String,
+    wantsJSON: Bool
+) throws -> Int {
+    var workflowID: UUID?
+    var taskSelector: String?
+    var repositoryDirectoryPath: String?
+    var macrosDirectoryPath: String?
+    var shouldActivateTarget = false
+    var shouldLaunchTarget = false
+    var shouldConfirmPlayback = false
+    var shouldHandoffToAppHost = false
+    var requestedAt = Date.now
+    var index = 0
+
+    while index < arguments.count {
+        let token = arguments[index]
+        switch token {
+        case "--json":
+            break
+        case "--workflow-id":
+            workflowID = try parseWorkflowCLIUUID(
+                workflowCLIValue(after: token, in: arguments, at: &index),
+                path: token
+            )
+        case "--task":
+            taskSelector = try workflowCLIValue(after: token, in: arguments, at: &index)
+        case "--repository-dir":
+            repositoryDirectoryPath = try workflowCLIValue(after: token, in: arguments, at: &index)
+        case "--macros-dir":
+            macrosDirectoryPath = try workflowCLIValue(after: token, in: arguments, at: &index)
+        case "--activate-target":
+            shouldActivateTarget = true
+        case "--confirm-launch":
+            shouldLaunchTarget = true
+            shouldActivateTarget = true
+        case "--confirm-playback":
+            shouldConfirmPlayback = true
+        case "--handoff-app":
+            shouldHandoffToAppHost = true
+        case "--handoff":
+            let value = try workflowCLIValue(after: token, in: arguments, at: &index)
+            guard value == "app" || value == "appHost" else {
+                throw WorkflowCLIError(
+                    "unsupportedHandoffTarget",
+                    "--handoff must be 'app'.",
+                    path: token
+                )
+            }
+            shouldHandoffToAppHost = true
+        case "--at":
+            requestedAt = try parseWorkflowCLIDate(workflowCLIValue(after: token, in: arguments, at: &index))
+        default:
+            if token.hasPrefix("--") {
+                throw WorkflowCLIError("unsupportedOption", "Unsupported option '\(token)'.", path: token)
+            }
+            guard workflowID == nil else {
+                throw WorkflowCLIError("unexpectedArgument", "Unexpected argument '\(token)'.", path: token)
+            }
+            workflowID = try parseWorkflowCLIUUID(token, path: "workflow-id")
+        }
+        index += 1
+    }
+
+    guard let workflowID else {
+        throw WorkflowCLIError(
+            "missingArgument",
+            "workflow acceptance bound-window requires a workflow ID.",
+            path: "workflow-id"
+        )
+    }
+    if shouldConfirmPlayback, !shouldHandoffToAppHost {
+        throw WorkflowCLIError(
+            "handoffRequired",
+            "Live bound-window workflow playback must use --handoff app so the running App host owns Player lifecycle.",
+            path: "--handoff"
+        )
+    }
+
+    let repository = workflowCLIRepository(directoryPath: repositoryDirectoryPath)
+    let macrosDirectory = macrosDirectoryPath.map { URL(fileURLWithPath: $0, isDirectory: true) }
+    let handoffClient = workflowCLIRuntimeHandoffClient(directoryPath: repositoryDirectoryPath)
+    let requestedPlaybackAt = requestedAt
+    let selectedTaskSelector = taskSelector
+    let activateTarget = shouldActivateTarget
+    let launchTarget = shouldLaunchTarget
+    let confirmPlayback = shouldConfirmPlayback
+    let payload = try waitForWorkflowCLIAsync {
+        try await runWorkflowBoundWindowAcceptance(
+            workflowID: workflowID,
+            taskSelector: selectedTaskSelector,
+            repository: repository,
+            macrosDirectory: macrosDirectory,
+            handoffClient: handoffClient,
+            activateTarget: activateTarget,
+            launchTarget: launchTarget,
+            confirmPlayback: confirmPlayback,
+            requestedAt: requestedPlaybackAt
+        )
+    }
+    let envelope = AutomationCLIResultEnvelope<AutomationWorkflowBoundWindowAcceptancePayload>
+        .workflowBoundWindowAcceptance(command: command, payload: payload)
+
+    if wantsJSON {
+        writeWorkflowJSON(envelope)
+    } else {
+        writeWorkflowBoundWindowAcceptanceSummary(payload)
     }
     return envelope.ok ? 0 : 1
 }
@@ -2396,6 +4367,84 @@ private func runWorkflowDraftNormalize(
         command: command,
         wantsJSON: wantsJSON
     )
+}
+
+private func runWorkflowDraftFromRecording(
+    _ arguments: [String],
+    command: String,
+    wantsJSON: Bool
+) throws -> Int {
+    var outPath: String?
+    var workflowName: String?
+    var maxTasks = 6
+    var includeCandidateFallback = true
+    let recordingBundle = try loadRecordingCLIBundle(arguments) { token, index, arguments in
+        switch token {
+        case "--out":
+            guard index + 1 < arguments.count else {
+                throw WorkflowCLIError("missingArgument", "\(token) requires a path.", path: token)
+            }
+            outPath = arguments[index + 1]
+            return 1
+        case "--name":
+            guard index + 1 < arguments.count else {
+                throw WorkflowCLIError("missingArgument", "\(token) requires a value.", path: token)
+            }
+            workflowName = arguments[index + 1]
+            return 1
+        case "--max-tasks":
+            guard index + 1 < arguments.count else {
+                throw WorkflowCLIError("missingArgument", "\(token) requires a value.", path: token)
+            }
+            maxTasks = try parseWorkflowCLIInt(
+                arguments[index + 1],
+                path: token
+            )
+            return 1
+        case "--suggestions-only":
+            includeCandidateFallback = false
+            return 0
+        default:
+            return nil
+        }
+    }
+
+    let suggestionResult = recordingCLISuggestionResult(
+        for: recordingBundle,
+        category: .conditions
+    )
+    let result = SemanticRecordingWorkflowDraftBuilder.build(
+        bundle: recordingBundle.bundle,
+        suggestions: suggestionResult.suggestions,
+        options: SemanticRecordingWorkflowDraftBuildOptions(
+            workflowName: workflowName,
+            maxTasks: maxTasks,
+            includeCandidateFallback: includeCandidateFallback
+        )
+    )
+
+    if let outPath {
+        let data = try encodeWorkflowCLIJSON(result.document)
+        try writeWorkflowCLIFile(data, to: outPath)
+    }
+
+    let payload = AutomationWorkflowDraftFromRecordingPayload(
+        requestedRecordingID: recordingBundle.requestedRecordingID,
+        recordingID: recordingBundle.bundle.id,
+        fixture: recordingBundle.fixture,
+        sourceOption: recordingBundle.sourceOption,
+        wrotePath: outPath,
+        result: result
+    )
+    let envelope = AutomationCLIResultEnvelope<AutomationWorkflowDraftFromRecordingPayload>
+        .workflowDraftFromRecording(command: command, payload: payload)
+
+    if wantsJSON {
+        writeWorkflowJSON(envelope)
+    } else {
+        writeWorkflowDraftFromRecordingSummary(payload)
+    }
+    return result.isValid ? 0 : 1
 }
 
 private func runWorkflowDraftPatch(
@@ -3503,6 +5552,160 @@ private func enqueueWorkflowRunHandoff(
     )
 }
 
+private func runWorkflowBoundWindowAcceptance(
+    workflowID: UUID,
+    taskSelector: String?,
+    repository: AutomationRepositoryClient,
+    macrosDirectory: URL?,
+    handoffClient: AutomationRuntimeHandoffClient,
+    activateTarget: Bool,
+    launchTarget: Bool,
+    confirmPlayback: Bool,
+    requestedAt: Date
+) async throws -> AutomationWorkflowBoundWindowAcceptancePayload {
+    let workflows = try await repository.loadWorkflows()
+    guard let workflow = workflows.first(where: { $0.id == workflowID }) else {
+        throw WorkflowCLIError(
+            "workflowNotFound",
+            "Workflow '\(workflowID.uuidString)' was not found.",
+            path: "workflow-id"
+        )
+    }
+    let task = try resolveWorkflowCLITask(selector: taskSelector, in: workflow)
+    guard task.isEnabled else {
+        throw WorkflowCLIError(
+            "taskDisabled",
+            "Task '\(task.name)' is disabled and cannot be accepted for playback.",
+            path: "--task"
+        )
+    }
+    guard let macroID = task.kind.macroID else {
+        throw WorkflowCLIError(
+            "taskIsNotMacro",
+            "Task '\(task.name)' is not a macro task.",
+            path: "--task"
+        )
+    }
+
+    let macro = try loadWorkflowMacroManifests(macrosDirectory: macrosDirectory)
+        .first { $0.id == macroID }
+    guard let macro else {
+        throw WorkflowCLIError(
+            "macroNotFound",
+            "Macro '\(macroID.uuidString)' was not found in the macro library.",
+            path: "macroID"
+        )
+    }
+    guard !macro.surfaces.isEmpty else {
+        throw WorkflowCLIError(
+            "macroHasNoBoundSurfaces",
+            "Macro '\(macro.name)' has no saved playback surfaces to activate.",
+            path: "macro.surfaces"
+        )
+    }
+    guard !PlaybackPlanner.plan(events: macro.events, loops: macro.loops, speed: macro.speed).steps.isEmpty else {
+        throw WorkflowCLIError(
+            "macroHasNoPlayableEvents",
+            "Macro '\(macro.name)' has no playable events.",
+            path: "macro.events"
+        )
+    }
+
+    let activationResults = activateTarget
+        ? workflowCLIActivateBoundTargetApps(
+            surfaces: macro.surfaces,
+            launchIfNeeded: launchTarget
+        )
+        : []
+    let handoff: AutomationRuntimeHandoffPayload?
+    if confirmPlayback {
+        handoff = try await enqueueWorkflowRunHandoff(
+            workflowID: workflow.id,
+            taskSelector: task.id.uuidString,
+            repository: repository,
+            handoffClient: handoffClient,
+            requestedAt: requestedAt
+        )
+    } else {
+        handoff = nil
+    }
+
+    return AutomationWorkflowBoundWindowAcceptancePayload(
+        workflow: workflow,
+        task: task,
+        macro: macro,
+        activationRequested: activateTarget,
+        launchRequested: launchTarget,
+        playbackHandoffRequested: confirmPlayback,
+        activationResults: activationResults,
+        handoff: handoff,
+        checkedAt: Date.now
+    )
+}
+
+private func workflowCLIActivateBoundTargetApps(
+    surfaces: [String: PlaybackSurface],
+    launchIfNeeded: Bool
+) -> [AutomationWorkflowBoundWindowActivationResult] {
+    let surfacesByBundle = Dictionary(grouping: surfaces.values.compactMap { surface -> (String, PlaybackSurface)? in
+        guard let bundleIdentifier = surface.bundleIdentifier?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !bundleIdentifier.isEmpty else {
+            return nil
+        }
+        return (bundleIdentifier, surface)
+    }, by: \.0)
+
+    return surfacesByBundle.keys.sorted().map { bundleIdentifier in
+        let surface = surfacesByBundle[bundleIdentifier]?.first?.1
+        let runningBefore = NSRunningApplication
+            .runningApplications(withBundleIdentifier: bundleIdentifier)
+        var app = runningBefore.first
+        var didLaunch = false
+        var errorMessage: String?
+
+        if app == nil, launchIfNeeded {
+            if let appURL = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleIdentifier) {
+                didLaunch = NSWorkspace.shared.open(appURL)
+                if didLaunch {
+                    Thread.sleep(forTimeInterval: 1.0)
+                    app = NSRunningApplication
+                        .runningApplications(withBundleIdentifier: bundleIdentifier)
+                        .first
+                }
+            } else {
+                errorMessage = "Could not locate an installed app for bundle identifier '\(bundleIdentifier)'."
+            }
+        }
+
+        guard let app else {
+            return AutomationWorkflowBoundWindowActivationResult(
+                bundleIdentifier: bundleIdentifier,
+                appName: surface?.appName,
+                wasRunning: !runningBefore.isEmpty,
+                didLaunch: didLaunch,
+                didActivate: false,
+                errorMessage: errorMessage ?? "Target app '\(bundleIdentifier)' is not running. Pass --confirm-launch to launch it before playback."
+            )
+        }
+
+        let didActivate: Bool
+        if #available(macOS 14.0, *) {
+            didActivate = app.activate()
+        } else {
+            didActivate = app.activate(options: [.activateIgnoringOtherApps])
+        }
+
+        return AutomationWorkflowBoundWindowActivationResult(
+            bundleIdentifier: bundleIdentifier,
+            appName: app.localizedName ?? surface?.appName,
+            wasRunning: !runningBefore.isEmpty,
+            didLaunch: didLaunch,
+            didActivate: didActivate,
+            errorMessage: didActivate ? nil : "Target app '\(bundleIdentifier)' was found but did not activate."
+        )
+    }
+}
+
 private func enqueueWorkflowCancelHandoff(
     runID: UUID,
     repository: AutomationRepositoryClient,
@@ -4029,6 +6232,49 @@ private func workflowCommandName(_ workflowArgs: [String]) -> String {
     return "workflow " + workflowArgs.prefix(3).joined(separator: " ")
 }
 
+private func recordingCommandName(_ recordingArgs: [String]) -> String {
+    guard let command = recordingArgs.first else {
+        return "recording"
+    }
+    switch command {
+    case "show":
+        return "recording.show"
+    case "explain":
+        return "recording.explain"
+    case "frames":
+        return "recording.frames"
+    case "frame":
+        if recordingArgs.dropFirst().first == "show" {
+            return "recording.frame.show"
+        }
+        return "recording.frame"
+    case "events-near":
+        return "recording.eventsNear"
+    case "ocr":
+        if Array(recordingArgs.dropFirst().prefix(1)) == ["search"] {
+            return "recording.ocr.search"
+        }
+        return "recording.ocr"
+    case "visual":
+        if Array(recordingArgs.dropFirst().prefix(1)) == ["search"] {
+            return "recording.visual.search"
+        }
+        return "recording.visual"
+    case "asset":
+        if let subcommand = recordingArgs.dropFirst().first {
+            return "recording.asset.\(subcommand)"
+        }
+        return "recording.asset"
+    case "suggest":
+        if let category = recordingArgs.dropFirst().first {
+            return "recording.suggest.\(category)"
+        }
+        return "recording.suggest"
+    default:
+        return "recording.\(command)"
+    }
+}
+
 private func semanticRecordingCommandName(_ semanticArgs: [String]) -> String {
     guard !semanticArgs.isEmpty else {
         return "semantic-recording"
@@ -4216,6 +6462,75 @@ private func parseWorkflowCLITextMatchMode(_ value: String, path: String) throws
     return matchMode
 }
 
+private func parseRecordingVisualObservationKind(
+    _ value: String,
+    path: String
+) throws -> RecordingVisualObservationKind {
+    guard let kind = RecordingVisualObservationKind(rawValue: value) else {
+        throw WorkflowCLIError(
+            "unsupportedVisualObservationKind",
+            "\(path) must be one of ocrText, axElement, windowSnapshot, pixelSample, imageTemplateCandidate, regionBaseline, regionDiff, or patternCandidate.",
+            path: path
+        )
+    }
+    return kind
+}
+
+private func parseRecordingCLIAssetExtractionKind(
+    _ value: String,
+    path: String
+) throws -> SemanticRecordingCLIAssetExtractionKind {
+    guard let kind = SemanticRecordingCLIAssetExtractionKind(rawValue: value) else {
+        throw WorkflowCLIError(
+            "unsupportedAssetKind",
+            "\(path) must be imageTemplate, image, or baseline.",
+            path: path
+        )
+    }
+    return kind
+}
+
+private func parseRecordingCLIRegionSpace(
+    _ value: String,
+    path: String
+) throws -> RecordingCoordinateSpace {
+    guard let space = RecordingCoordinateSpace(rawValue: value) else {
+        throw WorkflowCLIError(
+            "unsupportedRegionSpace",
+            "\(path) must be screenPixels, displayPixels, windowPixels, contentPixels, framePixels, or normalizedFrame.",
+            path: path
+        )
+    }
+    return space
+}
+
+private func parseRecordingCLIRegion(
+    _ value: String,
+    coordinateSpace: RecordingCoordinateSpace,
+    path: String
+) throws -> RecordingBounds {
+    let parts = value
+        .split(separator: ",", omittingEmptySubsequences: false)
+        .map { String($0).trimmingCharacters(in: .whitespacesAndNewlines) }
+    guard parts.count == 4,
+          let x = Double(parts[0]),
+          let y = Double(parts[1]),
+          let width = Double(parts[2]),
+          let height = Double(parts[3]),
+          width > 0,
+          height > 0 else {
+        throw WorkflowCLIError(
+            "invalidRegion",
+            "\(path) must be x,y,width,height with positive width and height.",
+            path: path
+        )
+    }
+    return RecordingBounds(
+        rect: RecordingRect(x: x, y: y, width: width, height: height),
+        coordinateSpace: coordinateSpace
+    )
+}
+
 private func parseWorkflowCLIDraftSchedule(
     type: String,
     startAt: Date?,
@@ -4288,6 +6603,33 @@ private func writeWorkflowJSON<Value: Encodable>(_ value: Value) {
         FileHandle.standardOutput.write(data)
         FileHandle.standardOutput.write(Data("\n".utf8))
     }
+}
+
+private func writeWorkflowDraftFromRecordingSummary(_ payload: AutomationWorkflowDraftFromRecordingPayload) {
+    var lines = [
+        "SparkleRecorder: generated workflow draft from recording.",
+        "- recording \(payload.recordingID.uuidString)",
+        "- workflow \(payload.result.document.workflow.name)",
+        "- tasks \(payload.result.generatedTaskCount), dependencies \(payload.result.document.workflow.dependencies.count)",
+        "- applied \(payload.result.appliedItems.count), skipped \(payload.result.skippedItems.count)",
+        "- valid \(payload.result.isValid ? "yes" : "no")"
+    ]
+    if payload.fixtureMode, let fixture = payload.fixture {
+        lines.append("- fixture \(fixture)")
+    } else if let sourceOption = payload.sourceOption {
+        lines.append("- source \(sourceOption)")
+    }
+    if let wrotePath = payload.wrotePath {
+        lines.append("- wrote \(wrotePath)")
+    }
+    for issue in payload.result.validation.issues {
+        lines.append("- [\(issue.severity.rawValue)] \(issue.code.rawValue): \(issue.message)")
+    }
+    for skipped in payload.result.skippedItems {
+        let id = skipped.suggestionID?.uuidString ?? skipped.candidateID ?? skipped.source.rawValue
+        lines.append("- [warning] skipped \(skipped.source.rawValue) \(id): \(skipped.reason)")
+    }
+    FileHandle.standardOutput.write(Data((lines.joined(separator: "\n") + "\n").utf8))
 }
 
 private func writeWorkflowDraftEditSummary(_ result: AutomationWorkflowDraftEditResult) {
@@ -4392,6 +6734,57 @@ private func writeWorkflowRunSummary(_ payload: AutomationWorkflowRunPayload) {
     for run in payload.executionRuns {
         lines.append("- \(run.id.uuidString) \(run.status) \(run.outcome.map(String.init(describing:)) ?? "pending")")
     }
+    FileHandle.standardOutput.write(Data((lines.joined(separator: "\n") + "\n").utf8))
+}
+
+private func writeWorkflowBoundWindowAcceptanceSummary(
+    _ payload: AutomationWorkflowBoundWindowAcceptancePayload
+) {
+    var lines = [
+        payload.readyForBoundWindowPlayback
+            ? "SparkleRecorder: bound-window workflow acceptance is ready."
+            : "SparkleRecorder: bound-window workflow acceptance is not ready.",
+        "- workflow \(payload.workflowID.uuidString) \(payload.workflowName)",
+        "- task \(payload.taskID.uuidString) \(payload.taskName)",
+        "- macro \(payload.macroID.uuidString) \(payload.macroName)",
+        "- events \(payload.macroEventCount)",
+        "- surfaces \(payload.macroSurfaceCount)",
+        "- coordinateMode \(payload.coordinateMode.rawValue)",
+        "- foregroundInput \(payload.resourceRequiresForegroundInput ? "yes" : "no")"
+    ]
+
+    for surface in payload.surfaces {
+        let target = [
+            surface.bundleIdentifier,
+            surface.windowTitle,
+            surface.appName
+        ]
+            .compactMap { $0?.nilIfEmptyForWorkflowCLISummary }
+            .joined(separator: " · ")
+        lines.append("- surface \(surface.surfaceID) \(target)")
+    }
+
+    for result in payload.activationResults {
+        let status = result.didActivate ? "activated" : "not-activated"
+        var line = "- app \(result.bundleIdentifier) \(status)"
+        if result.didLaunch {
+            line += " launched"
+        } else if result.wasRunning {
+            line += " already-running"
+        }
+        if let errorMessage = result.errorMessage {
+            line += " — \(errorMessage)"
+        }
+        lines.append(line)
+    }
+
+    if let handoff = payload.handoff {
+        lines.append("- handoff \(handoff.command.id.uuidString)")
+        lines.append("- pending \(handoff.pendingCommandCount)")
+    } else if payload.playbackHandoffRequested {
+        lines.append("- handoff not-created")
+    }
+
     FileHandle.standardOutput.write(Data((lines.joined(separator: "\n") + "\n").utf8))
 }
 
@@ -4534,6 +6927,13 @@ private func writeWorkflowMacroSummary(_ entries: [AutomationWorkflowDraftMacroC
 
 private func writeWorkflowError(_ message: String) {
     FileHandle.standardError.write(Data((message + "\n").utf8))
+}
+
+private extension String {
+    var nilIfEmptyForWorkflowCLISummary: String? {
+        let trimmed = trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? nil : trimmed
+    }
 }
 
 if args.count >= 2, args[1] == "--self-test" {
@@ -4751,11 +7151,7 @@ if args.count >= 3, args[1] == "--play" {
                     }
                 }
                 
-                context = PlaybackContext(
-                    surfaces: saved.surfaces,
-                    currentSurfaceFrames: [:],
-                    coordinateMode: saved.followWindowOffset ? .boundWindowOffset : .screenAbsolute
-                )
+                context = saved.playbackContext
             }
         } else {
             let macro = try dec.decode(Macro.self, from: data)

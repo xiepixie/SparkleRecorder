@@ -22,6 +22,7 @@ enum LiveSemanticRecordingStartResult: Equatable {
 struct LiveSemanticRecordingFinishResult: Equatable {
     var bundle: SemanticRecordingBundle
     var bundleDirectory: URL
+    var redactionResult: RecordingBundleRedactionApplicationResult?
 }
 
 struct LiveSemanticRecordingSessionDependencies: @unchecked Sendable {
@@ -33,7 +34,7 @@ struct LiveSemanticRecordingSessionDependencies: @unchecked Sendable {
     init(
         store: RecordingBundleStore = RecordingBundleStore(),
         preflightClient: SemanticRecordingPreflightClient = .live,
-        suppressionProducer: SemanticRecordingSuppressionProducer = SemanticRecordingSuppressionProducer(),
+        suppressionProducer: SemanticRecordingSuppressionProducer = .liveUserDefaults,
         makeCaptureClient: @escaping @Sendable (URL) -> SemanticRecordingCaptureClient = { directory in
             LiveSemanticCaptureClient.live(bundleDirectory: directory)
         }
@@ -95,13 +96,20 @@ actor LiveSemanticRecordingSession {
             sessionFactory: sessionFactory
         )
 
-        switch try await lifecycle.start(recordingTime: recordingTime) {
-        case .started(let startedPreflight):
-            self.lifecycle = lifecycle
-            bundleDirectory = directory
-            return .started(preflight: startedPreflight, bundleDirectory: directory)
-        case .blocked(let blockedPreflight):
-            return .blocked(preflight: blockedPreflight)
+        self.lifecycle = lifecycle
+        bundleDirectory = directory
+        do {
+            switch try await lifecycle.start(recordingTime: recordingTime) {
+            case .started(let startedPreflight):
+                return .started(preflight: startedPreflight, bundleDirectory: directory)
+            case .blocked(let blockedPreflight):
+                await cleanupBundleDirectory(recordingTime: recordingTime)
+                return .blocked(preflight: blockedPreflight)
+            }
+        } catch {
+            await cleanupBundleDirectory(recordingTime: recordingTime)
+            didFinish = true
+            throw error
         }
     }
 
@@ -129,15 +137,54 @@ actor LiveSemanticRecordingSession {
         guard let directory = bundleDirectory else {
             throw LiveSemanticRecordingSessionError.notStarted
         }
-        let bundle = try await activeLifecycle.finish(recordingTime: recordingTime)
-        try await dependencies.store.write(bundle, to: directory)
+
+        do {
+            let bundle = try await activeLifecycle.finish(recordingTime: recordingTime)
+            try await dependencies.store.write(bundle, to: directory)
+            let redactionPlan = SemanticRecordingRedactionPlanner.plan(for: bundle)
+            let redactionResult: RecordingBundleRedactionApplicationResult?
+            if redactionPlan.isEmpty {
+                redactionResult = nil
+            } else {
+                redactionResult = try await dependencies.store.applyRedactionPlan(
+                    redactionPlan,
+                    dryRun: false
+                )
+            }
+            lifecycle = nil
+            bundleDirectory = nil
+            didFinish = true
+            return LiveSemanticRecordingFinishResult(
+                bundle: bundle,
+                bundleDirectory: directory,
+                redactionResult: redactionResult
+            )
+        } catch {
+            await cleanupBundleDirectory(recordingTime: recordingTime)
+            didFinish = true
+            throw error
+        }
+    }
+
+    func cancel(recordingTime: TimeInterval) async {
+        guard !didFinish else {
+            return
+        }
+
+        await cleanupBundleDirectory(recordingTime: recordingTime)
+        didFinish = true
+    }
+
+    private func cleanupBundleDirectory(recordingTime: TimeInterval) async {
+        if let activeLifecycle = lifecycle {
+            await activeLifecycle.cancel(recordingTime: recordingTime)
+        }
+
+        _ = try? await dependencies.store.removeBundleDirectory(
+            recordingID: configuration.recordingID
+        )
         lifecycle = nil
         bundleDirectory = nil
-        didFinish = true
-        return LiveSemanticRecordingFinishResult(
-            bundle: bundle,
-            bundleDirectory: directory
-        )
     }
 
     private func requireLifecycle() throws -> SemanticRecordingLifecycle {

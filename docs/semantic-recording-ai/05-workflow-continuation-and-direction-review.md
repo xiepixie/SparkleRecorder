@@ -58,7 +58,7 @@ SparkleRecorder 的优势不是“让 AI 看视频后随便操作电脑”，而
 | Live visual diagnostics Open/Reveal | Fixture UI 已证明 artifact preview、Open/Reveal affordance 和 inline feedback；live evaluator 可写 sample/crop refs | 用真实 App 运行一次 visual/OCR condition，录屏证明 Run Detail 显示 watched region、last sample/crop、score/threshold，并且 Open/Reveal 打开真实 App Support artifact |
 | Branch evidence real-run consistency | `AutomationTaskRun.branchEvidence` durable payload 已有；fixture drill-in 已有 | 用真实 workflow 运行一次 success/failure/timeout branch，录屏证明 FlowGraph edge 状态、selected run、Run Detail branch evidence 三者一致 |
 | Template/baseline preview refs | draft/package refs、provider、baseline capture、fixture last-sample/region artifact first pass 已有 | 定义 template/baseline preview artifact ref，Run Detail 同屏展示 recorded template/baseline、runtime sample、score/diff；没有 ref 时明确 fallback |
-| Real drag/reorder WYSIWYG evidence | idle/drag-link/task-reorder/running fixture PNG 已有 | 录屏证明 macro drag, task reorder, connector link 的 preview 与真实 reducer mutation 一致 |
+| Real drag/reorder WYSIWYG evidence | idle/drag-link/task-reorder/running fixture PNG 已有；`live-task-reorder-wysiwyg.mov` 已证明 task reorder 按钮 mutation 与 graph/list 同步 | drag-link 或 macro drag live clip 可作为后续更广 authoring 证据；S0 authoring OR gate 已由 task reorder 满足 |
 | Managed visual asset storage policy | package-root retention first pass，可解析 package-local refs | 决定哪些资产留在 package、哪些复制到 app-managed store、如何迁移/删除/恢复 missing asset |
 | Evidence presenter consistency | Macro evidence 和 condition artifact presenter 都已有 Open/Reveal feedback first pass | 统一 action feedback 文案、missing/unreadable/unsafe path 状态、product evidence 录屏规则 |
 | Resource/runtime product evidence | resource waiting/max wait/timeout/retry projection first pass 已有 | 补多 workflow resource queue、runtime health、handoff result readback 的产品证据，不在 UI 中重写调度语义 |
@@ -167,7 +167,7 @@ If a proposed feature cannot answer one of those questions, it is probably infra
    - live visual diagnostics Open/Reveal recording
    - macro evidence Reveal Report / Open Screenshot recording
    - branch evidence real-run consistency recording
-   - real drag/reorder or drag-link WYSIWYG recording
+   - authoring WYSIWYG recording: task reorder live clip done; drag-link remains optional/future
    - template/baseline preview refs design note
 2. Semantic recording contract:
    - minimal `SemanticRecordingBundle` schema

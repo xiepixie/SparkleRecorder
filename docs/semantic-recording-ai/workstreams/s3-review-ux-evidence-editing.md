@@ -1,11 +1,13 @@
 # S3 Review UX And Evidence Editing
 
 更新时间：2026-07-07
-状态：Macro Review integration + linked Run Detail opener + Draft Preview handoff + selected-region draft selection + Review action semantics / S4 evidence alignment first pass + Bundle Health / Run Target first passes done; live product evidence open
+状态：first pass paused; Macro Review integration + linked Run Detail opener + Draft Preview handoff + selected-region draft selection + Review action semantics / S4 evidence alignment + Bundle Health / Run Target first passes done; live product evidence waits on S2 live bundle evidence
 Owner：S3, Review UX / Evidence Editing
 并行对象：S0 Workflow Evidence Closure, S1 Contract/Core, S2 App Capture/Visual Index, S4 CLI/AI
 
 S3 的任务是把 semantic recording bundle 变成用户能审阅、修正和教学的界面。第一版不能等待 live capture 完成；必须先用 S1 fixture 证明 Review UX 的投影、事件导航、overlay、source/runtime comparison 和 suggestion review 逻辑成立。第二版已经把 Review 从 fixture 推到真实 Run Detail 入口和 live bundle presenter：Run Detail 会优先从 `SavedMacro.semanticRecording` 打开 linked Macro Review，缺少绑定时仍保留手动 bundle picker fallback。用户可以审阅 frame timeline，框选 frame region，把候选生成 review-only workflow draft patch，并从 Review 直接进入 Draft Preview 走 existing confirm import。
+
+当前 S3 first pass 暂告一段落。接下来不要继续扩大 S3 UI 范围；S3 的下一次有效推进应由 S2 live semantic bundle 解锁：真实 `.mov` / keyframes / sidecars / OCR-window-AX observations / `SavedMacro.semanticRecording` metadata 先被 S2 生产和验证，然后 S3 再补 installed-app linked Review、frame-to-condition live clip 和 Review -> Draft Preview live evidence。S0-S4 总差距维护在 [../14-s0-s4-final-gap-alignment.md](../14-s0-s4-final-gap-alignment.md)。
 
 ## Scope
 
@@ -204,10 +206,14 @@ Observed status on 2026-07-07:
 
 ## Next Tasks
 
-1. Capture installed-app product evidence for linked Run Detail -> Macro Review opening from a `SavedMacro.semanticRecording` bundle, including Open/Reveal artifact actions.
+S3 is paused until S2 provides a reviewed live bundle path. Resume S3 in this order:
+
+1. Capture installed-app product evidence for linked Run Detail -> Macro Review opening from a `SavedMacro.semanticRecording` bundle, including Open/Reveal artifact actions, after S2 proves the ordinary Recorder bridge can attach that metadata from a live bundle.
 2. Add per-run/session semantic recording evidence drill-in once S2 exposes run-level metadata beyond the saved macro reference.
 3. Capture live product evidence for frame-to-condition creation once a live bundle can be opened from the installed app.
 4. Add installed-app product evidence for pixel color picking, suggestion accept/reject and the Review -> Draft Preview -> confirm import handoff from a live bundle.
+
+While paused, S3 should only keep fixture snapshots/action semantics current when S1/S2 contracts change. Do not add live capture, Vision, AX or raw path construction to SwiftUI to bypass S2.
 
 ## Implementation Log
 
@@ -243,3 +249,4 @@ Observed status on 2026-07-07:
 - 2026-07-07: Added S4-safe Run Target provenance evidence. `SemanticRecordingReviewRunTargetEvidence` is Codable, uses `semanticReview.runTarget` rather than a `review.*` mutation action, marks the boundary as `provenanceOnly`, preserves selected event/frame ids plus requested/matched recorded-event indexes, and round-trips in projection tests.
 - 2026-07-07: Surfaced Run Target provenance rows in Macro Review. Run Detail and the `semantic-review-run-target` snapshot now pass `SemanticRecordingReviewRunTargetEvidence` into the sheet, so users and S4/CLI summaries see the same provenance-only rows.
 - 2026-07-07: Added materialized-asset Review action semantics for S3/S4 alignment. `review.materializeAsset` uses `packageAssetOnly`, preserves source artifact -> package-local asset path plus digest, frame/event refs, bounds and visual asset key, and stays `mutatesWorkflow=false` until a reviewed draft patch/import exists.
+- 2026-07-07: Marked S3 first pass paused after Macro Review, Run Detail opener, Bundle Health, Run Target provenance, Draft Preview handoff, materialized asset action evidence and pixel color first passes. The next S3 work is intentionally gated on S2 live bundle evidence; current S0-S4 gap alignment lives in [../14-s0-s4-final-gap-alignment.md](../14-s0-s4-final-gap-alignment.md).

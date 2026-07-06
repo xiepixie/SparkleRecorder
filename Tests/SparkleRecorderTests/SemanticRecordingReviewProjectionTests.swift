@@ -76,6 +76,40 @@ struct SemanticRecordingReviewProjectionTests {
         #expect(comparison.threshold == 0.90)
     }
 
+    @Test("Review projection prefers redacted frame refs while preserving source frame refs")
+    func reviewProjectionPrefersRedactedFrameRefs() throws {
+        var bundle = SemanticRecordingFixture.checkoutBundle()
+        bundle.redactedFrames = [
+            SemanticRecordingRenderedFrameRedaction(
+                frameID: SemanticRecordingFixture.afterClickFrameID,
+                sourceImageRef: try RecordingArtifactRef("frames/000016-after-click.png"),
+                redactedImageRef: try RecordingArtifactRef("redacted/frames/after-click.png"),
+                renderedMaskCount: 1,
+                sourceSuppressionIDs: [SemanticRecordingFixture.suppressionID]
+            )
+        ]
+
+        let projection = SemanticRecordingReviewProjection(
+            bundle: bundle,
+            selectedEventID: SemanticRecordingFixture.waitEventID
+        )
+
+        let selectedFrame = try #require(projection.selectedFrame)
+        #expect(selectedFrame.id == SemanticRecordingFixture.afterClickFrameID)
+        #expect(selectedFrame.imageRefPath == "redacted/frames/after-click.png")
+        #expect(selectedFrame.sourceImageRefPath == "frames/000016-after-click.png")
+        #expect(selectedFrame.redactedImageRefPath == "redacted/frames/after-click.png")
+        #expect(selectedFrame.isRedacted)
+
+        let stripItem = try #require(
+            projection.frameStrip.first { $0.id == SemanticRecordingFixture.afterClickFrameID }
+        )
+        #expect(stripItem.imageRefPath == "redacted/frames/after-click.png")
+        #expect(stripItem.sourceImageRefPath == "frames/000016-after-click.png")
+        #expect(stripItem.redactedImageRefPath == "redacted/frames/after-click.png")
+        #expect(stripItem.isRedacted)
+    }
+
     @Test("Suggestions remain review-only and cite evidence")
     func suggestionsRemainReviewOnlyAndCiteEvidence() throws {
         let bundle = SemanticRecordingFixture.checkoutBundle()
@@ -490,7 +524,6 @@ struct SemanticRecordingReviewProjectionTests {
         #expect(target.selectedFrameID == SemanticRecordingFixture.afterClickFrameID)
         #expect(target.reason == SemanticRecordingReviewRunTarget.Reason.conditionCandidate)
     }
-
 
     @Test("Run target presentation explains failed event targeting")
     func runTargetPresentationExplainsFailedEventTargeting() {

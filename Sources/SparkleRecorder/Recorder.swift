@@ -23,10 +23,19 @@ final class Recorder: ObservableObject, @unchecked Sendable {
     @Published public var liveStats = RecordingStats.zero
     @Published public private(set) var liveWaveformEvents: [RecordedEvent] = []
     @Published public private(set) var activeSurfaces: [String: PlaybackSurface] = [:]
+    @Published public private(set) var semanticRecordingStatus: SemanticRecorderBridgeStatus = .idle
 
     private var engineClient: RecordingEngineClient?
     private var recordingTask: Task<Void, Never>?
+    private var recordingDiagnosticTask: Task<Void, Never>?
     private let makeRecordingEngine: @Sendable (CGEventMask) -> RecordingEngineClient
+    private let makeSemanticRecorderBridge: @Sendable (RecordingCaptureTarget) -> SemanticRecorderBridge
+    private let semanticSuppressionContextClient: SemanticRecordingSuppressionContextClient
+    private let semanticSuppressionProducer: SemanticRecordingSuppressionProducer
+    private var semanticRecorderBridge: SemanticRecorderBridge?
+    private var semanticRecordingTask: Task<Void, Never>?
+    private var semanticCaptureTarget: RecordingCaptureTarget?
+    private var lastSemanticSuppressionFingerprint: SemanticSuppressionFingerprint?
     private var baseMachTicks: UInt64 = 0
     private var isResumedSession = false
     private var resumeOffsetDuration: Double = 0
@@ -60,14 +69,33 @@ final class Recorder: ObservableObject, @unchecked Sendable {
     init(
         makeRecordingEngine: @escaping @Sendable (CGEventMask) -> RecordingEngineClient = { mask in
             RecordingEngineClient.live(mask: mask)
-        }
+        },
+        makeSemanticRecorderBridge: @escaping @Sendable (RecordingCaptureTarget) -> SemanticRecorderBridge = { target in
+            SemanticRecorderBridge(
+                configuration: SemanticRecordingCaptureConfiguration(
+                    captureTarget: target
+                )
+            )
+        },
+        semanticSuppressionContextClient: SemanticRecordingSuppressionContextClient = .live,
+        semanticSuppressionProducer: SemanticRecordingSuppressionProducer = .liveUserDefaults
     ) {
         self.makeRecordingEngine = makeRecordingEngine
+        self.makeSemanticRecorderBridge = makeSemanticRecorderBridge
+        self.semanticSuppressionContextClient = semanticSuppressionContextClient
+        self.semanticSuppressionProducer = semanticSuppressionProducer
     }
 
     deinit {
         engineClient?.stop()
         recordingTask?.cancel()
+        recordingDiagnosticTask?.cancel()
+        semanticRecordingTask?.cancel()
+        if let semanticRecorderBridge {
+            Task {
+                await semanticRecorderBridge.cancel(recordingTime: 0)
+            }
+        }
         displayTimer?.invalidate()
     }
 
@@ -84,7 +112,10 @@ final class Recorder: ObservableObject, @unchecked Sendable {
     // MARK: - Editing
 
     @discardableResult
-    func startRecording() -> Bool {
+    func startRecording(
+        semanticRecordingEnabled: Bool = UserDefaults.standard.bool(forKey: "semanticRecordingEnabled"),
+        semanticCaptureTarget: RecordingCaptureTarget = RecordingCaptureTarget()
+    ) -> Bool {
         guard !isRecording else { return true }
         events.removeAll()
         liveWaveformEvents.removeAll()
@@ -138,24 +169,49 @@ final class Recorder: ObservableObject, @unchecked Sendable {
                 self?.processRawInput(input)
             }
         }
+        let diagnosticStream = client.diagnostics()
+        recordingDiagnosticTask = Task { [weak self] in
+            for await diagnostic in diagnosticStream {
+                self?.processRecordingDiagnostic(diagnostic)
+            }
+        }
 
         self.engineClient = client
         isRecording = true
+        startSemanticRecordingIfEnabled(
+            semanticRecordingEnabled,
+            captureTarget: semanticCaptureTarget
+        )
         startDisplayTimer()
         return true
     }
 
     func stopRecording() {
+        stopRecording(shouldFinishSemanticRecording: true)
+    }
+
+    func cancelRecording() {
+        stopRecording(shouldFinishSemanticRecording: false)
+    }
+
+    private func stopRecording(shouldFinishSemanticRecording: Bool) {
         guard isRecording else { return }
         engineClient?.stop()
         engineClient = nil
         recordingTask?.cancel()
         recordingTask = nil
+        recordingDiagnosticTask?.cancel()
+        recordingDiagnosticTask = nil
         surfaceTracker.stopTracking()
         stopDisplayTimer()
         flushPending()
         isRecording = false
         liveDuration = events.last?.time ?? 0
+        if shouldFinishSemanticRecording {
+            finishSemanticRecording(recordingTime: liveDuration)
+        } else {
+            cancelSemanticRecording(recordingTime: liveDuration)
+        }
     }
 
     private func flushPending() {
@@ -164,11 +220,14 @@ final class Recorder: ObservableObject, @unchecked Sendable {
         if activeSurfaces != snapshot.surfaces {
             activeSurfaces = snapshot.surfaces
         }
+        let semanticRecordingTime = snapshot.events.last?.time ?? liveDuration
+        recordSemanticSuppressionContext(recordingTime: semanticRecordingTime)
         guard !snapshot.events.isEmpty else { return }
         
         liveStats.merge(RecordingStats.summarize(snapshot.events))
         events.append(contentsOf: snapshot.events)
         appendLiveWaveformEvents(snapshot.events)
+        recordSemanticEvents(snapshot.events)
     }
     
     public func clearAll() {
@@ -235,5 +294,239 @@ final class Recorder: ObservableObject, @unchecked Sendable {
             ignoredKeyCodes: ignoredKeyCodes,
             trackedActiveSurface: surfaceTracker.cachedActiveSurface
         )
+    }
+
+    private func processRecordingDiagnostic(
+        _ diagnostic: RecordingEngineDiagnostic
+    ) {
+        switch diagnostic.kind {
+        case .eventTapDisabledByUserInput:
+            recordSecureInputSuppressionContext(createdAt: diagnostic.createdAt)
+        }
+    }
+
+    private func startSemanticRecordingIfEnabled(
+        _ semanticRecordingEnabled: Bool,
+        captureTarget: RecordingCaptureTarget
+    ) {
+        semanticRecordingTask?.cancel()
+        semanticRecorderBridge = nil
+        semanticCaptureTarget = nil
+        lastSemanticSuppressionFingerprint = nil
+        semanticRecordingStatus = .idle
+
+        guard semanticRecordingEnabled else {
+            return
+        }
+
+        let initialContext = semanticSuppressionContextClient.context(
+            captureTarget,
+            0
+        )
+        let initialDecision = semanticSuppressionProducer.captureSuppressionDecision(
+            for: initialContext
+        )
+        guard !initialDecision.shouldSuppressCapture else {
+            semanticRecordingStatus = .suppressed(
+                message: semanticCaptureSuppressionMessage(
+                    reasons: initialDecision.reasons
+                )
+            )
+            return
+        }
+
+        let bridge = makeSemanticRecorderBridge(captureTarget)
+        semanticRecorderBridge = bridge
+        semanticCaptureTarget = captureTarget
+        semanticRecordingStatus = .starting
+        semanticRecordingTask = Task { [weak self, bridge] in
+            let status = await bridge.start(recordingTime: 0)
+            await self?.setSemanticRecordingStatus(status)
+        }
+        recordSemanticSuppressionContext(initialContext)
+    }
+
+    private func recordSemanticEvents(_ events: [RecordedEvent]) {
+        guard let bridge = semanticRecorderBridge else {
+            return
+        }
+        Task { [weak self, bridge, events] in
+            let status = await bridge.record(events)
+            await self?.setSemanticRecordingStatus(status)
+        }
+    }
+
+    private func finishSemanticRecording(recordingTime: TimeInterval) {
+        guard let bridge = semanticRecorderBridge else {
+            return
+        }
+        semanticRecorderBridge = nil
+        semanticCaptureTarget = nil
+        lastSemanticSuppressionFingerprint = nil
+        semanticRecordingTask = Task { [weak self, bridge] in
+            let status = await bridge.finish(recordingTime: recordingTime)
+            await self?.setSemanticRecordingStatus(status)
+        }
+    }
+
+    private func cancelSemanticRecording(recordingTime: TimeInterval) {
+        guard let bridge = semanticRecorderBridge else {
+            return
+        }
+        semanticRecorderBridge = nil
+        semanticCaptureTarget = nil
+        lastSemanticSuppressionFingerprint = nil
+        semanticRecordingTask = Task { [weak self, bridge] in
+            let status = await bridge.cancel(recordingTime: recordingTime)
+            await self?.setSemanticRecordingStatus(status)
+        }
+    }
+
+    private func recordSemanticSuppressionContext(recordingTime: TimeInterval) {
+        guard let semanticCaptureTarget else {
+            return
+        }
+        let context = semanticSuppressionContextClient.context(
+            semanticCaptureTarget,
+            max(0, recordingTime)
+        )
+        recordSemanticSuppressionContext(context)
+    }
+
+    private func recordSemanticSuppressionContext(
+        _ context: SemanticRecordingSuppressionContext
+    ) {
+        guard let bridge = semanticRecorderBridge else {
+            return
+        }
+        let fingerprint = SemanticSuppressionFingerprint(context: context)
+        guard fingerprint != lastSemanticSuppressionFingerprint else {
+            return
+        }
+        lastSemanticSuppressionFingerprint = fingerprint
+
+        let decision = semanticSuppressionProducer.captureSuppressionDecision(
+            for: context
+        )
+        if decision.shouldSuppressCapture {
+            suppressSemanticRecording(
+                bridge: bridge,
+                context: context,
+                decision: decision
+            )
+            return
+        }
+
+        Task { [weak self, bridge, context] in
+            let status = await bridge.addSuppressions(for: context)
+            await self?.setSemanticRecordingStatus(status)
+        }
+    }
+
+    private func recordSecureInputSuppressionContext(createdAt: Date) {
+        guard semanticRecorderBridge != nil,
+              let semanticCaptureTarget else {
+            return
+        }
+        let context = SemanticRecordingSuppressionContext(
+            recordingTime: max(0, liveDuration),
+            target: semanticCaptureTarget,
+            secureInputEnabled: true,
+            createdAt: createdAt
+        )
+        recordSemanticSuppressionContext(context)
+    }
+
+    private func suppressSemanticRecording(
+        bridge: SemanticRecorderBridge,
+        context: SemanticRecordingSuppressionContext,
+        decision: SemanticRecordingCaptureSuppressionDecision
+    ) {
+        let message = semanticCaptureSuppressionMessage(
+            reasons: decision.reasons
+        )
+        let recordingTime = max(0, context.recordingTime ?? liveDuration)
+        semanticRecorderBridge = nil
+        semanticCaptureTarget = nil
+        lastSemanticSuppressionFingerprint = nil
+        semanticRecordingStatus = .suppressed(message: message)
+        semanticRecordingTask?.cancel()
+        semanticRecordingTask = Task { [weak self, bridge, recordingTime, message] in
+            let status = await bridge.suppress(
+                recordingTime: recordingTime,
+                message: message
+            )
+            await self?.setSemanticRecordingStatus(status)
+        }
+    }
+
+    private func semanticCaptureSuppressionMessage(
+        reasons: [RecordingSuppressionReason]
+    ) -> String {
+        let labels = reasons.map(Self.semanticCaptureSuppressionLabel)
+        guard !labels.isEmpty else {
+            return "Sensitive context detected."
+        }
+        return "\(labels.prefix(2).joined(separator: ", ")) detected."
+    }
+
+    private static func semanticCaptureSuppressionLabel(
+        _ reason: RecordingSuppressionReason
+    ) -> String {
+        switch reason {
+        case .secureInput:
+            return "Secure Input"
+        case .passwordField:
+            return "password field"
+        case .excludedApplication:
+            return "excluded app"
+        case .excludedWindow:
+            return "excluded window"
+        case .excludedDomain:
+            return "excluded domain"
+        case .privateRegion:
+            return "private region"
+        case .oversizedArtifact:
+            return "oversized artifact"
+        case .userDeleted:
+            return "deleted artifact"
+        case .unknown:
+            return "sensitive context"
+        }
+    }
+
+    @MainActor
+    private func setSemanticRecordingStatus(
+        _ status: SemanticRecorderBridgeStatus
+    ) {
+        if case .suppressed = semanticRecordingStatus,
+           case .suppressed = status {
+            semanticRecordingStatus = status
+            return
+        }
+        if case .suppressed = semanticRecordingStatus {
+            return
+        }
+        semanticRecordingStatus = status
+    }
+}
+
+private struct SemanticSuppressionFingerprint: Equatable {
+    var applicationBundleID: String?
+    var windowTitle: String?
+    var domain: String?
+    var secureInputEnabled: Bool
+    var passwordFieldFocused: Bool
+    var privateRegion: Bool
+    var artifactByteCount: Int?
+
+    init(context: SemanticRecordingSuppressionContext) {
+        applicationBundleID = context.target.appBundleIdentifier?.lowercased()
+        windowTitle = context.target.windowTitle?.lowercased()
+        domain = context.domain?.lowercased()
+        secureInputEnabled = context.secureInputEnabled
+        passwordFieldFocused = context.passwordFieldFocused
+        privateRegion = context.privateRegion
+        artifactByteCount = context.artifactByteCount
     }
 }

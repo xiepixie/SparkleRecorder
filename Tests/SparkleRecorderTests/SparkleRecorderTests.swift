@@ -268,6 +268,57 @@ struct SparkleRecorderTests {
         #expect(groups[1].textAnchor == nil)
     }
 
+    @Test("Event Grouper Labels Empty Text Click As Needs Text")
+    func eventGrouperLabelsEmptyTextClickAsNeedsText() throws {
+        let emptyAnchor = TextAnchor(
+            text: "",
+            observedFrame: RectValue(x: 0, y: 0, width: 0, height: 0)
+        )
+        var down = RecordedEvent.make(.leftMouseDown, time: 0.00, x: 130, y: 102, mouseButton: 0, clickCount: 1)
+        down.coordinateStrategy = .locatorOnly
+        down.textAnchor = emptyAnchor
+        var up = RecordedEvent.make(.leftMouseUp, time: 0.02, x: 130, y: 102, mouseButton: 0, clickCount: 1)
+        up.coordinateStrategy = .locatorOnly
+        up.textAnchor = emptyAnchor
+
+        let group = try #require(EventGrouper().group([down, up]).first)
+
+        #expect(group.kind == .click)
+        #expect(group.summary == "Click text (needs text)")
+        #expect(group.textAnchor?.text == "")
+    }
+
+    @Test("Recorded Coordinate Click Can Become Text Click")
+    func recordedCoordinateClickCanBecomeTextClick() throws {
+        var events = TestFixtures.clickPair(
+            downTime: 0.00,
+            upTime: 0.02,
+            x: 130,
+            y: 102
+        )
+        let anchor = TextAnchor(
+            text: "Confirm",
+            observedFrame: RectValue(x: 90, y: 90, width: 80, height: 24),
+            searchRegion: RectValue(x: 70, y: 70, width: 140, height: 80),
+            coordinateFallback: PointValue(x: 130, y: 102)
+        )
+
+        for index in events.indices {
+            events[index].coordinateStrategy = .locatorOnly
+            events[index].locatorFallbackPolicy = .fail
+            events[index].textAnchor = anchor
+            events[index].textTimeout = 8.0
+        }
+
+        let group = try #require(EventGrouper().group(events).first)
+
+        #expect(group.kind == .click)
+        #expect(group.summary == "Click text: Confirm")
+        #expect(group.textAnchor?.text == "Confirm")
+        #expect(group.textTimeout == 8.0)
+        #expect(events.allSatisfy { $0.coordinateStrategy == .locatorOnly })
+    }
+
     @Test("Event Grouper Labels Wait Text Gone")
     func eventGrouperLabelsWaitTextGone() throws {
         var event = RecordedEvent.make(.waitForText, time: 1)
@@ -283,6 +334,31 @@ struct SparkleRecorderTests {
         #expect(group.kind == .waitForTextGone)
         #expect(group.summary == "Wait Text Gone: Loading")
         #expect(group.verifyMustExist == false)
+    }
+
+    @Test("Event Grouper Labels Empty Wait And Verify Text As Needs Text")
+    func eventGrouperLabelsEmptyWaitAndVerifyTextAsNeedsText() {
+        let emptyAnchor = TextAnchor(
+            text: "   ",
+            observedFrame: RectValue(x: 0, y: 0, width: 0, height: 0)
+        )
+        var wait = RecordedEvent.make(.waitForText, time: 1)
+        wait.textAnchor = emptyAnchor
+        wait.verifyMustExist = true
+        var gone = RecordedEvent.make(.waitForText, time: 2)
+        gone.textAnchor = emptyAnchor
+        gone.verifyMustExist = false
+        var verify = RecordedEvent.make(.verifyText, time: 3)
+        verify.textAnchor = emptyAnchor
+
+        let groups = EventGrouper().group([wait, gone, verify])
+
+        #expect(groups.filter { $0.kind != .wait }.map(\.summary) == [
+            "Wait Text (needs text)",
+            "Wait Text Gone (needs text)",
+            "Verify Text (needs text)"
+        ])
+        #expect(groups.filter { $0.kind == .wait }.count == 2)
     }
 
     @Test("Event Grouper Strict Continuity")

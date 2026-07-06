@@ -10,12 +10,12 @@ public struct AutomationPlayerStartRequest: Sendable {
         runID: UUID,
         macro: SavedMacro,
         scheduledStartTime: Date? = nil,
-        context: PlaybackContext = PlaybackContext()
+        context: PlaybackContext? = nil
     ) {
         self.runID = runID
         self.macro = macro
         self.scheduledStartTime = scheduledStartTime
-        self.context = context
+        self.context = context ?? macro.playbackContext
     }
 }
 

@@ -201,18 +201,33 @@ extension ActionGroupKind {
 
 func actionWorkflowMessage(for group: ActionGroup, event: RecordedEvent?) -> String {
     if group.kind == .waitForText {
+        guard ActionGroupProjection.textAnchorIsReady(event?.textAnchor ?? group.textAnchor) else {
+            return NSLocalizedString("Needs target text before playback can wait.", comment: "")
+        }
         return NSLocalizedString("Waits until the target text appears, then continues. It does not click.", comment: "")
     }
     if group.kind == .waitForTextGone {
+        guard ActionGroupProjection.textAnchorIsReady(event?.textAnchor ?? group.textAnchor) else {
+            return NSLocalizedString("Needs target text before playback can wait.", comment: "")
+        }
         return NSLocalizedString("Waits until the target text disappears, then continues. It does not click.", comment: "")
     }
     if group.kind == .verifyText {
+        guard ActionGroupProjection.textAnchorIsReady(event?.textAnchor ?? group.textAnchor) else {
+            return NSLocalizedString("Needs target text before playback can verify.", comment: "")
+        }
         return NSLocalizedString("Checks the text condition once. Playback stops if the condition is not met.", comment: "")
     }
     if group.kind == .multiPointClick {
         return NSLocalizedString("Clicks several coordinates in rapid sequence so they behave like one combined action.", comment: "")
     }
     if group.kind.canUseLocatorStrategy && ((event?.coordinateStrategy == .locatorOnly) || group.textAnchor != nil) {
+        guard ActionGroupProjection.textAnchorIsReady(event?.textAnchor ?? group.textAnchor) else {
+            if group.kind == .click {
+                return NSLocalizedString("Needs target text before playback can click.", comment: "")
+            }
+            return NSLocalizedString("Needs target text before playback can locate this action.", comment: "")
+        }
         if group.kind == .click {
             return NSLocalizedString("Waits for the target text up to the timeout, then clicks the matched text box.", comment: "")
         }

@@ -3,6 +3,11 @@ import CoreGraphics
 
 public protocol EventTapThreadDelegate: AnyObject {
     func eventTapThread(_ thread: EventTapThread, didReceive type: CGEventType, event: CGEvent)
+    func eventTapThreadDidDisableByUserInput(_ thread: EventTapThread)
+}
+
+public extension EventTapThreadDelegate {
+    func eventTapThreadDidDisableByUserInput(_ thread: EventTapThread) {}
 }
 
 public final class EventTapThread: Thread, @unchecked Sendable {
@@ -87,6 +92,7 @@ public final class EventTapThread: Thread, @unchecked Sendable {
                 return Unmanaged.passUnretained(event)
             } else if type == .tapDisabledByUserInput {
                 NSLog("SparkleRecorder: Event tap disabled by user input (e.g., Secure Input). Must wait for context change.")
+                thread.delegate?.eventTapThreadDidDisableByUserInput(thread)
                 // It might not re-enable immediately if secure input is active, but we try.
                 if let tap = thread.tap {
                     CGEvent.tapEnable(tap: tap, enable: true)

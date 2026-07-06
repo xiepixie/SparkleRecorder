@@ -121,7 +121,7 @@ enum SemanticRecordingReviewPresenter {
     ) async throws -> SemanticRecordingReviewState {
         let directory = bundleDirectory(from: selectedURL)
         let store = RecordingBundleStore(rootDirectory: directory.deletingLastPathComponent())
-        let bundle = try await store.loadManifest(from: directory)
+        let bundle = try await store.loadBundle(from: directory)
         let validationIssues = bundle.validate()
         let artifactStatuses = artifactStatuses(for: bundle, directory: directory)
 
@@ -147,7 +147,7 @@ enum SemanticRecordingReviewPresenter {
         }
         let directory = appSupportRootURL.appendingRecordingArtifactRef(bundleRef)
         let store = RecordingBundleStore(rootDirectory: directory.deletingLastPathComponent())
-        let bundle = try await store.loadManifest(from: directory)
+        let bundle = try await store.loadBundle(from: directory)
         let validationIssues = bundle.validate()
         let artifactStatuses = artifactStatuses(for: bundle, directory: directory)
 
@@ -530,6 +530,8 @@ enum SemanticRecordingReviewPresenter {
         refs.append(contentsOf: bundle.runtimeSamples.map(\.artifactRef))
         refs.append(contentsOf: bundle.previewComparisons.compactMap(\.diffArtifactRef))
         refs.append(contentsOf: bundle.suppressions.compactMap(\.redactedArtifactRef))
+        refs.append(contentsOf: bundle.redactedFrames.map(\.redactedImageRef))
+        refs.append(contentsOf: bundle.redactedVideos.map(\.redactedVideoRef))
 
         var seen = Set<String>()
         return refs

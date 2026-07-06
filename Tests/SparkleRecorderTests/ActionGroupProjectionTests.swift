@@ -176,4 +176,123 @@ struct ActionGroupProjectionTests {
         #expect(snapshot.eventIndices.isEmpty)
         #expect(!snapshot.containsBehavior)
     }
+
+    @Test("Text target selection includes coordinate clicks that can become click text")
+    func textTargetSelectionIncludesCoordinateClickCandidates() {
+        let waitID = UUID()
+        let clickID = UUID()
+        var events = [
+            RecordedEvent.make(.waitForText, time: 0.0),
+            RecordedEvent.make(.leftMouseDown, time: 0.2, x: 120, y: 80, mouseButton: 0),
+            RecordedEvent.make(.leftMouseUp, time: 0.25, x: 120, y: 80, mouseButton: 0)
+        ]
+        events[0].textAnchor = TextAnchor(
+            text: "Confirm",
+            observedFrame: RectValue(x: 100, y: 70, width: 80, height: 24)
+        )
+        let groups = [
+            ActionGroup(
+                id: waitID,
+                kind: .waitForText,
+                eventIndices: [0],
+                startTime: 0.0,
+                endTime: 0.0,
+                summary: "Wait Text"
+            ),
+            ActionGroup(
+                id: clickID,
+                kind: .click,
+                eventIndices: [1, 2],
+                startTime: 0.2,
+                endTime: 0.25,
+                summary: "Click"
+            )
+        ]
+
+        let targets = ActionGroupProjection.textTargetGroups(
+            groups: groups,
+            selectedGroupIDs: [waitID, clickID],
+            events: events
+        )
+        let configuredOnly = ActionGroupProjection.textTargetGroups(
+            groups: groups,
+            selectedGroupIDs: [waitID, clickID],
+            events: events,
+            includesCoordinateClickCandidates: false
+        )
+
+        #expect(targets.map(\.kind) == [.waitForText, .click])
+        #expect(configuredOnly.map(\.kind) == [.waitForText])
+    }
+
+    @Test("Text target selection does not turn plain scrolls into click text candidates")
+    func textTargetSelectionExcludesPlainScrollCandidates() {
+        let scrollID = UUID()
+        var events = [
+            RecordedEvent.make(.scrollWheel, time: 0.0, x: 120, y: 80, scrollDeltaY: -8)
+        ]
+        let group = ActionGroup(
+            id: scrollID,
+            kind: .scroll,
+            eventIndices: [0],
+            startTime: 0.0,
+            endTime: 0.0,
+            summary: "Scroll"
+        )
+
+        #expect(!ActionGroupProjection.isTextTargetGroup(group, events: events))
+
+        events[0].coordinateStrategy = .locatorOnly
+
+        #expect(ActionGroupProjection.isTextTargetGroup(group, events: events))
+    }
+
+    @Test("Text target readiness reports inserted empty text actions as incomplete")
+    func textTargetReadinessReportsEmptyInsertedTextActions() {
+        let groupID = UUID()
+        var events = TestFixtures.clickPair(x: 130, y: 102)
+        let emptyAnchor = TextAnchor(
+            text: "",
+            observedFrame: RectValue(x: 0, y: 0, width: 0, height: 0)
+        )
+        for index in events.indices {
+            events[index].coordinateStrategy = .locatorOnly
+            events[index].textAnchor = emptyAnchor
+        }
+        let group = ActionGroup(
+            id: groupID,
+            kind: .click,
+            eventIndices: [0, 1],
+            startTime: 0,
+            endTime: 0.1,
+            summary: "Click text",
+            textAnchor: emptyAnchor
+        )
+
+        #expect(ActionGroupProjection.textTargetReadiness(for: group, events: events) == .missingText)
+        #expect(!ActionGroupProjection.textAnchorIsReady(emptyAnchor))
+    }
+
+    @Test("Text target readiness treats typed text with no observed frame as ready")
+    func textTargetReadinessAllowsTypedTextWithoutObservedFrame() {
+        let groupID = UUID()
+        let anchor = TextAnchor(
+            text: "Confirm",
+            observedFrame: RectValue(x: 0, y: 0, width: 0, height: 0)
+        )
+        var event = RecordedEvent.make(.waitForText, time: 0)
+        event.textAnchor = anchor
+        let group = ActionGroup(
+            id: groupID,
+            kind: .waitForText,
+            eventIndices: [0],
+            startTime: 0,
+            endTime: 0,
+            summary: "Wait Text",
+            textAnchor: anchor
+        )
+
+        #expect(ActionGroupProjection.textTargetReadiness(for: group, events: [event]) == .ready)
+        #expect(ActionGroupProjection.textAnchorIsReady(anchor))
+    }
 }

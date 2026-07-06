@@ -19,6 +19,53 @@ public struct HotkeyBinding: Codable, Equatable, Hashable, Sendable {
     }
 }
 
+public struct MacroSemanticRecordingReference: Codable, Equatable, Sendable {
+    public var recordingID: UUID
+    public var bundleRelativePath: String
+    public var manifestRelativePath: String
+    public var capturedAt: Date
+    public var eventCount: Int
+
+    public init(
+        recordingID: UUID,
+        bundleRelativePath: String,
+        manifestRelativePath: String,
+        capturedAt: Date = Date(),
+        eventCount: Int
+    ) {
+        self.recordingID = recordingID
+        self.bundleRelativePath = bundleRelativePath
+        self.manifestRelativePath = manifestRelativePath
+        self.capturedAt = capturedAt
+        self.eventCount = max(0, eventCount)
+    }
+}
+
+public struct MacroPlayableSanitizationSummary: Codable, Equatable, Sendable {
+    public var recordingID: UUID?
+    public var appliedAt: Date
+    public var sanitizedEventCount: Int
+    public var withheldReadableFieldCount: Int
+    public var reviewRequiredEventCount: Int
+    public var reviewRequiredFieldCount: Int
+
+    public init(
+        recordingID: UUID? = nil,
+        appliedAt: Date = Date(),
+        sanitizedEventCount: Int,
+        withheldReadableFieldCount: Int,
+        reviewRequiredEventCount: Int,
+        reviewRequiredFieldCount: Int
+    ) {
+        self.recordingID = recordingID
+        self.appliedAt = appliedAt
+        self.sanitizedEventCount = max(0, sanitizedEventCount)
+        self.withheldReadableFieldCount = max(0, withheldReadableFieldCount)
+        self.reviewRequiredEventCount = max(0, reviewRequiredEventCount)
+        self.reviewRequiredFieldCount = max(0, reviewRequiredFieldCount)
+    }
+}
+
 /// A saved macro entry in the library.
 public struct SavedMacro: Codable, Identifiable, Equatable, Sendable {
     public var id: UUID
@@ -51,6 +98,10 @@ public struct SavedMacro: Codable, Identifiable, Equatable, Sendable {
     public var notes: String = ""
     /// Optional chain — when this macro finishes playing, immediately play this next macro.
     public var chainTo: UUID?
+    /// Optional semantic recording evidence captured alongside the playable event stream.
+    public var semanticRecording: MacroSemanticRecordingReference?
+    /// Summary of readable playable macro metadata withheld because semantic evidence was sensitive.
+    public var playableSanitization: MacroPlayableSanitizationSummary?
 
     // Statistics
     public var playCount: Int = 0
@@ -80,6 +131,7 @@ public struct SavedMacro: Codable, Identifiable, Equatable, Sendable {
         case id, name, events, createdAt, modifiedAt, version
         case loops, speed, surface, surfaces, followWindowOffset
         case icon, accent, tags, favorite, hotkey, notes, chainTo
+        case semanticRecording, playableSanitization
         case playCount, lastPlayedAt, totalRunTime
         case cachedDuration, cachedEventCount, cachedWaveformBars
     }
@@ -103,6 +155,8 @@ public struct SavedMacro: Codable, Identifiable, Equatable, Sendable {
                 hotkey: HotkeyBinding? = nil,
                 notes: String = "",
                 chainTo: UUID? = nil,
+                semanticRecording: MacroSemanticRecordingReference? = nil,
+                playableSanitization: MacroPlayableSanitizationSummary? = nil,
                 playCount: Int = 0,
                 lastPlayedAt: Date? = nil,
                 totalRunTime: TimeInterval = 0) {
@@ -123,6 +177,8 @@ public struct SavedMacro: Codable, Identifiable, Equatable, Sendable {
         self.hotkey = hotkey
         self.notes = notes
         self.chainTo = chainTo
+        self.semanticRecording = semanticRecording
+        self.playableSanitization = playableSanitization
         self.playCount = playCount
         self.lastPlayedAt = lastPlayedAt
         self.totalRunTime = totalRunTime
@@ -152,6 +208,14 @@ public struct SavedMacro: Codable, Identifiable, Equatable, Sendable {
         self.hotkey = try c.decodeIfPresent(HotkeyBinding.self, forKey: .hotkey)
         self.notes = try c.decodeIfPresent(String.self, forKey: .notes) ?? ""
         self.chainTo = try c.decodeIfPresent(UUID.self, forKey: .chainTo)
+        self.semanticRecording = try c.decodeIfPresent(
+            MacroSemanticRecordingReference.self,
+            forKey: .semanticRecording
+        )
+        self.playableSanitization = try c.decodeIfPresent(
+            MacroPlayableSanitizationSummary.self,
+            forKey: .playableSanitization
+        )
         self.playCount = try c.decodeIfPresent(Int.self, forKey: .playCount) ?? 0
         self.lastPlayedAt = try c.decodeIfPresent(Date.self, forKey: .lastPlayedAt)
         self.totalRunTime = try c.decodeIfPresent(TimeInterval.self, forKey: .totalRunTime) ?? 0
@@ -182,6 +246,8 @@ public struct SavedMacro: Codable, Identifiable, Equatable, Sendable {
         try c.encodeIfPresent(hotkey, forKey: .hotkey)
         try c.encode(notes, forKey: .notes)
         try c.encodeIfPresent(chainTo, forKey: .chainTo)
+        try c.encodeIfPresent(semanticRecording, forKey: .semanticRecording)
+        try c.encodeIfPresent(playableSanitization, forKey: .playableSanitization)
         try c.encode(playCount, forKey: .playCount)
         try c.encodeIfPresent(lastPlayedAt, forKey: .lastPlayedAt)
         try c.encode(totalRunTime, forKey: .totalRunTime)
@@ -214,5 +280,19 @@ public struct SavedMacro: Codable, Identifiable, Equatable, Sendable {
                 duration: cachedDuration
             )
         }
+    }
+}
+
+public extension SavedMacro {
+    var playbackContext: PlaybackContext {
+        guard !surfaces.isEmpty else {
+            return PlaybackContext()
+        }
+
+        return PlaybackContext(
+            surfaces: surfaces,
+            currentSurfaceFrames: [:],
+            coordinateMode: followWindowOffset ? .boundWindowOffset : .screenAbsolute
+        )
     }
 }

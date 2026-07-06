@@ -126,6 +126,93 @@ struct AutomationWorkflowRuntimeCLITests {
         #expect(envelope.nextActions.contains { $0.command.contains("workflow runs") })
     }
 
+    @Test("Bound-window acceptance payload exposes macro surface context and handoff next action")
+    func boundWindowAcceptancePayloadExposesSurfaceContext() throws {
+        let workflowID = UUID(uuidString: "60000000-0000-0000-0000-000000000041")!
+        let taskID = UUID(uuidString: "60000000-0000-0000-0000-000000000042")!
+        let macroID = UUID(uuidString: "60000000-0000-0000-0000-000000000043")!
+        let commandID = UUID(uuidString: "60000000-0000-0000-0000-000000000044")!
+        let checkedAt = Date(timeIntervalSince1970: 6_340)
+        let task = AutomationTask(
+            id: taskID,
+            name: "大贸易",
+            kind: .macro(macroID: macroID),
+            resourceRequirement: .foregroundInput
+        )
+        let workflow = AutomationWorkflow(
+            id: workflowID,
+            name: "新建工作流",
+            tasks: [task],
+            createdAt: checkedAt,
+            modifiedAt: checkedAt
+        )
+        let surface = PlaybackSurface(
+            appName: "Cookie Run Kingdom",
+            bundleIdentifier: "com.devsisters.ck",
+            windowTitle: "Cookie Run: Kingdom",
+            recordedFrame: RectValue(x: 503, y: 273, width: 1_051, height: 820)
+        )
+        let macro = SavedMacro(
+            id: macroID,
+            name: "大贸易",
+            events: TestFixtures.clickPair(),
+            surfaces: [TestFixtures.surfaceId: surface],
+            followWindowOffset: true
+        )
+        let handoff = AutomationRuntimeHandoffPayload(
+            command: AutomationRuntimeHandoffCommand(
+                id: commandID,
+                kind: .manualStart(workflowID: workflowID, taskID: taskID),
+                requestedAt: checkedAt,
+                source: "test"
+            ),
+            enqueuedAt: checkedAt,
+            pendingCommandCount: 1
+        )
+        let payload = AutomationWorkflowBoundWindowAcceptancePayload(
+            workflow: workflow,
+            task: task,
+            macro: macro,
+            activationRequested: true,
+            launchRequested: true,
+            playbackHandoffRequested: true,
+            activationResults: [
+                AutomationWorkflowBoundWindowActivationResult(
+                    bundleIdentifier: "com.devsisters.ck",
+                    appName: "Cookie Run Kingdom",
+                    wasRunning: false,
+                    didLaunch: true,
+                    didActivate: true
+                )
+            ],
+            handoff: handoff,
+            checkedAt: checkedAt
+        )
+        let envelope = AutomationCLIResultEnvelope<AutomationWorkflowBoundWindowAcceptancePayload>
+            .workflowBoundWindowAcceptance(command: "workflow acceptance bound-window", payload: payload)
+
+        #expect(payload.readyForBoundWindowPlayback)
+        #expect(payload.workflowID == workflowID)
+        #expect(payload.taskName == "大贸易")
+        #expect(payload.macroID == macroID)
+        #expect(payload.macroEventCount == 2)
+        #expect(payload.macroSurfaceCount == 1)
+        #expect(payload.playbackContextSurfaceCount == 1)
+        #expect(payload.coordinateMode == .boundWindowOffset)
+        #expect(payload.surfaces.first?.bundleIdentifier == "com.devsisters.ck")
+        #expect(payload.handoff?.command.id == commandID)
+        #expect(envelope.ok)
+        #expect(envelope.nextActions.contains { $0.command.contains("workflow handoff status \(commandID.uuidString)") })
+        #expect(envelope.nextActions.contains { $0.command.contains("workflow runs \(workflowID.uuidString)") })
+
+        let encoded = try JSONEncoder().encode(envelope)
+        let decoded = try JSONDecoder().decode(
+            AutomationCLIResultEnvelope<AutomationWorkflowBoundWindowAcceptancePayload>.self,
+            from: encoded
+        )
+        #expect(decoded == envelope)
+    }
+
     @Test("Workflow handoff status payload reports receipt state")
     func workflowHandoffStatusPayloadReportsReceiptState() throws {
         let workflowID = UUID(uuidString: "60000000-0000-0000-0000-000000000034")!

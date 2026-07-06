@@ -206,6 +206,58 @@ final class MacroLibrary: ObservableObject {
         mutate(id) { $0.chainTo = target }
     }
 
+    func attachSemanticRecording(
+        id: UUID,
+        reference: MacroSemanticRecordingReference
+    ) {
+        mutate(id) {
+            $0.semanticRecording = reference
+        }
+    }
+
+    @discardableResult
+    func applyPlayableSanitization(
+        id: UUID,
+        plan: SemanticRecordingPlayableSanitizationPlan,
+        appliedAt: Date = Date()
+    ) async -> MacroPlayableSanitizationSummary? {
+        guard !plan.isEmpty,
+              macros.contains(where: { $0.id == id }) else {
+            return nil
+        }
+
+        let sourceEvents: [RecordedEvent]
+        let inMemoryEvents = macros.first { $0.id == id }?.events ?? []
+        if inMemoryEvents.isEmpty {
+            do {
+                sourceEvents = try await client.loadEvents(id)
+            } catch {
+                return nil
+            }
+        } else {
+            sourceEvents = inMemoryEvents
+        }
+
+        guard let index = macros.firstIndex(where: { $0.id == id }) else {
+            return nil
+        }
+
+        let sanitizedEvents = plan.playbackPreservingSanitizedEvents(from: sourceEvents)
+        let summary = plan.summary(appliedAt: appliedAt)
+        macros[index].playableSanitization = summary
+        macros[index].modifiedAt = appliedAt
+        if sanitizedEvents != sourceEvents {
+            macros[index].events = sanitizedEvents
+            macros[index].refreshCachesFromEvents()
+            Task { try? await client.saveEvents(sanitizedEvents, id) }
+        }
+
+        let updated = macros[index]
+        Task { try? await client.saveMetadata(updated) }
+        save()
+        return summary
+    }
+
     func toggleFavorite(id: UUID) {
         mutate(id) { $0.favorite.toggle() }
         // Re-sort: favorites at top, preserve relative order otherwise.

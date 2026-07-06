@@ -733,6 +733,56 @@ struct AutomationOwnerBClientTests {
         #expect(await recorder.macroIDs == [macroID])
     }
 
+    @Test("Effect runner preserves saved macro playback surface context for workflow playback")
+    func effectRunnerPreservesSavedMacroPlaybackSurfaceContext() async throws {
+        let runID = UUID()
+        let workflowID = UUID()
+        let taskID = UUID()
+        let macroID = UUID()
+        let startedAt = Date(timeIntervalSince1970: 825)
+        let surface = TestFixtures.surface(
+            appName: "Cookie Run Kingdom",
+            bundleIdentifier: "com.devsisters.CookieRunKingdom",
+            windowTitle: "Cookie Run Kingdom"
+        )
+        let macro = SavedMacro(
+            id: macroID,
+            name: "Cookie Run bound macro",
+            events: TestFixtures.clickPair(),
+            surfaces: [TestFixtures.surfaceId: surface],
+            followWindowOffset: true
+        )
+        let recorder = PlayerStartRecorder()
+        let player = AutomationPlayerClient(
+            start: { request in
+                await recorder.record(request)
+                return .started
+            },
+            cancel: { _ in }
+        )
+        let runner = AutomationEffectRunner(
+            resourceArbiter: .live(),
+            player: player,
+            loadMacro: { id in id == macroID ? macro : nil },
+            now: { startedAt },
+            sleep: { _ in }
+        )
+
+        let actions = await runner.run(.startPlayer(
+            runID: runID,
+            workflowID: workflowID,
+            taskID: taskID,
+            macroID: macroID
+        ))
+
+        let context = try #require(await recorder.contexts.first)
+        #expect(actions == [.playerStarted(runID: runID, at: startedAt)])
+        #expect(context.surfaces == [TestFixtures.surfaceId: surface])
+        #expect(context.currentSurfaceFrames.isEmpty)
+        #expect(context.currentContentFrames.isEmpty)
+        #expect(context.coordinateMode == .boundWindowOffset)
+    }
+
     @Test("Effect runner cancels player through PlayerClient")
     func effectRunnerCancelsPlayer() async {
         let runID = UUID()
@@ -1184,6 +1234,7 @@ struct AutomationOwnerBClientTests {
 private actor PlayerStartRecorder {
     private var recordedRunIDs: [UUID] = []
     private var recordedMacroIDs: [UUID] = []
+    private var recordedContexts: [PlaybackContext] = []
 
     var runIDs: [UUID] {
         recordedRunIDs
@@ -1193,9 +1244,14 @@ private actor PlayerStartRecorder {
         recordedMacroIDs
     }
 
+    var contexts: [PlaybackContext] {
+        recordedContexts
+    }
+
     func record(_ request: AutomationPlayerStartRequest) {
         recordedRunIDs.append(request.runID)
         recordedMacroIDs.append(request.macro.id)
+        recordedContexts.append(request.context)
     }
 }
 

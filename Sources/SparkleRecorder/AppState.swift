@@ -51,6 +51,53 @@ final class AppState: ObservableObject {
     @Published var recordMouseMoves: Bool {
         didSet { UserDefaults.standard.set(recordMouseMoves, forKey: "recordMouseMoves") }
     }
+    /// Experimental: pair playable macro events with video/keyframe semantic evidence.
+    @Published var semanticRecordingEnabled: Bool {
+        didSet { UserDefaults.standard.set(semanticRecordingEnabled, forKey: "semanticRecordingEnabled") }
+    }
+    @Published var semanticRecordingRetentionMaximumArtifactAgeDays: Int {
+        didSet {
+            UserDefaults.standard.set(
+                max(0, semanticRecordingRetentionMaximumArtifactAgeDays),
+                forKey: "semanticRecordingRetentionMaximumArtifactAgeDays"
+            )
+        }
+    }
+    @Published var semanticRecordingExpiredDisposition: SemanticRecordingRetentionDisposition {
+        didSet {
+            UserDefaults.standard.set(
+                semanticRecordingExpiredDisposition.rawValue,
+                forKey: "semanticRecordingExpiredDisposition"
+            )
+        }
+    }
+    @Published var semanticRecordingExcludedApplicationBundleIDsText: String {
+        didSet { persistSemanticRecordingSuppressionSettings() }
+    }
+    @Published var semanticRecordingExcludedWindowTitleFragmentsText: String {
+        didSet { persistSemanticRecordingSuppressionSettings() }
+    }
+    @Published var semanticRecordingExcludedDomainsText: String {
+        didSet { persistSemanticRecordingSuppressionSettings() }
+    }
+    @Published var semanticRecordingMaximumArtifactMegabytes: Int {
+        didSet { persistSemanticRecordingSuppressionSettings() }
+    }
+    @Published var semanticRecordingLastScheduledRetentionCleanupAt: Date? {
+        didSet {
+            if let semanticRecordingLastScheduledRetentionCleanupAt {
+                UserDefaults.standard.set(
+                    semanticRecordingLastScheduledRetentionCleanupAt,
+                    forKey: Self.semanticRecordingLastScheduledRetentionCleanupAtKey
+                )
+            } else {
+                UserDefaults.standard.removeObject(
+                    forKey: Self.semanticRecordingLastScheduledRetentionCleanupAtKey
+                )
+            }
+        }
+    }
+    @Published var semanticRecordingPreflightPresentation: SemanticRecordingPreflightPresentation?
     /// Has the user finished onboarding?
     @Published var onboardingComplete: Bool {
         didSet { UserDefaults.standard.set(onboardingComplete, forKey: "onboardingComplete") }
@@ -78,6 +125,46 @@ final class AppState: ObservableObject {
         self.soundEnabled = d.object(forKey: "soundEnabled") as? Bool ?? false
         self.showRecordingHUD = d.object(forKey: "showRecordingHUD") as? Bool ?? true
         self.recordMouseMoves = d.object(forKey: "recordMouseMoves") as? Bool ?? false
+        self.semanticRecordingEnabled = d.object(forKey: "semanticRecordingEnabled") as? Bool ?? false
+        self.semanticRecordingRetentionMaximumArtifactAgeDays = max(
+            0,
+            d.object(forKey: "semanticRecordingRetentionMaximumArtifactAgeDays") as? Int
+                ?? SemanticRecordingRetentionSettings.defaultMaximumArtifactAgeDays
+        )
+        self.semanticRecordingExpiredDisposition = SemanticRecordingRetentionDisposition(
+            rawValue: d.string(forKey: "semanticRecordingExpiredDisposition") ?? ""
+        ) ?? .pruneArtifacts
+        let suppressionSettings = SemanticRecordingSuppressionSettings(
+            excludedApplicationBundleIDs: d.stringArray(
+                forKey: Self.semanticRecordingExcludedApplicationBundleIDsKey
+            ) ?? [],
+            excludedWindowTitleFragments: d.stringArray(
+                forKey: Self.semanticRecordingExcludedWindowTitleFragmentsKey
+            ) ?? [],
+            excludedDomains: d.stringArray(
+                forKey: Self.semanticRecordingExcludedDomainsKey
+            ) ?? [],
+            maximumArtifactByteCount: d.object(
+                forKey: Self.semanticRecordingMaximumArtifactByteCountKey
+            ) as? Int
+        )
+        self.semanticRecordingExcludedApplicationBundleIDsText = SemanticRecordingSuppressionSettings
+            .listText(suppressionSettings.excludedApplicationBundleIDs)
+        self.semanticRecordingExcludedWindowTitleFragmentsText = SemanticRecordingSuppressionSettings
+            .listText(suppressionSettings.excludedWindowTitleFragments)
+        self.semanticRecordingExcludedDomainsText = SemanticRecordingSuppressionSettings
+            .listText(suppressionSettings.excludedDomains)
+        if let maximumArtifactByteCount = suppressionSettings.maximumArtifactByteCount {
+            self.semanticRecordingMaximumArtifactMegabytes = max(
+                1,
+                Int(ceil(Double(maximumArtifactByteCount) / Double(Self.bytesPerMegabyte)))
+            )
+        } else {
+            self.semanticRecordingMaximumArtifactMegabytes = 0
+        }
+        self.semanticRecordingLastScheduledRetentionCleanupAt = d.object(
+            forKey: Self.semanticRecordingLastScheduledRetentionCleanupAtKey
+        ) as? Date
         self.onboardingComplete = d.object(forKey: "onboardingComplete") as? Bool ?? false
         self.menuBarOnly = d.object(forKey: "menuBarOnly") as? Bool ?? false
 
@@ -120,6 +207,56 @@ final class AppState: ObservableObject {
         }
     }
 
+    var semanticRecordingRetentionSettings: SemanticRecordingRetentionSettings {
+        SemanticRecordingRetentionSettings(
+            maximumArtifactAgeDays: semanticRecordingRetentionMaximumArtifactAgeDays,
+            expiredDisposition: semanticRecordingExpiredDisposition
+        )
+    }
+
+    var semanticRecordingSuppressionSettings: SemanticRecordingSuppressionSettings {
+        SemanticRecordingSuppressionSettings(
+            excludedApplicationBundleIDs: SemanticRecordingSuppressionSettings.parseListText(
+                semanticRecordingExcludedApplicationBundleIDsText
+            ),
+            excludedWindowTitleFragments: SemanticRecordingSuppressionSettings.parseListText(
+                semanticRecordingExcludedWindowTitleFragmentsText
+            ),
+            excludedDomains: SemanticRecordingSuppressionSettings.parseListText(
+                semanticRecordingExcludedDomainsText
+            ),
+            maximumArtifactByteCount: semanticRecordingMaximumArtifactMegabytes > 0
+                ? semanticRecordingMaximumArtifactMegabytes * Self.bytesPerMegabyte
+                : nil
+        )
+    }
+
+    private func persistSemanticRecordingSuppressionSettings() {
+        let settings = semanticRecordingSuppressionSettings
+        UserDefaults.standard.set(
+            settings.excludedApplicationBundleIDs,
+            forKey: Self.semanticRecordingExcludedApplicationBundleIDsKey
+        )
+        UserDefaults.standard.set(
+            settings.excludedWindowTitleFragments,
+            forKey: Self.semanticRecordingExcludedWindowTitleFragmentsKey
+        )
+        UserDefaults.standard.set(
+            settings.excludedDomains,
+            forKey: Self.semanticRecordingExcludedDomainsKey
+        )
+        if let maximumArtifactByteCount = settings.maximumArtifactByteCount {
+            UserDefaults.standard.set(
+                maximumArtifactByteCount,
+                forKey: Self.semanticRecordingMaximumArtifactByteCountKey
+            )
+        } else {
+            UserDefaults.standard.removeObject(
+                forKey: Self.semanticRecordingMaximumArtifactByteCountKey
+            )
+        }
+    }
+
     private func persist(_ binding: HotkeyBinding, key: String) {
         if let data = try? JSONEncoder().encode(binding) {
             UserDefaults.standard.set(data, forKey: key)
@@ -133,4 +270,11 @@ final class AppState: ObservableObject {
         }
         return b
     }
+
+    private static let bytesPerMegabyte = 1_048_576
+    private static let semanticRecordingExcludedApplicationBundleIDsKey = "semanticRecordingExcludedApplicationBundleIDs"
+    private static let semanticRecordingExcludedWindowTitleFragmentsKey = "semanticRecordingExcludedWindowTitleFragments"
+    private static let semanticRecordingExcludedDomainsKey = "semanticRecordingExcludedDomains"
+    private static let semanticRecordingMaximumArtifactByteCountKey = "semanticRecordingMaximumArtifactByteCount"
+    private static let semanticRecordingLastScheduledRetentionCleanupAtKey = "semanticRecordingLastScheduledRetentionCleanupAt"
 }

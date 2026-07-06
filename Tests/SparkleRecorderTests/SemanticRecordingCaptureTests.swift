@@ -4,6 +4,94 @@ import Testing
 
 @Suite("Semantic Recording Capture Tests")
 struct SemanticRecordingCaptureTests {
+    @Test("Capture target mapper prefers window identity from playback surface")
+    func captureTargetMapperPrefersWindowIdentityFromPlaybackSurface() {
+        let surface = PlaybackSurface(
+            appName: "Checkout",
+            bundleIdentifier: "com.example.checkout",
+            windowTitle: "Checkout - Order 42",
+            recordedDisplayId: 7,
+            recordedWindowId: 42,
+            recordedFrame: RectValue(x: 10, y: 20, width: 800, height: 600)
+        )
+
+        let target = SemanticRecordingCaptureTargetMapper.target(
+            surface: surface,
+            surfaceID: "checkout-window"
+        )
+
+        #expect(target.kind == .window)
+        #expect(target.surfaceID == "checkout-window")
+        #expect(target.displayID == 7)
+        #expect(target.windowID == 42)
+        #expect(target.appBundleIdentifier == "com.example.checkout")
+        #expect(target.appName == "Checkout")
+        #expect(target.windowTitle == "Checkout - Order 42")
+    }
+
+    @Test("Capture target mapper falls back to display without surface")
+    func captureTargetMapperFallsBackToDisplayWithoutSurface() {
+        let target = SemanticRecordingCaptureTargetMapper.target(
+            surface: nil,
+            fallbackDisplayID: 99
+        )
+
+        #expect(target.kind == .display)
+        #expect(target.surfaceID == "surface-1")
+        #expect(target.displayID == 99)
+        #expect(target.windowID == nil)
+        #expect(target.appBundleIdentifier == nil)
+        #expect(target.windowTitle == nil)
+    }
+
+    @Test("Cancel stops movie without writing a stop keyframe")
+    func cancelStopsMovieWithoutWritingStopKeyframe() async throws {
+        let recordingID = uuid("75000000-0000-0000-0000-000000000031")
+        let segmentID = uuid("75000000-0000-0000-0000-000000000032")
+        let startFrameID = uuid("75000000-0000-0000-0000-000000000033")
+        let ids = CaptureIDFixture(values: [
+            .videoSegment: [segmentID],
+            .frame: [startFrameID]
+        ])
+        let spy = CaptureClientSpy()
+        let client = SemanticRecordingCaptureClient(
+            startMovie: { request in
+                await spy.append("startMovie:\(request.artifactRef.path)")
+                return SemanticRecordingMovieHandle(
+                    segmentID: request.segmentID,
+                    artifactRef: request.artifactRef,
+                    target: request.target,
+                    startTime: request.recordingTime
+                )
+            },
+            finishMovie: { request in
+                await spy.append("finishMovie:\(request.handle.artifactRef.path)")
+                return SemanticRecordingMovieFinishResult(duration: request.recordingTime)
+            },
+            captureFrame: { request in
+                await spy.append("captureFrame:\(request.source.rawValue)")
+                return SemanticRecordingCapturedFrame()
+            }
+        )
+        let session = SemanticRecordingCaptureSession(
+            configuration: SemanticRecordingCaptureConfiguration(recordingID: recordingID),
+            client: client,
+            ids: ids.provider
+        )
+
+        try await session.start(recordingTime: 0.25)
+        await session.cancel(recordingTime: 1.5)
+
+        #expect(await spy.operations == [
+            "startMovie:video/recording.mov",
+            "captureFrame:recordingStart",
+            "finishMovie:video/recording.mov"
+        ])
+        await #expect(throws: SemanticRecordingCaptureError.alreadyFinished) {
+            try await session.record(recordedEvent(.leftMouseUp, time: 1.6), index: 0)
+        }
+    }
+
     @Test("Capture session builds video segment and event-aligned keyframes")
     func captureSessionBuildsVideoSegmentAndEventAlignedKeyframes() async throws {
         let recordingID = uuid("75000000-0000-0000-0000-000000000001")
@@ -227,6 +315,104 @@ struct SemanticRecordingCaptureTests {
         #expect(bundle.visualObservations.first?.frameID == textFrameID)
         #expect(bundle.visualObservations.first?.text == "Order confirmed")
         #expect(bundle.observations(frameID: textFrameID).map(\.id) == [observationID])
+    }
+
+    @Test("Suppression redacts future AI-safe text and visual observation text")
+    func suppressionRedactsFutureAISafeTextAndVisualObservationText() async throws {
+        let recordingID = uuid("77000000-0000-0000-0000-000000000101")
+        let textFrameID = uuid("77000000-0000-0000-0000-000000000103")
+        let observationID = uuid("77000000-0000-0000-0000-000000000104")
+        let eventID = uuid("77000000-0000-0000-0000-000000000106")
+        let semanticID = uuid("77000000-0000-0000-0000-000000000107")
+        let suppressionID = uuid("77000000-0000-0000-0000-000000000108")
+        let ids = CaptureIDFixture(values: [
+            .frame: [
+                uuid("77000000-0000-0000-0000-000000000102"),
+                textFrameID,
+                uuid("77000000-0000-0000-0000-000000000105")
+            ],
+            .timelineEvent: [eventID],
+            .semanticEvent: [semanticID]
+        ])
+        let secretArtifactRef = try RecordingArtifactRef("observations/secret-crop.png")
+        let client = SemanticRecordingCaptureClient(
+            startMovie: { request in
+                SemanticRecordingMovieHandle(
+                    segmentID: request.segmentID,
+                    artifactRef: request.artifactRef,
+                    target: request.target,
+                    startTime: 0
+                )
+            },
+            finishMovie: { request in
+                SemanticRecordingMovieFinishResult(duration: request.recordingTime)
+            },
+            captureFrame: { _ in
+                SemanticRecordingCapturedFrame(imageSize: RecordingImageSize(width: 800, height: 600))
+            },
+            indexFrame: { request in
+                guard request.frame.source == .textInput else {
+                    return []
+                }
+                return [
+                    RecordingVisualObservation(
+                        id: observationID,
+                        kind: .ocrText,
+                        recordingTime: request.frame.recordingTime,
+                        frameID: request.frame.id,
+                        artifactRef: secretArtifactRef,
+                        bounds: RecordingBounds(
+                            rect: RecordingRect(x: 20, y: 40, width: 180, height: 30),
+                            coordinateSpace: .windowPixels
+                        ),
+                        text: "Card 4242",
+                        confidence: 0.96,
+                        provider: "Vision.fake",
+                        providerVersion: "0.1",
+                        createdAt: request.createdAt
+                    )
+                ]
+            }
+        )
+        let session = SemanticRecordingCaptureSession(
+            configuration: SemanticRecordingCaptureConfiguration(recordingID: recordingID),
+            client: client,
+            ids: ids.provider
+        )
+
+        try await session.start()
+        await session.addSuppression(RecordingSuppressionRecord(
+            id: suppressionID,
+            reason: .passwordField,
+            timeRange: RecordingTimeRange(startTime: 0.35, duration: 0.2),
+            detail: "A password field was focused.",
+            createdAt: Date(timeIntervalSince1970: 1_800_000_300)
+        ))
+        try await session.record(
+            recordedEvent(.keyDown, time: 0.4, unicodeString: "4"),
+            index: 0
+        )
+        let bundle = try await session.finish(recordingTime: 0.8)
+
+        #expect(bundle.validate().isEmpty)
+        #expect(bundle.suppressions.map(\.id) == [suppressionID])
+        #expect(bundle.aiSafeEvents.map(\.id) == [semanticID])
+        #expect(bundle.aiSafeEvents.first?.title == "Input withheld")
+        #expect(bundle.aiSafeEvents.first?.summary == "Details withheld due to passwordField.")
+        #expect(bundle.aiSafeEvents.first?.evidenceFrameIDs.isEmpty == true)
+        #expect(bundle.aiSafeEvents.first?.risk == "Suppressed evidence is unavailable to AI suggestions.")
+        #expect(bundle.timelineEvents.first?.id == eventID)
+        #expect(bundle.timelineEvents.first?.frameID == textFrameID)
+
+        let observation = try #require(bundle.visualObservations.first)
+        #expect(observation.id == observationID)
+        #expect(observation.frameID == textFrameID)
+        #expect(observation.text == nil)
+        #expect(observation.confidence == nil)
+        #expect(observation.artifactRef == nil)
+        #expect(observation.labels.contains("redacted"))
+        #expect(observation.metadata["redactedReason"] == "passwordField")
+        #expect(observation.metadata["redactedBySuppressionID"] == suppressionID.uuidString)
     }
 
     @Test("Frame index can attach window and AX metadata observations")

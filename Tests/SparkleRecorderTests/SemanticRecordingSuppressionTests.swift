@@ -98,6 +98,110 @@ struct SemanticRecordingSuppressionTests {
         #expect(excludedSubdomain.map(\.reason) == [.excludedDomain])
     }
 
+    @Test("Suppression settings normalize UI list text into rules")
+    func suppressionSettingsNormalizeUIListTextIntoRules() {
+        let settings = SemanticRecordingSuppressionSettings(
+            excludedApplicationBundleIDs: SemanticRecordingSuppressionSettings.parseListText(
+                " COM.EXAMPLE.BANK, com.example.bank\ncom.example.vault "
+            ),
+            excludedWindowTitleFragments: SemanticRecordingSuppressionSettings.parseListText(
+                " Private Checkout; Password "
+            ),
+            excludedDomains: SemanticRecordingSuppressionSettings.parseListText(
+                "https://www.bank.example.com/login, bank.example.com, .vault.example.org."
+            ),
+            maximumArtifactByteCount: 0
+        )
+
+        #expect(settings.excludedApplicationBundleIDs == [
+            "com.example.bank",
+            "com.example.vault"
+        ])
+        #expect(settings.excludedWindowTitleFragments == [
+            "private checkout",
+            "password"
+        ])
+        #expect(settings.excludedDomains == [
+            "bank.example.com",
+            "vault.example.org"
+        ])
+        #expect(settings.maximumArtifactByteCount == nil)
+        #expect(SemanticRecordingSuppressionSettings.listText(settings.excludedDomains) == "bank.example.com, vault.example.org")
+
+        let rules = settings.rules
+        #expect(rules.excludes(applicationBundleID: "COM.EXAMPLE.BANK"))
+        #expect(rules.excludes(windowTitle: "Checkout - Password"))
+        #expect(rules.excludes(domain: "secure.bank.example.com"))
+    }
+
+    @Test("Capture suppression decision withholds semantic capture for sensitive contexts")
+    func captureSuppressionDecisionWithholdsSemanticCaptureForSensitiveContexts() {
+        let producer = SemanticRecordingSuppressionProducer(
+            rules: SemanticRecordingSuppressionRules(
+                excludedApplicationBundleIDs: ["com.example.bank"],
+                excludedWindowTitleFragments: ["payment details"],
+                excludedDomains: ["bank.example.com"],
+                maximumArtifactByteCount: 100
+            )
+        )
+        let context = SemanticRecordingSuppressionContext(
+            target: RecordingCaptureTarget(
+                kind: .window,
+                appBundleIdentifier: "COM.EXAMPLE.BANK",
+                windowTitle: "Payment Details"
+            ),
+            domain: "https://secure.bank.example.com/login",
+            secureInputEnabled: true,
+            passwordFieldFocused: true,
+            privateRegion: true,
+            artifactByteCount: 101
+        )
+
+        let decision = producer.captureSuppressionDecision(for: context)
+
+        #expect(decision.shouldSuppressCapture)
+        #expect(decision.reasons == [
+            .secureInput,
+            .passwordField,
+            .excludedApplication,
+            .excludedWindow,
+            .excludedDomain,
+            .privateRegion
+        ])
+    }
+
+    @Test("Capture suppression allows harmless and retention-only contexts")
+    func captureSuppressionDecisionAllowsHarmlessAndRetentionOnlyContexts() {
+        let producer = SemanticRecordingSuppressionProducer(
+            rules: SemanticRecordingSuppressionRules(
+                excludedDomains: ["private.example.com"],
+                maximumArtifactByteCount: 10
+            )
+        )
+
+        let harmless = producer.captureSuppressionDecision(
+            for: SemanticRecordingSuppressionContext(
+                target: RecordingCaptureTarget(
+                    kind: .window,
+                    appBundleIdentifier: "com.example.notes",
+                    windowTitle: "Public Notes"
+                ),
+                domain: "example.org",
+                artifactByteCount: 10
+            )
+        )
+        let retentionOnly = producer.captureSuppressionDecision(
+            for: SemanticRecordingSuppressionContext(
+                target: RecordingCaptureTarget(kind: .window),
+                domain: "example.org",
+                artifactByteCount: 11
+            )
+        )
+
+        #expect(harmless == .allow)
+        #expect(retentionOnly == .allow)
+    }
+
     private func uuid(_ value: String) -> UUID {
         guard let uuid = UUID(uuidString: value) else {
             preconditionFailure("Invalid test UUID: \(value)")

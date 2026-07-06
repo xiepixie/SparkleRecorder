@@ -73,12 +73,13 @@ public struct ActionGroup: Identifiable, Equatable, Sendable {
     /// Number of clicks (1 = single, 2 = double, 3 = triple, etc.)
     public var clickCount: Int
     
-    // Phase 8 properties
-    public var textAnchor: TextAnchor?
-    public var textTimeout: TimeInterval?
-    public var verifyMustExist: Bool?
-    public var behaviorGroupID: BehaviorGroupID?
-    public var behaviorGroupName: String?
+	// Phase 8 properties
+	public var textAnchor: TextAnchor?
+	public var textTimeout: TimeInterval?
+	public var verifyMustExist: Bool?
+	public var textTargetReadiness: TextTargetReadiness
+	public var behaviorGroupID: BehaviorGroupID?
+	public var behaviorGroupName: String?
     
     public init(
         id: UUID = UUID(),
@@ -98,12 +99,13 @@ public struct ActionGroup: Identifiable, Equatable, Sendable {
         scrollPayload: ScrollPayload? = nil,
         summary: String,
         clickCount: Int = 1,
-        textAnchor: TextAnchor? = nil,
-        textTimeout: TimeInterval? = nil,
-        verifyMustExist: Bool? = nil,
-        behaviorGroupID: BehaviorGroupID? = nil,
-        behaviorGroupName: String? = nil
-    ) {
+	    textAnchor: TextAnchor? = nil,
+	    textTimeout: TimeInterval? = nil,
+	    verifyMustExist: Bool? = nil,
+	    textTargetReadiness: TextTargetReadiness = .notTextTarget,
+	    behaviorGroupID: BehaviorGroupID? = nil,
+	    behaviorGroupName: String? = nil
+	) {
         self.id = id
         self.kind = kind
         self.eventIndices = eventIndices
@@ -121,12 +123,13 @@ public struct ActionGroup: Identifiable, Equatable, Sendable {
         self.scrollPayload = scrollPayload
         self.summary = summary
         self.clickCount = clickCount
-        self.textAnchor = textAnchor
-        self.textTimeout = textTimeout
-        self.verifyMustExist = verifyMustExist
-        self.behaviorGroupID = behaviorGroupID
-        self.behaviorGroupName = behaviorGroupName
-    }
+	    self.textAnchor = textAnchor
+	    self.textTimeout = textTimeout
+	    self.verifyMustExist = verifyMustExist
+	    self.textTargetReadiness = textTargetReadiness
+	    self.behaviorGroupID = behaviorGroupID
+	    self.behaviorGroupName = behaviorGroupName
+	}
 }
 
 public struct EventGrouper: Sendable {
@@ -317,15 +320,15 @@ public struct EventGrouper: Sendable {
                     summary = String(format: NSLocalizedString("Long Press (%@) at (%d, %d)", comment: ""), btnName, Int(startEv.x), Int(startEv.y))
                 } else {
                     kind = .click
-                    let btnName = mouseButtonName(kind: ev.kind, button: ev.mouseButton)
-                    if startEv.coordinateStrategy == .locatorOnly || startEv.textAnchor != nil {
-                        let text = startEv.textAnchor?.text ?? ""
-                        summary = text.isEmpty
-                            ? NSLocalizedString("Click text", comment: "")
-                            : String(format: NSLocalizedString("Click text: %@", comment: ""), text)
-                    } else {
-                        summary = String(format: NSLocalizedString("%@ Click at (%d, %d)", comment: ""), btnName, Int(startEv.x), Int(startEv.y))
-                    }
+	                    let btnName = mouseButtonName(kind: ev.kind, button: ev.mouseButton)
+	                    if startEv.coordinateStrategy == .locatorOnly || startEv.textAnchor != nil {
+	                        let text = startEv.textAnchor?.text.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+	                        summary = text.isEmpty
+	                            ? NSLocalizedString("Click text (needs text)", comment: "")
+	                            : String(format: NSLocalizedString("Click text: %@", comment: ""), text)
+	                    } else {
+	                        summary = String(format: NSLocalizedString("%@ Click at (%d, %d)", comment: ""), btnName, Int(startEv.x), Int(startEv.y))
+	                    }
                 }
                 
                 groups.append(ActionGroup(
@@ -339,11 +342,14 @@ public struct EventGrouper: Sendable {
                     path: dragPoints,
                     mouseButton: ev.mouseButton,
                     summary: summary,
-                    clickCount: max(1, Int(startEv.clickCount)),
-                    textAnchor: startEv.textAnchor,
-                    textTimeout: startEv.textTimeout,
-                    verifyMustExist: startEv.verifyMustExist
-                ))
+	                    clickCount: max(1, Int(startEv.clickCount)),
+	                    textAnchor: startEv.textAnchor,
+	                    textTimeout: startEv.textTimeout,
+	                    verifyMustExist: startEv.verifyMustExist,
+	                    textTargetReadiness: (startEv.coordinateStrategy == .locatorOnly || startEv.textAnchor != nil)
+	                        ? textTargetReadiness(for: startEv.textAnchor)
+	                        : .notTextTarget
+	                ))
                 
                 i = j
                 continue
@@ -515,26 +521,26 @@ public struct EventGrouper: Sendable {
             } else if ev.kind == .mouseMoved {
                 name = String(format: NSLocalizedString("Move to (%d, %d)", comment: ""), Int(ev.x), Int(ev.y))
                 kind = .mouseMove
-            } else if ev.kind == .waitForText {
-                let mustExist = ev.verifyMustExist ?? true
-                if let text = ev.textAnchor?.text, !text.isEmpty {
-                    name = mustExist
-                        ? String(format: NSLocalizedString("Wait Text: %@", comment: ""), text)
-                        : String(format: NSLocalizedString("Wait Text Gone: %@", comment: ""), text)
-                } else {
-                    name = mustExist
-                        ? NSLocalizedString("Wait Text", comment: "")
-                        : NSLocalizedString("Wait Text Gone", comment: "")
-                }
-                kind = mustExist ? .waitForText : .waitForTextGone
-            } else if ev.kind == .verifyText {
-                let mustExist = ev.verifyMustExist ?? true
-                if let text = ev.textAnchor?.text, !text.isEmpty {
-                    name = String(format: NSLocalizedString("Verify Text: %@ (%@)", comment: ""), text, mustExist ? NSLocalizedString("Exists", comment: "") : NSLocalizedString("Not Exists", comment: ""))
-                } else {
-                    name = NSLocalizedString("Verify Text", comment: "")
-                }
-                kind = .verifyText
+	            } else if ev.kind == .waitForText {
+	                let mustExist = ev.verifyMustExist ?? true
+	                if let text = ev.textAnchor?.text.trimmingCharacters(in: .whitespacesAndNewlines), !text.isEmpty {
+	                    name = mustExist
+	                        ? String(format: NSLocalizedString("Wait Text: %@", comment: ""), text)
+	                        : String(format: NSLocalizedString("Wait Text Gone: %@", comment: ""), text)
+	                } else {
+	                    name = mustExist
+	                        ? NSLocalizedString("Wait Text (needs text)", comment: "")
+	                        : NSLocalizedString("Wait Text Gone (needs text)", comment: "")
+	                }
+	                kind = mustExist ? .waitForText : .waitForTextGone
+	            } else if ev.kind == .verifyText {
+	                let mustExist = ev.verifyMustExist ?? true
+	                if let text = ev.textAnchor?.text.trimmingCharacters(in: .whitespacesAndNewlines), !text.isEmpty {
+	                    name = String(format: NSLocalizedString("Verify Text: %@ (%@)", comment: ""), text, mustExist ? NSLocalizedString("Exists", comment: "") : NSLocalizedString("Not Exists", comment: ""))
+	                } else {
+	                    name = NSLocalizedString("Verify Text (needs text)", comment: "")
+	                }
+	                kind = .verifyText
             } else {
                 name = "\(ev.kind)"
                 kind = ev.kind.isMouse ? .click : .keyPress
@@ -551,11 +557,14 @@ public struct EventGrouper: Sendable {
                     keyFlags: ev.kind.isKey ? ev.flags : nil,
                     unicodeString: ev.kind.isKey ? ev.unicodeString : nil,
                     mouseButton: ev.kind.isMouse ? ev.mouseButton : nil,
-                    summary: name,
-                    textAnchor: ev.textAnchor,
-                textTimeout: ev.textTimeout,
-                verifyMustExist: ev.verifyMustExist
-            ))
+	                    summary: name,
+	                    textAnchor: ev.textAnchor,
+	                textTimeout: ev.textTimeout,
+	                verifyMustExist: ev.verifyMustExist,
+	                textTargetReadiness: (kind == .waitForText || kind == .waitForTextGone || kind == .verifyText)
+	                    ? textTargetReadiness(for: ev.textAnchor)
+	                    : .notTextTarget
+	            ))
             
             i += 1
         }
@@ -572,8 +581,8 @@ public struct EventGrouper: Sendable {
                     endTime: live,
                     summary: String(format: NSLocalizedString("Wait %.2fs", comment: ""), gap)
                 ))
-            }
-        }
+	    }
+	}
         
         // Post-process: merge consecutive clicks into multi-clicks
         groups = mergeScrollSegments(groups, events: events)
@@ -583,6 +592,11 @@ public struct EventGrouper: Sendable {
         groups = mergeBehaviorGroups(groups, events: events)
         
         return groups
+    }
+
+    private func textTargetReadiness(for anchor: TextAnchor?) -> TextTargetReadiness {
+        guard let anchor else { return .missingAnchor }
+        return ActionGroupProjection.textAnchorIsReady(anchor) ? .ready : .missingText
     }
 
     private func mergeScrollSegments(_ groups: [ActionGroup], events: [RecordedEvent]) -> [ActionGroup] {

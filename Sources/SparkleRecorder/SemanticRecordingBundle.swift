@@ -94,6 +94,37 @@ public struct RecordingArtifactRef: Codable, Equatable, Hashable, Sendable {
     }
 }
 
+public enum SemanticRecordingBundleDirectoryIdentityError: Error, Equatable, Sendable {
+    case recordingIDMismatch(directoryID: UUID, bundleID: UUID)
+}
+
+public enum SemanticRecordingBundleDirectoryIdentity {
+    public static func directoryName(for recordingID: UUID) -> String {
+        recordingID.uuidString
+    }
+
+    public static func recordingID(fromDirectoryName directoryName: String) -> UUID? {
+        UUID(uuidString: directoryName.trimmingCharacters(in: .whitespacesAndNewlines))
+    }
+
+    @discardableResult
+    public static func validate(
+        bundle: SemanticRecordingBundle,
+        directoryName: String
+    ) throws -> UUID {
+        guard let directoryID = recordingID(fromDirectoryName: directoryName) else {
+            return bundle.id
+        }
+        guard directoryID == bundle.id else {
+            throw SemanticRecordingBundleDirectoryIdentityError.recordingIDMismatch(
+                directoryID: directoryID,
+                bundleID: bundle.id
+            )
+        }
+        return bundle.id
+    }
+}
+
 public struct RecordingImageSize: Codable, Equatable, Sendable {
     public var width: Int
     public var height: Int
@@ -813,6 +844,8 @@ public enum SemanticRecordingBundleIssue: Equatable, Sendable {
     case duplicateRuntimeSampleID(UUID)
     case duplicatePreviewComparisonID(UUID)
     case duplicateSuppressionID(UUID)
+    case duplicateRedactedFrameID(UUID)
+    case duplicateRedactedVideoSegmentID(UUID)
     case frameReferencesMissingVideoSegment(frameID: UUID, videoSegmentID: UUID)
     case timelineEventReferencesMissingFrame(eventID: UUID, frameID: UUID)
     case timelineEventReferencesMissingVideoSegment(eventID: UUID, videoSegmentID: UUID)
@@ -827,6 +860,10 @@ public enum SemanticRecordingBundleIssue: Equatable, Sendable {
     case comparisonReferencesMissingSample(comparisonID: UUID, runtimeSampleRefID: UUID)
     case suppressionReferencesMissingFrame(suppressionID: UUID, frameID: UUID)
     case suppressionReferencesMissingTimelineEvent(suppressionID: UUID, eventID: UUID)
+    case redactedFrameReferencesMissingFrame(frameID: UUID)
+    case redactedFrameReferencesMissingSuppression(frameID: UUID, suppressionID: UUID)
+    case redactedVideoReferencesMissingVideoSegment(videoSegmentID: UUID)
+    case redactedVideoReferencesMissingSuppression(videoSegmentID: UUID, suppressionID: UUID)
 }
 
 public struct SemanticRecordingBundle: Codable, Equatable, Sendable, Identifiable {
@@ -844,6 +881,27 @@ public struct SemanticRecordingBundle: Codable, Equatable, Sendable, Identifiabl
     public var runtimeSamples: [RecordingRuntimeSampleReference]
     public var previewComparisons: [RecordingPreviewComparison]
     public var suppressions: [RecordingSuppressionRecord]
+    public var redactedFrames: [SemanticRecordingRenderedFrameRedaction]
+    public var redactedVideos: [SemanticRecordingRenderedVideoRedaction]
+
+    private enum CodingKeys: String, CodingKey {
+        case id
+        case schemaVersion
+        case createdAt
+        case capturePolicy
+        case captureTarget
+        case videoSegments
+        case frames
+        case timelineEvents
+        case semanticEvents
+        case visualObservations
+        case sourcePreviews
+        case runtimeSamples
+        case previewComparisons
+        case suppressions
+        case redactedFrames
+        case redactedVideos
+    }
 
     public init(
         id: UUID = UUID(),
@@ -859,7 +917,9 @@ public struct SemanticRecordingBundle: Codable, Equatable, Sendable, Identifiabl
         sourcePreviews: [RecordingSourcePreviewReference] = [],
         runtimeSamples: [RecordingRuntimeSampleReference] = [],
         previewComparisons: [RecordingPreviewComparison] = [],
-        suppressions: [RecordingSuppressionRecord] = []
+        suppressions: [RecordingSuppressionRecord] = [],
+        redactedFrames: [SemanticRecordingRenderedFrameRedaction] = [],
+        redactedVideos: [SemanticRecordingRenderedVideoRedaction] = []
     ) {
         self.id = id
         self.schemaVersion = schemaVersion
@@ -875,6 +935,70 @@ public struct SemanticRecordingBundle: Codable, Equatable, Sendable, Identifiabl
         self.runtimeSamples = runtimeSamples
         self.previewComparisons = previewComparisons
         self.suppressions = suppressions
+        self.redactedFrames = redactedFrames
+        self.redactedVideos = redactedVideos
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.id = try container.decode(UUID.self, forKey: .id)
+        self.schemaVersion = try container.decodeIfPresent(
+            SemanticRecordingSchemaVersion.self,
+            forKey: .schemaVersion
+        ) ?? SemanticRecordingSchema.current
+        self.createdAt = try container.decode(Date.self, forKey: .createdAt)
+        self.capturePolicy = try container.decodeIfPresent(
+            RecordingCapturePolicy.self,
+            forKey: .capturePolicy
+        ) ?? RecordingCapturePolicy()
+        self.captureTarget = try container.decodeIfPresent(
+            RecordingCaptureTarget.self,
+            forKey: .captureTarget
+        )
+        self.videoSegments = try container.decodeIfPresent(
+            [RecordingVideoSegment].self,
+            forKey: .videoSegments
+        ) ?? []
+        self.frames = try container.decodeIfPresent(
+            [RecordingFrameReference].self,
+            forKey: .frames
+        ) ?? []
+        self.timelineEvents = try container.decodeIfPresent(
+            [RecordingTimelineEvent].self,
+            forKey: .timelineEvents
+        ) ?? []
+        self.semanticEvents = try container.decodeIfPresent(
+            [RecordingSemanticEvent].self,
+            forKey: .semanticEvents
+        ) ?? []
+        self.visualObservations = try container.decodeIfPresent(
+            [RecordingVisualObservation].self,
+            forKey: .visualObservations
+        ) ?? []
+        self.sourcePreviews = try container.decodeIfPresent(
+            [RecordingSourcePreviewReference].self,
+            forKey: .sourcePreviews
+        ) ?? []
+        self.runtimeSamples = try container.decodeIfPresent(
+            [RecordingRuntimeSampleReference].self,
+            forKey: .runtimeSamples
+        ) ?? []
+        self.previewComparisons = try container.decodeIfPresent(
+            [RecordingPreviewComparison].self,
+            forKey: .previewComparisons
+        ) ?? []
+        self.suppressions = try container.decodeIfPresent(
+            [RecordingSuppressionRecord].self,
+            forKey: .suppressions
+        ) ?? []
+        self.redactedFrames = try container.decodeIfPresent(
+            [SemanticRecordingRenderedFrameRedaction].self,
+            forKey: .redactedFrames
+        ) ?? []
+        self.redactedVideos = try container.decodeIfPresent(
+            [SemanticRecordingRenderedVideoRedaction].self,
+            forKey: .redactedVideos
+        ) ?? []
     }
 
     public var aiSafeEvents: [RecordingSemanticEvent] {
@@ -909,6 +1033,22 @@ public struct SemanticRecordingBundle: Codable, Equatable, Sendable, Identifiabl
         visualObservations.filter { $0.frameID == frameID }
     }
 
+    public func redactedFrame(frameID: UUID) -> SemanticRecordingRenderedFrameRedaction? {
+        redactedFrames.first { $0.frameID == frameID }
+    }
+
+    public func redactedVideo(
+        videoSegmentID: UUID
+    ) -> SemanticRecordingRenderedVideoRedaction? {
+        redactedVideos.first { $0.videoSegmentID == videoSegmentID }
+    }
+
+    public func preferredImageRef(
+        for frame: RecordingFrameReference
+    ) -> RecordingArtifactRef {
+        redactedFrame(frameID: frame.id)?.redactedImageRef ?? frame.imageRef
+    }
+
     public func previewComparisons(sourcePreviewRefID: UUID) -> [RecordingPreviewComparison] {
         previewComparisons.filter { $0.sourcePreviewRefID == sourcePreviewRefID }
     }
@@ -925,6 +1065,7 @@ public struct SemanticRecordingBundle: Codable, Equatable, Sendable, Identifiabl
         let visualObservationIDs = Set(visualObservations.map(\.id))
         let sourcePreviewIDs = Set(sourcePreviews.map(\.id))
         let runtimeSampleIDs = Set(runtimeSamples.map(\.id))
+        let suppressionIDs = Set(suppressions.map(\.id))
 
         issues.append(
             contentsOf: Self.duplicateIssues(
@@ -978,6 +1119,18 @@ public struct SemanticRecordingBundle: Codable, Equatable, Sendable, Identifiabl
             contentsOf: Self.duplicateIssues(
                 suppressions.map(\.id),
                 issue: SemanticRecordingBundleIssue.duplicateSuppressionID
+            )
+        )
+        issues.append(
+            contentsOf: Self.duplicateIssues(
+                redactedFrames.map(\.frameID),
+                issue: SemanticRecordingBundleIssue.duplicateRedactedFrameID
+            )
+        )
+        issues.append(
+            contentsOf: Self.duplicateIssues(
+                redactedVideos.map(\.videoSegmentID),
+                issue: SemanticRecordingBundleIssue.duplicateRedactedVideoSegmentID
             )
         )
 
@@ -1105,6 +1258,42 @@ public struct SemanticRecordingBundle: Codable, Equatable, Sendable, Identifiabl
             }
         }
 
+        for redactedFrame in redactedFrames {
+            if !frameIDs.contains(redactedFrame.frameID) {
+                issues.append(
+                    .redactedFrameReferencesMissingFrame(frameID: redactedFrame.frameID)
+                )
+            }
+            for suppressionID in redactedFrame.sourceSuppressionIDs
+                where !suppressionIDs.contains(suppressionID) {
+                issues.append(
+                    .redactedFrameReferencesMissingSuppression(
+                        frameID: redactedFrame.frameID,
+                        suppressionID: suppressionID
+                    )
+                )
+            }
+        }
+
+        for redactedVideo in redactedVideos {
+            if !videoSegmentIDs.contains(redactedVideo.videoSegmentID) {
+                issues.append(
+                    .redactedVideoReferencesMissingVideoSegment(
+                        videoSegmentID: redactedVideo.videoSegmentID
+                    )
+                )
+            }
+            for suppressionID in redactedVideo.sourceSuppressionIDs
+                where !suppressionIDs.contains(suppressionID) {
+                issues.append(
+                    .redactedVideoReferencesMissingSuppression(
+                        videoSegmentID: redactedVideo.videoSegmentID,
+                        suppressionID: suppressionID
+                    )
+                )
+            }
+        }
+
         return issues
     }
 
@@ -1119,5 +1308,174 @@ public struct SemanticRecordingBundle: Codable, Equatable, Sendable, Identifiabl
             issues.append(issue(id))
         }
         return issues
+    }
+}
+
+public struct SemanticRecordingBundleSidecars: Equatable, Sendable {
+    public var videoSegments: [RecordingVideoSegment]?
+    public var frames: [RecordingFrameReference]?
+    public var timelineEvents: [RecordingTimelineEvent]?
+    public var semanticEvents: [RecordingSemanticEvent]?
+    public var visualObservations: [RecordingVisualObservation]?
+    public var sourcePreviews: [RecordingSourcePreviewReference]?
+    public var runtimeSamples: [RecordingRuntimeSampleReference]?
+    public var previewComparisons: [RecordingPreviewComparison]?
+    public var suppressions: [RecordingSuppressionRecord]?
+    public var redactedFrames: [SemanticRecordingRenderedFrameRedaction]?
+    public var redactedVideos: [SemanticRecordingRenderedVideoRedaction]?
+
+    public init(
+        videoSegments: [RecordingVideoSegment]? = nil,
+        frames: [RecordingFrameReference]? = nil,
+        timelineEvents: [RecordingTimelineEvent]? = nil,
+        semanticEvents: [RecordingSemanticEvent]? = nil,
+        visualObservations: [RecordingVisualObservation]? = nil,
+        sourcePreviews: [RecordingSourcePreviewReference]? = nil,
+        runtimeSamples: [RecordingRuntimeSampleReference]? = nil,
+        previewComparisons: [RecordingPreviewComparison]? = nil,
+        suppressions: [RecordingSuppressionRecord]? = nil,
+        redactedFrames: [SemanticRecordingRenderedFrameRedaction]? = nil,
+        redactedVideos: [SemanticRecordingRenderedVideoRedaction]? = nil
+    ) {
+        self.videoSegments = videoSegments
+        self.frames = frames
+        self.timelineEvents = timelineEvents
+        self.semanticEvents = semanticEvents
+        self.visualObservations = visualObservations
+        self.sourcePreviews = sourcePreviews
+        self.runtimeSamples = runtimeSamples
+        self.previewComparisons = previewComparisons
+        self.suppressions = suppressions
+        self.redactedFrames = redactedFrames
+        self.redactedVideos = redactedVideos
+    }
+}
+
+public enum SemanticRecordingBundleSidecarKind: String, Codable, Equatable, Sendable, CaseIterable {
+    case videoSegments
+    case frames
+    case timelineEvents
+    case semanticEvents
+    case visualObservations
+    case suppressions
+    case redactedFrames
+    case redactedVideos
+}
+
+public struct SemanticRecordingBundleSidecarLoadIssue: Codable, Equatable, Sendable {
+    public var kind: SemanticRecordingBundleSidecarKind
+    public var relativePath: String
+    public var message: String
+    public var fallbackToManifest: Bool
+
+    public init(
+        kind: SemanticRecordingBundleSidecarKind,
+        relativePath: String,
+        message: String,
+        fallbackToManifest: Bool = true
+    ) {
+        self.kind = kind
+        self.relativePath = relativePath
+        self.message = message
+        self.fallbackToManifest = fallbackToManifest
+    }
+}
+
+public struct SemanticRecordingBundleSidecarLoadDiagnostics: Codable, Equatable, Sendable {
+    public var loadedKinds: [SemanticRecordingBundleSidecarKind]
+    public var missingKinds: [SemanticRecordingBundleSidecarKind]
+    public var failedIssues: [SemanticRecordingBundleSidecarLoadIssue]
+
+    public init(
+        loadedKinds: [SemanticRecordingBundleSidecarKind] = [],
+        missingKinds: [SemanticRecordingBundleSidecarKind] = [],
+        failedIssues: [SemanticRecordingBundleSidecarLoadIssue] = []
+    ) {
+        self.loadedKinds = Self.unique(loadedKinds)
+        self.missingKinds = Self.unique(missingKinds)
+        self.failedIssues = failedIssues
+    }
+
+    public var isDegraded: Bool {
+        !failedIssues.isEmpty
+    }
+
+    public mutating func recordLoaded(_ kind: SemanticRecordingBundleSidecarKind) {
+        Self.appendUnique(kind, to: &loadedKinds)
+    }
+
+    public mutating func recordMissing(_ kind: SemanticRecordingBundleSidecarKind) {
+        Self.appendUnique(kind, to: &missingKinds)
+    }
+
+    public mutating func recordFailed(
+        _ kind: SemanticRecordingBundleSidecarKind,
+        relativePath: String,
+        message: String,
+        fallbackToManifest: Bool = true
+    ) {
+        failedIssues.append(
+            SemanticRecordingBundleSidecarLoadIssue(
+                kind: kind,
+                relativePath: relativePath,
+                message: message,
+                fallbackToManifest: fallbackToManifest
+            )
+        )
+    }
+
+    private static func appendUnique(
+        _ kind: SemanticRecordingBundleSidecarKind,
+        to kinds: inout [SemanticRecordingBundleSidecarKind]
+    ) {
+        guard !kinds.contains(kind) else { return }
+        kinds.append(kind)
+    }
+
+    private static func unique(
+        _ kinds: [SemanticRecordingBundleSidecarKind]
+    ) -> [SemanticRecordingBundleSidecarKind] {
+        var result: [SemanticRecordingBundleSidecarKind] = []
+        for kind in kinds where !result.contains(kind) {
+            result.append(kind)
+        }
+        return result
+    }
+}
+
+public struct SemanticRecordingBundleLoadResult: Codable, Equatable, Sendable {
+    public var bundle: SemanticRecordingBundle
+    public var sidecarDiagnostics: SemanticRecordingBundleSidecarLoadDiagnostics
+
+    public init(
+        manifest: SemanticRecordingBundle,
+        sidecars: SemanticRecordingBundleSidecars = SemanticRecordingBundleSidecars(),
+        sidecarDiagnostics: SemanticRecordingBundleSidecarLoadDiagnostics = SemanticRecordingBundleSidecarLoadDiagnostics()
+    ) {
+        self.bundle = manifest.applyingSidecars(sidecars)
+        self.sidecarDiagnostics = sidecarDiagnostics
+    }
+}
+
+public extension SemanticRecordingBundle {
+    func applyingSidecars(_ sidecars: SemanticRecordingBundleSidecars) -> SemanticRecordingBundle {
+        SemanticRecordingBundle(
+            id: id,
+            schemaVersion: schemaVersion,
+            createdAt: createdAt,
+            capturePolicy: capturePolicy,
+            captureTarget: captureTarget,
+            videoSegments: sidecars.videoSegments ?? videoSegments,
+            frames: sidecars.frames ?? frames,
+            timelineEvents: sidecars.timelineEvents ?? timelineEvents,
+            semanticEvents: sidecars.semanticEvents ?? semanticEvents,
+            visualObservations: sidecars.visualObservations ?? visualObservations,
+            sourcePreviews: sidecars.sourcePreviews ?? sourcePreviews,
+            runtimeSamples: sidecars.runtimeSamples ?? runtimeSamples,
+            previewComparisons: sidecars.previewComparisons ?? previewComparisons,
+            suppressions: sidecars.suppressions ?? suppressions,
+            redactedFrames: sidecars.redactedFrames ?? redactedFrames,
+            redactedVideos: sidecars.redactedVideos ?? redactedVideos
+        )
     }
 }

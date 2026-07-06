@@ -1,0 +1,46 @@
+{
+  "schema": "sparkle.workflow.draft.v1",
+  "workflow": {
+    "name": "S0 Branch Evidence Live Gate",
+    "tasks": [
+      {
+        "key": "source_manual_rejected",
+        "name": "Source manual check",
+        "type": "manualApproval",
+        "resource": "none",
+        "schedule": {
+          "type": "manual"
+        },
+        "graphPosition": {
+          "x": 160,
+          "y": 120
+        }
+      },
+      {
+        "key": "target_previous_outcome",
+        "name": "Target previous-outcome check",
+        "type": "condition",
+        "condition": {
+          "type": "previousOutcome",
+          "outcome": "conditionNotMatched"
+        },
+        "resource": "none",
+        "schedule": {
+          "type": "manual"
+        },
+        "graphPosition": {
+          "x": 480,
+          "y": 120
+        }
+      }
+    ],
+    "dependencies": [
+      {
+        "key": "source_to_target_when_not_matched",
+        "from": "source_manual_rejected",
+        "to": "target_previous_outcome",
+        "trigger": "conditionNotMatched"
+      }
+    ]
+  }
+}

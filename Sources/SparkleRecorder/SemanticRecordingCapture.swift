@@ -328,12 +328,13 @@ public actor SemanticRecordingCaptureSession {
         timelineEvents.append(timelineEvent)
 
         if let semanticEvent = semanticEvent(for: event, eventID: eventID, frameID: frame?.id) {
-            semanticEvents.append(semanticEvent)
+            semanticEvents.append(redactedSemanticEventIfNeeded(semanticEvent))
         }
     }
 
     public func addSuppression(_ suppression: RecordingSuppressionRecord) {
         suppressions.append(suppression)
+        applySemanticRedaction(for: suppression)
     }
 
     public func finish(recordingTime: TimeInterval) async throws -> SemanticRecordingBundle {
@@ -387,6 +388,24 @@ public actor SemanticRecordingCaptureSession {
         )
     }
 
+    public func cancel(recordingTime: TimeInterval) async {
+        guard didStart, !didFinish else {
+            return
+        }
+        didFinish = true
+
+        if let movieHandle {
+            _ = try? await client.finishMovie(SemanticRecordingMovieFinishRequest(
+                recordingID: configuration.recordingID,
+                handle: movieHandle,
+                finishedAt: configuration.createdAt.addingTimeInterval(recordingTime),
+                recordingTime: recordingTime
+            ))
+        }
+
+        movieHandle = nil
+    }
+
     private func captureFrame(
         source: RecordingFrameCaptureSource,
         recordingTime: TimeInterval,
@@ -429,7 +448,7 @@ public actor SemanticRecordingCaptureSession {
             target: configuration.captureTarget,
             createdAt: configuration.createdAt.addingTimeInterval(recordingTime)
         ))
-        visualObservations.append(contentsOf: indexed)
+        visualObservations.append(contentsOf: indexed.map(redactedVisualObservationIfNeeded))
         return frame
     }
 
@@ -520,6 +539,138 @@ public actor SemanticRecordingCaptureSession {
 
     private static func format(_ time: TimeInterval) -> String {
         String(format: "%.3f", max(0, time))
+    }
+
+    private func applySemanticRedaction(
+        for suppression: RecordingSuppressionRecord
+    ) {
+        guard suppression.reason.redactsSemanticEvidence else {
+            return
+        }
+        semanticEvents = semanticEvents.map { event in
+            guard suppressionMatches(suppression, semanticEvent: event) else {
+                return event
+            }
+            return redactedSemanticEvent(event, suppression: suppression)
+        }
+        visualObservations = visualObservations.map { observation in
+            guard suppressionMatches(suppression, observation: observation) else {
+                return observation
+            }
+            return redactedVisualObservation(observation, suppression: suppression)
+        }
+    }
+
+    private func redactedSemanticEventIfNeeded(
+        _ event: RecordingSemanticEvent
+    ) -> RecordingSemanticEvent {
+        var redacted = event
+        for suppression in suppressions where suppression.reason.redactsSemanticEvidence {
+            if suppressionMatches(suppression, semanticEvent: redacted) {
+                redacted = redactedSemanticEvent(redacted, suppression: suppression)
+            }
+        }
+        return redacted
+    }
+
+    private func redactedVisualObservationIfNeeded(
+        _ observation: RecordingVisualObservation
+    ) -> RecordingVisualObservation {
+        var redacted = observation
+        for suppression in suppressions where suppression.reason.redactsSemanticEvidence {
+            if suppressionMatches(suppression, observation: redacted) {
+                redacted = redactedVisualObservation(redacted, suppression: suppression)
+            }
+        }
+        return redacted
+    }
+
+    private func redactedSemanticEvent(
+        _ event: RecordingSemanticEvent,
+        suppression: RecordingSuppressionRecord
+    ) -> RecordingSemanticEvent {
+        var redacted = event
+        redacted.title = Self.redactedTitle(for: event.kind)
+        redacted.summary = "Details withheld due to \(suppression.reason.rawValue)."
+        redacted.evidenceFrameIDs = []
+        redacted.observationIDs = []
+        redacted.risk = "Suppressed evidence is unavailable to AI suggestions."
+        return redacted
+    }
+
+    private func redactedVisualObservation(
+        _ observation: RecordingVisualObservation,
+        suppression: RecordingSuppressionRecord
+    ) -> RecordingVisualObservation {
+        var redacted = observation
+        redacted.text = nil
+        redacted.confidence = nil
+        redacted.artifactRef = nil
+        if !redacted.labels.contains("redacted") {
+            redacted.labels.append("redacted")
+        }
+        redacted.metadata["redactedReason"] = suppression.reason.rawValue
+        redacted.metadata["redactedBySuppressionID"] = suppression.id.uuidString
+        return redacted
+    }
+
+    private func suppressionMatches(
+        _ suppression: RecordingSuppressionRecord,
+        semanticEvent event: RecordingSemanticEvent
+    ) -> Bool {
+        if let eventID = suppression.eventID,
+           event.timelineEventID == eventID {
+            return true
+        }
+        if let frameID = suppression.frameID,
+           event.frameID == frameID || event.evidenceFrameIDs.contains(frameID) {
+            return true
+        }
+        return suppressionMatches(
+            suppression,
+            recordingTime: event.recordingTime
+        )
+    }
+
+    private func suppressionMatches(
+        _ suppression: RecordingSuppressionRecord,
+        observation: RecordingVisualObservation
+    ) -> Bool {
+        if let frameID = suppression.frameID,
+           observation.frameID == frameID {
+            return true
+        }
+        return suppressionMatches(
+            suppression,
+            recordingTime: observation.recordingTime
+        )
+    }
+
+    private func suppressionMatches(
+        _ suppression: RecordingSuppressionRecord,
+        recordingTime: TimeInterval
+    ) -> Bool {
+        if let timeRange = suppression.timeRange {
+            return timeRange.contains(recordingTime)
+        }
+        if let suppressionTime = suppression.recordingTime {
+            return abs(max(0, recordingTime) - max(0, suppressionTime)) <= 0.001
+        }
+        return false
+    }
+
+    private static func redactedTitle(
+        for kind: RecordingSemanticEventKind
+    ) -> String {
+        switch kind {
+        case .inputText:
+            return "Input withheld"
+        case .wait,
+             .conditionCandidate:
+            return "Text evidence withheld"
+        default:
+            return "Semantic evidence withheld"
+        }
     }
 }
 

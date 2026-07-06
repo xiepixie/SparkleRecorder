@@ -108,6 +108,19 @@ public actor SemanticRecordingLifecycle {
         return bundle
     }
 
+    public func cancel(recordingTime: TimeInterval) async {
+        guard !didFinish else {
+            return
+        }
+
+        if let session {
+            await session.cancel(recordingTime: recordingTime)
+        }
+        didFinish = true
+        session = nil
+        blockedPreflight = nil
+    }
+
     private func requireSession() throws -> SemanticRecordingCaptureSession {
         guard !didFinish else {
             throw SemanticRecordingLifecycleError.alreadyFinished

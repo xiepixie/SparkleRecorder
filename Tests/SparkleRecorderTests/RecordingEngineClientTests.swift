@@ -78,6 +78,56 @@ struct RecordingEngineClientTests {
         #expect(probe.snapshot.stops == 1)
     }
 
+    @Test("Fake client can feed recording diagnostics")
+    func fakeClientFeedsRecordingDiagnostics() async {
+        let diagnostic = RecordingEngineDiagnostic(
+            kind: .eventTapDisabledByUserInput,
+            detail: "Secure Input"
+        )
+        let client = RecordingEngineClient(
+            events: {
+                AsyncStream { continuation in
+                    continuation.finish()
+                }
+            },
+            diagnostics: {
+                AsyncStream { continuation in
+                    continuation.yield(diagnostic)
+                    continuation.finish()
+                }
+            },
+            start: { true },
+            stop: {}
+        )
+
+        var received: [RecordingEngineDiagnostic] = []
+        for await diagnostic in client.diagnostics() {
+            received.append(diagnostic)
+        }
+
+        #expect(received == [diagnostic])
+    }
+
+    @Test("Diagnostics default to an empty stream")
+    func diagnosticsDefaultToEmptyStream() async {
+        let client = RecordingEngineClient(
+            events: {
+                AsyncStream { continuation in
+                    continuation.finish()
+                }
+            },
+            start: { true },
+            stop: {}
+        )
+
+        var received: [RecordingEngineDiagnostic] = []
+        for await diagnostic in client.diagnostics() {
+            received.append(diagnostic)
+        }
+
+        #expect(received.isEmpty)
+    }
+
     @Test("Fake client can model startup failure")
     func fakeClientCanModelStartupFailure() {
         let probe = RecordingEngineProbe()

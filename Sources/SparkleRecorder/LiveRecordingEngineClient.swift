@@ -29,25 +29,67 @@ private final class RawEventContinuationBox: @unchecked Sendable {
     }
 }
 
+private final class RecordingDiagnosticContinuationBox: @unchecked Sendable {
+    private let lock = NSLock()
+    private var continuation: AsyncStream<RecordingEngineDiagnostic>.Continuation?
+
+    func set(_ continuation: AsyncStream<RecordingEngineDiagnostic>.Continuation) {
+        lock.lock()
+        self.continuation = continuation
+        lock.unlock()
+    }
+
+    func yield(_ diagnostic: RecordingEngineDiagnostic) {
+        lock.lock()
+        let continuation = self.continuation
+        lock.unlock()
+        continuation?.yield(diagnostic)
+    }
+
+    func finish() {
+        lock.lock()
+        let continuation = self.continuation
+        self.continuation = nil
+        lock.unlock()
+        continuation?.finish()
+    }
+}
+
 extension RecordingEngineClient {
     public static func live(mask: CGEventMask) -> Self {
         let thread = EventTapThread(mask: mask)
         let continuationBox = RawEventContinuationBox()
+        let diagnosticBox = RecordingDiagnosticContinuationBox()
 
         final class Adapter: EventTapThreadDelegate, @unchecked Sendable {
             let continuationBox: RawEventContinuationBox
+            let diagnosticBox: RecordingDiagnosticContinuationBox
 
-            init(continuationBox: RawEventContinuationBox) {
+            init(
+                continuationBox: RawEventContinuationBox,
+                diagnosticBox: RecordingDiagnosticContinuationBox
+            ) {
                 self.continuationBox = continuationBox
+                self.diagnosticBox = diagnosticBox
             }
 
             func eventTapThread(_ thread: EventTapThread, didReceive type: CGEventType, event: CGEvent) {
                 guard let input = RawInputEvent(eventType: type, event: event) else { return }
                 continuationBox.yield(input)
             }
+
+            func eventTapThreadDidDisableByUserInput(_ thread: EventTapThread) {
+                diagnosticBox.yield(RecordingEngineDiagnostic(
+                    kind: .eventTapDisabledByUserInput,
+                    detail: "The event tap was disabled by user input, which commonly indicates Secure Input."
+                ))
+            }
         }
 
-        let adapter = Adapter(continuationBox: continuationBox)
+        let adapter = Adapter(
+            continuationBox: continuationBox,
+            diagnosticBox: diagnosticBox
+        )
         continuationBox.keepAlive = adapter
         thread.delegate = adapter
 
@@ -58,6 +100,15 @@ extension RecordingEngineClient {
                     continuation.onTermination = { @Sendable _ in
                         thread.stop()
                         continuationBox.finish()
+                        diagnosticBox.finish()
+                    }
+                }
+            },
+            diagnostics: {
+                AsyncStream(bufferingPolicy: .bufferingNewest(128)) { continuation in
+                    diagnosticBox.set(continuation)
+                    continuation.onTermination = { @Sendable _ in
+                        diagnosticBox.finish()
                     }
                 }
             },
@@ -66,12 +117,14 @@ extension RecordingEngineClient {
                 if !started {
                     thread.stop()
                     continuationBox.finish()
+                    diagnosticBox.finish()
                 }
                 return started
             },
             stop: {
                 thread.stop()
                 continuationBox.finish()
+                diagnosticBox.finish()
             }
         )
     }

@@ -39,14 +39,14 @@ Workflow / Vision / Evidence 侧也已有 first pass：
 
 当前 Workflow 页面也暴露了 semantic recording 必须补上的产品缺口：
 
-- visual diagnostics 目前已有 `AutomationTaskRun.conditionEvidence`、live sample artifact refs、安全 preview/open/reveal presenter 和 fixture 截图；仍缺真实 live capture / Open / Reveal 交互录屏。
-- branch evidence 目前已有 durable `AutomationTaskRun.branchEvidence` 和 fixture drill-in；仍缺真实 run 中 FlowGraph edge、selected run、Run Detail 三处一致性的产品录屏。
-- template/baseline refs 目前能作为 visual condition / draft asset 字段流转；仍缺来自录制帧或运行样本的 thumbnail / diff / source-frame preview，让用户知道这个 ref 真实指向什么。
+- visual diagnostics 目前已有 `AutomationTaskRun.conditionEvidence`、live sample artifact refs、安全 preview/open/reveal presenter、fixture 截图，以及 `live-visual-diagnostics-open-reveal.mov` / `.md` 证明 App-host OCR condition run payload 和真实 App Support artifact file actions。
+- branch evidence 目前已有 durable `AutomationTaskRun.branchEvidence`、fixture drill-in，以及 `live-branch-evidence-consistency.mov` / `.md` 证明 App-host handoff run payload 中 source run、target run、dependency trigger 和 live App window capture 一致；更完整的手动 Run Detail drill-in 录屏可后续补充。
+- template/baseline refs 目前能作为 visual condition / draft asset 字段流转；fixture 已能渲染 source/runtime/decision，仍缺真实 Review UI 中来自录制帧或运行样本的 thumbnail / diff / source-frame preview，让用户知道这个 ref 真实指向什么。
 - Product evidence 已证明 UI 可读，但还没有把“录制时的基准画面”和“运行时看到的样本”连成一条用户能理解的证据链。
 
 这些缺口说明 semantic recording 的第一价值不是生成更炫的 AI，而是把宏从坐标脚本升级成有来源、有证据、可修正、可组合的自动化资产。
 
-当前剩余任务、优先级和过度设计审计维护在 [06-current-work-and-next-tasks.md](06-current-work-and-next-tasks.md) 和 [10-next-stage-reality-check.md](10-next-stage-reality-check.md)。本文件只记录快照，不单独作为执行队列。
+当前剩余任务、优先级和过度设计审计维护在 [06-current-work-and-next-tasks.md](06-current-work-and-next-tasks.md)、[10-next-stage-reality-check.md](10-next-stage-reality-check.md) 和 [12-remaining-work-and-direction-control.md](12-remaining-work-and-direction-control.md)。本文件只记录快照，不单独作为执行队列。
 
 ## Target Architecture
 
@@ -107,4 +107,4 @@ SwiftUI should not do file IO, run Vision directly from view bodies, or infer wo
 - AI 默认查询本地 summary、OCR、visual index 和 selected crop，不默认读取完整视频。
 - Semantic recording 的 visual assets 必须能进入现有 `AutomationWorkflowDraftVisualAssets` / package provider / artifact presenter 边界。
 - App Knowledge 先做轻量 app/surface/macro grouping；自然语言组合要等证据资产足够后再推进。
-- 当前阶段先关掉 Workflow 真实产品证据缺口，再写 `SemanticRecordingBundle` v0；不要在 live visual diagnostics、branch evidence 和 template/baseline preview refs 未可信前启动完整视频/AI 大路线。
+- 当前阶段已关掉 S0 Workflow strict live evidence gate，下一步扩展 `SemanticRecordingBundle` 的 live 产品路径；不要在真实 Review UI、frame-to-condition、S2 live `.mov`/keyframes 和 CLI suggestion 未可信前启动完整 MCP/App Knowledge 大路线。

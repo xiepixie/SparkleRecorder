@@ -168,10 +168,12 @@ struct EditorSidebar: View {
                                 }
 
 		                        if grp.kind.editsSemanticTextTarget || (grp.kind.canUseLocatorStrategy && inspStrategy == .locatorOnly) {
-		                            if let anchor = firstEvent?.textAnchor {
+                                    let textReadiness = ActionGroupProjection.textTargetReadiness(for: grp, events: recorder.events)
+                                    let anchor = ActionGroupProjection.firstTextAnchor(for: grp, events: recorder.events)
+		                            if textReadiness.isReady, let anchor {
 		                                AnchorPositionCard(anchor: anchor, fallbackPolicy: firstEvent?.locatorFallbackPolicy ?? .fail)
 		                            } else {
-		                                visionEmptyState()
+		                                visionEmptyState(readiness: textReadiness)
 		                            }
 		                        }
                     } else if selection.count > 1 {
@@ -676,18 +678,47 @@ struct EditorSidebar: View {
     }
     
     @ViewBuilder
-    func visionEmptyState() -> some View {
-        HStack(spacing: 7) {
-            Image(systemName: "text.viewfinder")
+    func visionEmptyState(readiness: TextTargetReadiness = .missingAnchor) -> some View {
+        HStack(alignment: .top, spacing: 7) {
+            Image(systemName: readiness == .missingText ? "exclamationmark.triangle" : "text.viewfinder")
                 .foregroundStyle(Brand.sigAmber)
-            Text(NSLocalizedString("Pick text to lock a search box and playback point.", comment: ""))
-                .font(.system(size: 10))
-                .foregroundStyle(.secondary)
+                .frame(width: 14)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(textTargetReadinessTitle(readiness))
+                    .font(.system(size: 10.5, weight: .semibold))
+                    .foregroundStyle(.primary)
+                Text(textTargetReadinessDetail(readiness))
+                    .font(.system(size: 10))
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
         }
         .padding(8)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Color.primary.opacity(0.045))
         .clipShape(.rect(cornerRadius: 7))
+    }
+
+    func textTargetReadinessTitle(_ readiness: TextTargetReadiness) -> String {
+        switch readiness {
+        case .missingText:
+            return NSLocalizedString("No target text", comment: "")
+        case .missingAnchor, .notTextTarget:
+            return NSLocalizedString("No text target", comment: "")
+        case .ready:
+            return NSLocalizedString("Text target ready", comment: "")
+        }
+    }
+
+    func textTargetReadinessDetail(_ readiness: TextTargetReadiness) -> String {
+        switch readiness {
+        case .missingText:
+            return NSLocalizedString("Pick text or type a non-empty target.", comment: "")
+        case .missingAnchor, .notTextTarget:
+            return NSLocalizedString("Pick text to create a searchable target.", comment: "")
+        case .ready:
+            return NSLocalizedString("Playback will use the matched text target.", comment: "")
+        }
     }
 
     @ViewBuilder
@@ -864,17 +895,15 @@ struct EditorSidebar: View {
     }
 
     func isTextTargetGroup(_ group: ActionGroup) -> Bool {
-        if group.kind.editsSemanticTextTarget { return true }
-        guard group.kind.canUseLocatorStrategy else { return false }
-        return group.textAnchor != nil || group.eventIndices.contains { index in
-            guard recorder.events.indices.contains(index) else { return false }
-            let event = recorder.events[index]
-            return event.coordinateStrategy == .locatorOnly || event.textAnchor != nil
-        }
+        ActionGroupProjection.isTextTargetGroup(group, events: recorder.events)
     }
 
     func selectedTextTargetGroups() -> [ActionGroup] {
-        selectedGroups().filter(isTextTargetGroup)
+        ActionGroupProjection.textTargetGroups(
+            groups: rows.map(\.group),
+            selectedGroupIDs: selection,
+            events: recorder.events
+        )
     }
 
     var canBindSelection: Bool {
@@ -1352,7 +1381,7 @@ struct EditorSidebar: View {
         let selectedGroups = selectedGroups()
         withUndo(NSLocalizedString("Batch Set Timeout", comment: "")) {
             for grp in selectedGroups {
-                if grp.kind.editsSemanticTextTarget || (grp.kind.canUseLocatorStrategy && inspStrategy == .locatorOnly) {
+                if grp.kind.editsSemanticTextTarget {
                     let anchor = firstEvent(for: grp)?.textAnchor ?? grp.textAnchor
                     recorder.events.updateSemanticAction(
                         at: grp.eventIndices,
@@ -1360,6 +1389,19 @@ struct EditorSidebar: View {
                         timeout: inspTimeout,
                         verifyMustExist: firstEvent(for: grp)?.verifyMustExist,
                         fallbackPolicy: firstEvent(for: grp)?.locatorFallbackPolicy
+                    )
+                } else if ActionGroupProjection.isTextTargetGroup(
+                    grp,
+                    events: recorder.events,
+                    includesCoordinateClickCandidates: false
+                ) {
+                    let anchor = firstEvent(for: grp)?.textAnchor ?? grp.textAnchor
+                    recorder.events.updateCoordinateStrategy(
+                        at: grp.eventIndices,
+                        strategy: .locatorOnly,
+                        textAnchor: anchor,
+                        fallbackPolicy: firstEvent(for: grp)?.locatorFallbackPolicy,
+                        textTimeout: inspTimeout
                     )
                 }
             }

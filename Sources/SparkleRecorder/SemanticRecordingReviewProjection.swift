@@ -467,6 +467,7 @@ public struct SemanticRecordingReviewProjection: Equatable, Sendable {
             return left.recordingTime < right.recordingTime
         }
         let framesByID = Dictionary(uniqueKeysWithValues: bundle.frames.map { ($0.id, $0) })
+        let redactedFramesByFrameID = Self.redactedFramesByFrameID(bundle.redactedFrames)
         let observationsByFrameID = Dictionary(grouping: bundle.visualObservations.compactMap { observation -> (UUID, RecordingVisualObservation)? in
             guard let frameID = observation.frameID else { return nil }
             return (frameID, observation)
@@ -564,11 +565,15 @@ public struct SemanticRecordingReviewProjection: Equatable, Sendable {
             return row
         }
         self.frameStrip = sortedFrames.map { frame in
-            FrameStripItem(
+            let redactedFrame = redactedFramesByFrameID[frame.id]
+            return FrameStripItem(
                 id: frame.id,
                 recordingTime: frame.recordingTime,
                 source: frame.source,
-                imageRefPath: frame.imageRef.path,
+                imageRefPath: (redactedFrame?.redactedImageRef ?? frame.imageRef).path,
+                sourceImageRefPath: frame.imageRef.path,
+                redactedImageRefPath: redactedFrame?.redactedImageRef.path,
+                isRedacted: redactedFrame != nil,
                 surfaceID: frame.surfaceID,
                 relatedEventIDs: frame.relatedEventIDs,
                 observationCount: observationsByFrameID[frame.id]?.count ?? 0,
@@ -583,6 +588,7 @@ public struct SemanticRecordingReviewProjection: Equatable, Sendable {
                 .sorted { Self.sortKey(for: $0) < Self.sortKey(for: $1) }
             let frameSourcePreviews = (sourcePreviewsByFrameID[effectiveSelectedFrameID] ?? [])
                 .sorted { Self.sortKey(for: $0) < Self.sortKey(for: $1) }
+            let redactedFrame = redactedFramesByFrameID[frame.id]
             let comparisonRows = frameSourcePreviews.flatMap { source in
                 (comparisonsBySourceID[source.id] ?? []).compactMap { comparison -> ComparisonRow? in
                     guard let runtimeSample = runtimeSamplesByID[comparison.runtimeSampleRefID] else {
@@ -608,7 +614,10 @@ public struct SemanticRecordingReviewProjection: Equatable, Sendable {
                 id: frame.id,
                 recordingTime: frame.recordingTime,
                 source: frame.source,
-                imageRefPath: frame.imageRef.path,
+                imageRefPath: (redactedFrame?.redactedImageRef ?? frame.imageRef).path,
+                sourceImageRefPath: frame.imageRef.path,
+                redactedImageRefPath: redactedFrame?.redactedImageRef.path,
+                isRedacted: redactedFrame != nil,
                 imageSize: frame.imageSize,
                 surfaceID: frame.surfaceID,
                 relatedEventIDs: frame.relatedEventIDs,
@@ -665,6 +674,9 @@ public struct SemanticRecordingReviewProjection: Equatable, Sendable {
         public var recordingTime: TimeInterval
         public var source: RecordingFrameCaptureSource
         public var imageRefPath: String
+        public var sourceImageRefPath: String
+        public var redactedImageRefPath: String?
+        public var isRedacted: Bool
         public var surfaceID: String?
         public var relatedEventIDs: [UUID]
         public var observationCount: Int
@@ -694,6 +706,9 @@ public struct SemanticRecordingReviewProjection: Equatable, Sendable {
         public var recordingTime: TimeInterval
         public var source: RecordingFrameCaptureSource
         public var imageRefPath: String
+        public var sourceImageRefPath: String
+        public var redactedImageRefPath: String?
+        public var isRedacted: Bool
         public var imageSize: RecordingImageSize?
         public var surfaceID: String?
         public var relatedEventIDs: [UUID]
@@ -825,6 +840,22 @@ public struct SemanticRecordingReviewProjection: Equatable, Sendable {
             bounds: evidence.bounds,
             summary: evidence.summary
         )
+    }
+
+    private static func redactedFramesByFrameID(
+        _ redactedFrames: [SemanticRecordingRenderedFrameRedaction]
+    ) -> [UUID: SemanticRecordingRenderedFrameRedaction] {
+        let sorted = redactedFrames.sorted {
+            if $0.frameID == $1.frameID {
+                return $0.redactedImageRef.path < $1.redactedImageRef.path
+            }
+            return $0.frameID.uuidString < $1.frameID.uuidString
+        }
+        var result: [UUID: SemanticRecordingRenderedFrameRedaction] = [:]
+        for redactedFrame in sorted where result[redactedFrame.frameID] == nil {
+            result[redactedFrame.frameID] = redactedFrame
+        }
+        return result
     }
 
     private static func conditionCandidates(

@@ -1,0 +1,27 @@
+{
+  "schema": "sparkle.workflow.draft.v1",
+  "workflow": {
+    "name": "S0 Macro Evidence Live Gate",
+    "tasks": [
+      {
+        "key": "intentional_point_resolve_failure",
+        "name": "Intentional point-resolve failure",
+        "type": "macro",
+        "macroRef": {
+          "id": "C0D3AA10-0000-4000-8000-000000000E01",
+          "name": "S0 Evidence Intentional Failure"
+        },
+        "schedule": {
+          "type": "manual"
+        },
+        "resource": "foregroundInput",
+        "timeoutSeconds": 10,
+        "graphPosition": {
+          "x": 260,
+          "y": 180
+        }
+      }
+    ],
+    "dependencies": []
+  }
+}
