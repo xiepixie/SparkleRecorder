@@ -2,6 +2,177 @@ import CoreGraphics
 import CryptoKit
 import Foundation
 
+public struct SemanticRecordingReviewActionSemantics: Equatable, Sendable {
+    public enum ActionName: String, Codable, Equatable, Sendable {
+        case draftCandidate = "review.draftCandidate"
+        case draftSelection = "review.draftSelection"
+        case acceptSuggestion = "review.acceptSuggestion"
+        case rejectSuggestion = "review.rejectSuggestion"
+        case clearDecision = "review.clearDecision"
+        case previewDraft = "review.previewDraft"
+        case importDraft = "review.importDraft"
+    }
+
+    public enum MutationBoundary: String, Codable, Equatable, Sendable {
+        case reviewLocal = "reviewLocal"
+        case draftPatchOnly = "draftPatchOnly"
+        case draftPreviewRequired = "draftPreviewRequired"
+        case confirmedImport = "confirmedImport"
+    }
+
+    public struct EvidenceAlignment: Equatable, Sendable {
+        public var suggestionID: UUID?
+        public var frameID: UUID?
+        public var eventIDs: [UUID]
+        public var observationIDs: [UUID]
+        public var sourcePreviewRefID: UUID?
+        public var artifactPath: String?
+        public var bounds: RecordingBounds?
+        public var summary: String?
+
+        public init(
+            suggestionID: UUID? = nil,
+            frameID: UUID? = nil,
+            eventIDs: [UUID] = [],
+            observationIDs: [UUID] = [],
+            sourcePreviewRefID: UUID? = nil,
+            artifactPath: String? = nil,
+            bounds: RecordingBounds? = nil,
+            summary: String? = nil
+        ) {
+            self.suggestionID = suggestionID
+            self.frameID = frameID
+            self.eventIDs = eventIDs
+            self.observationIDs = observationIDs
+            self.sourcePreviewRefID = sourcePreviewRefID
+            self.artifactPath = artifactPath
+            self.bounds = bounds
+            self.summary = summary
+        }
+    }
+
+    public var actionName: ActionName
+    public var title: String
+    public var mutationBoundary: MutationBoundary
+    public var createsDraftPatch: Bool
+    public var mutatesWorkflow: Bool
+    public var evidence: EvidenceAlignment
+
+    public init(
+        actionName: ActionName,
+        title: String,
+        mutationBoundary: MutationBoundary,
+        createsDraftPatch: Bool,
+        mutatesWorkflow: Bool,
+        evidence: EvidenceAlignment
+    ) {
+        self.actionName = actionName
+        self.title = title
+        self.mutationBoundary = mutationBoundary
+        self.createsDraftPatch = createsDraftPatch
+        self.mutatesWorkflow = mutatesWorkflow
+        self.evidence = evidence
+    }
+
+    public static func acceptSuggestion(
+        _ suggestion: SemanticRecordingReviewProjection.SuggestionRow
+    ) -> SemanticRecordingReviewActionSemantics {
+        SemanticRecordingReviewActionSemantics(
+            actionName: .acceptSuggestion,
+            title: "Accept suggestion",
+            mutationBoundary: .draftPreviewRequired,
+            createsDraftPatch: true,
+            mutatesWorkflow: false,
+            evidence: evidenceAlignment(suggestion)
+        )
+    }
+
+    public static func rejectSuggestion(
+        _ suggestion: SemanticRecordingReviewProjection.SuggestionRow
+    ) -> SemanticRecordingReviewActionSemantics {
+        SemanticRecordingReviewActionSemantics(
+            actionName: .rejectSuggestion,
+            title: "Reject suggestion",
+            mutationBoundary: .reviewLocal,
+            createsDraftPatch: false,
+            mutatesWorkflow: false,
+            evidence: evidenceAlignment(suggestion)
+        )
+    }
+
+    public static func clearDecision(
+        _ suggestion: SemanticRecordingReviewProjection.SuggestionRow
+    ) -> SemanticRecordingReviewActionSemantics {
+        SemanticRecordingReviewActionSemantics(
+            actionName: .clearDecision,
+            title: "Clear review decision",
+            mutationBoundary: .reviewLocal,
+            createsDraftPatch: false,
+            mutatesWorkflow: false,
+            evidence: evidenceAlignment(suggestion)
+        )
+    }
+
+    public static func draftCandidate(
+        _ candidate: SemanticRecordingReviewProjection.ConditionCandidateRow,
+        regionSelection: SemanticRecordingFrameRegionSelection? = nil
+    ) -> SemanticRecordingReviewActionSemantics {
+        let selectedRegion = regionSelection?.frameID == candidate.sourceFrameID ? regionSelection : nil
+        return SemanticRecordingReviewActionSemantics(
+            actionName: selectedRegion == nil ? .draftCandidate : .draftSelection,
+            title: selectedRegion == nil ? "Draft candidate" : "Draft selected region",
+            mutationBoundary: .draftPreviewRequired,
+            createsDraftPatch: true,
+            mutatesWorkflow: false,
+            evidence: EvidenceAlignment(
+                frameID: candidate.sourceFrameID,
+                observationIDs: candidate.observationID.map { [$0] } ?? [],
+                sourcePreviewRefID: candidate.sourcePreviewRefID,
+                artifactPath: selectedRegion?.artifactPath ?? candidate.artifactPath,
+                bounds: selectedRegion?.bounds ?? candidate.bounds,
+                summary: selectedRegion?.label ?? candidate.summary
+            )
+        )
+    }
+
+    public static func previewDraft() -> SemanticRecordingReviewActionSemantics {
+        SemanticRecordingReviewActionSemantics(
+            actionName: .previewDraft,
+            title: "Preview draft",
+            mutationBoundary: .draftPreviewRequired,
+            createsDraftPatch: false,
+            mutatesWorkflow: false,
+            evidence: EvidenceAlignment()
+        )
+    }
+
+    public static func importDraft() -> SemanticRecordingReviewActionSemantics {
+        SemanticRecordingReviewActionSemantics(
+            actionName: .importDraft,
+            title: "Import reviewed draft",
+            mutationBoundary: .confirmedImport,
+            createsDraftPatch: false,
+            mutatesWorkflow: true,
+            evidence: EvidenceAlignment()
+        )
+    }
+
+    private static func evidenceAlignment(
+        _ suggestion: SemanticRecordingReviewProjection.SuggestionRow
+    ) -> EvidenceAlignment {
+        let primaryEvidence = suggestion.evidence.first
+        return EvidenceAlignment(
+            suggestionID: suggestion.id,
+            frameID: primaryEvidence?.frameID,
+            eventIDs: primaryEvidence?.eventIDs ?? [],
+            observationIDs: primaryEvidence?.observationIDs ?? [],
+            artifactPath: primaryEvidence?.artifactPath,
+            bounds: primaryEvidence?.bounds,
+            summary: primaryEvidence?.summary ?? suggestion.summary
+        )
+    }
+}
+
 public enum SemanticRecordingReviewDraftPatchError: Error, Equatable, Sendable {
     case missingSourceFrame(UUID)
     case missingRegionBounds(String)

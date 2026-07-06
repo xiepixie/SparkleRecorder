@@ -6,7 +6,7 @@
 - Source fixture: `AutomationRunState.ownerCFixture` with `Upload report` macro carrying `SavedMacro.semanticRecording`
 - UI surface: `AutomationMainContentView` -> `AutomationTaskRunDetailView`
 - Screenshot file: `semantic-review-run-detail.png`
-- Checklist item: S3 linked Run Detail -> Macro Review opener metadata and bundle reveal affordance
+- Checklist item: S3 linked Run Detail -> Macro Review opener metadata, evidence-scope readiness, and bundle reveal affordance
 - Worktree note: generated from the fixture snapshot command in the current dirty multi-owner worktree; the linked semantic recording metadata is deterministic fixture data.
 - Known gaps: this screenshot is fixture product evidence, not a live installed-app clip. Real Open/Reveal interaction recording, live bundle existence, suggestion accept/reject recording, and per-run/session semantic recording metadata remain open.
 
@@ -14,6 +14,7 @@
 
 - The selected run resolves the `Upload report` saved macro and its `SavedMacro.semanticRecording` reference.
 - Run Detail shows the Macro Review entry before opening the sheet, including Open, Reveal and manual bundle controls.
+- The Macro Review section now exposes readiness chips for `Source`, `Run` and `Fallback`, making the current scope explicit: the fixture resolves saved-macro linked evidence, while per-run semantic bundle binding is still not available.
 - The linked Macro Review details show recording id, event count, captured date and manifest ref.
 - Reveal is routed through `SemanticRecordingReviewPresenter.revealBundle(from:)`, so SwiftUI does not construct App Support paths directly.
 - This artifact proves the fixture Run Detail linked metadata state; it does not claim live semantic recording capture or installed-app product completion.

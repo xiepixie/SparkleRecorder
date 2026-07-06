@@ -676,6 +676,10 @@ struct SemanticRecordingReviewFixtureView: View {
                             accent: Color(red: 0.34, green: 0.72, blue: 0.95)
                         )
 
+                        if let decision = suggestionReviewDecisions[suggestion.id] {
+                            suggestionActionSemanticsSummary(suggestion, decision: decision)
+                        }
+
                         suggestionEvidenceSummary(suggestion)
 
                         HStack(spacing: 8) {
@@ -723,6 +727,34 @@ struct SemanticRecordingReviewFixtureView: View {
                 emptyInspectorText("No suggestions for this fixture.")
             }
         }
+    }
+
+    private func suggestionActionSemanticsSummary(
+        _ suggestion: SemanticRecordingReviewProjection.SuggestionRow,
+        decision: SuggestionReviewDecision
+    ) -> some View {
+        let semantics = decision.actionSemantics(for: suggestion)
+        return HStack(alignment: .firstTextBaseline, spacing: 6) {
+            Image(systemName: semantics.mutatesWorkflow ? "square.and.arrow.down" : decision.systemImage)
+                .font(.system(size: 10, weight: .semibold))
+                .foregroundStyle(decision.tint)
+            Text(semantics.actionName.rawValue)
+                .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                .foregroundStyle(Color.white.opacity(0.60))
+                .lineLimit(1)
+            Text(mutationBoundaryLabel(semantics.mutationBoundary))
+                .font(.system(size: 10, weight: .semibold))
+                .foregroundStyle(Color.white.opacity(0.46))
+                .lineLimit(1)
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 7)
+        .background(decision.tint.opacity(0.08), in: RoundedRectangle(cornerRadius: 7))
+        .overlay(
+            RoundedRectangle(cornerRadius: 7)
+                .stroke(decision.tint.opacity(0.20), lineWidth: 1)
+        )
     }
 
     private func suggestionEvidenceSummary(
@@ -787,6 +819,7 @@ struct SemanticRecordingReviewFixtureView: View {
         _ suggestion: SemanticRecordingReviewProjection.SuggestionRow,
         decision: SuggestionReviewDecision
     ) -> [(title: String, value: String, systemImage: String, tint: Color)] {
+        let semantics = decision.actionSemantics(for: suggestion)
         let evidenceValue = suggestion.evidence.first
             .map(suggestionDecisionEvidenceLabel)
             ?? NSLocalizedString("No evidence ref recorded.", comment: "")
@@ -794,6 +827,12 @@ struct SemanticRecordingReviewFixtureView: View {
         switch decision {
         case .accepted:
             return [
+                (
+                    NSLocalizedString("Action", comment: ""),
+                    "\(semantics.actionName.rawValue) · \(mutationBoundaryLabel(semantics.mutationBoundary))",
+                    "checkmark.circle",
+                    Color(red: 0.48, green: 0.76, blue: 0.52)
+                ),
                 (
                     NSLocalizedString("Evidence", comment: ""),
                     evidenceValue,
@@ -809,6 +848,12 @@ struct SemanticRecordingReviewFixtureView: View {
             ]
         case .rejected:
             return [
+                (
+                    NSLocalizedString("Action", comment: ""),
+                    "\(semantics.actionName.rawValue) · \(mutationBoundaryLabel(semantics.mutationBoundary))",
+                    "xmark.circle",
+                    Color(red: 1.00, green: 0.50, blue: 0.58)
+                ),
                 (
                     NSLocalizedString("Decision", comment: ""),
                     NSLocalizedString("No workflow change recorded for this suggestion.", comment: ""),
@@ -1554,6 +1599,21 @@ struct SemanticRecordingReviewFixtureView: View {
         return parts.isEmpty ? NSLocalizedString("Evidence refs kept with this review decision.", comment: "") : parts.joined(separator: " · ")
     }
 
+    private func mutationBoundaryLabel(
+        _ boundary: SemanticRecordingReviewActionSemantics.MutationBoundary
+    ) -> String {
+        switch boundary {
+        case .reviewLocal:
+            return NSLocalizedString("Review local", comment: "")
+        case .draftPatchOnly:
+            return NSLocalizedString("Draft patch only", comment: "")
+        case .draftPreviewRequired:
+            return NSLocalizedString("Draft Preview required", comment: "")
+        case .confirmedImport:
+            return NSLocalizedString("Confirmed import", comment: "")
+        }
+    }
+
     private func acceptedSuggestionPatchExplanation(
         _ suggestion: SemanticRecordingReviewProjection.SuggestionRow
     ) -> String {
@@ -1570,6 +1630,17 @@ struct SemanticRecordingReviewFixtureView: View {
 private enum SuggestionReviewDecision {
     case accepted
     case rejected
+
+    func actionSemantics(
+        for suggestion: SemanticRecordingReviewProjection.SuggestionRow
+    ) -> SemanticRecordingReviewActionSemantics {
+        switch self {
+        case .accepted:
+            return .acceptSuggestion(suggestion)
+        case .rejected:
+            return .rejectSuggestion(suggestion)
+        }
+    }
 
     var title: String {
         switch self {

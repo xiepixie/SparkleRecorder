@@ -1,7 +1,7 @@
 # S3 Review UX And Evidence Editing
 
 更新时间：2026-07-06
-状态：Macro Review integration + linked Run Detail opener + Draft Preview handoff + selected-region draft selection + manual crop materialization/provenance first pass; live product evidence open
+状态：Macro Review integration + linked Run Detail opener + Draft Preview handoff + selected-region draft selection + Review action semantics / S4 evidence alignment first pass; live product evidence open
 Owner：S3, Review UX / Evidence Editing
 并行对象：S0 Workflow Evidence Closure, S1 Contract/Core, S2 App Capture/Visual Index, S4 CLI/AI
 
@@ -40,6 +40,7 @@ S3 does not own:
 - Review visual asset materialization: `SemanticRecordingReviewAssetMaterializer`
 - Review manual frame-crop extraction for image/template and baseline candidates
 - Reviewed selected-region inspector and `Draft Selection` action
+- Review action semantics vocabulary for S3/S4 evidence alignment
 - Draft Preview visual asset provenance badges for Review-generated crops
 - Review source/runtime/diff evidence drill-in tiles
 - Run Detail Macro Review entry: `AutomationTaskRunDetailView`
@@ -66,6 +67,7 @@ S3 does not own:
 - Review UI 的候选 patch 现在可以打开 `AutomationWorkflowDraftPreviewSheet`。用户确认前不会修改原 workflow；确认时复用既有 Draft Preview import path，并在已有 workflow 上覆盖 compiled id/createdAt，避免生成重复 workflow。
 - Pixel candidates now expose `AutomationVisualColorPickerView` inside Review, and the selected hex is passed into `SemanticRecordingReviewDraftPatchRequest.pixelColorHex` so `pixelMatched` patches no longer require metadata-provided `colorHex` when the user supplies a reviewed target color.
 - Suggestion rows now show evidence refs and explicit `Accept` / `Reject` actions. `Accept` jumps to the cited frame/event, resolves the matching condition candidate, and generates the same review-only draft patch path; `Reject` records local review state only and does not mutate the workflow. Review decisions now show accepted/rejected status, cited evidence, staged patch operation, Draft Preview import boundary and an Undo control; rejecting or undoing the accepted suggestion clears the staged draft patch if that patch came from the same suggestion.
+- Review actions now have explicit semantics through `SemanticRecordingReviewActionSemantics`. `review.acceptSuggestion`, `review.rejectSuggestion`, `review.draftCandidate`, `review.draftSelection`, `review.previewDraft` and `review.importDraft` carry a mutation boundary and evidence alignment. The first S3/S4 alignment test compares the shared `RecordingSuggestion` fixture evidence consumed by S4 with S3 Review action evidence refs, proving the same suggestion id, frame id, event ids, observation ids and artifact ref survive into Review actions.
 - Run Detail 已提供 Macro Review 入口；如果当前 run 或 task 能解析到带 `SavedMacro.semanticRecording` 的 macro，`AutomationTaskRunDetailView` 会直接通过 `SemanticRecordingReviewPresenter.reviewState(from:)` 打开 linked bundle。缺少该 metadata 或打开失败时，用户仍可以手动选择真实 bundle directory / `manifest.json`。
 - Run Detail 的 linked Macro Review 区现在会在打开前显示 recording id、event count、captured date 和 manifest ref，并通过 `SemanticRecordingReviewPresenter.revealBundle(from:)` 提供 Reveal Linked Bundle 操作。SwiftUI 仍不直接拼 App Support 路径；路径解析留在 presenter。
 - `semantic-review-run-detail` fixture snapshot 现在会把带 `SavedMacro.semanticRecording` 的 `Upload report` macro 注入 Run Detail，证明 linked Macro Review metadata、Open/Reveal/manual bundle controls 在真实 Workflow inspector surface 中可见。
@@ -123,12 +125,22 @@ SwiftUI should not receive raw bundle directory paths and construct file URLs it
 
 Suggestion review and CLI suggestions must cite the same frame/event/observation/source refs. S4 should not create separate evidence identifiers.
 
+Current accepted vocabulary:
+
+| S3 action | Mutation boundary | S4 requirement |
+| --- | --- | --- |
+| `review.acceptSuggestion` | `draftPreviewRequired` | cite the suggestion id plus frame/event/observation/artifact refs needed to resolve a patchable Review candidate |
+| `review.rejectSuggestion` | `reviewLocal` | keep the same evidence refs but record no workflow mutation |
+| `review.draftCandidate` | `draftPreviewRequired` | preserve source preview / observation / artifact refs for a candidate generated from a frame |
+| `review.draftSelection` | `draftPreviewRequired` | preserve selected bounds plus frame/surface/source preview refs when a user-reviewed region overrides candidate bounds |
+| `review.importDraft` | `confirmedImport` | only after Draft Preview confirmation; S4 must not model suggestions as direct workflow writes |
+
 ## Verification
 
 Current targeted verification:
 
 ```bash
-swift test --scratch-path .build-test --enable-swift-testing --disable-xctest --filter 'SemanticRecordingReviewProjectionTests'
+swift test --scratch-path .build-test --enable-swift-testing --disable-xctest --filter 'SemanticRecordingReviewActionSemanticsTests|SemanticRecordingReviewProjectionTests'
 swift build -Xswiftc -swift-version -Xswiftc 6
 swift run SparkleRecorder workflow product-evidence snapshot semantic-review-timeline --output docs/workflow-page-productization/product-evidence/semantic-review-timeline.png
 swift run SparkleRecorder workflow product-evidence snapshot semantic-review-run-detail --output docs/workflow-page-productization/product-evidence/semantic-review-run-detail.png
@@ -137,7 +149,7 @@ swift run SparkleRecorder workflow product-evidence snapshot semantic-review-dra
 
 Observed status on 2026-07-06:
 
-- `SemanticRecordingReviewProjectionTests`: 9 tests passed; coverage includes OCR wait patch, image appeared patch, visual asset upsert operations, package-local materialization path rewriting, manual frame region override, manual frame crop extraction data flow and user-picked pixel color -> `pixelMatched` patch.
+- S3 targeted tests: `SemanticRecordingReviewActionSemanticsTests` and `SemanticRecordingReviewProjectionTests` passed; coverage includes OCR wait patch, image appeared patch, visual asset upsert operations, package-local materialization path rewriting, manual frame region override, manual frame crop extraction data flow, user-picked pixel color -> `pixelMatched` patch, shared suggestion evidence refs and S4-aligned Review action semantics.
 - Swift 6 build: passed.
 - Product evidence snapshot: generated `docs/workflow-page-productization/product-evidence/semantic-review-timeline.png` with sidecar `semantic-review-timeline.md`; current artifact includes the selected-region inspector, `Draft Selection`, source/runtime/diff evidence tiles, suggestion evidence refs, `Accept` / `Reject` controls, accepted status, evidence-backed staged patch explanation and an Undo review-decision control.
 - Run Detail product evidence snapshot: generated `docs/workflow-page-productization/product-evidence/semantic-review-run-detail.png` with sidecar `semantic-review-run-detail.md`; current artifact shows linked Macro Review metadata and Open/Reveal/manual bundle controls from the Workflow inspector.
@@ -169,3 +181,4 @@ Observed status on 2026-07-06:
 - 2026-07-06: Added Review source/runtime evidence drill-in tiles. The Macro Review inspector now renders Source, Runtime and Diff artifact slots with safe refs in fixture mode and available/missing/thumbnail states for real bundles loaded through `SemanticRecordingReviewPresenter`; `semantic-review-timeline.png` was regenerated to show the drill-in slots in the S3 fixture surface.
 - 2026-07-06: Added evidence-backed suggestion decision explanations. Accepted suggestions now show the cited frame/artifact, staged patch operation and Draft Preview import boundary inline; rejected suggestions keep their evidence refs while making the no-mutation decision explicit.
 - 2026-07-06: Added selected-region draft selection polish. A reviewed frame region now appears as a first-class inspector block with bounds/frame/surface metadata, `Draft Selection` routes that region into frame-to-condition patch generation, and the timeline product evidence snapshot shows the selected overlay plus review-only mutation boundary.
+- 2026-07-06: Added Review action semantics for S4 alignment. `SemanticRecordingReviewActionSemantics` defines stable Review action names, mutation boundaries and evidence alignment for accept/reject/draft-selection/import; the action semantics test now compares the shared suggestion fixture refs consumed by S4 with the S3 Review action refs.

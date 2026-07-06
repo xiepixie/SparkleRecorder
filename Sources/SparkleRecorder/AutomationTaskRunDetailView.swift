@@ -213,6 +213,8 @@ struct AutomationTaskRunDetailView: View {
                 .foregroundStyle(.tertiary)
                 .fixedSize(horizontal: false, vertical: true)
 
+            macroReviewReadiness
+
             if let linkedSemanticRecording {
                 linkedSemanticRecordingDetails(linkedSemanticRecording.reference)
             }
@@ -245,6 +247,43 @@ struct AutomationTaskRunDetailView: View {
                         .strokeBorder(Color.primary.opacity(0.075), lineWidth: 0.6)
                 )
         )
+    }
+
+    private var macroReviewReadiness: some View {
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: 5) {
+                macroReviewBadge(
+                    title: NSLocalizedString("Source", comment: ""),
+                    value: linkedSemanticRecording == nil
+                        ? NSLocalizedString("Manual", comment: "")
+                        : NSLocalizedString("Saved Macro", comment: "")
+                )
+                macroReviewBadge(
+                    title: NSLocalizedString("Run", comment: ""),
+                    value: NSLocalizedString("Not bound", comment: "")
+                )
+                macroReviewBadge(
+                    title: NSLocalizedString("Fallback", comment: ""),
+                    value: NSLocalizedString("Bundle Picker", comment: "")
+                )
+            }
+            VStack(alignment: .leading, spacing: 5) {
+                macroReviewBadge(
+                    title: NSLocalizedString("Source", comment: ""),
+                    value: linkedSemanticRecording == nil
+                        ? NSLocalizedString("Manual", comment: "")
+                        : NSLocalizedString("Saved Macro", comment: "")
+                )
+                macroReviewBadge(
+                    title: NSLocalizedString("Run", comment: ""),
+                    value: NSLocalizedString("Not bound", comment: "")
+                )
+                macroReviewBadge(
+                    title: NSLocalizedString("Fallback", comment: ""),
+                    value: NSLocalizedString("Bundle Picker", comment: "")
+                )
+            }
+        }
     }
 
     private func linkedSemanticRecordingDetails(
@@ -333,7 +372,7 @@ struct AutomationTaskRunDetailView: View {
     private var macroReviewSummary: String {
         if let linkedSemanticRecording {
             return String(
-                format: NSLocalizedString("Open the semantic recording captured with %@. It includes %d timeline events and can still be replaced with a manual bundle.", comment: ""),
+                format: NSLocalizedString("Open the semantic recording captured with %@. It includes %d timeline events; this run does not carry a separate semantic bundle yet.", comment: ""),
                 linkedSemanticRecording.macro.name,
                 linkedSemanticRecording.reference.eventCount
             )
