@@ -1,4 +1,5 @@
 import CoreGraphics
+import CryptoKit
 import Foundation
 
 public enum SemanticRecordingReviewDraftPatchError: Error, Equatable, Sendable {
@@ -8,6 +9,182 @@ public enum SemanticRecordingReviewDraftPatchError: Error, Equatable, Sendable {
     case missingConditionText(String)
     case missingArtifact(String)
     case missingPixelColor(String)
+}
+
+public enum SemanticRecordingReviewAssetMaterializationError: Error, Equatable, Sendable {
+    case missingSourceArtifact(String)
+    case unsafeDestinationPath(String)
+}
+
+public enum SemanticRecordingReviewMaterializedAssetKind: String, Codable, Equatable, Sendable {
+    case image
+    case baseline
+
+    public var directoryName: String {
+        switch self {
+        case .image:
+            return "images"
+        case .baseline:
+            return "baselines"
+        }
+    }
+}
+
+public struct SemanticRecordingReviewMaterializedAsset: Codable, Equatable, Sendable {
+    public var kind: SemanticRecordingReviewMaterializedAssetKind
+    public var key: String
+    public var sourcePath: String
+    public var destinationPath: String
+    public var sha256: String
+
+    public init(
+        kind: SemanticRecordingReviewMaterializedAssetKind,
+        key: String,
+        sourcePath: String,
+        destinationPath: String,
+        sha256: String
+    ) {
+        self.kind = kind
+        self.key = key
+        self.sourcePath = sourcePath
+        self.destinationPath = destinationPath
+        self.sha256 = sha256
+    }
+}
+
+public struct SemanticRecordingReviewAssetMaterializationResult: Equatable, Sendable {
+    public var patch: AutomationWorkflowDraftPatchDocument
+    public var copiedAssets: [SemanticRecordingReviewMaterializedAsset]
+
+    public init(
+        patch: AutomationWorkflowDraftPatchDocument,
+        copiedAssets: [SemanticRecordingReviewMaterializedAsset]
+    ) {
+        self.patch = patch
+        self.copiedAssets = copiedAssets
+    }
+}
+
+public enum SemanticRecordingReviewAssetMaterializer {
+    public static func materialize(
+        patch: AutomationWorkflowDraftPatchDocument,
+        readArtifact: (_ sourcePath: String) throws -> Data,
+        writeAsset: (_ data: Data, _ destinationPath: String) throws -> Void
+    ) throws -> SemanticRecordingReviewAssetMaterializationResult {
+        var patch = patch
+        var copiedAssets: [SemanticRecordingReviewMaterializedAsset] = []
+
+        for index in patch.ops.indices {
+            switch patch.ops[index].op {
+            case "upsertVisualImage":
+                guard let asset = patch.ops[index].visualImage else {
+                    continue
+                }
+                let materialized = try materialize(
+                    asset: asset,
+                    kind: .image,
+                    readArtifact: readArtifact,
+                    writeAsset: writeAsset
+                )
+                patch.ops[index].visualImage?.path = materialized.destinationPath
+                patch.ops[index].visualImage?.sha256 = materialized.sha256
+                copiedAssets.append(materialized)
+
+            case "upsertVisualBaseline":
+                guard let asset = patch.ops[index].visualBaseline else {
+                    continue
+                }
+                let materialized = try materialize(
+                    asset: asset,
+                    kind: .baseline,
+                    readArtifact: readArtifact,
+                    writeAsset: writeAsset
+                )
+                patch.ops[index].visualBaseline?.path = materialized.destinationPath
+                patch.ops[index].visualBaseline?.sha256 = materialized.sha256
+                copiedAssets.append(materialized)
+
+            default:
+                continue
+            }
+        }
+
+        return SemanticRecordingReviewAssetMaterializationResult(
+            patch: patch,
+            copiedAssets: copiedAssets
+        )
+    }
+
+    private static func materialize(
+        asset: AutomationWorkflowDraftVisualImageAsset,
+        kind: SemanticRecordingReviewMaterializedAssetKind,
+        readArtifact: (_ sourcePath: String) throws -> Data,
+        writeAsset: (_ data: Data, _ destinationPath: String) throws -> Void
+    ) throws -> SemanticRecordingReviewMaterializedAsset {
+        guard let rawSourcePath = asset.path?.trimmedForSemanticReviewPatch.nilIfEmptyForSemanticReviewPatch,
+              let sourcePath = try? RecordingArtifactRef.normalized(rawSourcePath) else {
+            throw SemanticRecordingReviewAssetMaterializationError.missingSourceArtifact(asset.key)
+        }
+
+        let destinationPath = destinationPath(
+            for: asset,
+            sourcePath: sourcePath,
+            kind: kind
+        )
+        guard AutomationWorkflowDraftVisualAssets.normalizedRelativeAssetPath(destinationPath) == destinationPath else {
+            throw SemanticRecordingReviewAssetMaterializationError.unsafeDestinationPath(destinationPath)
+        }
+
+        let data = try readArtifact(sourcePath)
+        let digest = SHA256.hash(data: data)
+            .map { String(format: "%02x", $0) }
+            .joined()
+        try writeAsset(data, destinationPath)
+
+        return SemanticRecordingReviewMaterializedAsset(
+            kind: kind,
+            key: asset.key,
+            sourcePath: sourcePath,
+            destinationPath: destinationPath,
+            sha256: digest
+        )
+    }
+
+    private static func destinationPath(
+        for asset: AutomationWorkflowDraftVisualImageAsset,
+        sourcePath: String,
+        kind: SemanticRecordingReviewMaterializedAssetKind
+    ) -> String {
+        let fileExtension = safeFileExtension(from: sourcePath)
+        return "assets/\(kind.directoryName)/\(safeFileStem(for: asset.key)).\(fileExtension)"
+    }
+
+    private static func safeFileExtension(from path: String) -> String {
+        let rawExtension = URL(fileURLWithPath: path).pathExtension.lowercased()
+        let cleaned = rawExtension.filter { character in
+            character.isLetter || character.isNumber
+        }
+        guard !cleaned.isEmpty, cleaned.count <= 8 else {
+            return "png"
+        }
+        return cleaned
+    }
+
+    private static func safeFileStem(for value: String) -> String {
+        let stem = value
+            .lowercased()
+            .map { character in
+                character.isLetter || character.isNumber ? character : "_"
+            }
+            .reduce(into: "") { partial, character in
+                if partial.last == "_" && character == "_" {
+                    return
+                }
+                partial.append(character)
+            }
+            .trimmingCharacters(in: CharacterSet(charactersIn: "_"))
+        return stem.isEmpty ? "semantic_review_asset" : stem
+    }
 }
 
 public struct SemanticRecordingFrameRegionSelection: Equatable, Sendable {

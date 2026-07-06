@@ -186,6 +186,52 @@ struct SemanticRecordingReviewProjectionTests {
         #expect(patched.document.visualAssets?.images == [imageAsset])
     }
 
+    @Test("Review visual assets materialize into package local patch paths")
+    func reviewVisualAssetsMaterializeIntoPackageLocalPatchPaths() throws {
+        let bundle = SemanticRecordingFixture.checkoutBundle()
+        let projection = SemanticRecordingReviewProjection(
+            bundle: bundle,
+            selectedEventID: SemanticRecordingFixture.clickEventID
+        )
+        let candidate = try #require(
+            projection.selectedFrame?.conditionCandidates.first { $0.kind == .imageAppeared }
+        )
+        let result = try SemanticRecordingReviewDraftPatchBuilder.makePatch(
+            bundle: bundle,
+            request: SemanticRecordingReviewDraftPatchRequest(candidate: candidate)
+        )
+        let templateData = Data("template-data".utf8)
+        var writtenAssets: [String: Data] = [:]
+
+        let materialized = try SemanticRecordingReviewAssetMaterializer.materialize(
+            patch: result.patch,
+            readArtifact: { sourcePath in
+                #expect(sourcePath == "visual-index/templates/checkout-button.png")
+                return templateData
+            },
+            writeAsset: { data, destinationPath in
+                writtenAssets[destinationPath] = data
+            }
+        )
+
+        let imageOperation = try #require(
+            materialized.patch.ops.first { $0.op == "upsertVisualImage" }
+        )
+        let imageAsset = try #require(imageOperation.visualImage)
+        let copiedAsset = try #require(materialized.copiedAssets.first)
+        let expectedPath = "assets/images/sr_00000001_checkout_button_0000000f_template.png"
+        let expectedDigest = "20dc26ad587152ac3f284bd839b19944cb945d680f3220334697b5aa0f455f13"
+
+        #expect(materialized.copiedAssets.count == 1)
+        #expect(copiedAsset.kind == .image)
+        #expect(copiedAsset.sourcePath == "visual-index/templates/checkout-button.png")
+        #expect(copiedAsset.destinationPath == expectedPath)
+        #expect(copiedAsset.sha256 == expectedDigest)
+        #expect(imageAsset.path == expectedPath)
+        #expect(imageAsset.sha256 == expectedDigest)
+        #expect(writtenAssets[expectedPath] == templateData)
+    }
+
     @Test("Manual frame region selection can override candidate bounds")
     func manualFrameRegionSelectionCanOverrideCandidateBounds() throws {
         let bundle = SemanticRecordingFixture.checkoutBundle()

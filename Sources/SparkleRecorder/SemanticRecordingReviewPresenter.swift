@@ -1,4 +1,5 @@
 import AppKit
+import CryptoKit
 import Foundation
 import SparkleRecorderCore
 import UniformTypeIdentifiers
@@ -53,6 +54,11 @@ enum SemanticRecordingReviewPresenterError: LocalizedError {
             return NSLocalizedString("Application Support directory is unavailable.", comment: "")
         }
     }
+}
+
+private struct SemanticRecordingReviewMaterializedPatch {
+    var patch: AutomationWorkflowDraftPatchDocument
+    var packageDirectory: URL?
 }
 
 @MainActor
@@ -172,6 +178,10 @@ enum SemanticRecordingReviewPresenter {
         sourceName: String,
         sourceDirectory: URL?
     ) throws -> AutomationWorkflowDraftPreviewState {
+        let materializedPatch = try materializePatchAssetsIfNeeded(
+            patch,
+            sourceDirectory: sourceDirectory
+        )
         let baseDocument: AutomationWorkflowDraftDocument
         if let workflow {
             baseDocument = AutomationWorkflowDraftExporter.export(workflow).document
@@ -183,14 +193,14 @@ enum SemanticRecordingReviewPresenter {
 
         let macroCatalog = macros.map(AutomationWorkflowDraftMacroCatalogEntry.init(macro:))
         let patched = try AutomationWorkflowDraftPatchApplier.apply(
-            patch,
+            materializedPatch.patch,
             to: baseDocument,
             context: AutomationWorkflowDraftValidationContext(macroCatalog: macroCatalog)
         )
         let preview = AutomationWorkflowDraftPreviewPresenter.previewState(
             document: patched.document,
             sourceName: sourceName,
-            sourceDirectory: sourceDirectory,
+            sourceDirectory: materializedPatch.packageDirectory ?? sourceDirectory,
             macroCatalog: macroCatalog
         )
         guard let workflow,
@@ -209,6 +219,68 @@ enum SemanticRecordingReviewPresenter {
             projection: preview.projection,
             compiledWorkflow: compiledWorkflow
         )
+    }
+
+    private static func materializePatchAssetsIfNeeded(
+        _ patch: AutomationWorkflowDraftPatchDocument,
+        sourceDirectory: URL?
+    ) throws -> SemanticRecordingReviewMaterializedPatch {
+        guard let sourceDirectory else {
+            return SemanticRecordingReviewMaterializedPatch(
+                patch: patch,
+                packageDirectory: nil
+            )
+        }
+
+        let packageDirectory = try reviewAssetPackageDirectory(
+            for: patch,
+            sourceDirectory: sourceDirectory
+        )
+        let materialized = try SemanticRecordingReviewAssetMaterializer.materialize(
+            patch: patch,
+            readArtifact: { path in
+                let ref = try RecordingArtifactRef(path)
+                let url = sourceDirectory.appendingRecordingArtifactRef(ref)
+                return try Data(contentsOf: url)
+            },
+            writeAsset: { data, path in
+                let ref = try RecordingArtifactRef(path)
+                let url = packageDirectory.appendingRecordingArtifactRef(ref)
+                try FileManager.default.createDirectory(
+                    at: url.deletingLastPathComponent(),
+                    withIntermediateDirectories: true
+                )
+                try data.write(to: url, options: .atomic)
+            }
+        )
+
+        return SemanticRecordingReviewMaterializedPatch(
+            patch: materialized.patch,
+            packageDirectory: materialized.copiedAssets.isEmpty ? nil : packageDirectory
+        )
+    }
+
+    private static func reviewAssetPackageDirectory(
+        for patch: AutomationWorkflowDraftPatchDocument,
+        sourceDirectory: URL
+    ) throws -> URL {
+        let supportDirectory = AutomationPersistence.defaultFileURL
+            .deletingLastPathComponent()
+            .standardizedFileURL
+
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.sortedKeys]
+        let patchData = try encoder.encode(patch)
+        var digestInput = Data(sourceDirectory.standardizedFileURL.path.utf8)
+        digestInput.append(patchData)
+        let digest = SHA256.hash(data: digestInput)
+            .prefix(12)
+            .map { String(format: "%02x", $0) }
+            .joined()
+
+        return supportDirectory
+            .appendingPathComponent("ReviewVisualAssets", isDirectory: true)
+            .appendingPathComponent(digest, isDirectory: true)
     }
 
     static func savePatch(

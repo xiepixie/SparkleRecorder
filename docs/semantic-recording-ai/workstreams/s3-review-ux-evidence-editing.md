@@ -1,7 +1,7 @@
 # S3 Review UX And Evidence Editing
 
 更新时间：2026-07-06
-状态：Macro Review integration + linked Run Detail opener + Draft Preview handoff + pixel color picking + suggestion review first pass; live product evidence open
+状态：Macro Review integration + linked Run Detail opener + Draft Preview handoff + package-local visual asset materialization first pass; live product evidence open
 Owner：S3, Review UX / Evidence Editing
 并行对象：S0 Workflow Evidence Closure, S1 Contract/Core, S2 App Capture/Visual Index, S4 CLI/AI
 
@@ -37,6 +37,7 @@ S3 does not own:
 - Live bundle presenter: `SemanticRecordingReviewPresenter`
 - Frame-region to draft patch builder: `SemanticRecordingReviewDraftPatchBuilder`
 - Workflow draft patch visual asset upserts: `upsertVisualRegion`, `upsertVisualImage`, `upsertVisualBaseline`
+- Review visual asset materialization: `SemanticRecordingReviewAssetMaterializer`
 - Run Detail Macro Review entry: `AutomationTaskRunDetailView`
 - Review patch -> Draft Preview -> confirm import handoff through the existing draft import path
 - Pixel sample color picking UI for `pixelMatched` candidates
@@ -57,14 +58,14 @@ S3 does not own:
 - Pixel candidates now expose `AutomationVisualColorPickerView` inside Review, and the selected hex is passed into `SemanticRecordingReviewDraftPatchRequest.pixelColorHex` so `pixelMatched` patches no longer require metadata-provided `colorHex` when the user supplies a reviewed target color.
 - Suggestion rows now show evidence refs and explicit `Accept Patch` / `Reject` actions. `Accept Patch` jumps to the cited frame/event, resolves the matching condition candidate, and generates the same review-only draft patch path; `Reject` records local review state only and does not mutate the workflow.
 - Run Detail 已提供 Macro Review 入口；如果当前 run 或 task 能解析到带 `SavedMacro.semanticRecording` 的 macro，`AutomationTaskRunDetailView` 会直接通过 `SemanticRecordingReviewPresenter.reviewState(from:)` 打开 linked bundle。缺少该 metadata 或打开失败时，用户仍可以手动选择真实 bundle directory / `manifest.json`。
+- Review -> Draft Preview 现在会把 image/template 和 baseline 候选引用的 semantic bundle artifact 复制到 app-managed `ReviewVisualAssets/<digest>/assets/images|baselines`，并把 patch 中的 `visualAssets.images/baselines.path` 重写成 package-local safe refs。确认导入后，既有 `AutomationMainContentView.importWorkflowFromDraftPreview` 会把该 package directory 写入 visual asset package-root manifest，而不是把 workflow 绑定到可能被 retention 清理的 semantic bundle。
 - SwiftUI Review 只消费 presenter 解析好的 artifact statuses，不在 view body 内运行 Vision/AX/ScreenCaptureKit，也不自己拼 raw bundle paths。
 
 尚未完成：
 
 - 完整 run/session -> semantic recording evidence drill-in；当前已支持 `SavedMacro.semanticRecording` 的 macro 级 linked opener，但还没有每次 workflow run 的独立 semantic recording id / run evidence id。
-- frame crop file copy / package materialization semantics；当前 patch 登记 safe refs，真实文件复制仍属于 app-edge presenter/package import 层。
+- 手动画框后从 full frame 重新裁出新的 template/baseline 文件；当前 first pass 物化的是 S1/S2 已生成的 source-preview/template/baseline artifact。
 - frame-to-condition live clip and real product evidence.
-- image/baseline crop extraction UI still needs package-local file materialization before broad shipping.
 - installed-app product evidence for linked Run Detail opener, suggestion accept/reject and Review -> Draft Preview remains open; current proof is fixture product evidence plus compiled product wiring.
 
 ## Accepted S1 Contract Usage
@@ -121,14 +122,14 @@ swift run SparkleRecorder workflow product-evidence snapshot semantic-review-tim
 
 Observed status on 2026-07-06:
 
-- `SemanticRecordingReviewProjectionTests`: 7 tests passed; coverage includes OCR wait patch, image appeared patch, visual asset upsert operations, manual frame region override and user-picked pixel color -> `pixelMatched` patch.
+- `SemanticRecordingReviewProjectionTests`: 8 tests passed; coverage includes OCR wait patch, image appeared patch, visual asset upsert operations, package-local materialization path rewriting, manual frame region override and user-picked pixel color -> `pixelMatched` patch.
 - Swift 6 build: passed.
 - Product evidence snapshot: generated `docs/workflow-page-productization/product-evidence/semantic-review-timeline.png` with sidecar `semantic-review-timeline.md`; current artifact includes suggestion evidence refs plus `Accept Patch` / `Reject` controls.
 
 ## Next Tasks
 
 1. Capture installed-app product evidence for linked Run Detail -> Macro Review opening from a `SavedMacro.semanticRecording` bundle, including Open/Reveal artifact actions.
-2. Define frame crop file copy/package materialization semantics for package-local image/baseline refs.
+2. Add manual-region crop extraction for image/baseline candidates when the user overrides the source-preview bounds.
 3. Add per-run/session semantic recording evidence drill-in once S2 exposes run-level metadata beyond the saved macro reference.
 4. Capture live product evidence for frame-to-condition creation once a live bundle can be opened from the installed app.
 5. Add product evidence for pixel color picking, suggestion accept/reject and the Review -> Draft Preview -> confirm import handoff from an installed-app bundle.
@@ -142,3 +143,4 @@ Observed status on 2026-07-06:
 - 2026-07-06: Added Review-side pixel color picking for `pixelMatched` candidates and a pure test proving user-picked color can generate and apply a valid pixel condition patch without metadata color evidence.
 - 2026-07-06: Added suggestion review actions. Suggestions now expose cited evidence rows, `Accept Patch` to create a review-only patch from matching evidence, and `Reject` as a local non-mutating review decision.
 - 2026-07-06: Connected Run Detail Macro Review to `SavedMacro.semanticRecording`. The primary button now opens the linked bundle through `SemanticRecordingReviewPresenter.reviewState(from:)` when macro metadata exists, keeps a manual bundle fallback, and guards async open results so a stale request cannot present Review for a different selected run.
+- 2026-07-06: Added package-local materialization for Review-generated image/template and baseline assets. `SemanticRecordingReviewAssetMaterializer` rewrites patch asset refs to `assets/images` or `assets/baselines`, computes SHA-256 from copied bytes, and `SemanticRecordingReviewPresenter.previewState` writes those files under app-managed `ReviewVisualAssets` before opening Draft Preview.
