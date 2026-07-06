@@ -172,14 +172,20 @@ public struct SemanticRecordingReviewActionSemantics: Codable, Equatable, Sendab
             mutationBoundary: .draftPreviewRequired,
             createsDraftPatch: true,
             mutatesWorkflow: false,
-            evidence: EvidenceAlignment(
-                frameID: candidate.sourceFrameID,
-                observationIDs: candidate.observationID.map { [$0] } ?? [],
-                sourcePreviewRefID: candidate.sourcePreviewRefID,
-                artifactPath: selectedRegion?.artifactPath ?? candidate.artifactPath,
-                bounds: selectedRegion?.bounds ?? candidate.bounds,
-                summary: selectedRegion?.label ?? candidate.summary
-            )
+            evidence: evidenceAlignment(candidate, regionSelection: regionSelection)
+        )
+    }
+
+    public static func previewDraft(
+        _ result: SemanticRecordingReviewDraftPatchResult
+    ) -> SemanticRecordingReviewActionSemantics {
+        SemanticRecordingReviewActionSemantics(
+            actionName: .previewDraft,
+            title: "Preview draft",
+            mutationBoundary: .draftPreviewRequired,
+            createsDraftPatch: false,
+            mutatesWorkflow: false,
+            evidence: result.actionEvidence
         )
     }
 
@@ -191,6 +197,19 @@ public struct SemanticRecordingReviewActionSemantics: Codable, Equatable, Sendab
             createsDraftPatch: false,
             mutatesWorkflow: false,
             evidence: EvidenceAlignment()
+        )
+    }
+
+    public static func importDraft(
+        _ result: SemanticRecordingReviewDraftPatchResult
+    ) -> SemanticRecordingReviewActionSemantics {
+        SemanticRecordingReviewActionSemantics(
+            actionName: .importDraft,
+            title: "Import reviewed draft",
+            mutationBoundary: .confirmedImport,
+            createsDraftPatch: false,
+            mutatesWorkflow: true,
+            evidence: result.actionEvidence
         )
     }
 
@@ -232,6 +251,21 @@ public struct SemanticRecordingReviewActionSemantics: Codable, Equatable, Sendab
             artifactPath: primaryEvidence?.artifactRef?.path,
             bounds: primaryEvidence?.bounds,
             summary: primaryEvidence?.summary ?? suggestion.summary
+        )
+    }
+
+    public static func evidenceAlignment(
+        _ candidate: SemanticRecordingReviewProjection.ConditionCandidateRow,
+        regionSelection: SemanticRecordingFrameRegionSelection? = nil
+    ) -> EvidenceAlignment {
+        let selectedRegion = regionSelection?.frameID == candidate.sourceFrameID ? regionSelection : nil
+        return EvidenceAlignment(
+            frameID: candidate.sourceFrameID,
+            observationIDs: candidate.observationID.map { [$0] } ?? [],
+            sourcePreviewRefID: selectedRegion?.sourcePreviewRefID ?? candidate.sourcePreviewRefID,
+            artifactPath: selectedRegion?.artifactPath ?? candidate.artifactPath,
+            bounds: selectedRegion?.bounds ?? candidate.bounds,
+            summary: selectedRegion?.label ?? candidate.summary
         )
     }
 }
@@ -590,6 +624,7 @@ public struct SemanticRecordingReviewDraftPatchResult: Equatable, Sendable {
     public var imageAsset: AutomationWorkflowDraftVisualImageAsset?
     public var baselineAsset: AutomationWorkflowDraftVisualImageAsset?
     public var assetExtractions: [SemanticRecordingReviewAssetExtraction]
+    public var actionEvidence: SemanticRecordingReviewActionSemantics.EvidenceAlignment
     public var appliesToExistingTask: Bool
 
     public init(
@@ -600,6 +635,7 @@ public struct SemanticRecordingReviewDraftPatchResult: Equatable, Sendable {
         imageAsset: AutomationWorkflowDraftVisualImageAsset? = nil,
         baselineAsset: AutomationWorkflowDraftVisualImageAsset? = nil,
         assetExtractions: [SemanticRecordingReviewAssetExtraction] = [],
+        actionEvidence: SemanticRecordingReviewActionSemantics.EvidenceAlignment = .init(),
         appliesToExistingTask: Bool
     ) {
         self.patch = patch
@@ -609,6 +645,7 @@ public struct SemanticRecordingReviewDraftPatchResult: Equatable, Sendable {
         self.imageAsset = imageAsset
         self.baselineAsset = baselineAsset
         self.assetExtractions = assetExtractions
+        self.actionEvidence = actionEvidence
         self.appliesToExistingTask = appliesToExistingTask
     }
 }
@@ -783,6 +820,10 @@ public enum SemanticRecordingReviewDraftPatchBuilder {
             imageAsset: imageAsset,
             baselineAsset: baselineAsset,
             assetExtractions: assetExtractions,
+            actionEvidence: SemanticRecordingReviewActionSemantics.evidenceAlignment(
+                candidate,
+                regionSelection: request.regionSelection
+            ),
             appliesToExistingTask: appliesToExistingTask
         )
     }

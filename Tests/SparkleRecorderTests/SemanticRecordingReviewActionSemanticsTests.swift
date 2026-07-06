@@ -102,6 +102,49 @@ struct SemanticRecordingReviewActionSemanticsTests {
         #expect(clear.evidence == accept.evidence)
     }
 
+    @Test("Preview and import draft actions preserve staged patch evidence")
+    func previewAndImportDraftActionsPreserveStagedPatchEvidence() throws {
+        let bundle = SemanticRecordingFixture.checkoutBundle()
+        let projection = SemanticRecordingReviewProjection(
+            bundle: bundle,
+            selectedEventID: SemanticRecordingFixture.clickEventID
+        )
+        let candidate = try #require(
+            projection.selectedFrame?.conditionCandidates.first { $0.kind == .imageAppeared }
+        )
+        let result = try SemanticRecordingReviewDraftPatchBuilder.makePatch(
+            bundle: bundle,
+            request: SemanticRecordingReviewDraftPatchRequest(
+                candidate: candidate,
+                newTaskKey: "wait_checkout_button"
+            )
+        )
+
+        let preview = SemanticRecordingReviewActionSemantics.previewDraft(result)
+        let importAction = SemanticRecordingReviewActionSemantics.importDraft(result)
+
+        #expect(result.actionEvidence.frameID == SemanticRecordingFixture.beforeClickFrameID)
+        #expect(result.actionEvidence.sourcePreviewRefID == SemanticRecordingFixture.sourceTemplateRefID)
+        #expect(result.actionEvidence.observationIDs.isEmpty)
+        #expect(result.actionEvidence.artifactPath == "visual-index/templates/checkout-button.png")
+        #expect(result.actionEvidence.bounds == RecordingBounds(
+            rect: RecordingRect(x: 880, y: 620, width: 180, height: 48),
+            coordinateSpace: .windowPixels
+        ))
+
+        #expect(preview.actionName == .previewDraft)
+        #expect(preview.mutationBoundary == .draftPreviewRequired)
+        #expect(!preview.createsDraftPatch)
+        #expect(!preview.mutatesWorkflow)
+        #expect(preview.evidence == result.actionEvidence)
+
+        #expect(importAction.actionName == .importDraft)
+        #expect(importAction.mutationBoundary == .confirmedImport)
+        #expect(!importAction.createsDraftPatch)
+        #expect(importAction.mutatesWorkflow)
+        #expect(importAction.evidence == result.actionEvidence)
+    }
+
     @Test("Review action semantics are Codable for S4 JSON payloads")
     func reviewActionSemanticsAreCodableForS4JSONPayloads() throws {
         let bundle = SemanticRecordingFixture.checkoutBundle()
