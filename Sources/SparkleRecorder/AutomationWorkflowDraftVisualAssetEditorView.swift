@@ -132,24 +132,39 @@ struct AutomationWorkflowDraftVisualAssetEditorView: View {
                 .foregroundStyle(.secondary)
         } else {
             VStack(alignment: .leading, spacing: 6) {
-                ForEach(rows, id: \.0) { row in
+                ForEach(rows) { row in
                     HStack(spacing: 8) {
-                        Image(systemName: row.1)
+                        Image(systemName: row.systemImage)
                             .frame(width: 18)
                             .foregroundStyle(.secondary)
                             .accessibilityHidden(true)
                         VStack(alignment: .leading, spacing: 2) {
-                            Text(row.2)
+                            Text(row.title)
                                 .font(.caption)
                                 .bold()
                                 .lineLimit(1)
-                            Text(row.3)
+                            Text(row.path)
                                 .font(.caption2.monospaced())
                                 .foregroundStyle(.secondary)
                                 .lineLimit(1)
+                            if !row.provenance.isEmpty {
+                                ViewThatFits(in: .horizontal) {
+                                    HStack(spacing: 4) {
+                                        ForEach(row.provenance, id: \.self) { label in
+                                            provenanceBadge(label)
+                                        }
+                                    }
+                                    VStack(alignment: .leading, spacing: 4) {
+                                        ForEach(row.provenance, id: \.self) { label in
+                                            provenanceBadge(label)
+                                        }
+                                    }
+                                }
+                                .padding(.top, 2)
+                            }
                         }
                         Spacer(minLength: 0)
-                        Text(row.4)
+                        Text(row.kind)
                             .font(.caption2)
                             .foregroundStyle(.tertiary)
                             .lineLimit(1)
@@ -181,6 +196,23 @@ struct AutomationWorkflowDraftVisualAssetEditorView: View {
                     .overlay(
                         RoundedRectangle(cornerRadius: 7)
                             .strokeBorder(Color.primary.opacity(0.08), lineWidth: 0.6)
+                    )
+            )
+    }
+
+    private func provenanceBadge(_ label: String) -> some View {
+        Text(label)
+            .font(.caption2)
+            .foregroundStyle(.secondary)
+            .lineLimit(1)
+            .padding(.horizontal, 5)
+            .padding(.vertical, 2)
+            .background(
+                RoundedRectangle(cornerRadius: 5)
+                    .fill(Color.primary.opacity(0.035))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 5)
+                            .strokeBorder(Color.primary.opacity(0.07), lineWidth: 0.5)
                     )
             )
     }
@@ -234,26 +266,112 @@ struct AutomationWorkflowDraftVisualAssetEditorView: View {
         messageIsWarning ? Brand.sigAmber : .secondary
     }
 
-    private var visibleAssetRows: [(String, String, String, String, String)] {
+    private var visibleAssetRows: [VisibleAssetRow] {
         let imageRows = visualAssets.images.map { asset in
-            (
-                "image-\(asset.key)",
-                "photo",
-                asset.label ?? asset.key,
-                asset.path ?? NSLocalizedString("No path", comment: ""),
-                NSLocalizedString("Image", comment: "")
+            visibleAssetRow(
+                asset,
+                idPrefix: "image",
+                systemImage: "photo",
+                kind: NSLocalizedString("Image", comment: "")
             )
         }
         let baselineRows = visualAssets.baselines.map { asset in
-            (
-                "baseline-\(asset.key)",
-                "rectangle.dashed",
-                asset.label ?? asset.key,
-                asset.path ?? NSLocalizedString("No path", comment: ""),
-                NSLocalizedString("Baseline", comment: "")
+            visibleAssetRow(
+                asset,
+                idPrefix: "baseline",
+                systemImage: "rectangle.dashed",
+                kind: NSLocalizedString("Baseline", comment: "")
             )
         }
         return Array((imageRows + baselineRows).prefix(6))
+    }
+
+    private func visibleAssetRow(
+        _ asset: AutomationWorkflowDraftVisualImageAsset,
+        idPrefix: String,
+        systemImage: String,
+        kind: String
+    ) -> VisibleAssetRow {
+        VisibleAssetRow(
+            id: "\(idPrefix)-\(asset.key)",
+            systemImage: systemImage,
+            title: asset.label ?? asset.key,
+            path: asset.path ?? NSLocalizedString("No path", comment: ""),
+            kind: kind,
+            provenance: provenanceLabels(for: asset)
+        )
+    }
+
+    private func provenanceLabels(for asset: AutomationWorkflowDraftVisualImageAsset) -> [String] {
+        var labels: [String] = []
+        if let sourceFrameID = asset.sourceFrameID {
+            labels.append(
+                String(
+                    format: NSLocalizedString("Frame %@", comment: ""),
+                    shortID(sourceFrameID.uuidString)
+                )
+            )
+        }
+        if let sourceBounds = asset.sourceBounds {
+            labels.append(boundsLabel(sourceBounds, space: asset.sourceBoundsSpace))
+        }
+        if let sourceArtifactPath = asset.sourceArtifactPath {
+            labels.append(
+                String(
+                    format: NSLocalizedString("Source %@", comment: ""),
+                    compactPath(sourceArtifactPath)
+                )
+            )
+        }
+        if let sourceSurfaceID = asset.sourceSurfaceID {
+            labels.append(
+                String(
+                    format: NSLocalizedString("Surface %@", comment: ""),
+                    shortID(sourceSurfaceID)
+                )
+            )
+        }
+        if let sha256 = asset.sha256 {
+            labels.append(
+                String(
+                    format: NSLocalizedString("SHA %@", comment: ""),
+                    shortID(sha256)
+                )
+            )
+        }
+        return labels
+    }
+
+    private func boundsLabel(
+        _ bounds: RectValue,
+        space: AutomationOCRSearchRegionSpace?
+    ) -> String {
+        let boundsText = "\(formatNumber(bounds.x)),\(formatNumber(bounds.y)) \(formatNumber(bounds.width))x\(formatNumber(bounds.height))"
+        guard let space else {
+            return boundsText
+        }
+        return "\(space.rawValue) \(boundsText)"
+    }
+
+    private func compactPath(_ path: String) -> String {
+        let parts = path.split(separator: "/").map(String.init)
+        guard parts.count > 2 else {
+            return path
+        }
+        return parts.suffix(2).joined(separator: "/")
+    }
+
+    private func shortID(_ value: String) -> String {
+        String(value.prefix(8))
+    }
+
+    private func formatNumber(_ value: CGFloat) -> String {
+        let doubleValue = Double(value)
+        let roundedValue = doubleValue.rounded()
+        if abs(doubleValue - roundedValue) < 0.01 {
+            return String(Int(roundedValue))
+        }
+        return String(format: "%.3f", doubleValue)
     }
 
     private func choosePackageFile() {
@@ -427,4 +545,13 @@ struct AutomationWorkflowDraftVisualAssetEditorView: View {
 
     private static let imageKind = "image"
     private static let baselineKind = "baseline"
+}
+
+private struct VisibleAssetRow: Identifiable {
+    var id: String
+    var systemImage: String
+    var title: String
+    var path: String
+    var kind: String
+    var provenance: [String]
 }
