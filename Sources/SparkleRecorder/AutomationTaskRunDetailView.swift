@@ -22,6 +22,7 @@ struct AutomationTaskRunDetailView: View {
     @State private var semanticReviewInitialEventID: UUID?
     @State private var semanticReviewInitialFrameID: UUID?
     @State private var semanticReviewRunTargetPresentation: SemanticRecordingReviewRunTargetPresentation?
+    @State private var semanticReviewRunTargetEvidence: SemanticRecordingReviewRunTargetEvidence?
     @State private var semanticReviewBundleFeedback: SemanticRecordingReviewArtifactActionFeedback?
     @Environment(\.automationTaskRunEvidenceMacroPackageBaseURL) private var macroPackageBaseURL
     @Environment(\.automationTaskRunEvidenceAutoload) private var shouldAutoloadEvidence
@@ -170,6 +171,7 @@ struct AutomationTaskRunDetailView: View {
                 selectedEventID: semanticReviewInitialEventID,
                 selectedFrameID: semanticReviewInitialFrameID,
                 initialRunTargetPresentation: semanticReviewRunTargetPresentation,
+                initialRunTargetEvidence: semanticReviewRunTargetEvidence,
                 onImportWorkflow: onImportWorkflowFromDraftPreview
             )
                 .frame(minWidth: 1_180, idealWidth: 1_280, minHeight: 760, idealHeight: 820)
@@ -628,6 +630,7 @@ struct AutomationTaskRunDetailView: View {
         semanticReviewInitialEventID = target.selectedEventID
         semanticReviewInitialFrameID = target.selectedFrameID
         semanticReviewRunTargetPresentation = .make(target: target)
+        semanticReviewRunTargetEvidence = .make(target: target)
         semanticReviewState = state
     }
 
@@ -653,6 +656,7 @@ struct AutomationTaskRunDetailView: View {
         semanticReviewInitialEventID = nil
         semanticReviewInitialFrameID = nil
         semanticReviewRunTargetPresentation = nil
+        semanticReviewRunTargetEvidence = nil
         semanticReviewBundleFeedback = nil
     }
 }

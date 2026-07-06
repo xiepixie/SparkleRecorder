@@ -9,12 +9,14 @@ public struct SemanticRecordingReviewActionSemantics: Codable, Equatable, Sendab
         case acceptSuggestion = "review.acceptSuggestion"
         case rejectSuggestion = "review.rejectSuggestion"
         case clearDecision = "review.clearDecision"
+        case materializeAsset = "review.materializeAsset"
         case previewDraft = "review.previewDraft"
         case importDraft = "review.importDraft"
     }
 
     public enum MutationBoundary: String, Codable, Equatable, Sendable {
         case reviewLocal = "reviewLocal"
+        case packageAssetOnly = "packageAssetOnly"
         case draftPatchOnly = "draftPatchOnly"
         case draftPreviewRequired = "draftPreviewRequired"
         case confirmedImport = "confirmedImport"
@@ -207,6 +209,34 @@ public struct SemanticRecordingReviewActionSemantics: Codable, Equatable, Sendab
             createsDraftPatch: false,
             mutatesWorkflow: false,
             evidence: result.actionEvidence
+        )
+    }
+
+    public static func materializeAsset(
+        frameID: UUID?,
+        eventIDs: [UUID] = [],
+        sourceArtifactPath: String,
+        materializedAsset: SemanticRecordingReviewMaterializedAsset,
+        bounds: RecordingBounds? = nil,
+        summary: String? = nil
+    ) -> SemanticRecordingReviewActionSemantics {
+        SemanticRecordingReviewActionSemantics(
+            actionName: .materializeAsset,
+            title: "Materialize review asset",
+            mutationBoundary: .packageAssetOnly,
+            createsDraftPatch: false,
+            mutatesWorkflow: false,
+            evidence: EvidenceAlignment(
+                frameID: frameID,
+                eventIDs: eventIDs,
+                artifactPath: sourceArtifactPath,
+                materializedArtifactPath: materializedAsset.destinationPath,
+                materializedSHA256: materializedAsset.sha256,
+                visualAssetKind: materializedAsset.kind,
+                visualAssetKey: materializedAsset.key,
+                bounds: bounds,
+                summary: summary
+            )
         )
     }
 
@@ -530,6 +560,8 @@ public struct SemanticRecordingReviewActionPresentation: Codable, Equatable, Sen
         switch boundary {
         case .reviewLocal:
             return "Review local"
+        case .packageAssetOnly:
+            return "Package asset only"
         case .draftPatchOnly:
             return "Draft patch only"
         case .draftPreviewRequired:

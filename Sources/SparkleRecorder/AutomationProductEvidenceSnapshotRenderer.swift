@@ -687,7 +687,8 @@ enum AutomationProductEvidenceSnapshotRenderer {
                 selectedEventID: target.selectedEventID,
                 selectedFrameID: target.selectedFrameID,
                 initialDraftPatchCandidateID: candidateID,
-                initialRunTargetPresentation: .make(target: target)
+                initialRunTargetPresentation: .make(target: target),
+                initialRunTargetEvidence: .make(target: target)
             )
             .frame(width: width, height: height)
             .environment(\.colorScheme, .dark)

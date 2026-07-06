@@ -11,6 +11,7 @@ struct SemanticRecordingReviewFixtureView: View {
     private let macros: [SavedMacro]
     private let onImportWorkflow: (AutomationWorkflow, URL?) -> Void
     private let runTargetPresentation: SemanticRecordingReviewRunTargetPresentation?
+    private let runTargetEvidence: SemanticRecordingReviewRunTargetEvidence?
 
     @State private var selectedEventID: UUID?
     @State private var selectedFrameID: UUID?
@@ -38,6 +39,7 @@ struct SemanticRecordingReviewFixtureView: View {
         self.macros = []
         self.onImportWorkflow = { _, _ in }
         self.runTargetPresentation = nil
+        self.runTargetEvidence = nil
     }
 
     init(
@@ -51,7 +53,8 @@ struct SemanticRecordingReviewFixtureView: View {
         initialAcceptedSuggestionID: UUID? = nil,
         initialRejectedSuggestionID: UUID? = nil,
         initialDraftPreviewActionPresentations: [SemanticRecordingReviewActionPresentation] = [],
-        initialRunTargetPresentation: SemanticRecordingReviewRunTargetPresentation? = nil
+        initialRunTargetPresentation: SemanticRecordingReviewRunTargetPresentation? = nil,
+        initialRunTargetEvidence: SemanticRecordingReviewRunTargetEvidence? = nil
     ) {
         let projection = SemanticRecordingReviewProjection(
             bundle: bundle,
@@ -67,6 +70,7 @@ struct SemanticRecordingReviewFixtureView: View {
         self.macros = []
         self.onImportWorkflow = { _, _ in }
         self.runTargetPresentation = initialRunTargetPresentation
+        self.runTargetEvidence = initialRunTargetEvidence
         _selectedEventID = State(initialValue: selectedEventID)
         _selectedFrameID = State(initialValue: selectedFrameID)
         _selectedCandidateID = State(initialValue: initialDraftPatchCandidateID)
@@ -95,6 +99,7 @@ struct SemanticRecordingReviewFixtureView: View {
         selectedFrameID: UUID? = nil,
         initialDraftPatchCandidateID: String? = nil,
         initialRunTargetPresentation: SemanticRecordingReviewRunTargetPresentation? = nil,
+        initialRunTargetEvidence: SemanticRecordingReviewRunTargetEvidence? = nil,
         onImportWorkflow: @escaping (AutomationWorkflow, URL?) -> Void = { _, _ in }
     ) {
         let projection = SemanticRecordingReviewProjection(
@@ -111,6 +116,7 @@ struct SemanticRecordingReviewFixtureView: View {
         self.macros = macros
         self.onImportWorkflow = onImportWorkflow
         self.runTargetPresentation = initialRunTargetPresentation
+        self.runTargetEvidence = initialRunTargetEvidence
         _selectedEventID = State(initialValue: selectedEventID)
         _selectedFrameID = State(initialValue: selectedFrameID)
         _selectedCandidateID = State(initialValue: initialDraftPatchCandidateID)
@@ -525,7 +531,28 @@ struct SemanticRecordingReviewFixtureView: View {
 
     @ViewBuilder
     private var runTargetSection: some View {
-        if let runTargetPresentation {
+        if let runTargetEvidence {
+            VStack(alignment: .leading, spacing: 10) {
+                sectionTitle("Run Target")
+                inspectorRow(
+                    title: runTargetEvidence.title,
+                    subtitle: NSLocalizedString("Opened from Run Detail", comment: ""),
+                    detail: runTargetEvidence.detail,
+                    accent: Color(red: 0.34, green: 0.72, blue: 0.95)
+                )
+
+                VStack(alignment: .leading, spacing: 6) {
+                    ForEach(runTargetEvidence.rows) { row in
+                        bundleHealthInfoRow(
+                            title: row.label,
+                            value: row.value,
+                            systemImage: runTargetEvidenceRowIcon(row.kind),
+                            tint: Color(red: 0.34, green: 0.72, blue: 0.95)
+                        )
+                    }
+                }
+            }
+        } else if let runTargetPresentation {
             VStack(alignment: .leading, spacing: 10) {
                 sectionTitle("Run Target")
                 inspectorRow(
@@ -1291,6 +1318,31 @@ struct SemanticRecordingReviewFixtureView: View {
             RoundedRectangle(cornerRadius: 7)
                 .stroke(tint.opacity(0.18), lineWidth: 1)
         )
+    }
+
+    private func runTargetEvidenceRowIcon(
+        _ kind: SemanticRecordingReviewRunTargetEvidence.Row.Kind
+    ) -> String {
+        switch kind {
+        case .provenance:
+            return "point.topleft.down.curvedto.point.bottomright.up"
+        case .boundary:
+            return "lock.shield"
+        case .effect:
+            return "checkmark.seal"
+        case .selectedEvent:
+            return "recordingtape"
+        case .selectedFrame:
+            return "photo"
+        case .requestedEventIndex, .matchedEventIndex:
+            return "number"
+        case .target:
+            return "scope"
+        case .evidence:
+            return "doc.text.magnifyingglass"
+        case .summary:
+            return "text.alignleft"
+        }
     }
 
     private func artifactAvailabilityCounts(
@@ -2163,6 +2215,8 @@ struct SemanticRecordingReviewFixtureView: View {
             return "arrow.uturn.backward.circle"
         case .draftCandidate, .draftSelection:
             return "doc.badge.gearshape"
+        case .materializeAsset:
+            return "archivebox"
         case .previewDraft:
             return "doc.text.magnifyingglass"
         case .importDraft:
@@ -2188,6 +2242,8 @@ struct SemanticRecordingReviewFixtureView: View {
             return Color.white.opacity(0.58)
         case .draftCandidate, .draftSelection:
             return Color(red: 0.34, green: 0.72, blue: 0.95)
+        case .materializeAsset:
+            return Color(red: 0.54, green: 0.72, blue: 0.98)
         case .previewDraft:
             return Color(red: 1.00, green: 0.72, blue: 0.30)
         }
@@ -2205,6 +2261,8 @@ struct SemanticRecordingReviewFixtureView: View {
         switch boundary {
         case .reviewLocal:
             return NSLocalizedString("Review local", comment: "")
+        case .packageAssetOnly:
+            return NSLocalizedString("Package asset only", comment: "")
         case .draftPatchOnly:
             return NSLocalizedString("Draft patch only", comment: "")
         case .draftPreviewRequired:

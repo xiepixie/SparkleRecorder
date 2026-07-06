@@ -414,6 +414,58 @@ struct SemanticRecordingReviewActionSemanticsTests {
         #expect(rowsByKind[.bounds]?.value == "880,620 180x48 windowPixels")
     }
 
+    @Test("Materialized asset action preserves source and package evidence")
+    func materializedAssetActionPreservesSourceAndPackageEvidence() throws {
+        let bounds = RecordingBounds(
+            rect: RecordingRect(x: 20, y: 30, width: 80, height: 50),
+            coordinateSpace: .framePixels
+        )
+        let materialized = SemanticRecordingReviewMaterializedAsset(
+            kind: .image,
+            key: "sr_74000000_checkout_button_template",
+            sourcePath: "frames/000014-before-click.png",
+            destinationPath: "assets/images/sr_74000000_checkout_button_template.png",
+            sha256: "20dc26ad587152ac3f284bd839b19944cb945d680f3220334697b5aa0f455f13"
+        )
+
+        let action = SemanticRecordingReviewActionSemantics.materializeAsset(
+            frameID: SemanticRecordingFixture.beforeClickFrameID,
+            eventIDs: [SemanticRecordingFixture.clickEventID],
+            sourceArtifactPath: materialized.sourcePath,
+            materializedAsset: materialized,
+            bounds: bounds,
+            summary: "Frame region was materialized into a package-local visual asset."
+        )
+        let presentation = SemanticRecordingReviewActionPresentation(action)
+        let rowsByKind = Dictionary(uniqueKeysWithValues: presentation.rows.map { ($0.kind, $0) })
+
+        #expect(action.actionName == .materializeAsset)
+        #expect(action.mutationBoundary == .packageAssetOnly)
+        #expect(!action.createsDraftPatch)
+        #expect(!action.mutatesWorkflow)
+        #expect(action.evidence.frameID == SemanticRecordingFixture.beforeClickFrameID)
+        #expect(action.evidence.eventIDs == [SemanticRecordingFixture.clickEventID])
+        #expect(action.evidence.artifactPath == materialized.sourcePath)
+        #expect(action.evidence.materializedArtifactPath == materialized.destinationPath)
+        #expect(action.evidence.materializedSHA256 == materialized.sha256)
+        #expect(action.evidence.visualAssetKind == .image)
+        #expect(action.evidence.visualAssetKey == materialized.key)
+        #expect(action.evidence.bounds == bounds)
+
+        #expect(presentation.summary.contains("review.materializeAsset"))
+        #expect(presentation.summary.contains(materialized.destinationPath))
+        #expect(rowsByKind[.mutationBoundary]?.value == "Package asset only")
+        #expect(rowsByKind[.mutationEffect]?.value == "No workflow mutation")
+        #expect(rowsByKind[.frame]?.value == "00000004")
+        #expect(rowsByKind[.events]?.value == "00000007")
+        #expect(rowsByKind[.artifact]?.value == materialized.sourcePath)
+        #expect(rowsByKind[.materializedArtifact]?.value == materialized.destinationPath)
+        #expect(rowsByKind[.materializedDigest]?.value == "20dc26ad5871")
+        #expect(rowsByKind[.visualAsset]?.label == "Image asset")
+        #expect(rowsByKind[.visualAsset]?.value == materialized.key)
+        #expect(rowsByKind[.bounds]?.value == "20,30 80x50 framePixels")
+    }
+
     @Test("Review action presentation remains Codable for UI and S4 payloads")
     func reviewActionPresentationRemainsCodableForUIAndS4Payloads() throws {
         let bundle = SemanticRecordingFixture.checkoutBundle()

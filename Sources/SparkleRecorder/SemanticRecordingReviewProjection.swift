@@ -370,14 +370,14 @@ public struct SemanticRecordingReviewRunTargetEvidence: Codable, Equatable, Send
         if let requestedRecordedEventIndex {
             rows.append(Row(
                 kind: .requestedEventIndex,
-                label: "Requested event",
+                label: "Requested",
                 value: "Event #\(requestedRecordedEventIndex + 1)"
             ))
         }
         if let matchedRecordedEventIndex {
             rows.append(Row(
                 kind: .matchedEventIndex,
-                label: "Matched event",
+                label: "Matched",
                 value: "Event #\(matchedRecordedEventIndex + 1)"
             ))
         }

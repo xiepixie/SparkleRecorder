@@ -14,6 +14,7 @@
 
 - Macro Review opens on the frame/event selected by `SemanticRecordingReviewRunTarget.make(run:bundle:)`.
 - The inspector shows a `Run Target` block before Teach/Draft actions, explaining that Review started at the failed event reported by playback failure evidence.
-- Target badges expose `Target: Event #5` and `Evidence: Failure report`, so the selected frame is no longer unexplained after Run Detail opens Review.
+- The same block renders the `SemanticRecordingReviewRunTargetEvidence` rows: `semanticReview.runTarget`, `provenanceOnly`, no workflow mutation, selected event/frame, requested/matched event indexes, target and evidence.
+- Target rows expose `Target: Event #5` and `Evidence: Failure report`, so the selected frame is no longer unexplained after Run Detail opens Review.
 - The existing Teach System action rows remain visible below the target context and preserve `review.draftCandidate` / Draft Preview mutation semantics.
 - This artifact proves the Review surface can explain run-outcome targeting; it does not claim live per-run semantic recording binding.
