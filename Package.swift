@@ -54,6 +54,7 @@ let package = Package(
                 "AutomationVisualAssetImageProvider.swift",
                 "LiveAutomationPlayerClient.swift",
                 "LiveAutomationRuntimeHost.swift",
+                "LiveSemanticRecordingSession.swift",
                 "LiveSemanticRecordingPreflight.swift",
                 "LivePlaybackSynchronousRunStepClient.swift",
                 "LivePlaybackRunStepClient.swift",
