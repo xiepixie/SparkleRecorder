@@ -95,7 +95,7 @@ enum AutomationProductEvidenceSnapshotScenario: String, CaseIterable {
         case .templateBaselinePreviewRefs:
             return 980
         case .semanticReviewTimeline:
-            return 1_040
+            return 1_560
         case .semanticReviewStoredBundle:
             return 1_180
         case .semanticReviewPixelColor:

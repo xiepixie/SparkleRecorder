@@ -706,6 +706,8 @@ struct SemanticRecordingReviewFixtureView: View {
                             accent: Color(red: 0.34, green: 0.72, blue: 0.95)
                         )
 
+                        suggestionReviewActionContract(suggestion)
+
                         if let decision = suggestionReviewDecisions[suggestion.id] {
                             suggestionActionSemanticsSummary(suggestion, decision: decision)
                         }
@@ -785,6 +787,62 @@ struct SemanticRecordingReviewFixtureView: View {
             RoundedRectangle(cornerRadius: 7)
                 .stroke(decision.tint.opacity(0.20), lineWidth: 1)
         )
+    }
+
+    private func suggestionReviewActionContract(
+        _ suggestion: SemanticRecordingReviewProjection.SuggestionRow
+    ) -> some View {
+        let accept = SemanticRecordingReviewActionSemantics.acceptSuggestion(suggestion)
+        let reject = SemanticRecordingReviewActionSemantics.rejectSuggestion(suggestion)
+        let clear = SemanticRecordingReviewActionSemantics.clearDecision(suggestion)
+
+        return VStack(alignment: .leading, spacing: 7) {
+            HStack(alignment: .firstTextBaseline, spacing: 6) {
+                Image(systemName: "checklist")
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(Color(red: 0.34, green: 0.72, blue: 0.95))
+                Text(NSLocalizedString("Review Actions", comment: ""))
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(Color.white.opacity(0.52))
+                Text(reviewActionEvidenceLabel(accept.evidence))
+                    .font(.system(size: 10, weight: .medium, design: .monospaced))
+                    .foregroundStyle(Color.white.opacity(0.42))
+                    .lineLimit(1)
+                Spacer(minLength: 0)
+            }
+
+            reviewActionContractRow(accept)
+            reviewActionContractRow(reject)
+            reviewActionContractRow(clear)
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 8)
+        .background(Color.black.opacity(0.14), in: RoundedRectangle(cornerRadius: 7))
+        .overlay(
+            RoundedRectangle(cornerRadius: 7)
+                .stroke(Color.white.opacity(0.08), lineWidth: 1)
+        )
+    }
+
+    private func reviewActionContractRow(
+        _ semantics: SemanticRecordingReviewActionSemantics
+    ) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 6) {
+            Image(systemName: reviewActionSystemImage(semantics))
+                .font(.system(size: 10, weight: .semibold))
+                .foregroundStyle(reviewActionTint(semantics))
+            Text(semantics.actionName.rawValue)
+                .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                .foregroundStyle(Color.white.opacity(0.62))
+                .lineLimit(1)
+                .minimumScaleFactor(0.85)
+            Spacer(minLength: 8)
+            Text(mutationBoundaryLabel(semantics.mutationBoundary))
+                .font(.system(size: 10, weight: .semibold))
+                .foregroundStyle(reviewActionTint(semantics).opacity(0.82))
+                .lineLimit(1)
+                .minimumScaleFactor(0.85)
+        }
     }
 
     private func suggestionEvidenceSummary(
@@ -1627,6 +1685,62 @@ struct SemanticRecordingReviewFixtureView: View {
             parts.append(summary)
         }
         return parts.isEmpty ? NSLocalizedString("Evidence refs kept with this review decision.", comment: "") : parts.joined(separator: " · ")
+    }
+
+    private func reviewActionEvidenceLabel(
+        _ evidence: SemanticRecordingReviewActionSemantics.EvidenceAlignment
+    ) -> String {
+        var parts: [String] = []
+        if let suggestionID = evidence.suggestionID {
+            parts.append("suggestion \(shortID(suggestionID))")
+        }
+        if let frameID = evidence.frameID {
+            parts.append("frame \(shortID(frameID))")
+        }
+        if let artifactPath = evidence.artifactPath {
+            parts.append(compactPath(artifactPath))
+        } else if let observationID = evidence.observationIDs.first {
+            parts.append("obs \(shortID(observationID))")
+        }
+        return parts.isEmpty
+            ? NSLocalizedString("No evidence ref", comment: "")
+            : parts.joined(separator: " · ")
+    }
+
+    private func reviewActionSystemImage(
+        _ semantics: SemanticRecordingReviewActionSemantics
+    ) -> String {
+        switch semantics.actionName {
+        case .acceptSuggestion:
+            return "checkmark.circle"
+        case .rejectSuggestion:
+            return "xmark.circle"
+        case .clearDecision:
+            return "arrow.uturn.backward.circle"
+        case .draftCandidate, .draftSelection:
+            return "doc.badge.gearshape"
+        case .previewDraft:
+            return "doc.text.magnifyingglass"
+        case .importDraft:
+            return "square.and.arrow.down"
+        }
+    }
+
+    private func reviewActionTint(
+        _ semantics: SemanticRecordingReviewActionSemantics
+    ) -> Color {
+        switch semantics.actionName {
+        case .acceptSuggestion, .importDraft:
+            return Color(red: 0.48, green: 0.76, blue: 0.52)
+        case .rejectSuggestion:
+            return Color(red: 1.00, green: 0.50, blue: 0.58)
+        case .clearDecision:
+            return Color.white.opacity(0.58)
+        case .draftCandidate, .draftSelection:
+            return Color(red: 0.34, green: 0.72, blue: 0.95)
+        case .previewDraft:
+            return Color(red: 1.00, green: 0.72, blue: 0.30)
+        }
     }
 
     private func mutationBoundaryLabel(
