@@ -286,6 +286,22 @@ struct SparkleRecorderTests {
         #expect(group.kind == .click)
         #expect(group.summary == "Click text (needs text)")
         #expect(group.textAnchor?.text == "")
+        #expect(group.textTargetReadiness == .missingText)
+    }
+
+    @Test("Event Grouper Labels Locator Click Without Anchor As Needs Text")
+    func eventGrouperLabelsLocatorClickWithoutAnchorAsNeedsText() throws {
+        var down = RecordedEvent.make(.leftMouseDown, time: 0.00, x: 130, y: 102, mouseButton: 0, clickCount: 1)
+        down.coordinateStrategy = .locatorOnly
+        var up = RecordedEvent.make(.leftMouseUp, time: 0.02, x: 130, y: 102, mouseButton: 0, clickCount: 1)
+        up.coordinateStrategy = .locatorOnly
+
+        let group = try #require(EventGrouper().group([down, up]).first)
+
+        #expect(group.kind == .click)
+        #expect(group.summary == "Click text (needs text)")
+        #expect(group.textAnchor == nil)
+        #expect(group.textTargetReadiness == .missingAnchor)
     }
 
     @Test("Recorded Coordinate Click Can Become Text Click")
@@ -316,6 +332,7 @@ struct SparkleRecorderTests {
         #expect(group.summary == "Click text: Confirm")
         #expect(group.textAnchor?.text == "Confirm")
         #expect(group.textTimeout == 8.0)
+        #expect(group.textTargetReadiness == .ready)
         #expect(events.allSatisfy { $0.coordinateStrategy == .locatorOnly })
     }
 
@@ -357,6 +374,11 @@ struct SparkleRecorderTests {
             "Wait Text (needs text)",
             "Wait Text Gone (needs text)",
             "Verify Text (needs text)"
+        ])
+        #expect(groups.filter { $0.kind != .wait }.map(\.textTargetReadiness) == [
+            .missingText,
+            .missingText,
+            .missingText
         ])
         #expect(groups.filter { $0.kind == .wait }.count == 2)
     }

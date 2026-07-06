@@ -33,6 +33,14 @@ Owner：Recording / Workflow Evidence / Review handoff coordination / UI experie
 | S3 | First pass paused. Maintain snapshots/action semantics; resume installed-app evidence only after S2 provides live bundle + `SavedMacro.semanticRecording` inputs. |
 | S4 | First pass paused for product-ready live work. Maintain fixture/explicit stored-bundle CLI; resume default/live catalog/search/suggestion only after S2 live bundle/root policy and S3 Review boundaries stabilize. |
 
+## 1.2 Current Maintenance Alignment
+
+S3 is now in maintenance mode, not active product expansion. The current code-level maintenance work is limited to action semantics: selected recorded coordinate clicks can join the text-target binding path, empty or missing-anchor text targets are marked as not ready, and the action row now shows `needs text` / `No target text` instead of implying playback can succeed. Tests cover empty text clicks, locator clicks without anchors, ready text clicks and empty wait/verify text targets.
+
+This maintenance evidence supports the open action-preview checklist item, but it does not close the full product gate. The full gate still needs region-vs-click visual affordance evidence, click grouping proof for meaningful waits/visual changes, and installed-app evidence after S2 produces live bundles.
+
+No S2 live evidence has been accepted in this maintenance pass. S2 remains the only active unblocker for resuming S3 installed-app Review evidence and S4 product-ready live CLI/search/suggestion work.
+
 ## 2. What S3 Being Paused Means
 
 S3 should now be treated as a stable first-pass consumer, not the active producer of the next proof.
@@ -63,6 +71,15 @@ S3 should not keep expanding into broad UI/product scope until S2 provides live 
 用户逻辑要保持固定：先录制，再回看，再教学，再生成 draft，再预览/导入，再用运行证据诊断。UI 的工作不是把后端模型暴露给用户，而是把这个路径变短、变清楚、变不吓人。
 
 ## 3. Remaining Gaps From S0/S1 To S2
+
+S0 and S1 gave S2 the discipline and contract, but not the live producer proof. The practical delta is:
+
+| Source | Already Available | S2 Still Must Prove |
+| --- | --- | --- |
+| S0 strict evidence discipline | Live clips, sidecars, fixture-vs-live labels, strict audit rules and Open/Reveal evidence patterns. | Equivalent semantic-recording product evidence: real `.mov`, keyframes, sidecars, readiness diagnostics, recording-start guidance, cleanup/redaction/suppression notes and reviewed live sidecars. |
+| S1 bundle contract | Versioned bundle values, safe refs, video/frame/timeline/event/OCR/suppression/source-runtime comparison/query/suggestion shapes and deterministic fixtures. | Live producers fill those fields from ordinary recording, persist sidecars, reload them through `RecordingBundleStore`, and pass readiness against persisted disk state. |
+| S2 first-pass architecture | Core capture session, preflight, suppression/redaction, retention, debug-smoke sidecar, loader/catalog and experimental Recorder bridge. | Authorized macOS 15+ evidence that the ordinary app path writes a complete bundle, attaches `SavedMacro.semanticRecording`, cleans up failures and can be opened by Review. |
+| S3/S4 consumers | Fixture/stored Review and explicit stored-bundle CLI can consume S1/S2-shaped data. | Product S3/S4 can only resume after S2 provides accepted live bundle/root/id inputs; explicit fixtures and temporary bundle paths are not enough. |
 
 ### Gap A: S0 Evidence Discipline -> S2 Product Evidence
 
@@ -198,3 +215,13 @@ Do not do yet:
 4. Frame region picker: selection handles、bounds readout、candidate kind、clear/draft affordance 不遮挡画面；框选后的 draft action 要显示 mutation boundary。
 5. Draft Preview handoff: package-local asset provenance、source frame/crop/digest 更容易读懂，避免用户以为 semantic bundle 内部文件就是长期 workflow 依赖。
 6. Settings/preflight: ready/blocked/degraded、privacy exclusions、retention cleanup 变成面向用户的决策流，而不是工程状态列表。
+
+## 7. UI Checkpoint After S3 Pause
+
+S3 first pass 暂停后，UI 工作不再以继续扩 Review 功能为主，而是先修补后端状态到用户表面的断点。本轮 checkpoint 的第一处产品化修正是 Macro Editor 的 text-target readiness：
+
+- `EventGrouper` / `ActionGroup` 已能把 locator-only click、wait text、wait text gone 和 verify text 的 target 状态区分为 `missingAnchor`、`missingText` 或 `ready`。
+- Action list 现在优先显示 `No target text`，而不是在 locator-only / text action 缺目标时继续显示坐标；用户可以在运行前看到该动作还需要 Teach/Pick target。
+- 这类 UI polish 属于后续 UI owner 常规职责：不改 S1 schema，不绕过 S2 capture，不把 S3 live evidence 提前标完成，只把已有 projection/state 变成清楚、可信、可修正的界面反馈。
+
+下一批同类 UI 打磨应沿着同一规则推进：后端已经提供结构化状态时，SwiftUI 负责可视化和操作路径；后端还没有 live evidence 或 presenter 输入时，UI 只能显示 pending / missing / degraded，不伪造成完成能力。

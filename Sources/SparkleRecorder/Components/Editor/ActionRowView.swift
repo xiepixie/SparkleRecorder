@@ -96,7 +96,12 @@ struct ActionRowView: View {
 	            .frame(maxWidth: .infinity, alignment: .leading)
 
             Group {
-                if let ocrText = g.textAnchor?.text {
+                if g.textTargetReadiness.needsUserTarget {
+                    Text(NSLocalizedString("No target text", comment: ""))
+                        .lineLimit(1)
+                        .truncationMode(.tail)
+                        .foregroundStyle(Brand.sigAmber)
+                } else if let ocrText = g.textAnchor?.text {
                     if ActionGroupProjection.textAnchorIsReady(g.textAnchor) {
                         Text("\"\(ocrText)\"")
                             .lineLimit(1)

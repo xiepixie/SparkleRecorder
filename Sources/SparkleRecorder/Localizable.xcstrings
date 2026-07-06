@@ -9453,6 +9453,176 @@
         }
       }
     },
+    "No target text": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No target text"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "未设置目标文本"
+          }
+        }
+      }
+    },
+    "No text target": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No text target"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "未设置文本目标"
+          }
+        }
+      }
+    },
+    "Text target ready": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Text target ready"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "文本目标已就绪"
+          }
+        }
+      }
+    },
+    "Pick text or type a non-empty target.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pick text or type a non-empty target."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "选取文本或输入非空目标。"
+          }
+        }
+      }
+    },
+    "Pick text to create a searchable target.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pick text to create a searchable target."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "选取文本以创建可搜索目标。"
+          }
+        }
+      }
+    },
+    "Playback will use the matched text target.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Playback will use the matched text target."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "回放将使用匹配到的文本目标。"
+          }
+        }
+      }
+    },
+    "Needs target text before playback can wait.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Needs target text before playback can wait."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "需要目标文本后才能等待。"
+          }
+        }
+      }
+    },
+    "Needs target text before playback can verify.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Needs target text before playback can verify."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "需要目标文本后才能验证。"
+          }
+        }
+      }
+    },
+    "Needs target text before playback can click.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Needs target text before playback can click."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "需要目标文本后才能点击。"
+          }
+        }
+      }
+    },
+    "Needs target text before playback can locate this action.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Needs target text before playback can locate this action."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "需要目标文本后才能定位此动作。"
+          }
+        }
+      }
+    },
     "Wait for Text": {
       "extractionState": "manual",
       "localizations": {
@@ -9585,6 +9755,40 @@
           "stringUnit": {
             "state": "translated",
             "value": "等待文本：%@"
+          }
+        }
+      }
+    },
+    "Wait Text (needs text)": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Wait Text (needs text)"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "等待文本（需要文本）"
+          }
+        }
+      }
+    },
+    "Verify Text (needs text)": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Verify Text (needs text)"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "验证文本（需要文本）"
           }
         }
       }
@@ -10554,6 +10758,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "点击文本"
+          }
+        }
+      }
+    },
+    "Click text (needs text)": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Click text (needs text)"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "点击文本（需要文本）"
           }
         }
       }
@@ -12509,6 +12730,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "等待文本消失"
+          }
+        }
+      }
+    },
+    "Wait Text Gone (needs text)": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Wait Text Gone (needs text)"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "等待文本消失（需要文本）"
           }
         }
       }
