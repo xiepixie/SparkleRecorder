@@ -144,6 +144,7 @@ Current accepted vocabulary:
 | `review.rejectSuggestion` | `reviewLocal` | keep the same evidence refs but record no workflow mutation |
 | `review.draftCandidate` | `draftPreviewRequired` | preserve source preview / observation / artifact refs for a candidate generated from a frame |
 | `review.draftSelection` | `draftPreviewRequired` | preserve selected bounds plus frame/surface/source preview refs when a user-reviewed region overrides candidate bounds |
+| `review.previewDraft` | `draftPreviewRequired` | preserve source artifact refs plus package-local materialized asset paths, SHA-256 digests and draft task/condition ids after the Draft Preview handoff |
 | `review.importDraft` | `confirmedImport` | only after Draft Preview confirmation; S4 must not model suggestions as direct workflow writes |
 
 S4 coordination update:
@@ -152,6 +153,7 @@ S4 coordination update:
 - S4 can call `acceptSuggestion(_:)`, `rejectSuggestion(_:)` and `clearDecision(_:)` with the raw `RecordingSuggestion` returned by CLI/query services.
 - S4 can wrap those semantics with `SemanticRecordingReviewActionPresentation` for stable row-level evidence display.
 - The generated semantics preserve `suggestionID`, primary `frameID`, `eventIDs`, `observationIDs`, `artifactPath`, bounds and summary.
+- Preview/import semantics preserve `materializedAssets`, so CLI/AI summaries can explain source bundle artifact -> package-local draft asset alignment without treating the semantic recording bundle as a durable workflow dependency.
 - S4 fixture/stored/live suggestion payloads should expose these semantics as `reviewActions`; when a user-facing CLI/AI surface needs rows, it should expose a lossless `reviewActionPresentations` projection before calling stored/live suggestions product-ready.
 
 ## Verification
