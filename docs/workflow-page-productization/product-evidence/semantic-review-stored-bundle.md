@@ -16,11 +16,13 @@ Checklist item: S3 Review live bundle presenter path toward real Macro Review ev
 What this proves:
 
 - Macro Review can render from a stored bundle directory, not only from an in-memory fixture projection.
+- Bundle Health appears before Teach System actions, showing manifest validation status, Available/Missing artifact counts and suppression count/detail.
 - Source, Runtime and Diff evidence tiles show `Available` states and thumbnails from file-backed artifact refs.
 - Candidate artifact actions are visible only when the presenter-style artifact status says the safe ref exists.
+- Teach System candidates show `review.draftCandidate` with frame, source preview, source artifact and Draft Preview mutation boundary before the user creates a patch.
 - The selected wait frame still supports review-only Draft Patch generation before Draft Preview import.
 
 Known gaps:
 
 - This is stored fixture evidence, not an installed-app live capture.
-- It intentionally does not include a fake `.mov`; live `.mov` / keyframe bundle creation, live Open/Reveal recording, and confirmed Review -> Draft Preview import from a live bundle remain S2/S3 follow-up gates.
+- It intentionally does not include a fake `.mov`, so Bundle Health honestly reports one missing artifact while PNG evidence is available; live `.mov` / keyframe bundle creation, live Open/Reveal recording, and confirmed Review -> Draft Preview import from a live bundle remain S2/S3 follow-up gates.

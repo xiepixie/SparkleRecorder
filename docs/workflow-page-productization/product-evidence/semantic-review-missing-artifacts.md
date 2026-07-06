@@ -17,7 +17,9 @@ Checklist item: S3 Review missing/deleted artifact drill-in and S4 evidence stat
 What this proves:
 
 - Macro Review still opens from a stored bundle when referenced source/runtime/diff artifact files are missing.
+- Bundle Health summarizes missing refs before Teach/Draft actions, so users see evidence readiness before creating or importing a patch.
 - Candidate and Source/Runtime/Diff evidence rows show `Missing file` instead of hiding the evidence ref or silently dropping Open/Reveal affordances.
+- The candidate still shows `review.draftCandidate` with the original source artifact ref and Draft Preview mutation boundary, making the missing file a visible evidence status rather than a different action semantic.
 - Missing rows explain that Open/Reveal is unavailable and point to retention, delayed writes or omitted sidecars as likely causes.
 - The Review action contract remains visible, so missing artifact status is evidence context, not a hidden workflow mutation.
 

@@ -502,6 +502,7 @@ struct SemanticRecordingReviewFixtureView: View {
     private var inspector: some View {
         ScrollView(.vertical, showsIndicators: false) {
             VStack(alignment: .leading, spacing: 14) {
+                bundleHealthSection
                 conditionCandidates
                 regionSelectionSection
                 draftPatchSection
@@ -513,6 +514,77 @@ struct SemanticRecordingReviewFixtureView: View {
         }
         .frame(width: 380, alignment: .topLeading)
         .clipped()
+    }
+
+    @ViewBuilder
+    private var bundleHealthSection: some View {
+        if let reviewState {
+            let counts = artifactAvailabilityCounts(reviewState)
+            VStack(alignment: .leading, spacing: 10) {
+                sectionTitle("Bundle Health")
+                inspectorRow(
+                    title: reviewState.validationIssues.isEmpty
+                        ? NSLocalizedString("Bundle ready", comment: "")
+                        : String(
+                            format: NSLocalizedString("%d validation issues", comment: ""),
+                            reviewState.validationIssues.count
+                        ),
+                    subtitle: reviewState.sourceName,
+                    detail: bundleHealthDetail(reviewState),
+                    accent: reviewState.validationIssues.isEmpty
+                        ? Color(red: 0.48, green: 0.76, blue: 0.52)
+                        : Color(red: 1.00, green: 0.72, blue: 0.30)
+                )
+
+                HStack(spacing: 8) {
+                    bundleHealthMetric(
+                        NSLocalizedString("Available", comment: ""),
+                        "\(counts.available)/\(counts.total)",
+                        tint: Color(red: 0.48, green: 0.76, blue: 0.52)
+                    )
+                    bundleHealthMetric(
+                        NSLocalizedString("Missing", comment: ""),
+                        "\(counts.missing)",
+                        tint: counts.missing == 0
+                            ? Color.white.opacity(0.40)
+                            : Color(red: 1.00, green: 0.72, blue: 0.30)
+                    )
+                    bundleHealthMetric(
+                        NSLocalizedString("Suppressed", comment: ""),
+                        "\(projection.suppressionRows.count)",
+                        tint: projection.suppressionRows.isEmpty
+                            ? Color.white.opacity(0.40)
+                            : Color(red: 1.00, green: 0.50, blue: 0.58)
+                    )
+                }
+
+                if !reviewState.validationIssues.isEmpty {
+                    VStack(alignment: .leading, spacing: 6) {
+                        ForEach(Array(reviewState.validationIssues.prefix(2).enumerated()), id: \.offset) { _, issue in
+                            bundleHealthInfoRow(
+                                title: NSLocalizedString("Validation", comment: ""),
+                                value: validationIssueLabel(issue),
+                                systemImage: "exclamationmark.triangle",
+                                tint: Color(red: 1.00, green: 0.72, blue: 0.30)
+                            )
+                        }
+                    }
+                }
+
+                if !projection.suppressionRows.isEmpty {
+                    VStack(alignment: .leading, spacing: 6) {
+                        ForEach(projection.suppressionRows.prefix(2)) { suppression in
+                            bundleHealthInfoRow(
+                                title: suppression.reason.rawValue,
+                                value: suppressionDetail(suppression),
+                                systemImage: "hand.raised",
+                                tint: Color(red: 1.00, green: 0.50, blue: 0.58)
+                            )
+                        }
+                    }
+                }
+            }
+        }
     }
 
     @ViewBuilder
@@ -571,6 +643,7 @@ struct SemanticRecordingReviewFixtureView: View {
                             accent: Color(red: 0.48, green: 0.76, blue: 0.52)
                         )
                         artifactAvailabilityLine(path: candidate.artifactPath)
+                        conditionCandidateReviewActionContract(candidate)
 
                         HStack(spacing: 8) {
                             Button(NSLocalizedString("Draft Patch", comment: ""), systemImage: "doc.badge.gearshape") {
@@ -830,6 +903,77 @@ struct SemanticRecordingReviewFixtureView: View {
         )
     }
 
+    private func conditionCandidateReviewActionContract(
+        _ candidate: SemanticRecordingReviewProjection.ConditionCandidateRow
+    ) -> some View {
+        let selection = regionSelection?.frameID == candidate.sourceFrameID
+            ? regionSelection
+            : nil
+        let semantics = SemanticRecordingReviewActionSemantics.draftCandidate(
+            candidate,
+            regionSelection: selection
+        )
+        let presentation = SemanticRecordingReviewActionPresentation(semantics)
+        let rows = presentation.rows.filter { row in
+            switch row.kind {
+            case .artifact, .bounds, .frame, .sourcePreview, .summary:
+                return true
+            case .action,
+                 .draftCondition,
+                 .draftTask,
+                 .events,
+                 .materializedArtifact,
+                 .materializedDigest,
+                 .mutationBoundary,
+                 .mutationEffect,
+                 .observations,
+                 .suggestion,
+                 .visualAsset,
+                 .visualRegion:
+                return false
+            }
+        }
+
+        return VStack(alignment: .leading, spacing: 6) {
+            HStack(alignment: .firstTextBaseline, spacing: 6) {
+                Image(systemName: "checklist")
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(Color(red: 0.34, green: 0.72, blue: 0.95))
+                Text(NSLocalizedString("Review Action", comment: ""))
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(Color.white.opacity(0.52))
+                Text(reviewActionEvidenceLabel(semantics.evidence))
+                    .font(.system(size: 10, weight: .medium, design: .monospaced))
+                    .foregroundStyle(Color.white.opacity(0.42))
+                    .lineLimit(1)
+                Spacer(minLength: 0)
+            }
+
+            reviewActionContractRow(semantics)
+
+            ForEach(Array(rows.prefix(3).enumerated()), id: \.offset) { _, row in
+                HStack(alignment: .firstTextBaseline, spacing: 6) {
+                    Text(row.label)
+                        .font(.system(size: 9, weight: .semibold))
+                        .foregroundStyle(Color.white.opacity(0.40))
+                        .frame(width: 78, alignment: .leading)
+                    Text(row.value)
+                        .font(.system(size: 9, weight: .medium, design: .monospaced))
+                        .foregroundStyle(Color.white.opacity(0.54))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.82)
+                }
+            }
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 8)
+        .background(Color.black.opacity(0.14), in: RoundedRectangle(cornerRadius: 7))
+        .overlay(
+            RoundedRectangle(cornerRadius: 7)
+                .stroke(Color.white.opacity(0.08), lineWidth: 1)
+        )
+    }
+
     private func draftPatchActionContract(
         _ result: SemanticRecordingReviewDraftPatchResult
     ) -> some View {
@@ -1059,6 +1203,108 @@ struct SemanticRecordingReviewFixtureView: View {
                 accent: Color(red: 1.00, green: 0.50, blue: 0.58)
             )
         }
+    }
+
+    private func bundleHealthMetric(
+        _ title: String,
+        _ value: String,
+        tint: Color
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 3) {
+            Text(value)
+                .font(.system(size: 13, weight: .semibold, design: .monospaced))
+                .foregroundStyle(tint)
+                .lineLimit(1)
+            Text(title)
+                .font(.system(size: 9, weight: .semibold))
+                .foregroundStyle(Color.white.opacity(0.42))
+                .lineLimit(1)
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 8)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.black.opacity(0.14), in: RoundedRectangle(cornerRadius: 7))
+        .overlay(
+            RoundedRectangle(cornerRadius: 7)
+                .stroke(tint.opacity(0.18), lineWidth: 1)
+        )
+    }
+
+    private func bundleHealthInfoRow(
+        title: String,
+        value: String,
+        systemImage: String,
+        tint: Color
+    ) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 6) {
+            Image(systemName: systemImage)
+                .font(.system(size: 10, weight: .semibold))
+                .foregroundStyle(tint)
+            Text(title)
+                .font(.system(size: 10, weight: .semibold))
+                .foregroundStyle(Color.white.opacity(0.50))
+                .frame(width: 78, alignment: .leading)
+                .lineLimit(1)
+            Text(value)
+                .font(.system(size: 10, weight: .medium))
+                .foregroundStyle(Color.white.opacity(0.58))
+                .lineLimit(2)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 7)
+        .background(tint.opacity(0.08), in: RoundedRectangle(cornerRadius: 7))
+        .overlay(
+            RoundedRectangle(cornerRadius: 7)
+                .stroke(tint.opacity(0.18), lineWidth: 1)
+        )
+    }
+
+    private func artifactAvailabilityCounts(
+        _ state: SemanticRecordingReviewState
+    ) -> (total: Int, available: Int, missing: Int) {
+        let total = state.artifactStatuses.count
+        let available = state.artifactStatuses.values.filter(\.exists).count
+        return (total, available, max(0, total - available))
+    }
+
+    private func bundleHealthDetail(_ state: SemanticRecordingReviewState) -> String {
+        if state.validationIssues.isEmpty {
+            return NSLocalizedString(
+                "Manifest references validate. Review edits still require Draft Preview before import.",
+                comment: ""
+            )
+        }
+        return NSLocalizedString(
+            "Review can still inspect available evidence, but fix bundle references before treating suggestions as product-ready.",
+            comment: ""
+        )
+    }
+
+    private func validationIssueLabel(_ issue: SemanticRecordingBundleIssue) -> String {
+        String(describing: issue)
+            .replacingOccurrences(of: "SemanticRecordingBundleIssue.", with: "")
+    }
+
+    private func suppressionDetail(
+        _ suppression: SemanticRecordingReviewProjection.SuppressionRow
+    ) -> String {
+        var parts: [String] = []
+        if let recordingTime = suppression.recordingTime {
+            parts.append(timeLabel(recordingTime))
+        }
+        if let frameID = suppression.frameID {
+            parts.append("frame \(shortID(frameID))")
+        }
+        if suppression.count > 1 {
+            parts.append("\(suppression.count)x")
+        }
+        if let detail = suppression.detail {
+            parts.append(detail)
+        }
+        return parts.isEmpty
+            ? NSLocalizedString("Sensitive context was recorded and kept as review evidence.", comment: "")
+            : parts.joined(separator: " · ")
     }
 
     private func inspectorRow(
