@@ -29,6 +29,11 @@ public struct SemanticRecordingReviewActionSemantics: Codable, Equatable, Sendab
         public var artifactPath: String?
         public var materializedArtifactPath: String?
         public var materializedSHA256: String?
+        public var draftTaskKey: String?
+        public var draftConditionType: String?
+        public var visualRegionKey: String?
+        public var visualAssetKind: SemanticRecordingReviewMaterializedAssetKind?
+        public var visualAssetKey: String?
         public var bounds: RecordingBounds?
         public var summary: String?
 
@@ -41,6 +46,11 @@ public struct SemanticRecordingReviewActionSemantics: Codable, Equatable, Sendab
             artifactPath: String? = nil,
             materializedArtifactPath: String? = nil,
             materializedSHA256: String? = nil,
+            draftTaskKey: String? = nil,
+            draftConditionType: String? = nil,
+            visualRegionKey: String? = nil,
+            visualAssetKind: SemanticRecordingReviewMaterializedAssetKind? = nil,
+            visualAssetKey: String? = nil,
             bounds: RecordingBounds? = nil,
             summary: String? = nil
         ) {
@@ -52,6 +62,11 @@ public struct SemanticRecordingReviewActionSemantics: Codable, Equatable, Sendab
             self.artifactPath = artifactPath
             self.materializedArtifactPath = materializedArtifactPath
             self.materializedSHA256 = materializedSHA256
+            self.draftTaskKey = draftTaskKey
+            self.draftConditionType = draftConditionType
+            self.visualRegionKey = visualRegionKey
+            self.visualAssetKind = visualAssetKind
+            self.visualAssetKey = visualAssetKey
             self.bounds = bounds
             self.summary = summary
         }
@@ -333,6 +348,17 @@ public struct SemanticRecordingReviewActionSemantics: Codable, Equatable, Sendab
         for evidence: EvidenceAlignment,
         in materializedAssets: [SemanticRecordingReviewMaterializedAsset]
     ) -> SemanticRecordingReviewMaterializedAsset? {
+        if let visualAssetKey = evidence.visualAssetKey {
+            if let visualAssetKind = evidence.visualAssetKind,
+               let keyed = materializedAssets.first(where: {
+                   $0.key == visualAssetKey && $0.kind == visualAssetKind
+               }) {
+                return keyed
+            }
+            if let keyed = materializedAssets.first(where: { $0.key == visualAssetKey }) {
+                return keyed
+            }
+        }
         if let artifactPath = evidence.artifactPath,
            let exact = materializedAssets.first(where: { $0.sourcePath == artifactPath }) {
             return exact
@@ -969,6 +995,21 @@ public enum SemanticRecordingReviewDraftPatchBuilder {
             appliesToExistingTask: appliesToExistingTask
         ))
 
+        var actionEvidence = actionEvidence(
+            request: request,
+            frame: frame
+        )
+        actionEvidence.draftTaskKey = taskKey
+        actionEvidence.draftConditionType = condition.type
+        actionEvidence.visualRegionKey = region.key
+        if let imageAsset {
+            actionEvidence.visualAssetKind = .image
+            actionEvidence.visualAssetKey = imageAsset.key
+        } else if let baselineAsset {
+            actionEvidence.visualAssetKind = .baseline
+            actionEvidence.visualAssetKey = baselineAsset.key
+        }
+
         return SemanticRecordingReviewDraftPatchResult(
             patch: AutomationWorkflowDraftPatchDocument(ops: operations),
             taskKey: taskKey,
@@ -977,10 +1018,7 @@ public enum SemanticRecordingReviewDraftPatchBuilder {
             imageAsset: imageAsset,
             baselineAsset: baselineAsset,
             assetExtractions: assetExtractions,
-            actionEvidence: actionEvidence(
-                request: request,
-                frame: frame
-            ),
+            actionEvidence: actionEvidence,
             appliesToExistingTask: appliesToExistingTask
         )
     }

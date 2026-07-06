@@ -137,6 +137,11 @@ struct SemanticRecordingReviewActionSemanticsTests {
         ])
         #expect(result.actionEvidence.observationIDs == [SemanticRecordingFixture.ocrObservationID])
         #expect(result.actionEvidence.artifactPath == "visual-index/ocr/confirmation-region.png")
+        #expect(result.actionEvidence.draftTaskKey == result.taskKey)
+        #expect(result.actionEvidence.draftConditionType == result.condition.type)
+        #expect(result.actionEvidence.visualRegionKey == result.region?.key)
+        #expect(result.actionEvidence.visualAssetKind == nil)
+        #expect(result.actionEvidence.visualAssetKey == nil)
         #expect(preview.evidence == result.actionEvidence)
     }
 
@@ -187,6 +192,9 @@ struct SemanticRecordingReviewActionSemanticsTests {
         #expect(result.actionEvidence.observationIDs == [SemanticRecordingFixture.ocrObservationID])
         #expect(result.actionEvidence.sourcePreviewRefID == SemanticRecordingFixture.sourceOCRRefID)
         #expect(result.actionEvidence.artifactPath == "visual-index/ocr/confirmation-region.png")
+        #expect(result.actionEvidence.draftTaskKey == result.taskKey)
+        #expect(result.actionEvidence.draftConditionType == result.condition.type)
+        #expect(result.actionEvidence.visualRegionKey == result.region?.key)
         #expect(result.actionEvidence.bounds == selection.bounds)
         #expect(result.actionEvidence.summary == "Reviewed confirmation crop")
     }
@@ -219,6 +227,11 @@ struct SemanticRecordingReviewActionSemanticsTests {
         #expect(result.actionEvidence.sourcePreviewRefID == SemanticRecordingFixture.sourceTemplateRefID)
         #expect(result.actionEvidence.observationIDs.isEmpty)
         #expect(result.actionEvidence.artifactPath == "visual-index/templates/checkout-button.png")
+        #expect(result.actionEvidence.draftTaskKey == "wait_checkout_button")
+        #expect(result.actionEvidence.draftConditionType == "imageAppeared")
+        #expect(result.actionEvidence.visualRegionKey == result.region?.key)
+        #expect(result.actionEvidence.visualAssetKind == .image)
+        #expect(result.actionEvidence.visualAssetKey == result.imageAsset?.key)
         #expect(result.actionEvidence.bounds == RecordingBounds(
             rect: RecordingRect(x: 880, y: 620, width: 180, height: 48),
             coordinateSpace: .windowPixels
@@ -273,11 +286,80 @@ struct SemanticRecordingReviewActionSemanticsTests {
         let expectedDigest = "20dc26ad587152ac3f284bd839b19944cb945d680f3220334697b5aa0f455f13"
 
         #expect(preview.evidence.artifactPath == "visual-index/templates/checkout-button.png")
+        #expect(preview.evidence.draftTaskKey == result.taskKey)
+        #expect(preview.evidence.draftConditionType == result.condition.type)
+        #expect(preview.evidence.visualRegionKey == result.region?.key)
+        #expect(preview.evidence.visualAssetKind == .image)
+        #expect(preview.evidence.visualAssetKey == result.imageAsset?.key)
         #expect(preview.evidence.materializedArtifactPath == expectedPath)
         #expect(preview.evidence.materializedSHA256 == expectedDigest)
         #expect(importAction.evidence.artifactPath == preview.evidence.artifactPath)
         #expect(importAction.evidence.materializedArtifactPath == expectedPath)
         #expect(importAction.evidence.materializedSHA256 == expectedDigest)
+    }
+
+    @Test("Materialized draft actions align by visual asset key before source path")
+    func materializedDraftActionsAlignByVisualAssetKeyBeforeSourcePath() throws {
+        let bundle = SemanticRecordingFixture.checkoutBundle()
+        let projection = SemanticRecordingReviewProjection(
+            bundle: bundle,
+            selectedEventID: SemanticRecordingFixture.clickEventID
+        )
+        let candidate = try #require(
+            projection.selectedFrame?.conditionCandidates.first { $0.kind == .imageAppeared }
+        )
+        let selection = SemanticRecordingFrameRegionSelection(
+            frameID: SemanticRecordingFixture.beforeClickFrameID,
+            surfaceID: SemanticRecordingFixture.surfaceID,
+            bounds: RecordingBounds(
+                rect: RecordingRect(x: 20, y: 30, width: 80, height: 50),
+                coordinateSpace: .framePixels
+            ),
+            imageSize: RecordingImageSize(width: 1_440, height: 900),
+            label: "Reviewed crop",
+            candidateKind: .imageAppeared,
+            sourcePreviewRefID: candidate.sourcePreviewRefID,
+            observationID: candidate.observationID,
+            artifactPath: candidate.artifactPath
+        )
+        let result = try SemanticRecordingReviewDraftPatchBuilder.makePatch(
+            bundle: bundle,
+            request: SemanticRecordingReviewDraftPatchRequest(
+                candidate: candidate,
+                regionSelection: selection
+            )
+        )
+        let materialized = try SemanticRecordingReviewAssetMaterializer.materialize(
+            patch: result.patch,
+            assetExtractions: result.assetExtractions,
+            readArtifact: { sourcePath in
+                #expect(sourcePath == "frames/000014-before-click.png")
+                return Data("frame-image".utf8)
+            },
+            prepareAssetData: { _, _ in Data("reviewed-crop".utf8) },
+            writeAsset: { _, _ in }
+        )
+        let unrelatedExactPathAsset = SemanticRecordingReviewMaterializedAsset(
+            kind: .baseline,
+            key: "unrelated_baseline",
+            sourcePath: "visual-index/templates/checkout-button.png",
+            destinationPath: "assets/baselines/unrelated_baseline.png",
+            sha256: "wrong-digest"
+        )
+
+        let preview = SemanticRecordingReviewActionSemantics.previewDraft(
+            result,
+            materializedAssets: [unrelatedExactPathAsset] + materialized.copiedAssets
+        )
+        let expectedPath = "assets/images/sr_00000001_checkout_button_0000000f_template.png"
+        let expectedDigest = "4d46c6635bf07c73339741bc5331e52b53bd56fb3cbc5217f4a516ff232c7424"
+
+        #expect(result.actionEvidence.artifactPath == "visual-index/templates/checkout-button.png")
+        #expect(result.actionEvidence.visualAssetKind == .image)
+        #expect(result.actionEvidence.visualAssetKey == result.imageAsset?.key)
+        #expect(preview.evidence.materializedArtifactPath == expectedPath)
+        #expect(preview.evidence.materializedSHA256 == expectedDigest)
+        #expect(preview.evidence.materializedSHA256 != unrelatedExactPathAsset.sha256)
     }
 
     @Test("Review action semantics are Codable for S4 JSON payloads")
