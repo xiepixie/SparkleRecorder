@@ -66,9 +66,16 @@ enum SemanticRecordingReviewPresenterError: LocalizedError {
     }
 }
 
+struct SemanticRecordingReviewDraftPreviewResult {
+    var previewState: AutomationWorkflowDraftPreviewState
+    var previewAction: SemanticRecordingReviewActionSemantics
+    var importAction: SemanticRecordingReviewActionSemantics
+}
+
 private struct SemanticRecordingReviewMaterializedPatch {
     var patch: AutomationWorkflowDraftPatchDocument
     var packageDirectory: URL?
+    var copiedAssets: [SemanticRecordingReviewMaterializedAsset]
 }
 
 @MainActor
@@ -210,13 +217,40 @@ enum SemanticRecordingReviewPresenter {
         sourceName: String,
         sourceDirectory: URL?
     ) throws -> AutomationWorkflowDraftPreviewState {
-        try previewState(
+        try previewResult(
+            applying: result,
+            to: workflow,
+            macros: macros,
+            sourceName: sourceName,
+            sourceDirectory: sourceDirectory
+        ).previewState
+    }
+
+    static func previewResult(
+        applying result: SemanticRecordingReviewDraftPatchResult,
+        to workflow: AutomationWorkflow?,
+        macros: [SavedMacro],
+        sourceName: String,
+        sourceDirectory: URL?
+    ) throws -> SemanticRecordingReviewDraftPreviewResult {
+        let preview = try materializedPreview(
             applying: result.patch,
             assetExtractions: result.assetExtractions,
             to: workflow,
             macros: macros,
             sourceName: sourceName,
             sourceDirectory: sourceDirectory
+        )
+        return SemanticRecordingReviewDraftPreviewResult(
+            previewState: preview.previewState,
+            previewAction: .previewDraft(
+                result,
+                materializedAssets: preview.copiedAssets
+            ),
+            importAction: .importDraft(
+                result,
+                materializedAssets: preview.copiedAssets
+            )
         )
     }
 
@@ -227,24 +261,27 @@ enum SemanticRecordingReviewPresenter {
         sourceName: String,
         sourceDirectory: URL?
     ) throws -> AutomationWorkflowDraftPreviewState {
-        try previewState(
+        try materializedPreview(
             applying: patch,
             assetExtractions: [],
             to: workflow,
             macros: macros,
             sourceName: sourceName,
             sourceDirectory: sourceDirectory
-        )
+        ).previewState
     }
 
-    private static func previewState(
+    private static func materializedPreview(
         applying patch: AutomationWorkflowDraftPatchDocument,
         assetExtractions: [SemanticRecordingReviewAssetExtraction],
         to workflow: AutomationWorkflow?,
         macros: [SavedMacro],
         sourceName: String,
         sourceDirectory: URL?
-    ) throws -> AutomationWorkflowDraftPreviewState {
+    ) throws -> (
+        previewState: AutomationWorkflowDraftPreviewState,
+        copiedAssets: [SemanticRecordingReviewMaterializedAsset]
+    ) {
         let materializedPatch = try materializePatchAssetsIfNeeded(
             patch,
             assetExtractions: assetExtractions,
@@ -273,19 +310,25 @@ enum SemanticRecordingReviewPresenter {
         )
         guard let workflow,
               var compiledWorkflow = preview.compiledWorkflow else {
-            return preview
+            return (
+                previewState: preview,
+                copiedAssets: materializedPatch.copiedAssets
+            )
         }
 
         compiledWorkflow.id = workflow.id
         compiledWorkflow.createdAt = workflow.createdAt
-        return AutomationWorkflowDraftPreviewState(
-            sourceName: preview.sourceName,
-            sourceDirectory: preview.sourceDirectory,
-            loadedAt: preview.loadedAt,
-            document: preview.document,
-            macroCatalog: preview.macroCatalog,
-            projection: preview.projection,
-            compiledWorkflow: compiledWorkflow
+        return (
+            previewState: AutomationWorkflowDraftPreviewState(
+                sourceName: preview.sourceName,
+                sourceDirectory: preview.sourceDirectory,
+                loadedAt: preview.loadedAt,
+                document: preview.document,
+                macroCatalog: preview.macroCatalog,
+                projection: preview.projection,
+                compiledWorkflow: compiledWorkflow
+            ),
+            copiedAssets: materializedPatch.copiedAssets
         )
     }
 
@@ -297,7 +340,8 @@ enum SemanticRecordingReviewPresenter {
         guard let sourceDirectory else {
             return SemanticRecordingReviewMaterializedPatch(
                 patch: patch,
-                packageDirectory: nil
+                packageDirectory: nil,
+                copiedAssets: []
             )
         }
 
@@ -332,7 +376,8 @@ enum SemanticRecordingReviewPresenter {
 
         return SemanticRecordingReviewMaterializedPatch(
             patch: materialized.patch,
-            packageDirectory: materialized.copiedAssets.isEmpty ? nil : packageDirectory
+            packageDirectory: materialized.copiedAssets.isEmpty ? nil : packageDirectory,
+            copiedAssets: materialized.copiedAssets
         )
     }
 

@@ -21,6 +21,7 @@ struct SemanticRecordingReviewFixtureView: View {
     @State private var draftPatchSourceSuggestionID: UUID?
     @State private var draftPatchErrorMessage = ""
     @State private var draftPreviewState: AutomationWorkflowDraftPreviewState?
+    @State private var draftPreviewActionPresentations: [SemanticRecordingReviewActionPresentation] = []
     @State private var patchSaveMessage = ""
     @State private var artifactFeedback: SemanticRecordingReviewArtifactActionFeedback?
     @State private var dragStartPoint: CGPoint?
@@ -831,6 +832,12 @@ struct SemanticRecordingReviewFixtureView: View {
     ) -> some View {
         let preview = SemanticRecordingReviewActionSemantics.previewDraft(result)
         let importAction = SemanticRecordingReviewActionSemantics.importDraft(result)
+        let presentations = draftPreviewActionPresentations.isEmpty
+            ? [
+                SemanticRecordingReviewActionPresentation(preview),
+                SemanticRecordingReviewActionPresentation(importAction)
+            ]
+            : draftPreviewActionPresentations
 
         return VStack(alignment: .leading, spacing: 7) {
             HStack(alignment: .firstTextBaseline, spacing: 6) {
@@ -847,8 +854,9 @@ struct SemanticRecordingReviewFixtureView: View {
                 Spacer(minLength: 0)
             }
 
-            reviewActionPresentationRows(preview)
-            reviewActionPresentationRows(importAction)
+            ForEach(Array(presentations.enumerated()), id: \.offset) { _, presentation in
+                reviewActionPresentationRows(presentation)
+            }
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 8)
@@ -883,23 +891,28 @@ struct SemanticRecordingReviewFixtureView: View {
     private func reviewActionPresentationRows(
         _ semantics: SemanticRecordingReviewActionSemantics
     ) -> some View {
-        let presentation = SemanticRecordingReviewActionPresentation(semantics)
+        reviewActionPresentationRows(SemanticRecordingReviewActionPresentation(semantics))
+    }
+
+    private func reviewActionPresentationRows(
+        _ presentation: SemanticRecordingReviewActionPresentation
+    ) -> some View {
         let rows = presentation.rows.filter { reviewActionPresentationRowIsVisible($0.kind) }
 
         return VStack(alignment: .leading, spacing: 5) {
             HStack(alignment: .firstTextBaseline, spacing: 6) {
-                Image(systemName: reviewActionSystemImage(semantics))
+                Image(systemName: reviewActionSystemImage(presentation.actionName))
                     .font(.system(size: 10, weight: .semibold))
-                    .foregroundStyle(reviewActionTint(semantics))
+                    .foregroundStyle(reviewActionTint(presentation.actionName))
                 Text(presentation.actionName.rawValue)
                     .font(.system(size: 10, weight: .semibold, design: .monospaced))
                     .foregroundStyle(Color.white.opacity(0.62))
                     .lineLimit(1)
                     .minimumScaleFactor(0.85)
                 Spacer(minLength: 8)
-                Text(mutationBoundaryLabel(semantics.mutationBoundary))
+                Text(reviewActionBoundaryValue(presentation))
                     .font(.system(size: 10, weight: .semibold))
-                    .foregroundStyle(reviewActionTint(semantics).opacity(0.82))
+                    .foregroundStyle(reviewActionTint(presentation.actionName).opacity(0.82))
                     .lineLimit(1)
                     .minimumScaleFactor(0.85)
             }
@@ -1415,11 +1428,13 @@ struct SemanticRecordingReviewFixtureView: View {
                     pixelColorHex: pixelColorHex(for: candidate)
                 )
             )
+            draftPreviewActionPresentations = []
             draftPatchSourceSuggestionID = nil
             draftPatchErrorMessage = ""
             patchSaveMessage = ""
         } catch {
             draftPatchResult = nil
+            draftPreviewActionPresentations = []
             draftPatchSourceSuggestionID = nil
             draftPatchErrorMessage = String(describing: error)
         }
@@ -1453,12 +1468,14 @@ struct SemanticRecordingReviewFixtureView: View {
                 bundle: bundle,
                 request: request
             )
+            draftPreviewActionPresentations = []
             draftPatchErrorMessage = ""
             patchSaveMessage = ""
             draftPatchSourceSuggestionID = suggestion.id
             suggestionReviewDecisions[suggestion.id] = .accepted
         } catch {
             draftPatchResult = nil
+            draftPreviewActionPresentations = []
             draftPatchSourceSuggestionID = nil
             draftPatchErrorMessage = String(describing: error)
         }
@@ -1572,16 +1589,22 @@ struct SemanticRecordingReviewFixtureView: View {
 
     private func openDraftPreview(_ result: SemanticRecordingReviewDraftPatchResult) {
         do {
-            draftPreviewState = try SemanticRecordingReviewPresenter.previewState(
+            let previewResult = try SemanticRecordingReviewPresenter.previewResult(
                 applying: result,
                 to: workflow,
                 macros: macros,
                 sourceName: "Macro Review \(shortID(projection.recordingID))",
                 sourceDirectory: reviewState?.bundleDirectory
             )
+            draftPreviewState = previewResult.previewState
+            draftPreviewActionPresentations = [
+                SemanticRecordingReviewActionPresentation(previewResult.previewAction),
+                SemanticRecordingReviewActionPresentation(previewResult.importAction)
+            ]
             draftPatchErrorMessage = ""
         } catch {
             draftPreviewState = nil
+            draftPreviewActionPresentations = []
             draftPatchErrorMessage = String(describing: error)
         }
     }
@@ -1786,7 +1809,13 @@ struct SemanticRecordingReviewFixtureView: View {
     private func reviewActionSystemImage(
         _ semantics: SemanticRecordingReviewActionSemantics
     ) -> String {
-        switch semantics.actionName {
+        reviewActionSystemImage(semantics.actionName)
+    }
+
+    private func reviewActionSystemImage(
+        _ actionName: SemanticRecordingReviewActionSemantics.ActionName
+    ) -> String {
+        switch actionName {
         case .acceptSuggestion:
             return "checkmark.circle"
         case .rejectSuggestion:
@@ -1805,7 +1834,13 @@ struct SemanticRecordingReviewFixtureView: View {
     private func reviewActionTint(
         _ semantics: SemanticRecordingReviewActionSemantics
     ) -> Color {
-        switch semantics.actionName {
+        reviewActionTint(semantics.actionName)
+    }
+
+    private func reviewActionTint(
+        _ actionName: SemanticRecordingReviewActionSemantics.ActionName
+    ) -> Color {
+        switch actionName {
         case .acceptSuggestion, .importDraft:
             return Color(red: 0.48, green: 0.76, blue: 0.52)
         case .rejectSuggestion:
@@ -1817,6 +1852,12 @@ struct SemanticRecordingReviewFixtureView: View {
         case .previewDraft:
             return Color(red: 1.00, green: 0.72, blue: 0.30)
         }
+    }
+
+    private func reviewActionBoundaryValue(
+        _ presentation: SemanticRecordingReviewActionPresentation
+    ) -> String {
+        presentation.rows.first { $0.kind == .mutationBoundary }?.value ?? ""
     }
 
     private func mutationBoundaryLabel(

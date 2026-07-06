@@ -438,6 +438,30 @@ struct SemanticRecordingReviewActionSemanticsTests {
         #expect(decoded.summary.contains("visual-index/ocr/confirmation-region.png"))
     }
 
+    @Test("Raw S4 suggestion presentations preserve review evidence rows")
+    func rawS4SuggestionPresentationsPreserveReviewEvidenceRows() throws {
+        let bundle = SemanticRecordingFixture.checkoutBundle()
+        let suggestion = try #require(
+            SemanticRecordingFixture.checkoutSuggestions(bundle: bundle).first
+        )
+
+        let presentation = SemanticRecordingReviewActionPresentation(
+            .acceptSuggestion(suggestion)
+        )
+        let rowsByKind = Dictionary(uniqueKeysWithValues: presentation.rows.map { ($0.kind, $0) })
+
+        #expect(presentation.actionName == .acceptSuggestion)
+        #expect(rowsByKind[.mutationBoundary]?.value == "Draft Preview required")
+        #expect(rowsByKind[.mutationEffect]?.value == "Creates reviewed draft patch")
+        #expect(rowsByKind[.suggestion]?.value == "00000014")
+        #expect(rowsByKind[.frame]?.value == "00000005")
+        #expect(rowsByKind[.events]?.value == "00000007, 00000008")
+        #expect(rowsByKind[.observations]?.value == "0000000c")
+        #expect(rowsByKind[.artifact]?.value == "visual-index/ocr/confirmation-region.png")
+        #expect(rowsByKind[.bounds]?.value == "700,210 260x42 windowPixels")
+        #expect(rowsByKind[.summary]?.value == "Recorded text appeared after the checkout click.")
+    }
+
     @Test("Review action semantics are Codable for S4 JSON payloads")
     func reviewActionSemanticsAreCodableForS4JSONPayloads() throws {
         let bundle = SemanticRecordingFixture.checkoutBundle()
