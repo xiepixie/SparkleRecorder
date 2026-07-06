@@ -155,6 +155,108 @@ struct AutomationViewProjectionTests {
         ])
     }
 
+    @Test("Macro Review source presentation exposes failed event target")
+    func macroReviewSourcePresentationExposesFailedEventTarget() throws {
+        let workflowID = UUID()
+        let taskID = UUID()
+        let macroID = UUID()
+        let reference = MacroSemanticRecordingReference(
+            recordingID: UUID(),
+            bundleRelativePath: "SemanticRecordings/demo",
+            manifestRelativePath: "SemanticRecordings/demo/manifest.json",
+            eventCount: 4
+        )
+        let workflow = AutomationWorkflow(
+            id: workflowID,
+            name: "Review flow",
+            tasks: [
+                AutomationTask(
+                    id: taskID,
+                    name: "Upload report",
+                    kind: .macro(macroID: macroID)
+                )
+            ]
+        )
+        let macro = SavedMacro(
+            id: macroID,
+            name: "Upload report",
+            events: [TestFixtures.clickEvent()],
+            semanticRecording: reference
+        )
+        let run = AutomationTaskRun(
+            workflowID: workflowID,
+            taskID: taskID,
+            macroID: macroID,
+            outcome: .failed(report: RunReport(
+                runID: UUID(),
+                startTime: Date(timeIntervalSince1970: 1_800_000_000),
+                duration: 12,
+                isSuccess: false,
+                failedEventIndex: 2,
+                errorMessage: "Upload receipt was not visible"
+            ))
+        )
+
+        let presentation = AutomationMacroReviewSourcePresentation.make(
+            run: run,
+            workflow: workflow,
+            macros: [macro]
+        )
+
+        #expect(presentation.readinessBadges == [
+            .init(title: "Source", value: "Saved Macro"),
+            .init(title: "Scope", value: "Macro-level"),
+            .init(title: "Run", value: "Not bound"),
+            .init(title: "Target", value: "Event #3"),
+            .init(title: "Evidence", value: "Failure report"),
+            .init(title: "Fallback", value: "Bundle Picker")
+        ])
+    }
+
+    @Test("Macro Review source presentation exposes condition evidence target")
+    func macroReviewSourcePresentationExposesConditionEvidenceTarget() throws {
+        let workflowID = UUID()
+        let taskID = UUID()
+        let macroID = UUID()
+        let workflow = AutomationWorkflow(
+            id: workflowID,
+            name: "Review flow",
+            tasks: [
+                AutomationTask(
+                    id: taskID,
+                    name: "Wait for receipt",
+                    kind: .macro(macroID: macroID)
+                )
+            ]
+        )
+        let macro = SavedMacro(
+            id: macroID,
+            name: "Wait for receipt",
+            events: [TestFixtures.clickEvent()]
+        )
+        let run = AutomationTaskRun(
+            workflowID: workflowID,
+            taskID: taskID,
+            macroID: macroID,
+            outcome: .conditionNotMatched
+        )
+
+        let presentation = AutomationMacroReviewSourcePresentation.make(
+            run: run,
+            workflow: workflow,
+            macros: [macro]
+        )
+
+        #expect(presentation.readinessBadges == [
+            .init(title: "Source", value: "Manual"),
+            .init(title: "Scope", value: "User-picked"),
+            .init(title: "Run", value: "Not bound"),
+            .init(title: "Target", value: "Condition"),
+            .init(title: "Evidence", value: "Else branch"),
+            .init(title: "Fallback", value: "Bundle Picker")
+        ])
+    }
+
     @Test("Owner C fixture exposes all first milestone statuses")
     func ownerCFixtureExposesAllFirstMilestoneStatuses() {
         let projection = AutomationOverviewProjection.ownerCFixture()

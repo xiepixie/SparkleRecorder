@@ -78,7 +78,8 @@ public struct AutomationMacroReviewSourcePresentation: Equatable, Sendable {
                 readinessBadges: [
                     Badge(title: "Source", value: "Saved Macro"),
                     Badge(title: "Scope", value: "Macro-level"),
-                    Badge(title: "Run", value: "Not bound"),
+                    Badge(title: "Run", value: "Not bound")
+                ] + reviewTargetBadges(for: run) + [
                     Badge(title: "Fallback", value: "Bundle Picker")
                 ]
             )
@@ -93,10 +94,40 @@ public struct AutomationMacroReviewSourcePresentation: Equatable, Sendable {
             readinessBadges: [
                 Badge(title: "Source", value: "Manual"),
                 Badge(title: "Scope", value: "User-picked"),
-                Badge(title: "Run", value: "Not bound"),
+                Badge(title: "Run", value: "Not bound")
+            ] + reviewTargetBadges(for: run) + [
                 Badge(title: "Fallback", value: "Bundle Picker")
             ]
         )
+    }
+
+    private static func reviewTargetBadges(for run: AutomationTaskRun) -> [Badge] {
+        switch run.outcome {
+        case .failed(let report):
+            if let failedEventIndex = report?.failedEventIndex {
+                return [
+                    Badge(title: "Target", value: "Event #\(failedEventIndex + 1)"),
+                    Badge(title: "Evidence", value: "Failure report")
+                ]
+            }
+            return [
+                Badge(title: "Target", value: "Failed run"),
+                Badge(title: "Evidence", value: "Run outcome")
+            ]
+        case .timedOut:
+            return [
+                Badge(title: "Target", value: "Condition"),
+                Badge(title: "Evidence", value: "Timeout")
+            ]
+        case .conditionNotMatched:
+            return [
+                Badge(title: "Target", value: "Condition"),
+                Badge(title: "Evidence", value: "Else branch")
+            ]
+        case .succeeded, .cancelled, .resourceConflict, .permissionDenied,
+             .conditionMatched, .missingMacro, .rejected, nil:
+            return []
+        }
     }
 
     public var canRevealLinkedBundle: Bool {
