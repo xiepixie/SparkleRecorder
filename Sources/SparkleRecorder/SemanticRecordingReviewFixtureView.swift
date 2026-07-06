@@ -622,6 +622,8 @@ struct SemanticRecordingReviewFixtureView: View {
                     accent: Color(red: 0.34, green: 0.72, blue: 0.95)
                 )
 
+                draftPatchActionContract(draftPatchResult)
+
                 HStack(spacing: 8) {
                     Button(NSLocalizedString("Preview Draft", comment: ""), systemImage: "doc.text.magnifyingglass") {
                         openDraftPreview(draftPatchResult)
@@ -824,6 +826,39 @@ struct SemanticRecordingReviewFixtureView: View {
         )
     }
 
+    private func draftPatchActionContract(
+        _ result: SemanticRecordingReviewDraftPatchResult
+    ) -> some View {
+        let preview = SemanticRecordingReviewActionSemantics.previewDraft(result)
+        let importAction = SemanticRecordingReviewActionSemantics.importDraft(result)
+
+        return VStack(alignment: .leading, spacing: 7) {
+            HStack(alignment: .firstTextBaseline, spacing: 6) {
+                Image(systemName: "checklist")
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(Color(red: 0.34, green: 0.72, blue: 0.95))
+                Text(NSLocalizedString("Review Actions", comment: ""))
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(Color.white.opacity(0.52))
+                Text(result.actionEvidence.draftTaskKey ?? result.taskKey)
+                    .font(.system(size: 10, weight: .medium, design: .monospaced))
+                    .foregroundStyle(Color.white.opacity(0.42))
+                    .lineLimit(1)
+                Spacer(minLength: 0)
+            }
+
+            reviewActionPresentationRows(preview)
+            reviewActionPresentationRows(importAction)
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 8)
+        .background(Color.black.opacity(0.14), in: RoundedRectangle(cornerRadius: 7))
+        .overlay(
+            RoundedRectangle(cornerRadius: 7)
+                .stroke(Color.white.opacity(0.08), lineWidth: 1)
+        )
+    }
+
     private func reviewActionContractRow(
         _ semantics: SemanticRecordingReviewActionSemantics
     ) -> some View {
@@ -842,6 +877,46 @@ struct SemanticRecordingReviewFixtureView: View {
                 .foregroundStyle(reviewActionTint(semantics).opacity(0.82))
                 .lineLimit(1)
                 .minimumScaleFactor(0.85)
+        }
+    }
+
+    private func reviewActionPresentationRows(
+        _ semantics: SemanticRecordingReviewActionSemantics
+    ) -> some View {
+        let presentation = SemanticRecordingReviewActionPresentation(semantics)
+        let rows = presentation.rows.filter { reviewActionPresentationRowIsVisible($0.kind) }
+
+        return VStack(alignment: .leading, spacing: 5) {
+            HStack(alignment: .firstTextBaseline, spacing: 6) {
+                Image(systemName: reviewActionSystemImage(semantics))
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(reviewActionTint(semantics))
+                Text(presentation.actionName.rawValue)
+                    .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                    .foregroundStyle(Color.white.opacity(0.62))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.85)
+                Spacer(minLength: 8)
+                Text(mutationBoundaryLabel(semantics.mutationBoundary))
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(reviewActionTint(semantics).opacity(0.82))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.85)
+            }
+
+            ForEach(Array(rows.prefix(5).enumerated()), id: \.offset) { _, row in
+                HStack(alignment: .firstTextBaseline, spacing: 6) {
+                    Text(row.label)
+                        .font(.system(size: 9, weight: .semibold))
+                        .foregroundStyle(Color.white.opacity(0.40))
+                        .frame(width: 78, alignment: .leading)
+                    Text(row.value)
+                        .font(.system(size: 9, weight: .medium, design: .monospaced))
+                        .foregroundStyle(Color.white.opacity(0.54))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.82)
+                }
+            }
         }
     }
 
@@ -1756,6 +1831,32 @@ struct SemanticRecordingReviewFixtureView: View {
             return NSLocalizedString("Draft Preview required", comment: "")
         case .confirmedImport:
             return NSLocalizedString("Confirmed import", comment: "")
+        }
+    }
+
+    private func reviewActionPresentationRowIsVisible(
+        _ kind: SemanticRecordingReviewActionPresentation.RowKind
+    ) -> Bool {
+        switch kind {
+        case .artifact,
+             .bounds,
+             .draftCondition,
+             .draftTask,
+             .frame,
+             .materializedArtifact,
+             .materializedDigest,
+             .observations,
+             .sourcePreview,
+             .suggestion,
+             .summary,
+             .visualAsset,
+             .visualRegion:
+            return true
+        case .action,
+             .events,
+             .mutationBoundary,
+             .mutationEffect:
+            return false
         }
     }
 
