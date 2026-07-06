@@ -43,6 +43,45 @@ struct SemanticRecordingAcceptanceChecklistTests {
         }
     }
 
+    @Test("Unchecked checklist items have explicit open gate group coverage")
+    func uncheckedChecklistItemsHaveExplicitOpenGateGroupCoverage() throws {
+        let checklist = try String(
+            contentsOf: acceptanceChecklistURL(),
+            encoding: .utf8
+        )
+        let uncheckedItems = Self.uncheckedChecklistItems(in: checklist)
+        let auditSection = try #require(Self.section(named: "Current Open Gate Audit", in: checklist))
+        let auditRows = Self.auditGateRows(in: auditSection)
+
+        let coveragePrefixes = Self.uncheckedOpenGateCoverages.map(\.prefix)
+        let missingCoverage = uncheckedItems.filter { item in
+            !coveragePrefixes.contains { item.hasPrefix($0) }
+        }
+        let staleCoverage = coveragePrefixes.filter { prefix in
+            !uncheckedItems.contains { $0.hasPrefix(prefix) }
+        }
+
+        #expect(
+            missingCoverage.isEmpty,
+            "Every unchecked item must have an explicit open gate group mapping: \(missingCoverage)"
+        )
+        #expect(
+            staleCoverage.isEmpty,
+            "Unchecked gate mappings must stay in sync with current checklist item titles: \(staleCoverage)"
+        )
+
+        for coverage in Self.uncheckedOpenGateCoverages {
+            let row = try #require(
+                auditRows[coverage.gateGroup],
+                "Missing Current Open Gate Audit row for gate group: \(coverage.gateGroup)"
+            )
+            #expect(
+                row.contains(coverage.coveragePhrase),
+                "Unchecked item prefix '\(coverage.prefix)' is mapped to '\(coverage.gateGroup)', but that audit row does not mention '\(coverage.coveragePhrase)'"
+            )
+        }
+    }
+
     @Test("Open live gates stay mapped to playbook and evidence intake directory")
     func openLiveGatesStayMappedToPlaybookAndEvidenceDirectory() throws {
         let checklist = try String(
@@ -252,7 +291,7 @@ struct SemanticRecordingAcceptanceChecklistTests {
         "redacted frame/video consumption",
         "reviewed text-anchor mutation decision",
         "S4 default/live catalog readiness",
-        "image disappeared / region changed / pixel live conditions",
+        "image appeared/disappeared / region changed / pixel live conditions",
         "visual locator replacement",
         "image-byte visual similarity",
         "stored/live `workflow draft from-recording`",
@@ -299,6 +338,198 @@ struct SemanticRecordingAcceptanceChecklistTests {
         "Recording review screenshot with video frame, event row and OCR overlay.",
         "Frame-to-condition creation clip.",
         "AI cleanup suggestion screenshot with evidence explanation."
+    ]
+
+    private static let uncheckedOpenGateCoverages: [(
+        prefix: String,
+        gateGroup: String,
+        coveragePhrase: String
+    )] = [
+        (
+            "S2 live semantic recording product evidence is accepted as the unblocker for S3/S4.",
+            "S2 authorized live bundle",
+            "S2 live semantic recording product evidence"
+        ),
+        (
+            "S2 authorized live bundle gate is accepted.",
+            "S2 authorized live bundle",
+            "S2 authorized live bundle"
+        ),
+        (
+            "S2 ordinary Recorder bridge gate is accepted.",
+            "S2 ordinary Recorder bridge",
+            "S2 ordinary Recorder bridge"
+        ),
+        (
+            "S2 safety/privacy/cleanup gate is accepted.",
+            "S2 safety/privacy/cleanup",
+            "S2 safety/privacy/cleanup"
+        ),
+        (
+            "S2 product root/id policy gate is accepted.",
+            "S2 root/id policy",
+            "S2 product root/id policy"
+        ),
+        (
+            "S3 installed-app Review gate is accepted.",
+            "S3 live Review and frame-to-condition",
+            "S3 installed-app Review"
+        ),
+        (
+            "S3 live frame-to-condition and Draft Preview gate is accepted.",
+            "S3 live Review and frame-to-condition",
+            "S3 live frame-to-condition and Draft Preview"
+        ),
+        (
+            "S4 product-ready live catalog/query gate is accepted.",
+            "S4 product-ready live AI",
+            "S4 product-ready live catalog/query"
+        ),
+        (
+            "S4 stored/live suggestion and draft synthesis gate is accepted.",
+            "S4 product-ready live AI",
+            "stored/live suggestion and draft synthesis"
+        ),
+        (
+            "OCR/visual region picker renders wait/verify targets as region boxes with clear labels, and reserves click circles/pulses for actual click actions.",
+            "Workflow/UI polish not tied to S2 live bundle",
+            "OCR/visual region picker affordance"
+        ),
+        (
+            "Action preview/grouping follows the user-facing semantics from `13-direction-decision-and-remaining-slices.md`:",
+            "Workflow/UI polish not tied to S2 live bundle",
+            "action preview/grouping"
+        ),
+        (
+            "Workflow orchestration supports explicit loop semantics without encoding loops as dependency cycles.",
+            "Workflow/UI polish not tied to S2 live bundle",
+            "workflow loop product semantics"
+        ),
+        (
+            "Capture live cleanup product evidence for manual and scheduled retention cleanup.",
+            "S2 safety/privacy/cleanup",
+            "live manual/scheduled cleanup evidence"
+        ),
+        (
+            "Record target-window `.mov` during macro recording through `SCRecordingOutput`.",
+            "S2 authorized live bundle",
+            "target-window `.mov`"
+        ),
+        (
+            "Record target-window keyframes during macro recording.",
+            "S2 authorized live bundle",
+            "target-window keyframes"
+        ),
+        (
+            "Provide keyframe-only light mode only after default video path is safe and reviewable.",
+            "S2 authorized live bundle",
+            "keyframe-only light mode"
+        ),
+        (
+            "Show recorded video/keyframes in Macro Review.",
+            "S2 ordinary Recorder bridge",
+            "recorded video/keyframes in Macro Review"
+        ),
+        (
+            "Run OCR on selected/key frames through app-edge Vision adapter.",
+            "S2 authorized live bundle",
+            "app-edge Vision OCR"
+        ),
+        (
+            "Support pixel sampling from recorded frames.",
+            "S2 authorized live bundle",
+            "pixel sampling"
+        ),
+        (
+            "Store source frame ID, surface ID, crop bounds, search region and threshold for every extracted visual asset.",
+            "S2 authorized live bundle",
+            "remaining visual-index live production"
+        ),
+        (
+            "User can create image appeared/disappeared condition from recorded frame crop.",
+            "S3 live Review and frame-to-condition",
+            "image appeared/disappeared / region changed / pixel live conditions"
+        ),
+        (
+            "User can create region changed baseline from recorded frame region.",
+            "S3 live Review and frame-to-condition",
+            "image appeared/disappeared / region changed / pixel live conditions"
+        ),
+        (
+            "User can replace one fragile coordinate click with visual locator suggestion.",
+            "S3 live Review and frame-to-condition",
+            "visual locator replacement"
+        ),
+        (
+            "Product-ready default/live `recording list/show/explain --json`",
+            "S4 product-ready live AI",
+            "default/live `recording list/show/explain/ocr search`"
+        ),
+        (
+            "Product-ready default/live `recording ocr search --json`",
+            "S4 product-ready live AI",
+            "default/live `recording list/show/explain/ocr search`"
+        ),
+        (
+            "Product-ready image-byte visual similarity search",
+            "S4 product-ready live AI",
+            "image-byte visual similarity"
+        ),
+        (
+            "Live/stored-bundle `recording suggest waits/locators/conditions/cleanup --json` with real suggestion synthesis.",
+            "S4 product-ready live AI",
+            "stored/live suggestion and draft synthesis"
+        ),
+        (
+            "Product-ready stored/live `workflow draft from-recording --json` with real suggestion synthesis, missing/deleted artifact status and Review/Draft Preview alignment.",
+            "S4 product-ready live AI",
+            "stored/live `workflow draft from-recording`"
+        ),
+        (
+            "Draft Preview shows evidence references from recording frames in live product evidence.",
+            "S2 ordinary Recorder bridge",
+            "Draft Preview evidence refs from live recording frames"
+        ),
+        (
+            "Group recordings/macros by app bundle ID and surface family.",
+            "App Knowledge",
+            "App grouping"
+        ),
+        (
+            "Build app knowledge summary from existing recordings.",
+            "App Knowledge",
+            "app knowledge summary"
+        ),
+        (
+            "CLI can answer which existing macros/anchors may satisfy a natural-language goal.",
+            "App Knowledge",
+            "natural-language macro reuse"
+        ),
+        (
+            "AI can compose a draft from existing macros without requiring a new recording when evidence is sufficient.",
+            "App Knowledge",
+            "AI composition from existing macros"
+        ),
+        (
+            "UI explains reused recordings and missing evidence.",
+            "App Knowledge",
+            "UI reused-recording explanations"
+        ),
+        (
+            "Recording review screenshot with video frame, event row and OCR overlay.",
+            "S2 ordinary Recorder bridge",
+            "recording review screenshot with video frame/event/OCR"
+        ),
+        (
+            "Frame-to-condition creation clip.",
+            "S3 live Review and frame-to-condition",
+            "frame-to-condition clip"
+        ),
+        (
+            "AI cleanup suggestion screenshot with evidence explanation.",
+            "S4 product-ready live AI",
+            "AI cleanup screenshot"
+        )
     ]
 
     private static let requiredPlaybookPhrases: [String] = [
@@ -452,6 +683,23 @@ struct SemanticRecordingAcceptanceChecklistTests {
                 }
                 return String(line.dropFirst(marker.count))
             }
+    }
+
+    private static func auditGateRows(in markdown: String) -> [String: String] {
+        var rows: [String: String] = [:]
+        for line in markdown.split(separator: "\n", omittingEmptySubsequences: false) {
+            guard line.hasPrefix("|") else { continue }
+            let cells = line
+                .split(separator: "|", omittingEmptySubsequences: false)
+                .dropFirst()
+                .dropLast()
+                .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            guard cells.count >= 4 else { continue }
+            let group = cells[0]
+            guard group != "Gate Group", !group.hasPrefix("---") else { continue }
+            rows[group] = cells.joined(separator: " | ")
+        }
+        return rows
     }
 
     private static func uncheckedChecklistItemBlocks(
