@@ -39,6 +39,7 @@ let package = Package(
                 "Components",
                 "ScreenCaptureService.swift",
                 "ScreenCaptureKitSemanticCapture.swift",
+                "SemanticRecordingFrameObservationIndexer.swift",
                 "VisionDetector.swift",
                 "VisionRecordingIndexer.swift",
                 "RecordingArtifactURL.swift",

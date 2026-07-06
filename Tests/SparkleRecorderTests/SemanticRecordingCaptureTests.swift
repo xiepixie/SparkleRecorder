@@ -229,6 +229,114 @@ struct SemanticRecordingCaptureTests {
         #expect(bundle.observations(frameID: textFrameID).map(\.id) == [observationID])
     }
 
+    @Test("Frame index can attach window and AX metadata observations")
+    func frameIndexCanAttachWindowAndAXMetadataObservations() async throws {
+        let recordingID = uuid("7A000000-0000-0000-0000-000000000001")
+        let eventFrameID = uuid("7A000000-0000-0000-0000-000000000003")
+        let windowObservationID = uuid("7A000000-0000-0000-0000-000000000004")
+        let axObservationID = uuid("7A000000-0000-0000-0000-000000000005")
+        let ids = CaptureIDFixture(values: [
+            .frame: [
+                uuid("7A000000-0000-0000-0000-000000000002"),
+                eventFrameID,
+                uuid("7A000000-0000-0000-0000-000000000006")
+            ],
+            .timelineEvent: [uuid("7A000000-0000-0000-0000-000000000007")],
+            .semanticEvent: [uuid("7A000000-0000-0000-0000-000000000008")]
+        ])
+        let client = SemanticRecordingCaptureClient(
+            startMovie: { request in
+                SemanticRecordingMovieHandle(
+                    segmentID: request.segmentID,
+                    artifactRef: request.artifactRef,
+                    target: request.target,
+                    startTime: 0
+                )
+            },
+            finishMovie: { request in
+                SemanticRecordingMovieFinishResult(duration: request.recordingTime)
+            },
+            captureFrame: { _ in
+                SemanticRecordingCapturedFrame(imageSize: RecordingImageSize(width: 1_440, height: 900))
+            },
+            indexFrame: { request in
+                guard request.frame.source == .mouseUp else {
+                    return []
+                }
+                return [
+                    RecordingVisualObservation(
+                        id: windowObservationID,
+                        kind: .windowSnapshot,
+                        recordingTime: request.frame.recordingTime,
+                        frameID: request.frame.id,
+                        bounds: RecordingBounds(
+                            rect: RecordingRect(x: 120, y: 80, width: 900, height: 640),
+                            coordinateSpace: .screenPixels
+                        ),
+                        text: "Checkout",
+                        provider: "CoreGraphics.fake",
+                        labels: ["window"],
+                        metadata: [
+                            "bundleIdentifier": "com.example.Checkout",
+                            "windowID": "42"
+                        ],
+                        createdAt: request.createdAt
+                    ),
+                    RecordingVisualObservation(
+                        id: axObservationID,
+                        kind: .axElement,
+                        recordingTime: request.frame.recordingTime,
+                        frameID: request.frame.id,
+                        bounds: RecordingBounds(
+                            rect: RecordingRect(x: 240, y: 180, width: 120, height: 32),
+                            coordinateSpace: .screenPixels
+                        ),
+                        text: "Place Order",
+                        provider: "ApplicationServices.fake",
+                        labels: ["accessibility"],
+                        metadata: [
+                            "role": "AXButton",
+                            "title": "Place Order"
+                        ],
+                        createdAt: request.createdAt
+                    )
+                ]
+            }
+        )
+        let session = SemanticRecordingCaptureSession(
+            configuration: SemanticRecordingCaptureConfiguration(
+                recordingID: recordingID,
+                captureTarget: RecordingCaptureTarget(
+                    kind: .window,
+                    surfaceID: "checkout-window",
+                    windowID: 42,
+                    appBundleIdentifier: "com.example.Checkout",
+                    windowTitle: "Checkout"
+                ),
+                defaultSurfaceID: "checkout-window"
+            ),
+            client: client,
+            ids: ids.provider
+        )
+
+        try await session.start()
+        try await session.record(
+            recordedEvent(.leftMouseUp, time: 0.4, surfaceID: "checkout-window"),
+            index: 0
+        )
+        let bundle = try await session.finish(recordingTime: 0.8)
+
+        #expect(bundle.validate().isEmpty)
+        #expect(bundle.visualObservations.map(\.kind) == [.windowSnapshot, .axElement])
+        #expect(bundle.visualObservations.allSatisfy { $0.frameID == eventFrameID })
+        #expect(bundle.visualObservations.first?.metadata["windowID"] == "42")
+        #expect(bundle.visualObservations.last?.metadata["role"] == "AXButton")
+        #expect(bundle.observations(frameID: eventFrameID).map(\.id) == [
+            windowObservationID,
+            axObservationID
+        ])
+    }
+
     @Test("Capture session enforces lifecycle ordering")
     func captureSessionEnforcesLifecycleOrdering() async throws {
         let client = SemanticRecordingCaptureClient(

@@ -16,7 +16,9 @@ enum LiveSemanticCaptureClient {
     static func live(bundleDirectory: URL) -> SemanticRecordingCaptureClient {
         let movieRecorder = ScreenCaptureKitMovieRecorder(bundleDirectory: bundleDirectory)
         let frameSource = ScreenCaptureKitFrameSource(bundleDirectory: bundleDirectory)
-        let visionIndexer = VisionRecordingIndexer(bundleDirectory: bundleDirectory)
+        let frameIndexer = SemanticRecordingFrameObservationIndexer(
+            visionIndexer: VisionRecordingIndexer(bundleDirectory: bundleDirectory)
+        )
 
         return SemanticRecordingCaptureClient(
             startMovie: { request in
@@ -29,7 +31,7 @@ enum LiveSemanticCaptureClient {
                 try await frameSource.capture(request)
             },
             indexFrame: { request in
-                try await visionIndexer.indexFrame(request)
+                try await frameIndexer.indexFrame(request)
             }
         )
     }
