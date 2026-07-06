@@ -222,4 +222,87 @@ struct SemanticRecordingReviewProjectionTests {
         #expect(result.region?.space == .displayAbsolute)
         #expect(result.region?.label == "Custom confirmation area")
     }
+
+    @Test("Pixel condition candidate can use user-picked color without metadata")
+    func pixelConditionCandidateCanUseUserPickedColorWithoutMetadata() throws {
+        let pixelSourceID = UUID(uuidString: "74000000-0000-0000-0000-000000000020")!
+        let pixelObservationID = UUID(uuidString: "74000000-0000-0000-0000-000000000021")!
+        let pixelBounds = RecordingBounds(
+            rect: RecordingRect(x: 1_024, y: 246, width: 1, height: 1),
+            coordinateSpace: .windowPixels
+        )
+        var bundle = SemanticRecordingFixture.checkoutBundle()
+        bundle.sourcePreviews.append(RecordingSourcePreviewReference(
+            id: pixelSourceID,
+            kind: .pixelSample,
+            recordingID: bundle.id,
+            frameID: SemanticRecordingFixture.afterClickFrameID,
+            eventID: SemanticRecordingFixture.waitEventID,
+            surfaceID: SemanticRecordingFixture.surfaceID,
+            bounds: pixelBounds,
+            imageSize: RecordingImageSize(width: 1, height: 1),
+            createdAt: bundle.createdAt,
+            recordingTime: 2.45,
+            label: "Ready status pixel"
+        ))
+        bundle.visualObservations.append(RecordingVisualObservation(
+            id: pixelObservationID,
+            kind: .pixelSample,
+            recordingTime: 2.45,
+            frameID: SemanticRecordingFixture.afterClickFrameID,
+            sourcePreviewRefID: pixelSourceID,
+            bounds: pixelBounds,
+            confidence: 0.94,
+            score: 0.94,
+            provider: "SparkleRecorder.fixture",
+            providerVersion: "0.1",
+            labels: ["readyStatus"],
+            createdAt: bundle.createdAt
+        ))
+
+        let projection = SemanticRecordingReviewProjection(
+            bundle: bundle,
+            selectedEventID: SemanticRecordingFixture.waitEventID
+        )
+        let candidate = try #require(
+            projection.selectedFrame?.conditionCandidates.first { $0.kind == .pixelMatched }
+        )
+
+        #expect(throws: SemanticRecordingReviewDraftPatchError.missingPixelColor(candidate.id)) {
+            try SemanticRecordingReviewDraftPatchBuilder.makePatch(
+                bundle: bundle,
+                request: SemanticRecordingReviewDraftPatchRequest(candidate: candidate)
+            )
+        }
+
+        let result = try SemanticRecordingReviewDraftPatchBuilder.makePatch(
+            bundle: bundle,
+            request: SemanticRecordingReviewDraftPatchRequest(
+                candidate: candidate,
+                threshold: 0.93,
+                pixelColorHex: "#2BC66A"
+            )
+        )
+
+        #expect(result.patch.ops.map { $0.op } == ["upsertVisualRegion", "addTask"])
+        #expect(result.condition.type == "pixelMatched")
+        #expect(result.condition.colorHex == "#2BC66A")
+        #expect(result.condition.threshold == 0.93)
+        #expect(result.condition.regionRef == "sr_00000001_ready_status_pixel_00000020_region")
+        #expect(result.region?.bounds == RectValue(x: 1_024, y: 246, width: 1, height: 1))
+        #expect(result.region?.space == .windowLocal)
+
+        let patched = try AutomationWorkflowDraftPatchApplier.apply(
+            result.patch,
+            to: AutomationWorkflowDraftDocument(workflow: AutomationWorkflowDraft(name: "Checkout"))
+        )
+        let task = try #require(patched.document.workflow.tasks.first)
+        let region = try #require(result.region)
+        let regions = try #require(patched.document.visualAssets?.regions)
+
+        #expect(patched.validation.isValid)
+        #expect(task.type == "condition")
+        #expect(task.condition == result.condition)
+        #expect(regions == [region])
+    }
 }

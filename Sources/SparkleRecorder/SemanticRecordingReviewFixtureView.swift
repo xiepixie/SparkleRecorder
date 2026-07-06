@@ -15,6 +15,7 @@ struct SemanticRecordingReviewFixtureView: View {
     @State private var selectedFrameID: UUID?
     @State private var selectedCandidateID: String?
     @State private var regionSelection: SemanticRecordingFrameRegionSelection?
+    @State private var pixelColorHexes: [String: String] = [:]
     @State private var draftPatchResult: SemanticRecordingReviewDraftPatchResult?
     @State private var draftPatchErrorMessage = ""
     @State private var draftPreviewState: AutomationWorkflowDraftPreviewState?
@@ -481,6 +482,18 @@ struct SemanticRecordingReviewFixtureView: View {
                                 .accessibilityLabel(NSLocalizedString("Open candidate artifact", comment: ""))
                             }
                         }
+
+                        if candidate.kind == .pixelMatched {
+                            VStack(alignment: .leading, spacing: 6) {
+                                AutomationVisualColorPickerView(colorHex: pixelColorBinding(for: candidate))
+                                Text(NSLocalizedString("Choose the target pixel color before creating a reviewed condition.", comment: ""))
+                                    .font(.system(size: 11, weight: .medium))
+                                    .foregroundStyle(Color.white.opacity(0.48))
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
+                            .padding(10)
+                            .background(Color.black.opacity(0.14), in: RoundedRectangle(cornerRadius: 7))
+                        }
                     }
                 }
             } else {
@@ -876,7 +889,8 @@ struct SemanticRecordingReviewFixtureView: View {
                 bundle: bundle,
                 request: SemanticRecordingReviewDraftPatchRequest(
                     candidate: candidate,
-                    regionSelection: effectiveSelection
+                    regionSelection: effectiveSelection,
+                    pixelColorHex: pixelColorHex(for: candidate)
                 )
             )
             draftPatchErrorMessage = ""
@@ -885,6 +899,34 @@ struct SemanticRecordingReviewFixtureView: View {
             draftPatchResult = nil
             draftPatchErrorMessage = String(describing: error)
         }
+    }
+
+    private func pixelColorBinding(
+        for candidate: SemanticRecordingReviewProjection.ConditionCandidateRow
+    ) -> Binding<String> {
+        Binding(
+            get: {
+                pixelColorHexes[candidate.id] ?? ""
+            },
+            set: { newValue in
+                pixelColorHexes[candidate.id] = newValue
+                if selectedCandidateID == candidate.id {
+                    draftPatchResult = nil
+                    draftPatchErrorMessage = ""
+                    patchSaveMessage = ""
+                }
+            }
+        )
+    }
+
+    private func pixelColorHex(
+        for candidate: SemanticRecordingReviewProjection.ConditionCandidateRow
+    ) -> String? {
+        guard candidate.kind == .pixelMatched else {
+            return nil
+        }
+        let value = pixelColorHexes[candidate.id]?.trimmingCharacters(in: .whitespacesAndNewlines)
+        return value?.isEmpty == false ? value : nil
     }
 
     private func saveDraftPatch(_ patch: AutomationWorkflowDraftPatchDocument) {
