@@ -88,7 +88,7 @@ Record video
 
 - live visual diagnostics Open/Reveal：done for strict gate via `live-visual-diagnostics-open-reveal.mov` / `.md`。
 - live macro evidence Open/Reveal：done for strict gate via `live-macro-evidence-open-reveal.mov` / `.md`。
-- OCR/visual region picker：等待/验证只显示 region box 和 label；点击才显示 circle/pulse。
+- OCR/visual region picker：fixture evidence 已证明等待/验证显示 region box 和 label、点击/text-click 显示 circle/pulse；installed-app editor evidence 和完整 grouping proof 仍 open。
 - action preview stability：新动作启用预览后立即有可见轨迹；拖动点位或路径控制点后轨迹不消失，箭头方向实时更新。
 - action grouping rules：点击文字、普通点击、双击、多点点击必须按用户意图拆分，不能把有等待/画面变化的点击误合并。
 - saved macro/library preview：重新打开软件后 library 中的 timeline/total duration/preview 必须能从持久化数据重建。
@@ -163,7 +163,7 @@ MCP 仍然不做第一优先级。未来 MCP 只能包装这些 CLI/shared servi
 - frame-derived visual assets 必须进入 `AutomationWorkflowDraftVisualAssets` 或 workflow package-local refs。
 - import/export/package 设计要明确哪些 artifact 被复制、哪些保留为外部 package root、哪些缺失时显示 degraded。
 - 对 AI 来说，可写目标是 draft/patch，不是 app 内部 repository JSON。
-- workflow loop semantics must be added as an explicit contract later; current dependency graphs intentionally reject cycles, so loops cannot be smuggled in as back-edges.
+- workflow loop semantics now have a narrow explicit draft contract for fixed-count loops: draft v1 can expand a loop body into acyclic tasks/dependencies before validate/simulate/import. Product loop work remains open for authoring UI, runtime/run-evidence presentation, repeat-until/foreach policy and live proof; current dependency graphs intentionally reject cycles, so loops cannot be smuggled in as back-edges.
 
 当前不应该做：
 
@@ -183,7 +183,7 @@ MCP 仍然不做第一优先级。未来 MCP 只能包装这些 CLI/shared servi
 | AI direct-run workflow | 用户不可审阅，失败难解释 | AI 只写 suggestion/draft |
 | full App Knowledge graph | 还没有足够 live semantic bundles | 先 app/surface/macro/anchor 轻量分组 |
 | Player full rewrite as prerequisite | 会把用户价值拖成长期重构 | 增量抽 pure state/evidence helpers |
-| dependency-cycle loops | 会绕过 DAG validation、run history 和 failure evidence 语义 | 先定义 first-class loop body / termination / max-iteration contract |
+| dependency-cycle loops | 会绕过 DAG validation、run history 和 failure evidence 语义 | 固定次数 draft loop expansion 已有 first pass；repeat-until / foreach、authoring UI、runtime evidence 和 live proof 后置，仍不允许 graph back-edge |
 | SwiftUI Vision/file IO | 卡顿、权限边界混乱、不可测 | app-edge presenter/adapters + core value data |
 | video replaces playback truth | 会破坏 deterministic playback | `RecordedEvent` stays execution truth |
 

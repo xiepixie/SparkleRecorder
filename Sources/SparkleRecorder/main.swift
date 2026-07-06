@@ -665,7 +665,7 @@ private func runWorkflowProductEvidenceSnapshot(
           !scenarioArgument.hasPrefix("--") else {
         throw WorkflowCLIError(
             "missingArgument",
-                "Expected a snapshot scenario: idle, drag-link-authoring, task-reorder-authoring, running, failed-run-detail, failed-run-preview-unavailable, visual-diagnostics-drill-in, branch-evidence, template-baseline-preview-refs, or semantic-review-timeline."
+                "Expected a snapshot scenario: idle, drag-link-authoring, task-reorder-authoring, running, failed-run-detail, failed-run-preview-unavailable, visual-diagnostics-drill-in, branch-evidence, editor-preview-affordances, template-baseline-preview-refs, or semantic-review-timeline."
         )
     }
 

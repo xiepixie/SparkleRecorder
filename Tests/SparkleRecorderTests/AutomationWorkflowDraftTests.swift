@@ -192,6 +192,122 @@ struct AutomationWorkflowDraftTests {
         #expect(result.issues.contains { $0.code == .cycleDetected })
     }
 
+    @Test("Fixed loop draft expands to acyclic simulation and import")
+    func fixedLoopDraftExpandsToAcyclicSimulationAndImport() throws {
+        let document = AutomationWorkflowDraftDocument(workflow: AutomationWorkflowDraft(
+            name: "Fixed loop",
+            tasks: [
+                AutomationWorkflowDraftTask(key: "open", type: "delay", delaySeconds: 1),
+                AutomationWorkflowDraftTask(
+                    key: "repeat_battle",
+                    type: "loop",
+                    loop: AutomationWorkflowDraftLoop(
+                        count: 3,
+                        tasks: [
+                            AutomationWorkflowDraftTask(key: "tap", type: "delay", delaySeconds: 2),
+                            AutomationWorkflowDraftTask(
+                                key: "wait",
+                                type: "condition",
+                                condition: AutomationWorkflowDraftCondition(
+                                    type: "ocrText",
+                                    text: "Again"
+                                )
+                            )
+                        ]
+                    )
+                ),
+                AutomationWorkflowDraftTask(
+                    key: "done",
+                    type: "notification",
+                    notification: AutomationWorkflowDraftNotification(title: "Loop complete")
+                )
+            ],
+            dependencies: [
+                AutomationWorkflowDraftDependency(from: "open", to: "repeat_battle", trigger: "success"),
+                AutomationWorkflowDraftDependency(from: "repeat_battle", to: "done", trigger: "success")
+            ]
+        ))
+
+        let validation = AutomationWorkflowDraftValidator.validate(document)
+        let simulation = AutomationWorkflowDraftSimulator.simulate(document)
+        let importResult = AutomationWorkflowDraftImporter.dryRun(document)
+        let workflow = try #require(importResult.workflow)
+
+        #expect(validation.isValid)
+        #expect(importResult.isImportable)
+        #expect(workflow.validationIssues().isEmpty)
+        #expect(simulation.steps.map(\.taskKey) == [
+            "open",
+            "repeat_battle__1__tap",
+            "repeat_battle__1__wait",
+            "repeat_battle__2__tap",
+            "repeat_battle__2__wait",
+            "repeat_battle__3__tap",
+            "repeat_battle__3__wait",
+            "done"
+        ])
+        #expect(workflow.tasks.count == 8)
+        #expect(workflow.dependencies.count == 7)
+        let importedTaskKeys = Set(importResult.taskKeyToID.keys)
+        #expect(importedTaskKeys.contains("repeat_battle__3__wait"))
+        #expect(!importedTaskKeys.contains("repeat_battle"))
+        #expect(importResult.dependencyKeyToID.keys.contains("repeat_battle__2__wait->repeat_battle__3__tap:conditionMatched"))
+        #expect(importResult.dependencyKeyToID.keys.contains("repeat_battle__3__wait->done:conditionMatched"))
+    }
+
+    @Test("Loop draft validates fixed count and rejects nested loops")
+    func loopDraftValidatesFixedCountAndRejectsNestedLoops() {
+        let invalidCount = AutomationWorkflowDraftDocument(workflow: AutomationWorkflowDraft(
+            name: "Invalid loop",
+            tasks: [
+                AutomationWorkflowDraftTask(
+                    key: "repeat",
+                    type: "loop",
+                    loop: AutomationWorkflowDraftLoop(
+                        count: 0,
+                        tasks: [AutomationWorkflowDraftTask(key: "tap", type: "delay", delaySeconds: 1)]
+                    )
+                )
+            ]
+        ))
+        let nested = AutomationWorkflowDraftDocument(workflow: AutomationWorkflowDraft(
+            name: "Nested loop",
+            tasks: [
+                AutomationWorkflowDraftTask(
+                    key: "outer",
+                    type: "loop",
+                    loop: AutomationWorkflowDraftLoop(
+                        count: 2,
+                        tasks: [
+                            AutomationWorkflowDraftTask(
+                                key: "inner",
+                                type: "loop",
+                                loop: AutomationWorkflowDraftLoop(
+                                    count: 2,
+                                    tasks: [AutomationWorkflowDraftTask(key: "tap", type: "delay", delaySeconds: 1)]
+                                )
+                            )
+                        ]
+                    )
+                )
+            ]
+        ))
+
+        let invalidCountResult = AutomationWorkflowDraftValidator.validate(invalidCount)
+        let nestedResult = AutomationWorkflowDraftValidator.validate(nested)
+
+        #expect(!invalidCountResult.isValid)
+        #expect(invalidCountResult.issues.contains {
+            $0.code == .invalidLoop &&
+                $0.path == "$.workflow.tasks[0].loop.count"
+        })
+        #expect(!nestedResult.isValid)
+        #expect(nestedResult.issues.contains {
+            $0.code == .invalidLoop &&
+                $0.path == "$.workflow.tasks[0].loop.tasks[0].type"
+        })
+    }
+
     @Test("Repeating schedule requires start, interval, and unit")
     func repeatingScheduleRequiresStartIntervalAndUnit() {
         let document = AutomationWorkflowDraftDocument(workflow: AutomationWorkflowDraft(

@@ -205,8 +205,9 @@ public enum AutomationWorkflowDraftSimulator {
             )
         }
 
+        let expandedDocument = AutomationWorkflowDraftLoopExpander.expandedDocument(document)
         var engine = DraftSimulationEngine(
-            document: document,
+            document: expandedDocument,
             context: context,
             options: options,
             validationIssues: validation.issues

@@ -1990,6 +1990,40 @@
         }
       }
     },
+    "Loop": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Loop"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "循环"
+          }
+        }
+      }
+    },
+    "Repeats %d times, %d steps": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Repeats %d times, %d steps"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "重复 %d 次，%d 个步骤"
+          }
+        }
+      }
+    },
     "Repeat: continuous": {
       "extractionState": "manual",
       "localizations": {

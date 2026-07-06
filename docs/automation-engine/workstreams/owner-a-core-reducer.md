@@ -77,6 +77,7 @@ Owner A 是状态语义 owner。目标是把 AutomationEngine 做成纯、确定
 - `AutomationViewIntent.startTask` is the UI-facing contract for manual FlowGraph starts; it maps to `AutomationAction.manualStart`.
 - `AutomationAction.moveTask` persists `AutomationTask.graphPosition` and emits `persistWorkflows` for Owner C node-position edits.
 - Owner C expects edge status, node positions, and Canvas endpoints to remain projection outputs; SwiftUI must not recompute dependency logic or graph layout in `body`.
+- `sparkle.workflow.draft.v1` may express a fixed-count `loop` task as a draft/import convenience. `AutomationWorkflowDraftLoopExpander` expands loop bodies into normal acyclic tasks/dependencies before simulation/import; reducer/runtime still receive only ordinary DAG workflows and `AutomationWorkflow.validationIssues()` continues to reject dependency cycles.
 
 ## Planning Log
 
@@ -87,6 +88,7 @@ Owner A 是状态语义 owner。目标是把 AutomationEngine 做成纯、确定
 - 2026-07-05: UI manual start is now represented as `AutomationViewIntent.startTask`, keeping FlowGraph run buttons on the reducer path.
 - 2026-07-06: Condition terminal runs now carry durable `AutomationConditionEvaluationEvidence`, including optional `AutomationConditionDiagnosticArtifact` refs. A owns the pure payload, backward-compatible decoding, and safe relative-path normalization helper; B owns live artifact writing/presenter adapters; C only renders/opens accepted payload.
 - 2026-07-06: Resource waiting gained a pure max-wait timeout policy. `AutomationResourceRequirement.maxWaitDuration` stays separate from lease expiry, `clockTick` expires waiting runs as `.timedOut(deadline:)` through normal terminal cleanup/branching, and projection exposes deadline/remaining/fraction so C does not recalculate it in SwiftUI.
+- 2026-07-07: Fixed-count workflow draft loops gained a pure first pass. `AutomationWorkflowDraftLoop` validates count/body constraints and rejects nested loops; `AutomationWorkflowDraftLoopExpander` lowers loop bodies into acyclic tasks/dependencies before simulate/import, using `conditionMatched` for condition/manual-approval body transitions. Product loop authoring, runtime loop evidence, repeat-until and foreach remain future work.
 
 ## Handoff Checklist
 

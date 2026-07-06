@@ -92,6 +92,7 @@ Owner C owns how users understand and edit automation. The first UI goal is not 
 - Manual approval prompts are product source UI only; condition evaluation consumes them through `AutomationManualApprovalClient`.
 - OCR region picking is product source UI: `AutomationOCRRegionPicker` may use the existing text picker overlay and macro surface metadata, but saving still goes through `AutomationAction.upsertTask`.
 - Workflow package import/export is product UI over Owner B's `AutomationWorkflowPackage` codec; SwiftUI must not invent package fields or bypass reducer persistence. Missing local macro references may be surfaced as a product warning, but the package still does not carry macro payloads.
+- Draft Preview may display fixed-count loop draft rows (`Loop`, repeat count, body step count), but loop expansion remains a core draft/import projection concern; SwiftUI must not implement loop execution or graph back-edges.
 
 ## Planning Log
 
@@ -109,6 +110,7 @@ Owner C owns how users understand and edit automation. The first UI goal is not 
 - 2026-07-05: Owner C added OCR region preview/micro-editing plus display/window/content context hints, and added selected/all workflow package sharing through macOS share sheet.
 - 2026-07-05: Owner C added task inspector run history/detail rows for outcome reason, lifecycle timing, attempts, execution chain, upstream count, evidence availability, and duration metadata without crossing into Player/evidence payload loading.
 - 2026-07-06: Owner A/B exposed durable condition diagnostics with optional sample artifact refs. Owner C may render `AutomationTaskRun.conditionEvidence` and route artifact preview/open/reveal through `AutomationConditionEvidenceArtifactPresenter`, but SwiftUI must not call ScreenCapture, OCR, evaluator clients, image providers, or ad-hoc artifact path builders for diagnostics. Failure/rejected condition runs can now still carry explanatory evidence; UI should show the payload when present and only label diagnostics missing when `conditionEvidence == nil`.
+- 2026-07-07: Draft Preview projection now labels fixed-count loop draft rows and summarizes repeat/body counts. It still consumes validation/simulation/import projections only; product loop authoring UI and run-evidence presentation remain future work.
 
 ## Handoff Checklist
 

@@ -129,12 +129,13 @@ private struct DraftImportCompiler {
             )
         }
 
+        let expandedDocument = AutomationWorkflowDraftLoopExpander.expandedDocument(document)
         let workflowID = stableID(for: "workflow:\(document.workflow.name.trimmedForDraftImport)")
         var taskKeyToID: [String: UUID] = [:]
         var tasks: [AutomationTask] = []
         var macroResolutions: [AutomationWorkflowDraftMacroResolution] = []
 
-        for (index, task) in document.workflow.tasks.enumerated() {
+        for (index, task) in expandedDocument.workflow.tasks.enumerated() {
             let taskKey = task.key.trimmedForDraftImport
             let taskID = stableID(for: "workflow:\(workflowID.uuidString):task:\(taskKey)")
             taskKeyToID[taskKey] = taskID
@@ -161,7 +162,7 @@ private struct DraftImportCompiler {
         }
 
         var dependencyKeyToID: [String: UUID] = [:]
-        let dependencies = document.workflow.dependencies.compactMap { dependency -> AutomationDependency? in
+        let dependencies = expandedDocument.workflow.dependencies.compactMap { dependency -> AutomationDependency? in
             let dependencyKey = key(for: dependency)
             guard let fromID = taskKeyToID[dependency.from.trimmedForDraftImport],
                   let toID = taskKeyToID[dependency.to.trimmedForDraftImport],
@@ -187,7 +188,7 @@ private struct DraftImportCompiler {
             name: document.workflow.name.trimmedForDraftImport,
             tasks: tasks,
             dependencies: dependencies,
-            visualAssets: document.visualAssets,
+            visualAssets: expandedDocument.visualAssets,
             createdAt: options.importedAt,
             modifiedAt: options.importedAt
         )

@@ -218,6 +218,8 @@ public struct AutomationWorkflowDraftPreviewProjection: Codable, Equatable, Send
                 return NSLocalizedString("Notification", comment: "")
             case "manualApproval":
                 return NSLocalizedString("Manual approval", comment: "")
+            case "loop":
+                return NSLocalizedString("Loop", comment: "")
             default:
                 return task.type
             }
@@ -242,6 +244,14 @@ public struct AutomationWorkflowDraftPreviewProjection: Codable, Equatable, Send
                     ?? NSLocalizedString("Notification title missing", comment: "")
             case "manualApproval":
                 return NSLocalizedString("Manual approval required", comment: "")
+            case "loop":
+                let count = task.loop?.count ?? 0
+                let bodyCount = task.loop?.tasks.count ?? 0
+                return String(
+                    format: NSLocalizedString("Repeats %d times, %d steps", comment: ""),
+                    count,
+                    bodyCount
+                )
             default:
                 return task.type
             }

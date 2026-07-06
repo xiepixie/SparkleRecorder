@@ -23,7 +23,7 @@
 - [x] `AutomationOutcome` exists and distinguishes success, failure, cancel, timeout, resource conflict, permission denied, condition matched/not matched.
 - [x] `AutomationEffect.evaluateCondition` carries prior outcomes needed for contextual conditions.
 - [x] `SavedMacro` has no workflow runtime state.
-- [ ] Workflow-level loops have an explicit contract for loop body, termination/limit and run evidence. Current DAG validation rejects self-dependencies and cycles, so loops are not accepted through dependency back-edges.
+- [ ] Workflow-level loops have an explicit contract for loop body, termination/limit and run evidence. Current first pass: draft v1 supports fixed-count loop body expansion through `AutomationWorkflowDraftLoop` / `AutomationWorkflowDraftLoopExpander` into an acyclic workflow before simulation/import, including condition-body `conditionMatched` transitions, and DAG validation still rejects self-dependencies/cycles. Swift Testing covers fixed loop expansion, invalid/nested loop rejection, and Draft Preview/import projection of expanded loop steps. Product acceptance remains open for loop authoring UI, runtime/run-evidence presentation, repeat-until/foreach semantics and live product proof.
 - [x] Swift Testing covers Codable roundtrip and Sendable smoke.
 
 ## Phase 1: Reducer

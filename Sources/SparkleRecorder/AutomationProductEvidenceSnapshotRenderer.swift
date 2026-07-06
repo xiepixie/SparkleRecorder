@@ -11,6 +11,7 @@ enum AutomationProductEvidenceSnapshotScenario: String, CaseIterable {
     case failedRunPreviewUnavailable = "failed-run-preview-unavailable"
     case visualDiagnostics = "visual-diagnostics-drill-in"
     case branchEvidence = "branch-evidence"
+    case editorPreviewAffordances = "editor-preview-affordances"
     case templateBaselinePreviewRefs = "template-baseline-preview-refs"
     case semanticReviewTimeline = "semantic-review-timeline"
     case semanticReviewStoredBundle = "semantic-review-stored-bundle"
@@ -39,6 +40,8 @@ enum AutomationProductEvidenceSnapshotScenario: String, CaseIterable {
             self = .visualDiagnostics
         case "branch", "branch-evidence", "branch-evidence-drill-in":
             self = .branchEvidence
+        case "editor-preview-affordances", "macro-editor-preview-affordances", "editor-preview":
+            self = .editorPreviewAffordances
         case "template-baseline-preview-refs", "preview-refs", "semantic-preview-refs":
             self = .templateBaselinePreviewRefs
         case "semantic-review", "semantic-review-timeline", "review-timeline":
@@ -80,6 +83,8 @@ enum AutomationProductEvidenceSnapshotScenario: String, CaseIterable {
             return "visual-diagnostics-drill-in.png"
         case .branchEvidence:
             return "branch-evidence-drill-in.png"
+        case .editorPreviewAffordances:
+            return "editor-preview-affordances.png"
         case .templateBaselinePreviewRefs:
             return "template-baseline-preview-refs.png"
         case .semanticReviewTimeline:
@@ -109,6 +114,8 @@ enum AutomationProductEvidenceSnapshotScenario: String, CaseIterable {
             return 1_220
         case .branchEvidence:
             return 1_120
+        case .editorPreviewAffordances:
+            return 1_020
         case .templateBaselinePreviewRefs:
             return 980
         case .semanticReviewTimeline:
@@ -142,7 +149,7 @@ enum AutomationProductEvidenceSnapshotScenario: String, CaseIterable {
             return Self.fixedUUID("00000000-0000-0000-0000-00000000c20b")
         case .branchEvidence:
             return Self.fixedUUID("00000000-0000-0000-0000-00000000c206")
-        case .templateBaselinePreviewRefs, .semanticReviewTimeline, .semanticReviewStoredBundle, .semanticReviewMissingArtifacts, .semanticReviewPixelColor, .semanticReviewMaterializedActions, .semanticReviewDraftPreview, .semanticReviewRunTarget:
+        case .editorPreviewAffordances, .templateBaselinePreviewRefs, .semanticReviewTimeline, .semanticReviewStoredBundle, .semanticReviewMissingArtifacts, .semanticReviewPixelColor, .semanticReviewMaterializedActions, .semanticReviewDraftPreview, .semanticReviewRunTarget:
             return nil
         }
     }
@@ -155,7 +162,7 @@ enum AutomationProductEvidenceSnapshotScenario: String, CaseIterable {
             return Self.fixedUUID("00000000-0000-0000-0000-00000000c40c")
         case .branchEvidence:
             return Self.fixedUUID("00000000-0000-0000-0000-00000000c406")
-        case .idle, .dragLinkAuthoring, .taskReorderAuthoring, .running, .templateBaselinePreviewRefs,
+        case .idle, .dragLinkAuthoring, .taskReorderAuthoring, .running, .editorPreviewAffordances, .templateBaselinePreviewRefs,
              .semanticReviewTimeline, .semanticReviewStoredBundle, .semanticReviewMissingArtifacts, .semanticReviewPixelColor, .semanticReviewMaterializedActions, .semanticReviewDraftPreview, .semanticReviewRunTarget:
             return nil
         }
@@ -165,7 +172,7 @@ enum AutomationProductEvidenceSnapshotScenario: String, CaseIterable {
         switch self {
         case .dragLinkAuthoring:
             return Self.fixedUUID("00000000-0000-0000-0000-00000000c202")
-        case .idle, .taskReorderAuthoring, .running, .failedRunDetail, .failedRunPreviewUnavailable, .visualDiagnostics, .branchEvidence,
+        case .idle, .taskReorderAuthoring, .running, .failedRunDetail, .failedRunPreviewUnavailable, .visualDiagnostics, .branchEvidence, .editorPreviewAffordances,
              .semanticReviewTimeline, .semanticReviewStoredBundle, .semanticReviewMissingArtifacts, .semanticReviewPixelColor, .semanticReviewMaterializedActions, .semanticReviewDraftPreview, .semanticReviewRunDetail, .semanticReviewRunTarget:
             return nil
         case .templateBaselinePreviewRefs:
@@ -177,7 +184,7 @@ enum AutomationProductEvidenceSnapshotScenario: String, CaseIterable {
         switch self {
         case .dragLinkAuthoring:
             return .onConditionMatched
-        case .idle, .taskReorderAuthoring, .running, .failedRunDetail, .failedRunPreviewUnavailable, .visualDiagnostics, .branchEvidence,
+        case .idle, .taskReorderAuthoring, .running, .failedRunDetail, .failedRunPreviewUnavailable, .visualDiagnostics, .branchEvidence, .editorPreviewAffordances,
              .semanticReviewTimeline, .semanticReviewStoredBundle, .semanticReviewMissingArtifacts, .semanticReviewPixelColor, .semanticReviewMaterializedActions, .semanticReviewDraftPreview, .semanticReviewRunDetail, .semanticReviewRunTarget:
             return .onSuccess
         case .templateBaselinePreviewRefs:
@@ -189,7 +196,7 @@ enum AutomationProductEvidenceSnapshotScenario: String, CaseIterable {
         switch self {
         case .failedRunDetail, .failedRunPreviewUnavailable:
             return true
-        case .idle, .dragLinkAuthoring, .taskReorderAuthoring, .running, .visualDiagnostics, .branchEvidence,
+        case .idle, .dragLinkAuthoring, .taskReorderAuthoring, .running, .visualDiagnostics, .branchEvidence, .editorPreviewAffordances,
              .templateBaselinePreviewRefs, .semanticReviewTimeline, .semanticReviewStoredBundle, .semanticReviewMissingArtifacts, .semanticReviewPixelColor, .semanticReviewMaterializedActions, .semanticReviewDraftPreview, .semanticReviewRunDetail, .semanticReviewRunTarget:
             return false
         }
@@ -201,7 +208,7 @@ enum AutomationProductEvidenceSnapshotScenario: String, CaseIterable {
             return "fixture-macros-preview-unavailable"
         case .idle, .dragLinkAuthoring, .taskReorderAuthoring, .running, .failedRunDetail, .visualDiagnostics,
              .branchEvidence, .templateBaselinePreviewRefs, .semanticReviewTimeline, .semanticReviewStoredBundle, .semanticReviewMissingArtifacts, .semanticReviewPixelColor, .semanticReviewMaterializedActions, .semanticReviewDraftPreview,
-             .semanticReviewRunDetail, .semanticReviewRunTarget:
+             .semanticReviewRunDetail, .semanticReviewRunTarget, .editorPreviewAffordances:
             return "fixture-macros"
         }
     }
@@ -215,7 +222,7 @@ enum AutomationProductEvidenceSnapshotScenario: String, CaseIterable {
             )
         case .idle, .dragLinkAuthoring, .running, .failedRunDetail,
              .failedRunPreviewUnavailable, .visualDiagnostics, .branchEvidence, .templateBaselinePreviewRefs,
-             .semanticReviewTimeline, .semanticReviewStoredBundle, .semanticReviewMissingArtifacts, .semanticReviewPixelColor, .semanticReviewMaterializedActions, .semanticReviewDraftPreview, .semanticReviewRunDetail, .semanticReviewRunTarget:
+             .semanticReviewTimeline, .semanticReviewStoredBundle, .semanticReviewMissingArtifacts, .semanticReviewPixelColor, .semanticReviewMaterializedActions, .semanticReviewDraftPreview, .semanticReviewRunDetail, .semanticReviewRunTarget, .editorPreviewAffordances:
             return nil
         }
     }
@@ -230,7 +237,7 @@ enum AutomationProductEvidenceSnapshotScenario: String, CaseIterable {
             return .succeeded(.revealReport)
         case .idle, .dragLinkAuthoring, .taskReorderAuthoring, .running,
              .failedRunPreviewUnavailable, .visualDiagnostics, .branchEvidence, .templateBaselinePreviewRefs,
-             .semanticReviewTimeline, .semanticReviewStoredBundle, .semanticReviewMissingArtifacts, .semanticReviewPixelColor, .semanticReviewMaterializedActions, .semanticReviewDraftPreview, .semanticReviewRunDetail, .semanticReviewRunTarget:
+             .semanticReviewTimeline, .semanticReviewStoredBundle, .semanticReviewMissingArtifacts, .semanticReviewPixelColor, .semanticReviewMaterializedActions, .semanticReviewDraftPreview, .semanticReviewRunDetail, .semanticReviewRunTarget, .editorPreviewAffordances:
             return nil
         }
     }
@@ -241,7 +248,7 @@ enum AutomationProductEvidenceSnapshotScenario: String, CaseIterable {
             return ["regionSampleImage": .succeeded(.reveal)]
         case .idle, .dragLinkAuthoring, .taskReorderAuthoring, .running,
              .failedRunDetail, .failedRunPreviewUnavailable, .branchEvidence, .templateBaselinePreviewRefs,
-             .semanticReviewTimeline, .semanticReviewStoredBundle, .semanticReviewMissingArtifacts, .semanticReviewPixelColor, .semanticReviewMaterializedActions, .semanticReviewDraftPreview, .semanticReviewRunDetail, .semanticReviewRunTarget:
+             .semanticReviewTimeline, .semanticReviewStoredBundle, .semanticReviewMissingArtifacts, .semanticReviewPixelColor, .semanticReviewMaterializedActions, .semanticReviewDraftPreview, .semanticReviewRunDetail, .semanticReviewRunTarget, .editorPreviewAffordances:
             return [:]
         }
     }
@@ -593,6 +600,225 @@ private struct SemanticRecordingPreviewRefsEvidenceView: View {
     }
 }
 
+private struct EditorPreviewAffordanceEvidenceView: View {
+    @StateObject private var overlayState: OverlayState
+
+    init() {
+        let state = OverlayState()
+        state.actions = Self.fixtureActions
+        _overlayState = StateObject(wrappedValue: state)
+    }
+
+    var body: some View {
+        ZStack {
+            Color(red: 0.09, green: 0.10, blue: 0.11)
+                .ignoresSafeArea()
+
+            VStack(alignment: .leading, spacing: 24) {
+                header
+
+                HStack(alignment: .top, spacing: 18) {
+                    previewSurface
+                    evidenceRail
+                }
+            }
+            .padding(42)
+        }
+    }
+
+    private var header: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Macro Editor Preview Affordances")
+                .font(.system(size: 34, weight: .semibold))
+                .foregroundStyle(.white)
+            Text("Fixture evidence for the UI owner rule: wait/verify actions are labeled condition regions, while click and text-click actions keep click pulse affordances.")
+                .font(.system(size: 15, weight: .medium))
+                .foregroundStyle(Color.white.opacity(0.64))
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    private var previewSurface: some View {
+        ZStack(alignment: .topLeading) {
+            appSurfaceBackground
+            TargetCrosshairView(state: overlayState)
+                .frame(width: 860, height: 620)
+                .allowsHitTesting(false)
+        }
+        .frame(width: 860, height: 620)
+        .clipShape(.rect(cornerRadius: 9))
+        .overlay(
+            RoundedRectangle(cornerRadius: 9)
+                .stroke(Color.white.opacity(0.10), lineWidth: 1)
+        )
+    }
+
+    private var appSurfaceBackground: some View {
+        ZStack(alignment: .topLeading) {
+            RoundedRectangle(cornerRadius: 9)
+                .fill(Color(red: 0.13, green: 0.15, blue: 0.16))
+
+            VStack(spacing: 0) {
+                HStack(spacing: 8) {
+                    Circle().fill(Color(red: 0.93, green: 0.32, blue: 0.28)).frame(width: 11, height: 11)
+                    Circle().fill(Color(red: 0.94, green: 0.70, blue: 0.25)).frame(width: 11, height: 11)
+                    Circle().fill(Color(red: 0.36, green: 0.74, blue: 0.38)).frame(width: 11, height: 11)
+                    Text("Checkout window")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(Color.white.opacity(0.54))
+                    Spacer()
+                }
+                .padding(.horizontal, 16)
+                .frame(height: 42)
+                .background(Color.white.opacity(0.045))
+
+                HStack(spacing: 22) {
+                    VStack(alignment: .leading, spacing: 18) {
+                        placeholderLine(width: 250, opacity: 0.32)
+                        placeholderLine(width: 360, opacity: 0.20)
+                        placeholderLine(width: 310, opacity: 0.20)
+                        Spacer(minLength: 0)
+                        HStack(spacing: 14) {
+                            RoundedRectangle(cornerRadius: 7)
+                                .fill(Color(red: 0.24, green: 0.47, blue: 0.70).opacity(0.52))
+                                .frame(width: 150, height: 42)
+                            RoundedRectangle(cornerRadius: 7)
+                                .fill(Color.white.opacity(0.08))
+                                .frame(width: 126, height: 42)
+                        }
+                    }
+                    .padding(28)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+
+                    VStack(spacing: 14) {
+                        ForEach(0..<4, id: \.self) { index in
+                            RoundedRectangle(cornerRadius: 7)
+                                .fill(Color.white.opacity(index == 2 ? 0.14 : 0.075))
+                                .frame(width: 214, height: 56)
+                        }
+                    }
+                    .padding(.trailing, 34)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
+        }
+    }
+
+    private func placeholderLine(width: CGFloat, opacity: Double) -> some View {
+        RoundedRectangle(cornerRadius: 3)
+            .fill(Color.white.opacity(opacity))
+            .frame(width: width, height: 10)
+    }
+
+    private var evidenceRail: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            railItem(
+                title: "Wait text",
+                detail: "Region label only; no click pulse.",
+                color: Color(red: 0.95, green: 0.63, blue: 0.21)
+            )
+            railItem(
+                title: "Verify text",
+                detail: "Condition region uses verify styling, not a coordinate click.",
+                color: Color(red: 0.60, green: 0.50, blue: 0.96)
+            )
+            railItem(
+                title: "Click text",
+                detail: "Text locator shows the region and click pulse because it sends input.",
+                color: Color(red: 0.37, green: 0.72, blue: 0.96)
+            )
+            railItem(
+                title: "Click position",
+                detail: "Ordinary coordinate click keeps the pulse target.",
+                color: Color(red: 0.45, green: 0.82, blue: 0.48)
+            )
+            Spacer(minLength: 0)
+            Text("Fixture screenshot. It proves the editor overlay component and projection affordance mapping, not live recording capture.")
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(Color.white.opacity(0.54))
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(20)
+        .frame(width: 360, height: 620, alignment: .topLeading)
+        .background(Color.white.opacity(0.055), in: RoundedRectangle(cornerRadius: 8))
+        .overlay(
+            RoundedRectangle(cornerRadius: 8)
+                .stroke(Color.white.opacity(0.09), lineWidth: 1)
+        )
+    }
+
+    private func railItem(title: String, detail: String, color: Color) -> some View {
+        HStack(alignment: .top, spacing: 10) {
+            Circle()
+                .fill(color)
+                .frame(width: 9, height: 9)
+                .padding(.top, 5)
+            VStack(alignment: .leading, spacing: 4) {
+                Text(title)
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(.white)
+                Text(detail)
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(Color.white.opacity(0.60))
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+    }
+
+    private static var fixtureActions: [RelativePreviewAction] {
+        [
+            RelativePreviewAction(
+                id: AutomationProductEvidenceSnapshotScenario.fixedUUID("7f000000-0000-0000-0000-000000000001"),
+                kind: .waitForText,
+                affordance: .waitTextRegion,
+                selectedPoint: nil,
+                dragPath: [],
+                observedFrame: nil,
+                searchRegion: CGRect(x: 86, y: 178, width: 250, height: 54),
+                fallbackPoint: nil,
+                themeColor: Color(red: 0.95, green: 0.63, blue: 0.21),
+                order: 1
+            ),
+            RelativePreviewAction(
+                id: AutomationProductEvidenceSnapshotScenario.fixedUUID("7f000000-0000-0000-0000-000000000002"),
+                kind: .verifyText,
+                affordance: .verifyTextRegion,
+                selectedPoint: nil,
+                dragPath: [],
+                observedFrame: nil,
+                searchRegion: CGRect(x: 530, y: 180, width: 218, height: 58),
+                fallbackPoint: nil,
+                themeColor: Color(red: 0.60, green: 0.50, blue: 0.96),
+                order: 2
+            ),
+            RelativePreviewAction(
+                id: AutomationProductEvidenceSnapshotScenario.fixedUUID("7f000000-0000-0000-0000-000000000003"),
+                kind: .click,
+                affordance: .textClickTarget,
+                selectedPoint: CGPoint(x: 198, y: 486),
+                dragPath: [CGPoint(x: 198, y: 486)],
+                observedFrame: CGRect(x: 118, y: 456, width: 160, height: 60),
+                searchRegion: CGRect(x: 94, y: 438, width: 208, height: 96),
+                fallbackPoint: CGPoint(x: 198, y: 486),
+                themeColor: Color(red: 0.37, green: 0.72, blue: 0.96),
+                order: 3
+            ),
+            RelativePreviewAction(
+                id: AutomationProductEvidenceSnapshotScenario.fixedUUID("7f000000-0000-0000-0000-000000000004"),
+                kind: .click,
+                affordance: .inputPoint,
+                selectedPoint: CGPoint(x: 636, y: 492),
+                dragPath: [CGPoint(x: 636, y: 492)],
+                observedFrame: nil,
+                searchRegion: nil,
+                fallbackPoint: nil,
+                themeColor: Color(red: 0.45, green: 0.82, blue: 0.48),
+                order: 4
+            )
+        ]
+    }
+}
+
 @MainActor
 enum AutomationProductEvidenceSnapshotRenderer {
     static func render(
@@ -603,6 +829,22 @@ enum AutomationProductEvidenceSnapshotRenderer {
         scale: CGFloat
     ) throws {
         let now = Date(timeIntervalSince1970: 1_800_000_000)
+        if scenario == .editorPreviewAffordances {
+            let view = EditorPreviewAffordanceEvidenceView()
+                .frame(width: width, height: height)
+                .environment(\.colorScheme, .dark)
+                .environment(\.locale, Locale(identifier: "en_US_POSIX"))
+                .background(Color(red: 0.09, green: 0.10, blue: 0.11))
+
+            try writeSwiftUISnapshot(
+                view,
+                outputURL: outputURL,
+                width: width,
+                height: height,
+                scale: scale
+            )
+            return
+        }
         if scenario == .templateBaselinePreviewRefs {
             let view = SemanticRecordingPreviewRefsEvidenceView(
                 bundle: SemanticRecordingFixture.checkoutBundle(createdAt: now)

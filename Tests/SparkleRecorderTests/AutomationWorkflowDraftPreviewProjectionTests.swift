@@ -157,4 +157,65 @@ struct AutomationWorkflowDraftPreviewProjectionTests {
             $0.subject == "watch"
         })
     }
+
+    @Test("Preview projection exposes fixed loop draft and expanded import")
+    func previewProjectionExposesFixedLoopDraftAndExpandedImport() throws {
+        let document = AutomationWorkflowDraftDocument(workflow: AutomationWorkflowDraft(
+            name: "Loop Preview",
+            tasks: [
+                AutomationWorkflowDraftTask(
+                    key: "repeat_checkout",
+                    type: "loop",
+                    loop: AutomationWorkflowDraftLoop(
+                        count: 2,
+                        tasks: [
+                            AutomationWorkflowDraftTask(key: "tap", type: "delay", delaySeconds: 1),
+                            AutomationWorkflowDraftTask(
+                                key: "wait_text",
+                                type: "condition",
+                                condition: AutomationWorkflowDraftCondition(type: "ocrText", text: "Done")
+                            )
+                        ]
+                    )
+                )
+            ]
+        ))
+        let validation = AutomationWorkflowDraftValidator.validate(document)
+        let simulation = AutomationWorkflowDraftSimulator.simulate(document)
+        let importResult = AutomationWorkflowDraftImporter.dryRun(document)
+
+        let projection = AutomationWorkflowDraftPreviewProjection(
+            document: document,
+            validationEnvelope: .workflowDraftValidation(command: "workflow draft validate", result: validation),
+            macroCatalogEnvelope: .workflowMacroCatalog(command: "workflow macros", macros: []),
+            simulationEnvelope: .workflowDraftSimulation(command: "workflow draft simulate", result: simulation),
+            importEnvelope: .workflowDraftImport(command: "workflow import --dry-run", result: importResult)
+        )
+
+        let loopRow = try #require(projection.taskRows.first)
+        let importPreview = try #require(projection.importPreview)
+
+        #expect(projection.isValid)
+        #expect(projection.isReadyForImport)
+        #expect(loopRow.key == "repeat_checkout")
+        #expect(loopRow.typeLabel == "Loop")
+        #expect(loopRow.detail == "Repeats 2 times, 2 steps")
+        #expect(projection.simulationRows.map(\.taskKey) == [
+            "repeat_checkout__1__tap",
+            "repeat_checkout__1__wait_text",
+            "repeat_checkout__2__tap",
+            "repeat_checkout__2__wait_text"
+        ])
+        #expect(importPreview.taskIDRows.map(\.key) == [
+            "repeat_checkout__1__tap",
+            "repeat_checkout__1__wait_text",
+            "repeat_checkout__2__tap",
+            "repeat_checkout__2__wait_text"
+        ])
+        #expect(importPreview.dependencyIDRows.map(\.key) == [
+            "repeat_checkout__1__tap->repeat_checkout__1__wait_text:success",
+            "repeat_checkout__1__wait_text->repeat_checkout__2__tap:conditionMatched",
+            "repeat_checkout__2__tap->repeat_checkout__2__wait_text:success"
+        ])
+    }
 }

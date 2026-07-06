@@ -40,6 +40,7 @@ public struct AutomationWorkflowDraftTask: Codable, Equatable, Sendable {
     public var key: String
     public var name: String?
     public var type: String
+    public var loop: AutomationWorkflowDraftLoop?
     public var macroRef: AutomationWorkflowDraftMacroRef?
     public var condition: AutomationWorkflowDraftCondition?
     public var delaySeconds: TimeInterval?
@@ -58,6 +59,7 @@ public struct AutomationWorkflowDraftTask: Codable, Equatable, Sendable {
         key: String,
         type: String,
         name: String? = nil,
+        loop: AutomationWorkflowDraftLoop? = nil,
         macroRef: AutomationWorkflowDraftMacroRef? = nil,
         condition: AutomationWorkflowDraftCondition? = nil,
         delaySeconds: TimeInterval? = nil,
@@ -75,6 +77,7 @@ public struct AutomationWorkflowDraftTask: Codable, Equatable, Sendable {
         self.key = key
         self.name = name
         self.type = type
+        self.loop = loop
         self.macroRef = macroRef
         self.condition = condition
         self.delaySeconds = delaySeconds
@@ -88,6 +91,21 @@ public struct AutomationWorkflowDraftTask: Codable, Equatable, Sendable {
         self.joinPolicy = joinPolicy
         self.enabled = enabled
         self.graphPosition = graphPosition
+    }
+}
+
+public struct AutomationWorkflowDraftLoop: Codable, Equatable, Sendable {
+    public static let maxFixedCount = 50
+
+    public var count: Int
+    public var tasks: [AutomationWorkflowDraftTask]
+
+    public init(
+        count: Int,
+        tasks: [AutomationWorkflowDraftTask]
+    ) {
+        self.count = count
+        self.tasks = tasks
     }
 }
 
@@ -344,6 +362,173 @@ public struct AutomationWorkflowDraftDependency: Codable, Equatable, Sendable {
     }
 }
 
+public enum AutomationWorkflowDraftLoopExpander {
+    public static func expandedDocument(
+        _ document: AutomationWorkflowDraftDocument
+    ) -> AutomationWorkflowDraftDocument {
+        var expandedTasks: [AutomationWorkflowDraftTask] = []
+        var loopPorts: [String: (entry: String, exit: String, exitTrigger: String)] = [:]
+
+        for task in document.workflow.tasks {
+            guard task.type.trimmedForDraftLoopExpansion == "loop",
+                  let loop = task.loop,
+                  loop.count > 0,
+                  !loop.tasks.isEmpty
+            else {
+                expandedTasks.append(task)
+                continue
+            }
+
+            let loopKey = task.key.trimmedForDraftLoopExpansion
+            let copies = expandedLoopTasks(for: task, loop: loop)
+            guard let entry = copies.first?.key,
+                  let exit = copies.last?.key,
+                  let exitBodyTask = loop.tasks.last else {
+                continue
+            }
+            loopPorts[loopKey] = (
+                entry: entry,
+                exit: exit,
+                exitTrigger: defaultCompletionTrigger(for: exitBodyTask)
+            )
+            expandedTasks.append(contentsOf: copies)
+        }
+
+        var expandedDependencies: [AutomationWorkflowDraftDependency] = []
+        expandedDependencies.append(contentsOf: generatedLoopDependencies(
+            for: document.workflow.tasks
+        ))
+        expandedDependencies.append(contentsOf: document.workflow.dependencies.map { dependency in
+            let fromLoop = loopPorts[dependency.from.trimmedForDraftLoopExpansion]
+            let toLoop = loopPorts[dependency.to.trimmedForDraftLoopExpansion]
+            let from = fromLoop?.exit ?? dependency.from
+            let to = toLoop?.entry ?? dependency.to
+            let trigger = fromLoop != nil &&
+                dependency.trigger.trimmedForDraftLoopExpansion == "success"
+                ? fromLoop?.exitTrigger ?? dependency.trigger
+                : dependency.trigger
+            let key = dependency.key?.trimmedForDraftLoopExpansion.nilIfEmptyForDraftLoopExpansion.map { key in
+                fromLoop != nil || toLoop != nil ? "loop-expanded:\(key)" : key
+            }
+            return AutomationWorkflowDraftDependency(
+                key: key,
+                from: from,
+                to: to,
+                trigger: trigger,
+                delaySeconds: dependency.delaySeconds,
+                enabled: dependency.enabled
+            )
+        })
+
+        return AutomationWorkflowDraftDocument(
+            schema: document.schema,
+            workflow: AutomationWorkflowDraft(
+                name: document.workflow.name,
+                tasks: expandedTasks,
+                dependencies: expandedDependencies
+            ),
+            visualAssets: document.visualAssets
+        )
+    }
+
+    private static func expandedLoopTasks(
+        for task: AutomationWorkflowDraftTask,
+        loop: AutomationWorkflowDraftLoop
+    ) -> [AutomationWorkflowDraftTask] {
+        let loopKey = task.key.trimmedForDraftLoopExpansion
+        let loopName = task.name?.trimmedForDraftLoopExpansion.nilIfEmptyForDraftLoopExpansion ?? loopKey
+        let enabled = task.enabled ?? true
+
+        return (1...loop.count).flatMap { iteration in
+            loop.tasks.enumerated().map { bodyIndex, bodyTask in
+                var copy = bodyTask
+                let bodyKey = bodyTask.key.trimmedForDraftLoopExpansion
+                copy.key = expandedKey(loopKey: loopKey, iteration: iteration, bodyKey: bodyKey)
+                copy.name = expandedName(
+                    loopName: loopName,
+                    iteration: iteration,
+                    bodyTask: bodyTask
+                )
+                copy.schedule = iteration == 1 && bodyIndex == 0 ? task.schedule : nil
+                copy.enabled = enabled && (bodyTask.enabled ?? true)
+                return copy
+            }
+        }
+    }
+
+    private static func generatedLoopDependencies(
+        for tasks: [AutomationWorkflowDraftTask]
+    ) -> [AutomationWorkflowDraftDependency] {
+        var dependencies: [AutomationWorkflowDraftDependency] = []
+
+        for task in tasks {
+            guard task.type.trimmedForDraftLoopExpansion == "loop",
+                  let loop = task.loop,
+                  loop.count > 0,
+                  !loop.tasks.isEmpty
+            else {
+                continue
+            }
+
+            let loopKey = task.key.trimmedForDraftLoopExpansion
+            let bodyKeys = loop.tasks.map { $0.key.trimmedForDraftLoopExpansion }
+
+            for iteration in 1...loop.count {
+                for pairIndex in bodyKeys.indices.dropLast() {
+                    let from = expandedKey(loopKey: loopKey, iteration: iteration, bodyKey: bodyKeys[pairIndex])
+                    let to = expandedKey(loopKey: loopKey, iteration: iteration, bodyKey: bodyKeys[pairIndex + 1])
+                    let trigger = defaultCompletionTrigger(for: loop.tasks[pairIndex])
+                    dependencies.append(AutomationWorkflowDraftDependency(
+                        key: "\(from)->\(to):\(trigger)",
+                        from: from,
+                        to: to,
+                        trigger: trigger
+                    ))
+                }
+
+                if iteration < loop.count,
+                   let last = bodyKeys.last,
+                   let first = bodyKeys.first {
+                    let from = expandedKey(loopKey: loopKey, iteration: iteration, bodyKey: last)
+                    let to = expandedKey(loopKey: loopKey, iteration: iteration + 1, bodyKey: first)
+                    let trigger = loop.tasks.last.map(defaultCompletionTrigger(for:)) ?? "success"
+                    dependencies.append(AutomationWorkflowDraftDependency(
+                        key: "\(from)->\(to):\(trigger)",
+                        from: from,
+                        to: to,
+                        trigger: trigger
+                    ))
+                }
+            }
+        }
+
+        return dependencies
+    }
+
+    private static func expandedKey(loopKey: String, iteration: Int, bodyKey: String) -> String {
+        "\(loopKey)__\(iteration)__\(bodyKey)"
+    }
+
+    private static func expandedName(
+        loopName: String,
+        iteration: Int,
+        bodyTask: AutomationWorkflowDraftTask
+    ) -> String {
+        let bodyName = bodyTask.name?.trimmedForDraftLoopExpansion.nilIfEmptyForDraftLoopExpansion ??
+            bodyTask.key.trimmedForDraftLoopExpansion
+        return "\(loopName) \(iteration): \(bodyName)"
+    }
+
+    private static func defaultCompletionTrigger(for task: AutomationWorkflowDraftTask) -> String {
+        switch task.type.trimmedForDraftLoopExpansion {
+        case "condition", "manualApproval":
+            return "conditionMatched"
+        default:
+            return "success"
+        }
+    }
+}
+
 public struct AutomationWorkflowDraftMacroCatalogEntry: Codable, Equatable, Sendable, Identifiable {
     public var id: UUID
     public var name: String
@@ -541,6 +726,7 @@ public enum AutomationWorkflowDraftIssueCode: String, Codable, Equatable, Sendab
     case invalidSchedule
     case invalidRetry
     case invalidJoinPolicy
+    case invalidLoop
     case missingVisualReference
     case missingPixel
     case invalidThreshold
@@ -570,7 +756,8 @@ private struct Validator {
         "condition",
         "delay",
         "notification",
-        "manualApproval"
+        "manualApproval",
+        "loop"
     ]
     private static let supportedConditionTypes: Set<String> = [
         "ocrText",
@@ -793,6 +980,8 @@ private struct Validator {
             validateNotificationTask(task, path: path, key: key)
         case "manualApproval":
             break
+        case "loop":
+            validateLoopTask(task, path: path, key: key)
         default:
             break
         }
@@ -980,6 +1169,45 @@ private struct Validator {
         }
     }
 
+    private mutating func validateLoopTask(_ task: AutomationWorkflowDraftTask, path: String, key: String) {
+        guard let loop = task.loop else {
+            add(.error, .invalidLoop, "Loop task '\(key)' needs a loop body.", "\(path).loop", taskKey: key)
+            return
+        }
+        guard loop.count >= 1, loop.count <= AutomationWorkflowDraftLoop.maxFixedCount else {
+            add(
+                .error,
+                .invalidLoop,
+                "Loop task '\(key)' count must be between 1 and \(AutomationWorkflowDraftLoop.maxFixedCount).",
+                "\(path).loop.count",
+                taskKey: key
+            )
+            return
+        }
+        guard !loop.tasks.isEmpty else {
+            add(.error, .invalidLoop, "Loop task '\(key)' needs at least one body task.", "\(path).loop.tasks", taskKey: key)
+            return
+        }
+
+        var bodyKeys: Set<String> = []
+        for (index, bodyTask) in loop.tasks.enumerated() {
+            let bodyPath = "\(path).loop.tasks[\(index)]"
+            let bodyKey = bodyTask.key.trimmedForDraftValidation
+            if bodyKey.isEmpty {
+                add(.error, .emptyTaskKey, "Loop body task key is required.", "\(bodyPath).key", taskKey: key)
+            } else if !bodyKeys.insert(bodyKey).inserted {
+                add(.error, .duplicateTaskKey, "Loop body task key '\(bodyKey)' is duplicated.", "\(bodyPath).key", taskKey: key)
+            }
+
+            if bodyTask.type.trimmedForDraftValidation == "loop" {
+                add(.error, .invalidLoop, "Nested loop tasks are not supported in draft v1.", "\(bodyPath).type", taskKey: key)
+                continue
+            }
+
+            validateTask(bodyTask, path: bodyPath, key: bodyKey)
+        }
+    }
+
     private mutating func validateSchedule(_ schedule: AutomationWorkflowDraftSchedule, path: String, taskKey: String) {
         switch schedule.type {
         case "manual":
@@ -1127,7 +1355,15 @@ private extension String {
         trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
+    var trimmedForDraftLoopExpansion: String {
+        trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
     var nilIfEmpty: String? {
+        isEmpty ? nil : self
+    }
+
+    var nilIfEmptyForDraftLoopExpansion: String? {
         isEmpty ? nil : self
     }
 }
