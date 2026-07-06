@@ -51,8 +51,10 @@ private struct WorkflowProductEvidenceCompleteSidecarPayload: Codable, Equatable
     var sidecarPath: String
     var clipPath: String
     var clipExists: Bool
+    var clipMeetsMinimumByteCount: Bool
     var action: String
     var sidecarCompleteAfterWrite: Bool
+    var incompleteSidecarLabels: [String]
     var targetSatisfiedAfterWrite: Bool
 }
 
@@ -589,6 +591,10 @@ private func runWorkflowProductEvidenceAudit(
 
     let resolvedDirectoryURL = directoryURL.standardizedFileURL
     let existingPaths = try productEvidenceExistingPaths(in: resolvedDirectoryURL)
+    let fileByteCounts = try productEvidenceFileByteCounts(
+        in: resolvedDirectoryURL,
+        existingPaths: existingPaths
+    )
     let sidecarContents = try productEvidenceSidecarContents(
         in: resolvedDirectoryURL,
         existingPaths: existingPaths
@@ -596,7 +602,8 @@ private func runWorkflowProductEvidenceAudit(
     let payload = AutomationProductEvidenceAudit.evaluate(
         directory: resolvedDirectoryURL.path,
         existingPaths: existingPaths,
-        sidecarContents: sidecarContents
+        sidecarContents: sidecarContents,
+        fileByteCounts: fileByteCounts
     )
     let missingMessages = payload.items
         .filter { $0.required && !$0.satisfied }
@@ -669,6 +676,10 @@ private func runWorkflowProductEvidenceCapturePlan(
 
     let resolvedDirectoryURL = directoryURL.standardizedFileURL
     let existingPaths = try productEvidenceExistingPaths(in: resolvedDirectoryURL)
+    let fileByteCounts = try productEvidenceFileByteCounts(
+        in: resolvedDirectoryURL,
+        existingPaths: existingPaths
+    )
     let sidecarContents = try productEvidenceSidecarContents(
         in: resolvedDirectoryURL,
         existingPaths: existingPaths
@@ -676,7 +687,8 @@ private func runWorkflowProductEvidenceCapturePlan(
     let payload = AutomationProductEvidenceAudit.liveCapturePlan(
         directory: resolvedDirectoryURL.path,
         existingPaths: existingPaths,
-        sidecarContents: sidecarContents
+        sidecarContents: sidecarContents,
+        fileByteCounts: fileByteCounts
     )
     let warnings = payload.items
         .filter { !$0.satisfied }
@@ -724,6 +736,9 @@ private func runWorkflowProductEvidenceCapturePlan(
                 FileHandle.standardOutput.write(Data(("    template: \(option.sidecarTemplateCommand)\n").utf8))
                 if !option.missingPaths.isEmpty {
                     FileHandle.standardOutput.write(Data(("    missing: \(option.missingPaths.joined(separator: ", "))\n").utf8))
+                }
+                if !option.undersizedPaths.isEmpty {
+                    FileHandle.standardOutput.write(Data(("    undersized: \(option.undersizedPaths.joined(separator: ", "))\n").utf8))
                 }
                 if !option.incompleteSidecarLabels.isEmpty {
                     FileHandle.standardOutput.write(Data(("    incomplete labels: \(option.incompleteSidecarLabels.joined(separator: ", "))\n").utf8))
@@ -775,6 +790,10 @@ private func runWorkflowProductEvidencePrepareLiveCapture(
         withIntermediateDirectories: true
     )
     let existingPaths = try productEvidenceExistingPaths(in: resolvedDirectoryURL)
+    let fileByteCounts = try productEvidenceFileByteCounts(
+        in: resolvedDirectoryURL,
+        existingPaths: existingPaths
+    )
     let sidecarContents = try productEvidenceSidecarContents(
         in: resolvedDirectoryURL,
         existingPaths: existingPaths
@@ -783,6 +802,7 @@ private func runWorkflowProductEvidencePrepareLiveCapture(
         directory: resolvedDirectoryURL.path,
         existingPaths: existingPaths,
         sidecarContents: sidecarContents,
+        fileByteCounts: fileByteCounts,
         includeSatisfied: includeSatisfied
     )
 
@@ -964,6 +984,10 @@ private func runWorkflowProductEvidenceCompleteSidecar(
         withIntermediateDirectories: true
     )
     let existingPaths = try productEvidenceExistingPaths(in: resolvedDirectoryURL)
+    let existingByteCounts = try productEvidenceFileByteCounts(
+        in: resolvedDirectoryURL,
+        existingPaths: existingPaths
+    )
     let existingSidecarContents = try productEvidenceSidecarContents(
         in: resolvedDirectoryURL,
         existingPaths: existingPaths
@@ -971,7 +995,8 @@ private func runWorkflowProductEvidenceCompleteSidecar(
     let existingPlan = AutomationProductEvidenceAudit.liveCapturePlan(
         directory: resolvedDirectoryURL.path,
         existingPaths: existingPaths,
-        sidecarContents: existingSidecarContents
+        sidecarContents: existingSidecarContents,
+        fileByteCounts: existingByteCounts
     )
     let existingOption = existingPlan.items
         .first { $0.id == completed.id }?
@@ -995,6 +1020,10 @@ private func runWorkflowProductEvidenceCompleteSidecar(
     try completed.content.write(to: sidecarURL, atomically: true, encoding: .utf8)
 
     let refreshedPaths = try productEvidenceExistingPaths(in: resolvedDirectoryURL)
+    let refreshedByteCounts = try productEvidenceFileByteCounts(
+        in: resolvedDirectoryURL,
+        existingPaths: refreshedPaths
+    )
     let refreshedContents = try productEvidenceSidecarContents(
         in: resolvedDirectoryURL,
         existingPaths: refreshedPaths
@@ -1002,11 +1031,15 @@ private func runWorkflowProductEvidenceCompleteSidecar(
     let refreshedPlan = AutomationProductEvidenceAudit.liveCapturePlan(
         directory: resolvedDirectoryURL.path,
         existingPaths: refreshedPaths,
-        sidecarContents: refreshedContents
+        sidecarContents: refreshedContents,
+        fileByteCounts: refreshedByteCounts
     )
     let refreshedItem = refreshedPlan.items.first { $0.id == completed.id }
     let refreshedOption = refreshedItem?.options.first { $0.sidecarPath == completed.sidecarPath }
+    let incompleteSidecarLabels = refreshedOption?.incompleteSidecarLabels ?? []
     let clipExists = refreshedPaths.contains(completed.clipPath)
+    let clipMeetsMinimumByteCount = clipExists &&
+        (refreshedByteCounts[completed.clipPath] ?? 0) >= AutomationProductEvidenceAudit.minimumLiveClipByteCount
     let action = existedBeforeWrite ? (overwrite ? "overwritten" : "completedDraft") : "written"
     let payload = WorkflowProductEvidenceCompleteSidecarPayload(
         directory: resolvedDirectoryURL.path,
@@ -1015,21 +1048,39 @@ private func runWorkflowProductEvidenceCompleteSidecar(
         sidecarPath: completed.sidecarPath,
         clipPath: completed.clipPath,
         clipExists: clipExists,
+        clipMeetsMinimumByteCount: clipMeetsMinimumByteCount,
         action: action,
-        sidecarCompleteAfterWrite: refreshedOption?.incompleteSidecarLabels.isEmpty == true,
+        sidecarCompleteAfterWrite: incompleteSidecarLabels.isEmpty,
+        incompleteSidecarLabels: incompleteSidecarLabels,
         targetSatisfiedAfterWrite: refreshedItem?.satisfied == true
     )
+    let warning: AutomationCLIMessage?
+    if !payload.sidecarCompleteAfterWrite {
+        warning = AutomationCLIMessage(
+            code: "incompleteLiveSidecar",
+            message: "\(completed.sidecarPath) still has incomplete or invalid live capture labels: \(payload.incompleteSidecarLabels.joined(separator: ", ")).",
+            path: completed.sidecarPath
+        )
+    } else if !clipExists {
+        warning = AutomationCLIMessage(
+            code: "missingLiveClip",
+            message: "\(completed.clipPath) is not present yet; the sidecar is complete but the live gate remains open.",
+            path: completed.clipPath
+        )
+    } else if !clipMeetsMinimumByteCount {
+        warning = AutomationCLIMessage(
+            code: "undersizedLiveClip",
+            message: "\(completed.clipPath) is present but empty or size-unknown; replace it with the real live recording.",
+            path: completed.clipPath
+        )
+    } else {
+        warning = nil
+    }
     let envelope = AutomationCLIResultEnvelope<WorkflowProductEvidenceCompleteSidecarPayload>(
         ok: true,
         command: command,
         data: payload,
-        warnings: clipExists ? [] : [
-            AutomationCLIMessage(
-                code: "missingLiveClip",
-                message: "\(completed.clipPath) is not present yet; the sidecar is complete but the live gate remains open.",
-                path: completed.clipPath
-            )
-        ],
+        warnings: warning.map { [$0] } ?? [],
         nextActions: payload.targetSatisfiedAfterWrite ? [
             AutomationCLINextAction(
                 command: "SparkleRecorder workflow product-evidence audit --require-live --json",
@@ -1053,7 +1104,9 @@ private func runWorkflowProductEvidenceCompleteSidecar(
         FileHandle.standardOutput.write(Data("""
         SparkleRecorder: completed sidecar \(payload.sidecarPath) [\(payload.action)].
         - clip: \(payload.clipPath) \(payload.clipExists ? "present" : "missing")
+        - clip non-empty: \(payload.clipMeetsMinimumByteCount ? "yes" : "no")
         - sidecar labels complete: \(payload.sidecarCompleteAfterWrite ? "yes" : "no")
+        - incomplete labels: \(payload.incompleteSidecarLabels.isEmpty ? "none" : payload.incompleteSidecarLabels.joined(separator: ", "))
         - live gate satisfied: \(payload.targetSatisfiedAfterWrite ? "yes" : "no")
 
         """.utf8))
@@ -1134,6 +1187,21 @@ private func productEvidenceExistingPaths(in directoryURL: URL) throws -> Set<St
         return []
     }
     return Set(try FileManager.default.contentsOfDirectory(atPath: directoryURL.path))
+}
+
+private func productEvidenceFileByteCounts(
+    in directoryURL: URL,
+    existingPaths: Set<String>
+) throws -> [String: Int64] {
+    var byteCounts: [String: Int64] = [:]
+    for path in existingPaths {
+        let url = directoryURL.appendingPathComponent(path, isDirectory: false)
+        let attributes = try FileManager.default.attributesOfItem(atPath: url.path)
+        if let size = attributes[.size] as? NSNumber {
+            byteCounts[path] = size.int64Value
+        }
+    }
+    return byteCounts
 }
 
 private func productEvidenceSidecarContents(

@@ -27,25 +27,29 @@ struct AutomationProductEvidenceAuditTests {
 
     @Test("Authoring live evidence accepts either reorder or drag-link pair")
     func authoringLiveEvidenceAcceptsEitherPair() {
+        let dragLinkPaths = Self.fixtureFiles
+            .union(Self.requiredLiveFilesWithoutAuthoring)
+            .union([
+                "live-drag-link-wysiwyg.mov",
+                "live-drag-link-wysiwyg.md"
+            ])
+        let taskReorderPaths = Self.fixtureFiles
+            .union(Self.requiredLiveFilesWithoutAuthoring)
+            .union([
+                "live-task-reorder-wysiwyg.mov",
+                "live-task-reorder-wysiwyg.md"
+            ])
         let withDragLink = AutomationProductEvidenceAudit.evaluate(
             directory: "/tmp/product-evidence",
-            existingPaths: Self.fixtureFiles
-                .union(Self.requiredLiveFilesWithoutAuthoring)
-                .union([
-                    "live-drag-link-wysiwyg.mov",
-                    "live-drag-link-wysiwyg.md"
-                ]),
-            sidecarContents: Self.validLiveSidecars
+            existingPaths: dragLinkPaths,
+            sidecarContents: Self.validLiveSidecars,
+            fileByteCounts: Self.fileByteCounts(for: dragLinkPaths)
         )
         let withTaskReorder = AutomationProductEvidenceAudit.evaluate(
             directory: "/tmp/product-evidence",
-            existingPaths: Self.fixtureFiles
-                .union(Self.requiredLiveFilesWithoutAuthoring)
-                .union([
-                    "live-task-reorder-wysiwyg.mov",
-                    "live-task-reorder-wysiwyg.md"
-                ]),
-            sidecarContents: Self.validLiveSidecars
+            existingPaths: taskReorderPaths,
+            sidecarContents: Self.validLiveSidecars,
+            fileByteCounts: Self.fileByteCounts(for: taskReorderPaths)
         )
 
         #expect(withDragLink.allRequiredPresent)
@@ -56,15 +60,17 @@ struct AutomationProductEvidenceAuditTests {
 
     @Test("Live evidence accepts mp4 with a valid sidecar")
     func liveEvidenceAcceptsMP4WithValidSidecar() {
+        let existingPaths = Self.fixtureFiles
+            .union(Self.requiredLiveFilesWithoutAuthoringMP4)
+            .union([
+                "live-drag-link-wysiwyg.mp4",
+                "live-drag-link-wysiwyg.md"
+            ])
         let payload = AutomationProductEvidenceAudit.evaluate(
             directory: "/tmp/product-evidence",
-            existingPaths: Self.fixtureFiles
-                .union(Self.requiredLiveFilesWithoutAuthoringMP4)
-                .union([
-                    "live-drag-link-wysiwyg.mp4",
-                    "live-drag-link-wysiwyg.md"
-                ]),
-            sidecarContents: Self.validLiveSidecars
+            existingPaths: existingPaths,
+            sidecarContents: Self.validLiveSidecarsMP4,
+            fileByteCounts: Self.fileByteCounts(for: existingPaths)
         )
 
         #expect(payload.allRequiredPresent)
@@ -73,12 +79,14 @@ struct AutomationProductEvidenceAuditTests {
 
     @Test("Missing a sidecar keeps evidence incomplete")
     func missingSidecarKeepsEvidenceIncomplete() {
+        let existingPaths = Self.fixtureFiles
+            .union(Self.requiredLiveFilesWithoutAuthoring)
+            .union(["live-drag-link-wysiwyg.mov"])
         let payload = AutomationProductEvidenceAudit.evaluate(
             directory: "/tmp/product-evidence",
-            existingPaths: Self.fixtureFiles
-                .union(Self.requiredLiveFilesWithoutAuthoring)
-                .union(["live-drag-link-wysiwyg.mov"]),
-            sidecarContents: Self.validLiveSidecars
+            existingPaths: existingPaths,
+            sidecarContents: Self.validLiveSidecars,
+            fileByteCounts: Self.fileByteCounts(for: existingPaths)
         )
 
         #expect(!payload.allRequiredPresent)
@@ -100,17 +108,19 @@ struct AutomationProductEvidenceAuditTests {
 
     @Test("Live sidecar must contain S0 capture fields")
     func liveSidecarMustContainS0CaptureFields() {
+        let existingPaths = Self.fixtureFiles
+            .union(Self.requiredLiveFilesWithoutAuthoring)
+            .union([
+                "live-drag-link-wysiwyg.mov",
+                "live-drag-link-wysiwyg.md"
+            ])
         let payload = AutomationProductEvidenceAudit.evaluate(
             directory: "/tmp/product-evidence",
-            existingPaths: Self.fixtureFiles
-                .union(Self.requiredLiveFilesWithoutAuthoring)
-                .union([
-                    "live-drag-link-wysiwyg.mov",
-                    "live-drag-link-wysiwyg.md"
-                ]),
+            existingPaths: existingPaths,
             sidecarContents: Self.validLiveSidecars.merging(["live-drag-link-wysiwyg.md": "too thin"]) { _, new in
                 new
-            }
+            },
+            fileByteCounts: Self.fileByteCounts(for: existingPaths)
         )
 
         let item = payload.items.first { $0.id == "live-authoring-wysiwyg" }
@@ -118,6 +128,60 @@ struct AutomationProductEvidenceAuditTests {
         #expect(payload.missingRequiredIDs.contains("live-authoring-wysiwyg"))
         let sidecar = item?.fileGroups.flatMap { $0 }.first { $0.path == "live-drag-link-wysiwyg.md" }
         #expect(sidecar?.missingRequiredPhrases == AutomationProductEvidenceAudit.liveSidecarRequiredPhrases)
+    }
+
+    @Test("Live sidecar must identify a live recording source")
+    func liveSidecarMustIdentifyLiveRecordingSource() throws {
+        let existingPaths = Self.fixtureFiles.union([
+            "live-visual-diagnostics-open-reveal.mov",
+            "live-visual-diagnostics-open-reveal.md"
+        ])
+        let payload = AutomationProductEvidenceAudit.evaluate(
+            directory: "/tmp/product-evidence",
+            existingPaths: existingPaths,
+            sidecarContents: [
+                "live-visual-diagnostics-open-reveal.md": Self.liveSidecar(
+                    "visual diagnostics",
+                    clipPath: "live-visual-diagnostics-open-reveal.mov",
+                    evidenceSource: "fixture screenshot"
+                )
+            ],
+            fileByteCounts: Self.fileByteCounts(for: existingPaths)
+        )
+
+        let item = try #require(payload.items.first { $0.id == "live-visual-diagnostics-open-reveal" })
+        #expect(!item.satisfied)
+        let sidecar = try #require(item.fileGroups.flatMap { $0 }.first {
+            $0.path == "live-visual-diagnostics-open-reveal.md"
+        })
+        #expect(sidecar.missingRequiredPhrases == ["Evidence source:"])
+    }
+
+    @Test("Live sidecar clip file must match the satisfying clip")
+    func liveSidecarClipFileMustMatchSatisfyingClip() throws {
+        let existingPaths = Self.fixtureFiles.union([
+            "live-visual-diagnostics-open-reveal.mov",
+            "live-visual-diagnostics-open-reveal.md"
+        ])
+        let payload = AutomationProductEvidenceAudit.evaluate(
+            directory: "/tmp/product-evidence",
+            existingPaths: existingPaths,
+            sidecarContents: [
+                "live-visual-diagnostics-open-reveal.md": Self.liveSidecar(
+                    "visual diagnostics",
+                    clipPath: "live-visual-diagnostics-open-reveal.mp4"
+                )
+            ],
+            fileByteCounts: Self.fileByteCounts(for: existingPaths)
+        )
+
+        let item = try #require(payload.items.first { $0.id == "live-visual-diagnostics-open-reveal" })
+        #expect(!item.satisfied)
+        let movGroupSidecar = try #require(item.fileGroups.flatMap { $0 }.first { file in
+            file.path == "live-visual-diagnostics-open-reveal.md" &&
+                file.missingRequiredPhrases.contains("Clip file:")
+        })
+        #expect(movGroupSidecar.missingRequiredPhrases == ["Clip file:"])
     }
 
     @Test("Live sidecar template uses audit labels and selected clip candidates")
@@ -154,6 +218,9 @@ struct AutomationProductEvidenceAuditTests {
             ]),
             sidecarContents: [
                 "live-visual-diagnostics-open-reveal.md": completed.content
+            ],
+            fileByteCounts: [
+                "live-visual-diagnostics-open-reveal.mov": 1_024
             ]
         )
 
@@ -239,20 +306,60 @@ struct AutomationProductEvidenceAuditTests {
 
     @Test("Live capture plan reports satisfied live gates")
     func liveCapturePlanReportsSatisfiedLiveGates() {
+        let existingPaths = Self.fixtureFiles
+            .union(Self.requiredLiveFilesWithoutAuthoring)
+            .union([
+                "live-drag-link-wysiwyg.mov",
+                "live-drag-link-wysiwyg.md"
+            ])
         let payload = AutomationProductEvidenceAudit.liveCapturePlan(
             directory: "/tmp/product-evidence",
-            existingPaths: Self.fixtureFiles
-                .union(Self.requiredLiveFilesWithoutAuthoring)
-                .union([
-                    "live-drag-link-wysiwyg.mp4",
-                    "live-drag-link-wysiwyg.md"
-                ]),
-            sidecarContents: Self.validLiveSidecars
+            existingPaths: existingPaths,
+            sidecarContents: Self.validLiveSidecars,
+            fileByteCounts: Self.fileByteCounts(for: existingPaths)
         )
 
         #expect(payload.missingLiveCount == 0)
         #expect(payload.allLiveSatisfied)
         #expect(payload.items.allSatisfy { $0.satisfied })
+    }
+
+    @Test("Empty live clip keeps evidence incomplete")
+    func emptyLiveClipKeepsEvidenceIncomplete() throws {
+        let existingPaths = Self.fixtureFiles
+            .union(Self.requiredLiveFilesWithoutAuthoring)
+            .union([
+                "live-drag-link-wysiwyg.mov",
+                "live-drag-link-wysiwyg.md"
+            ])
+        var fileByteCounts = Self.fileByteCounts(for: existingPaths)
+        fileByteCounts["live-visual-diagnostics-open-reveal.mov"] = 0
+        let payload = AutomationProductEvidenceAudit.evaluate(
+            directory: "/tmp/product-evidence",
+            existingPaths: existingPaths,
+            sidecarContents: Self.validLiveSidecars,
+            fileByteCounts: fileByteCounts
+        )
+
+        #expect(!payload.allRequiredPresent)
+        #expect(payload.missingRequiredIDs == ["live-visual-diagnostics-open-reveal"])
+        let visualItem = try #require(payload.items.first { $0.id == "live-visual-diagnostics-open-reveal" })
+        let clip = try #require(visualItem.fileGroups.flatMap { $0 }.first {
+            $0.path == "live-visual-diagnostics-open-reveal.mov"
+        })
+        #expect(clip.byteCount == 0)
+        #expect(clip.minimumByteCount == AutomationProductEvidenceAudit.minimumLiveClipByteCount)
+        #expect(!clip.meetsMinimumByteCount)
+
+        let plan = AutomationProductEvidenceAudit.liveCapturePlan(
+            directory: "/tmp/product-evidence",
+            existingPaths: existingPaths,
+            sidecarContents: Self.validLiveSidecars,
+            fileByteCounts: fileByteCounts
+        )
+        let visualPlan = try #require(plan.items.first { $0.id == "live-visual-diagnostics-open-reveal" })
+        #expect(visualPlan.satisfied == false)
+        #expect(visualPlan.options.first?.undersizedPaths == ["live-visual-diagnostics-open-reveal.mov"])
     }
 
     @Test("Live sidecar drafts prepare missing S0 gate notes")
@@ -277,14 +384,16 @@ struct AutomationProductEvidenceAuditTests {
 
     @Test("Live sidecar drafts skip satisfied gates by default")
     func liveSidecarDraftsSkipSatisfiedGatesByDefault() {
+        let existingPaths = Self.fixtureFiles
+            .union([
+                "live-visual-diagnostics-open-reveal.mp4",
+                "live-visual-diagnostics-open-reveal.md"
+            ])
         let payload = AutomationProductEvidenceAudit.liveSidecarDrafts(
             directory: "/tmp/product-evidence",
-            existingPaths: Self.fixtureFiles
-                .union([
-                    "live-visual-diagnostics-open-reveal.mp4",
-                    "live-visual-diagnostics-open-reveal.md"
-                ]),
-            sidecarContents: Self.validLiveSidecars
+            existingPaths: existingPaths,
+            sidecarContents: Self.validLiveSidecarsMP4,
+            fileByteCounts: Self.fileByteCounts(for: existingPaths)
         )
 
         #expect(!payload.drafts.map(\.sidecarPath).contains("live-visual-diagnostics-open-reveal.md"))
@@ -293,15 +402,17 @@ struct AutomationProductEvidenceAuditTests {
 
     @Test("Live sidecar drafts can include satisfied gates for rehearsal")
     func liveSidecarDraftsCanIncludeSatisfiedGatesForRehearsal() {
+        let existingPaths = Self.fixtureFiles
+            .union(Self.requiredLiveFilesWithoutAuthoring)
+            .union([
+                "live-drag-link-wysiwyg.mov",
+                "live-drag-link-wysiwyg.md"
+            ])
         let payload = AutomationProductEvidenceAudit.liveSidecarDrafts(
             directory: "/tmp/product-evidence",
-            existingPaths: Self.fixtureFiles
-                .union(Self.requiredLiveFilesWithoutAuthoring)
-                .union([
-                    "live-drag-link-wysiwyg.mov",
-                    "live-drag-link-wysiwyg.md"
-                ]),
+            existingPaths: existingPaths,
             sidecarContents: Self.validLiveSidecars,
+            fileByteCounts: Self.fileByteCounts(for: existingPaths),
             includeSatisfied: true
         )
 
@@ -319,19 +430,21 @@ struct AutomationProductEvidenceAuditTests {
         let template = try #require(AutomationProductEvidenceAudit.liveSidecarTemplate(
             id: "live-visual-diagnostics-open-reveal"
         ))
+        let existingPaths = Self.fixtureFiles
+            .union(Self.requiredLiveFilesWithoutAuthoring)
+            .union([
+                "live-drag-link-wysiwyg.mov",
+                "live-drag-link-wysiwyg.md"
+            ])
         let payload = AutomationProductEvidenceAudit.evaluate(
             directory: "/tmp/product-evidence",
-            existingPaths: Self.fixtureFiles
-                .union(Self.requiredLiveFilesWithoutAuthoring)
-                .union([
-                    "live-drag-link-wysiwyg.mov",
-                    "live-drag-link-wysiwyg.md"
-                ]),
+            existingPaths: existingPaths,
             sidecarContents: Self.validLiveSidecars.merging([
                 "live-visual-diagnostics-open-reveal.md": template.template
             ]) { _, new in
                 new
-            }
+            },
+            fileByteCounts: Self.fileByteCounts(for: existingPaths)
         )
 
         let item = payload.items.first { $0.id == "live-visual-diagnostics-open-reveal" }
@@ -394,24 +507,77 @@ struct AutomationProductEvidenceAuditTests {
     ]
 
     private static let validLiveSidecars: [String: String] = [
-        "live-visual-diagnostics-open-reveal.md": liveSidecar("visual diagnostics"),
-        "live-macro-evidence-open-reveal.md": liveSidecar("macro evidence"),
-        "live-branch-evidence-consistency.md": liveSidecar("branch evidence"),
-        "live-drag-link-wysiwyg.md": liveSidecar("drag link"),
-        "live-task-reorder-wysiwyg.md": liveSidecar("task reorder")
+        "live-visual-diagnostics-open-reveal.md": liveSidecar(
+            "visual diagnostics",
+            clipPath: "live-visual-diagnostics-open-reveal.mov"
+        ),
+        "live-macro-evidence-open-reveal.md": liveSidecar(
+            "macro evidence",
+            clipPath: "live-macro-evidence-open-reveal.mov"
+        ),
+        "live-branch-evidence-consistency.md": liveSidecar(
+            "branch evidence",
+            clipPath: "live-branch-evidence-consistency.mov"
+        ),
+        "live-drag-link-wysiwyg.md": liveSidecar(
+            "drag link",
+            clipPath: "live-drag-link-wysiwyg.mov"
+        ),
+        "live-task-reorder-wysiwyg.md": liveSidecar(
+            "task reorder",
+            clipPath: "live-task-reorder-wysiwyg.mov"
+        )
     ]
 
-    private static func liveSidecar(_ label: String) -> String {
+    private static let validLiveSidecarsMP4: [String: String] = [
+        "live-visual-diagnostics-open-reveal.md": liveSidecar(
+            "visual diagnostics",
+            clipPath: "live-visual-diagnostics-open-reveal.mp4"
+        ),
+        "live-macro-evidence-open-reveal.md": liveSidecar(
+            "macro evidence",
+            clipPath: "live-macro-evidence-open-reveal.mp4"
+        ),
+        "live-branch-evidence-consistency.md": liveSidecar(
+            "branch evidence",
+            clipPath: "live-branch-evidence-consistency.mp4"
+        ),
+        "live-drag-link-wysiwyg.md": liveSidecar(
+            "drag link",
+            clipPath: "live-drag-link-wysiwyg.mp4"
+        ),
+        "live-task-reorder-wysiwyg.md": liveSidecar(
+            "task reorder",
+            clipPath: "live-task-reorder-wysiwyg.mp4"
+        )
+    ]
+
+    private static func fileByteCounts(for paths: Set<String>) -> [String: Int64] {
+        Dictionary(uniqueKeysWithValues: paths.compactMap { path in
+            guard path.hasSuffix(".mov") || path.hasSuffix(".mp4") else {
+                return nil
+            }
+            return (path, 1_024)
+        })
+    }
+
+    private static func liveSidecar(
+        _ label: String,
+        clipPath: String,
+        evidenceSource: String = "live App recording."
+    ) -> String {
         """
         # \(label)
 
         - Capture date: 2026-07-06.
+        - Worktree note: main at abc123, dirty only product evidence clip.
         - App build/run source: local build from current worktree.
         - Workflow/package: live workflow package.
         - User action: captured \(label) interaction.
         - Checklist item: S0 live product evidence.
         - Known gaps: none for this specific capture.
-        - Evidence source: live App recording.
+        - Evidence source: \(evidenceSource)
+        - Clip file: `\(clipPath)`
         """
     }
 

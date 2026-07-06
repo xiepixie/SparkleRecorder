@@ -23,6 +23,8 @@
 - [x] `workflow product-evidence prepare-live-capture` writes missing sidecar drafts while preserving existing notes by default, without satisfying strict live evidence audit.
 - [x] Missing S0 live sidecar drafts are materialized under `docs/workflow-page-productization/product-evidence/`; placeholders remain intentionally incomplete until live clips are captured.
 - [x] `workflow product-evidence complete-sidecar` fills reviewed sidecar fields through typed CLI options, validates accepted clip filenames, and leaves the gate open when the clip file is absent.
+- [x] Strict product-evidence audit rejects zero-byte or size-unknown live `.mov` / `.mp4` clips, and `capture-plan` reports undersized clip paths instead of letting placeholder files close S0.
+- [x] Strict product-evidence audit rejects live sidecars whose `Evidence source:` describes fixture/mock/synthetic evidence or whose `Clip file:` does not name exactly one accepted candidate matching the satisfying clip.
 - [ ] Keep `06-current-work-and-next-tasks.md` updated whenever evidence status, owner boundary, accepted contract, or immediate next slice changes.
 - [ ] Keep [workstreams/s0-workflow-evidence.md](workstreams/s0-workflow-evidence.md) updated while S0 is active.
 - [ ] `workflow product-evidence audit --require-live --json` passes before S0 Workflow Evidence Closure is claimed.
