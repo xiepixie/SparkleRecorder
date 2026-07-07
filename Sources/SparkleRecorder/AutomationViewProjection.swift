@@ -601,6 +601,7 @@ public enum AutomationViewProjection {
             baselineRef: condition.baselineRef,
             pixel: condition.pixel,
             colorHex: condition.targetColorHex,
+            pixelSampleRadius: condition.pixelSampleRadius,
             threshold: condition.threshold
         )
     }
@@ -663,6 +664,9 @@ public enum AutomationViewProjection {
         }
         if let colorHex = condition.targetColorHex {
             parts.append(String(format: NSLocalizedString("Color %@", comment: ""), colorHex))
+        }
+        if let pixelSampleRadius = condition.pixelSampleRadius {
+            parts.append(String(format: NSLocalizedString("Sample radius %d", comment: ""), pixelSampleRadius))
         }
         if let threshold = condition.threshold {
             parts.append(String(format: NSLocalizedString("Threshold %.2f", comment: ""), threshold))

@@ -91,6 +91,49 @@ struct DomainSendableTests {
         assertSendable(AutomationExternalSignalClient.inactive)
         assertSendable(AutomationManualApprovalClient.rejecting)
         assertSendable(AutomationConditionEvaluatorClient.contextual())
+        assertSendable(AutomationVisualFrameSample(
+            source: .fixture,
+            capturedAt: Date(timeIntervalSince1970: 0),
+            imageSize: RecordingImageSize(width: 10, height: 10),
+            provider: "fixture"
+        ))
+        assertSendable(AutomationVisualDetectorScore(
+            value: 12,
+            threshold: 15,
+            comparison: .lessThanOrEqual
+        ))
+        if let detectorRequest = AutomationVisualDetectorRequest(
+            workflowID: UUID(),
+            taskID: UUID(),
+            condition: AutomationConditionSpec(
+                name: "Ready",
+                kind: .ocrText(AutomationOCRCondition(text: "Ready"))
+            ),
+            sample: AutomationVisualFrameSample(
+                source: .fixture,
+                capturedAt: Date(timeIntervalSince1970: 0),
+                imageSize: RecordingImageSize(width: 10, height: 10),
+                provider: "fixture"
+            ),
+            scope: .fullDisplay(explicitlyChosen: false),
+            requestedAt: Date(timeIntervalSince1970: 0)
+        ) {
+            assertSendable(AutomationVisualFrameRoute(
+                request: detectorRequest,
+                displayBounds: RectValue(x: 0, y: 0, width: 10, height: 10),
+                implicitFullDisplayFallback: true
+            ))
+        }
+        assertSendable(AutomationRepeatUntilLoopState(
+            policy: AutomationRepeatUntilLoopPolicy(
+                bodyTaskIDs: [UUID()],
+                condition: AutomationConditionSpec(
+                    name: "Ready",
+                    kind: .ocrText(AutomationOCRCondition(text: "Ready"))
+                )
+            ),
+            startedAt: Date(timeIntervalSince1970: 0)
+        ))
         assertSendable(AutomationRepositoryRefreshState.idle)
         assertSendable(AutomationRepositoryRefreshClient(
             currentState: { .idle },

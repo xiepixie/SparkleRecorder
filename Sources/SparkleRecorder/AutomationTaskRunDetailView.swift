@@ -188,7 +188,10 @@ struct AutomationTaskRunDetailView: View {
 
                 Spacer(minLength: 0)
 
-                Button(macroReviewPresentation.buttonTitle(isOpening: isOpeningSemanticReview), systemImage: "rectangle.stack.badge.play") {
+                Button(
+                    NSLocalizedString(macroReviewPresentation.buttonTitle(isOpening: isOpeningSemanticReview), comment: ""),
+                    systemImage: "rectangle.stack.badge.play"
+                ) {
                     openSemanticReview()
                 }
                 .buttonStyle(.bordered)
@@ -216,10 +219,12 @@ struct AutomationTaskRunDetailView: View {
                 }
             }
 
-            Text(macroReviewPresentation.summary)
+            Text(localizedMacroReviewSummary)
                 .font(.caption)
                 .foregroundStyle(.tertiary)
                 .fixedSize(horizontal: false, vertical: true)
+
+            macroReviewDecisionRows
 
             macroReviewReadiness
 
@@ -255,6 +260,75 @@ struct AutomationTaskRunDetailView: View {
                         .strokeBorder(Color.primary.opacity(0.075), lineWidth: 0.6)
                 )
         )
+    }
+
+    private var macroReviewDecisionRows: some View {
+        VStack(alignment: .leading, spacing: 5) {
+            ForEach(Array(macroReviewPresentation.decisionRows.enumerated()), id: \.offset) { _, row in
+                macroReviewDecisionRow(row)
+            }
+        }
+    }
+
+    private func macroReviewDecisionRow(
+        _ row: AutomationMacroReviewSourcePresentation.DecisionRow
+    ) -> some View {
+        let tint = macroReviewDecisionTint(row.tone)
+        return VStack(alignment: .leading, spacing: 4) {
+            HStack(alignment: .firstTextBaseline, spacing: 6) {
+                Label(NSLocalizedString(row.title, comment: ""), systemImage: macroReviewDecisionImage(row.tone))
+                    .foregroundStyle(tint)
+                    .lineLimit(1)
+
+                Spacer(minLength: 0)
+
+                Text(NSLocalizedString(row.value, comment: ""))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
+            .font(.caption)
+
+            Text(NSLocalizedString(row.detail, comment: ""))
+                .font(.caption)
+                .foregroundStyle(.tertiary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(7)
+        .background(
+            RoundedRectangle(cornerRadius: 8)
+                .fill(tint.opacity(0.04))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8)
+                        .strokeBorder(tint.opacity(0.13), lineWidth: 0.6)
+                )
+        )
+        .accessibilityElement(children: .combine)
+    }
+
+    private func macroReviewDecisionTint(
+        _ tone: AutomationMacroReviewSourcePresentation.DecisionRow.Tone
+    ) -> Color {
+        switch tone {
+        case .ready:
+            return Brand.libraryGreen
+        case .needsInput:
+            return Brand.sigAmber
+        case .reviewOnly:
+            return Brand.libraryBlue
+        }
+    }
+
+    private func macroReviewDecisionImage(
+        _ tone: AutomationMacroReviewSourcePresentation.DecisionRow.Tone
+    ) -> String {
+        switch tone {
+        case .ready:
+            return "checkmark.circle"
+        case .needsInput:
+            return "exclamationmark.triangle"
+        case .reviewOnly:
+            return "lock.doc"
+        }
     }
 
     private var macroReviewReadiness: some View {
@@ -318,9 +392,9 @@ struct AutomationTaskRunDetailView: View {
 
     private func macroReviewBadge(title: String, value: String) -> some View {
         HStack(spacing: 4) {
-            Text(title)
+            Text(NSLocalizedString(title, comment: ""))
                 .foregroundStyle(.tertiary)
-            Text(value)
+            Text(NSLocalizedString(value, comment: ""))
                 .foregroundStyle(.secondary)
                 .lineLimit(1)
         }
@@ -353,6 +427,22 @@ struct AutomationTaskRunDetailView: View {
             workflow: workflow,
             macros: macros
         )
+    }
+
+    private var localizedMacroReviewSummary: String {
+        if let macroName = macroReviewPresentation.macroName,
+           let reference = macroReviewPresentation.recordingReference {
+            return String(
+                format: NSLocalizedString(
+                    "Open the semantic recording captured with %@. It includes %d timeline events; this run does not carry a separate semantic bundle yet.",
+                    comment: ""
+                ),
+                macroName,
+                reference.eventCount
+            )
+        }
+
+        return NSLocalizedString(macroReviewPresentation.summary, comment: "")
     }
 
     private func semanticReviewFeedbackPresentation(

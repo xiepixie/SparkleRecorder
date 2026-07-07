@@ -179,9 +179,29 @@ private final class LiveAutomationConditionEvaluator: @unchecked Sendable {
             sampleAt: sampleAt
         ))
 
+        guard let detectionInput = ocrDetectionInput(
+            image: image,
+            resolution: resolution
+        ) else {
+            let evidence = makeOCREvidence(
+                request: request,
+                condition: condition,
+                outcome: .conditionNotMatched,
+                sampleCount: sampleCount,
+                firstSampleAt: firstSampleAt,
+                sampleAt: sampleAt,
+                displayBounds: displayBounds,
+                resolution: resolution,
+                detections: [],
+                matchedText: nil,
+                artifacts: artifacts
+            )
+            return .notMatched(evidence)
+        }
+
         let detections: [TextDetection]
         do {
-            detections = try await visionDetector.detectText(in: image)
+            detections = try await visionDetector.detectText(in: detectionInput.image)
         } catch {
             let outcome = await outcome(for: error)
             return .failed(AutomationConditionEvaluationResult(
@@ -201,13 +221,7 @@ private final class LiveAutomationConditionEvaluator: @unchecked Sendable {
             ))
         }
 
-        let regionDetections = detections.filter { detection in
-            detectionIntersectsSearchRegion(
-                detection,
-                image: image,
-                resolution: resolution
-            )
-        }
+        let regionDetections = detections
         let matched = regionDetections.first { detection in
             matches(candidate: detection.text, target: condition.text, mode: condition.matchMode)
         }
@@ -228,40 +242,43 @@ private final class LiveAutomationConditionEvaluator: @unchecked Sendable {
         return matched == nil ? .notMatched(evidence) : .matched(evidence)
     }
 
+    private func ocrDetectionInput(
+        image: CGImage,
+        resolution: AutomationOCRSearchRegionResolution
+    ) -> OCRDetectionInput? {
+        switch resolution {
+        case .unrestricted:
+            return OCRDetectionInput(image: image)
+        case .unavailable:
+            return nil
+        case .resolved(let region):
+            let imageBounds = CGRect(x: 0, y: 0, width: image.width, height: image.height)
+            let cropRect = CGRect(
+                x: region.x,
+                y: region.y,
+                width: region.width,
+                height: region.height
+            )
+            .integral
+            .intersection(imageBounds)
+
+            guard !cropRect.isNull,
+                  cropRect.width > 1,
+                  cropRect.height > 1,
+                  let cropped = image.cropping(to: cropRect) else {
+                return nil
+            }
+
+            return OCRDetectionInput(image: cropped)
+        }
+    }
+
     private func resolvedRegion(for resolution: AutomationOCRSearchRegionResolution) -> RectValue? {
         switch resolution {
         case .resolved(let region):
             return region
         case .unrestricted, .unavailable:
             return nil
-        }
-    }
-
-    private func detectionIntersectsSearchRegion(
-        _ detection: TextDetection,
-        image: CGImage,
-        resolution: AutomationOCRSearchRegionResolution
-    ) -> Bool {
-        switch resolution {
-        case .unrestricted:
-            return true
-        case .unavailable:
-            return false
-        case .resolved(let searchRegion):
-            let imageSize = CGSize(width: image.width, height: image.height)
-            let detectionRect = CGRect(
-                x: detection.boundingBox.minX * imageSize.width,
-                y: detection.boundingBox.minY * imageSize.height,
-                width: detection.boundingBox.width * imageSize.width,
-                height: detection.boundingBox.height * imageSize.height
-            )
-            let searchRect = CGRect(
-                x: searchRegion.x,
-                y: searchRegion.y,
-                width: searchRegion.width,
-                height: searchRegion.height
-            )
-            return detectionRect.intersects(searchRect)
         }
     }
 
@@ -487,6 +504,10 @@ private final class LiveAutomationConditionEvaluator: @unchecked Sendable {
         case matched(AutomationConditionEvaluationEvidence)
         case notMatched(AutomationConditionEvaluationEvidence)
         case failed(AutomationConditionEvaluationResult)
+    }
+
+    private struct OCRDetectionInput {
+        var image: CGImage
     }
 }
 

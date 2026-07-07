@@ -84,6 +84,69 @@ struct ActionGroupProjectionTests {
         #expect(behavior.eventIndices == [2, 3])
     }
 
+    @Test("Projection finds inserted selection targets by event identity after sorting")
+    func projectionFindsInsertedSelectionTargetsByEventIdentity() throws {
+        let insertedEvents = TestFixtures.clickPair(downTime: 0.2, upTime: 0.3, x: 40, y: 50)
+        let events = [
+            RecordedEvent.make(.keyDown, time: 0.0, keyCode: 36),
+            insertedEvents[0],
+            insertedEvents[1],
+            RecordedEvent.make(.keyUp, time: 0.5, keyCode: 36)
+        ]
+        let groups = ActionGroupProjection.groups(
+            from: events,
+            liveDuration: 0.5,
+            hidesMouseMoves: false,
+            smartMergeGestures: true
+        )
+
+        let matchedIndices = ActionGroupProjection.eventIndices(matching: insertedEvents, in: events)
+        let matchedGroup = try #require(ActionGroupProjection.firstGroup(
+            matching: insertedEvents,
+            in: events,
+            groups: groups
+        ))
+
+        #expect(matchedIndices == Set([1, 2]))
+        #expect(matchedGroup.kind == .click)
+        #expect(matchedGroup.eventIndices == [1, 2])
+    }
+
+    @Test("Projection finds regrouped behavior and exposed unbound rows")
+    func projectionFindsRegroupedBehaviorAndUnboundRows() throws {
+        let behaviorID = BehaviorGroupID()
+        var events = TestFixtures.clickPair(downTime: 0.0, upTime: 0.05, x: 40, y: 50)
+        events.append(RecordedEvent.make(.scrollWheel, time: 0.30, x: 40, y: 50, scrollDeltaY: -2))
+        events.bindBehavior(at: [0, 1, 2], id: behaviorID, name: "Reveal panel")
+
+        let boundGroups = ActionGroupProjection.groups(
+            from: events,
+            liveDuration: 0.30,
+            hidesMouseMoves: false,
+            smartMergeGestures: true
+        )
+        let behavior = try #require(ActionGroupProjection.firstBehaviorGroup(id: behaviorID, groups: boundGroups))
+
+        #expect(behavior.kind == .sequence)
+        #expect(behavior.eventIndices == [0, 1, 2])
+        #expect(behavior.containedActionCount == 2)
+
+        events.unbindBehavior(at: behavior.eventIndices)
+        let unboundGroups = ActionGroupProjection.groups(
+            from: events,
+            liveDuration: 0.30,
+            hidesMouseMoves: false,
+            smartMergeGestures: true
+        )
+        let exposedGroups = ActionGroupProjection.groups(
+            containingEventIndices: Set(behavior.eventIndices),
+            groups: unboundGroups
+        )
+
+        #expect(exposedGroups.map(\.kind) == [.click, .scroll])
+        #expect(exposedGroups.map(\.eventIndices) == [[0, 1], [2]])
+    }
+
     @Test("Selection snapshot keeps group order and sorts event indices once")
     func selectionSnapshotKeepsGroupOrderAndSortsEventIndices() {
         let firstID = UUID()
@@ -124,8 +187,10 @@ struct ActionGroupProjectionTests {
 
         #expect(snapshot.groupIDs == [firstID, secondID])
         #expect(snapshot.eventIndices == [1, 3, 4])
+        #expect(snapshot.eventBackedGroupCount == 2)
         #expect(snapshot.containsBehavior)
-        #expect(snapshot.canBindBehavior)
+        #expect(snapshot.behaviorBindReadiness == .containsBehavior)
+        #expect(!snapshot.canBindBehavior)
     }
 
     @Test("Selection snapshot detects behavior stored on grouped row")
@@ -151,8 +216,101 @@ struct ActionGroupProjectionTests {
 
         #expect(snapshot.groupIDs == [groupID])
         #expect(snapshot.eventIndices.isEmpty)
+        #expect(snapshot.eventBackedGroupCount == 0)
         #expect(snapshot.containsBehavior)
+        #expect(snapshot.behaviorBindReadiness == .containsBehavior)
         #expect(!snapshot.canBindBehavior)
+    }
+
+    @Test("Selection snapshot requires multiple visible actions to bind behavior")
+    func selectionSnapshotRequiresMultipleVisibleActionsToBindBehavior() {
+        let clickID = UUID()
+        let singleClickGroup = ActionGroup(
+            id: clickID,
+            kind: .click,
+            eventIndices: [0, 1],
+            startTime: 0,
+            endTime: 0.1,
+            summary: "Click"
+        )
+        let waitID = UUID()
+        let waitGroup = ActionGroup(
+            id: waitID,
+            kind: .wait,
+            eventIndices: [],
+            startTime: 0.1,
+            endTime: 0.4,
+            summary: "Wait"
+        )
+        let keyID = UUID()
+        let keyGroup = ActionGroup(
+            id: keyID,
+            kind: .keyPress,
+            eventIndices: [2],
+            startTime: 0.4,
+            endTime: 0.5,
+            summary: "Press key"
+        )
+        let scrollID = UUID()
+        let scrollGroup = ActionGroup(
+            id: scrollID,
+            kind: .scroll,
+            eventIndices: [3],
+            startTime: 0.7,
+            endTime: 0.7,
+            summary: "Scroll"
+        )
+        let events = [
+            RecordedEvent.make(.leftMouseDown, time: 0.0, x: 10, y: 10),
+            RecordedEvent.make(.leftMouseUp, time: 0.1, x: 10, y: 10),
+            RecordedEvent.make(.keyDown, time: 0.4, keyCode: 36),
+            RecordedEvent.make(.scrollWheel, time: 0.7, x: 10, y: 10)
+        ]
+        let groups = [singleClickGroup, waitGroup, keyGroup, scrollGroup]
+
+        let singleSnapshot = ActionGroupProjection.selectionSnapshot(
+            groups: groups,
+            selectedGroupIDs: [clickID],
+            events: events
+        )
+        let multiSnapshot = ActionGroupProjection.selectionSnapshot(
+            groups: groups,
+            selectedGroupIDs: [clickID, keyID],
+            events: events
+        )
+        let waitOnlySnapshot = ActionGroupProjection.selectionSnapshot(
+            groups: groups,
+            selectedGroupIDs: [waitID],
+            events: events
+        )
+        let waitPlusClickSnapshot = ActionGroupProjection.selectionSnapshot(
+            groups: groups,
+            selectedGroupIDs: [clickID, waitID],
+            events: events
+        )
+        let nonContiguousSnapshot = ActionGroupProjection.selectionSnapshot(
+            groups: groups,
+            selectedGroupIDs: [clickID, scrollID],
+            events: events
+        )
+
+        #expect(singleSnapshot.eventBackedGroupCount == 1)
+        #expect(!singleSnapshot.canBindBehavior)
+        #expect(singleSnapshot.behaviorBindReadiness == .needsTwoRecordedActions)
+        #expect(multiSnapshot.eventBackedGroupCount == 2)
+        #expect(multiSnapshot.eventBackedSelectionIsContiguous)
+        #expect(multiSnapshot.canBindBehavior)
+        #expect(multiSnapshot.behaviorBindReadiness == .ready)
+        #expect(waitOnlySnapshot.eventBackedGroupCount == 0)
+        #expect(!waitOnlySnapshot.canBindBehavior)
+        #expect(waitOnlySnapshot.behaviorBindReadiness == .needsTwoRecordedActions)
+        #expect(waitPlusClickSnapshot.eventBackedGroupCount == 1)
+        #expect(!waitPlusClickSnapshot.canBindBehavior)
+        #expect(waitPlusClickSnapshot.behaviorBindReadiness == .needsTwoRecordedActions)
+        #expect(nonContiguousSnapshot.eventBackedGroupCount == 2)
+        #expect(!nonContiguousSnapshot.eventBackedSelectionIsContiguous)
+        #expect(!nonContiguousSnapshot.canBindBehavior)
+        #expect(nonContiguousSnapshot.behaviorBindReadiness == .nonContiguousRecordedActions)
     }
 
     @Test("Selection snapshot is empty when nothing is selected")
@@ -175,6 +333,7 @@ struct ActionGroupProjectionTests {
         #expect(snapshot.groupIDs.isEmpty)
         #expect(snapshot.eventIndices.isEmpty)
         #expect(!snapshot.containsBehavior)
+        #expect(snapshot.behaviorBindReadiness == .noSelection)
     }
 
     @Test("Text target selection includes coordinate clicks that can become click text")
@@ -507,6 +666,88 @@ struct ActionGroupProjectionTests {
         #expect(clickGroup.summary == "Click text (needs text)")
         #expect(clickGroup.textTargetReadiness == .missingText)
         #expect(plan.liveDurationAfterConversion == 1.1)
+    }
+
+    @Test("Text click conversion planner can use a reviewed text target override")
+    func textClickConversionPlannerUsesReviewedTextTargetOverride() throws {
+        var wait = RecordedEvent.make(.waitForText, time: 1.0)
+        wait.textAnchor = TextAnchor(
+            text: "",
+            observedFrame: RectValue(x: 20, y: 30, width: 40, height: 20)
+        )
+        wait.textTimeout = 4.0
+        let reviewedAnchor = TextAnchor(
+            text: "Start",
+            observedFrame: RectValue(x: 90, y: 90, width: 80, height: 24)
+        )
+        let group = ActionGroup(
+            kind: .waitForText,
+            eventIndices: [0],
+            startTime: 1.0,
+            endTime: 1.0,
+            summary: "Wait Text",
+            textAnchor: wait.textAnchor,
+            textTimeout: 4.0
+        )
+
+        let plan = ActionGroupTextClickConversionPlanner.plan(
+            for: group,
+            events: [wait],
+            liveDuration: 1.0,
+            textAnchorOverride: reviewedAnchor,
+            textTimeoutOverride: 9.0
+        )
+        let clickGroup = try #require(EventGrouper().group(plan.insertedEvents).first)
+
+        #expect(!plan.isEmpty)
+        #expect(plan.insertedEvents.allSatisfy { $0.textAnchor?.text == "Start" })
+        #expect(plan.insertedEvents.allSatisfy { $0.textTimeout == 9.0 })
+        #expect(plan.insertedEvents.allSatisfy { $0.textAnchor?.coordinateFallback == PointValue(x: 130, y: 102) })
+        #expect(clickGroup.summary == "Click text: Start")
+        #expect(clickGroup.textTargetReadiness == .ready)
+    }
+
+    @Test("Text click conversion readiness explains unavailable wait conversion")
+    func textClickConversionReadinessExplainsUnavailableWaitConversion() {
+        let waitWithoutSource = ActionGroup(
+            kind: .waitForText,
+            eventIndices: [],
+            startTime: 1.0,
+            endTime: 1.0,
+            summary: "Wait Text"
+        )
+        let staleWait = ActionGroup(
+            kind: .waitForText,
+            eventIndices: [0],
+            startTime: 1.0,
+            endTime: 1.0,
+            summary: "Wait Text"
+        )
+        let click = ActionGroup(
+            kind: .click,
+            eventIndices: [0],
+            startTime: 1.0,
+            endTime: 1.0,
+            summary: "Click"
+        )
+
+        #expect(ActionGroupTextClickConversionPlanner.readiness(
+            for: waitWithoutSource,
+            events: []
+        ) == .missingSourceEvent)
+        #expect(ActionGroupTextClickConversionPlanner.readiness(
+            for: staleWait,
+            events: [RecordedEvent.make(.leftMouseDown, time: 1.0)]
+        ) == .sourceEventMismatch)
+        #expect(ActionGroupTextClickConversionPlanner.readiness(
+            for: click,
+            events: [RecordedEvent.make(.leftMouseDown, time: 1.0)]
+        ) == .unsupportedAction)
+        #expect(ActionGroupTextClickConversionPlanner.plan(
+            for: waitWithoutSource,
+            events: [],
+            liveDuration: 1.0
+        ).isEmpty)
     }
 
     @Test("Passive wait duplication planner extends middle wait by shifting later events")

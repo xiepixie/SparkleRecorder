@@ -35,6 +35,30 @@ enum AutomationVisualConditionPresentation {
         }
     }
 
+    static func detectorTitle(for type: AutomationVisualConditionType) -> String {
+        switch type {
+        case .regionChanged:
+            return NSLocalizedString("Detector: baseline diff", comment: "")
+        case .imageAppeared, .imageDisappeared:
+            return NSLocalizedString("Detector: image template", comment: "")
+        case .pixelMatched:
+            return NSLocalizedString("Detector: pixel color", comment: "")
+        }
+    }
+
+    static func detectorDetail(for type: AutomationVisualConditionType) -> String {
+        switch type {
+        case .regionChanged:
+            return NSLocalizedString("Compares the watched area with a saved baseline image.", comment: "")
+        case .imageAppeared:
+            return NSLocalizedString("Looks for a saved image crop, such as an icon or button, inside the watched area.", comment: "")
+        case .imageDisappeared:
+            return NSLocalizedString("Continues when the saved image crop is absent from the watched area.", comment: "")
+        case .pixelMatched:
+            return NSLocalizedString("Checks a target color at a pixel or small sampled area.", comment: "")
+        }
+    }
+
     static func title(for progressKind: AutomationConditionProgressKind) -> String {
         switch progressKind {
         case .ocrText:
@@ -75,6 +99,34 @@ enum AutomationVisualConditionPresentation {
         case .manualApproval:
             return "hand.raised.fill"
         }
+    }
+}
+
+enum AutomationConditionObservationPresentation {
+    static func ocrDetectorTitle() -> String {
+        NSLocalizedString("Detector: OCR text", comment: "")
+    }
+
+    static func ocrDetectorDetail() -> String {
+        NSLocalizedString("Recognizes visible text only; icons and drawings need a visual condition.", comment: "")
+    }
+
+    static func scopeTitle(hasRegion: Bool) -> String {
+        hasRegion
+            ? NSLocalizedString("Scope: selected region", comment: "")
+            : NSLocalizedString("Scope: full display", comment: "")
+    }
+
+    static func ocrScopeDetail(hasRegion: Bool) -> String {
+        hasRegion
+            ? NSLocalizedString("Only text detected inside the selected region can match.", comment: "")
+            : NSLocalizedString("All detected text on the captured display can match.", comment: "")
+    }
+
+    static func visualScopeDetail(hasRegion: Bool) -> String {
+        hasRegion
+            ? NSLocalizedString("Only pixels inside the selected bounds are evaluated.", comment: "")
+            : NSLocalizedString("The visual check scans the whole captured display.", comment: "")
     }
 }
 

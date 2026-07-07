@@ -109,6 +109,18 @@ private struct RecordingCLIBundle {
     var bundle: SemanticRecordingBundle
 }
 
+private struct RecordingCLIBundleLoad {
+    var requestedRecordingID: String
+    var fixture: String?
+    var sourceOption: String?
+    var bundleDirectory: URL?
+    var loadResult: SemanticRecordingBundleLoadResult
+
+    var bundle: SemanticRecordingBundle {
+        loadResult.bundle
+    }
+}
+
 if args.count >= 2, args[1] == "workflow" {
     runWorkflowCLI(args)
 }
@@ -143,6 +155,15 @@ private func runRecordingCLI(_ args: [String]) -> Never {
             exit(Int32(exitCode))
         }
 
+        if recordingArgs[0] == "macro-links" {
+            let exitCode = try runRecordingMacroLinks(
+                Array(recordingArgs.dropFirst()),
+                command: "recording.macroLinks",
+                wantsJSON: wantsJSON
+            )
+            exit(Int32(exitCode))
+        }
+
         if recordingArgs[0] == "show" {
             let exitCode = try runRecordingShow(
                 Array(recordingArgs.dropFirst()),
@@ -156,6 +177,15 @@ private func runRecordingCLI(_ args: [String]) -> Never {
             let exitCode = try runRecordingExplain(
                 Array(recordingArgs.dropFirst()),
                 command: "recording.explain",
+                wantsJSON: wantsJSON
+            )
+            exit(Int32(exitCode))
+        }
+
+        if recordingArgs[0] == "readiness" {
+            let exitCode = try runRecordingReadiness(
+                Array(recordingArgs.dropFirst()),
+                command: "recording.readiness",
                 wantsJSON: wantsJSON
             )
             exit(Int32(exitCode))
@@ -1569,6 +1599,215 @@ private func runRecordingExplain(
     return 0
 }
 
+private func runRecordingReadiness(
+    _ arguments: [String],
+    command: String,
+    wantsJSON: Bool
+) throws -> Int {
+    var requiresOCRReadiness = false
+    var requiresWindowOrAXReadiness = false
+    let recordingBundle = try loadRecordingCLIBundleTolerant(arguments) { token, _, _ in
+        switch token {
+        case "--json":
+            return 0
+        case "--require-ocr":
+            requiresOCRReadiness = true
+            return 0
+        case "--require-window-or-ax":
+            requiresWindowOrAXReadiness = true
+            return 0
+        default:
+            return nil
+        }
+    }
+    let policy = SemanticRecordingBundleReadinessPolicy(
+        capturePolicy: recordingBundle.bundle.capturePolicy,
+        requiresOCRObservations: requiresOCRReadiness,
+        requiresWindowOrAXObservations: requiresWindowOrAXReadiness
+    )
+    let readiness = SemanticRecordingBundleReadiness.evaluate(
+        recordingBundle.bundle,
+        policy: policy
+    )
+    let followUps = semanticRecordingDebugSmokeReadinessFollowUps(readiness)
+    let artifactFiles = SemanticRecordingArtifactFileAuditor.summary(
+        bundle: recordingBundle.bundle,
+        bundleDirectory: recordingBundle.bundleDirectory
+    )
+    let envelope = AutomationCLIResultEnvelope<SemanticRecordingCLIReadinessPayload>
+        .semanticRecordingReadiness(
+            command: command,
+            requestedRecordingID: recordingBundle.requestedRecordingID,
+            loadResult: recordingBundle.loadResult,
+            readiness: readiness,
+            fixture: recordingBundle.fixture,
+            sourceOption: recordingBundle.sourceOption,
+            bundleDirectory: recordingBundle.bundleDirectory?.path,
+            followUps: followUps,
+            artifactFiles: artifactFiles
+        )
+
+    if wantsJSON {
+        writeWorkflowJSON(envelope)
+    } else {
+        writeRecordingReadinessSummary(envelope.data)
+    }
+    return 0
+}
+
+private func runRecordingMacroLinks(
+    _ arguments: [String],
+    command: String,
+    wantsJSON: Bool
+) throws -> Int {
+    var macrosDirectory: URL?
+    var recordingsRoot: URL?
+    var includeUnlinked = false
+    var requiresOCRReadiness = false
+    var requiresWindowOrAXReadiness = false
+    var index = 0
+
+    while index < arguments.count {
+        let token = arguments[index]
+        switch token {
+        case "--json":
+            break
+        case "--macros-dir":
+            guard index + 1 < arguments.count else {
+                throw WorkflowCLIError("missingArgument", "--macros-dir requires a directory path.", path: token)
+            }
+            macrosDirectory = URL(fileURLWithPath: arguments[index + 1], isDirectory: true)
+                .standardizedFileURL
+            index += 1
+        case "--recordings-root":
+            guard index + 1 < arguments.count else {
+                throw WorkflowCLIError("missingArgument", "--recordings-root requires a path.", path: token)
+            }
+            recordingsRoot = URL(fileURLWithPath: arguments[index + 1], isDirectory: true)
+                .standardizedFileURL
+            index += 1
+        case "--include-unlinked":
+            includeUnlinked = true
+        case "--require-ocr":
+            requiresOCRReadiness = true
+        case "--require-window-or-ax":
+            requiresWindowOrAXReadiness = true
+        default:
+            if token.hasPrefix("--") {
+                throw WorkflowCLIError("unsupportedOption", "Unsupported option '\(token)'.", path: token)
+            }
+            throw WorkflowCLIError("unexpectedArgument", "Unexpected argument '\(token)'.", path: token)
+        }
+        index += 1
+    }
+
+    let resolvedMacrosDirectory = macrosDirectory ?? defaultWorkflowMacrosDirectory()
+    let resolvedRecordingsRoot = recordingsRoot ?? RecordingBundleStore.defaultRootDirectory
+    let store = RecordingBundleStore(rootDirectory: resolvedRecordingsRoot)
+    let manifests = try loadWorkflowMacroManifests(macrosDirectory: macrosDirectory)
+    var links: [SemanticRecordingCLIMacroLinkEntry] = []
+
+    for macro in manifests {
+        guard let reference = macro.semanticRecording else {
+            if includeUnlinked {
+                links.append(
+                    SemanticRecordingCLIMacroLinkEntry(
+                        macro: macro,
+                        status: .unlinked
+                    )
+                )
+            }
+            continue
+        }
+
+        let bundleDirectory = resolvedRecordingsRoot.appendingPathComponent(
+            SemanticRecordingBundleDirectoryIdentity.directoryName(for: reference.recordingID),
+            isDirectory: true
+        )
+        do {
+            let loadResult = try waitForWorkflowCLIAsync {
+                try await store.loadBundleTolerant(recordingID: reference.recordingID)
+            }
+            let policy = SemanticRecordingBundleReadinessPolicy(
+                capturePolicy: loadResult.bundle.capturePolicy,
+                requiresOCRObservations: requiresOCRReadiness,
+                requiresWindowOrAXObservations: requiresWindowOrAXReadiness
+            )
+            let readiness = SemanticRecordingBundleReadiness.evaluate(
+                loadResult.bundle,
+                policy: policy
+            )
+            let artifactFiles = SemanticRecordingArtifactFileAuditor.summary(
+                bundle: loadResult.bundle,
+                bundleDirectory: bundleDirectory
+            )
+            var issues: [String] = []
+            if loadResult.bundle.id != reference.recordingID {
+                issues.append("loadedRecordingIDMismatch")
+            }
+            if reference.eventCount != macro.eventCount {
+                issues.append("macroEventCountDiffersFromSemanticReference")
+            }
+            if reference.bundleRelativePath != MacroSemanticRecordingReference.defaultBundleRelativePath(
+                recordingID: reference.recordingID
+            ) {
+                issues.append("bundleRelativePathMismatch")
+            }
+            if reference.manifestRelativePath != MacroSemanticRecordingReference.defaultManifestRelativePath(
+                recordingID: reference.recordingID
+            ) {
+                issues.append("manifestRelativePathMismatch")
+            }
+            if artifactFiles?.hasIssues == true {
+                issues.append("artifactFilesDegraded")
+            }
+            links.append(
+                SemanticRecordingCLIMacroLinkEntry(
+                    macro: macro,
+                    bundleDirectory: bundleDirectory.path,
+                    loadResult: loadResult,
+                    readiness: readiness,
+                    artifactFiles: artifactFiles,
+                    issues: issues
+                )
+            )
+        } catch {
+            links.append(
+                SemanticRecordingCLIMacroLinkEntry(
+                    macro: macro,
+                    bundleDirectory: bundleDirectory.path,
+                    issues: ["loadFailed: \(error.localizedDescription)"],
+                    status: .failedToLoad
+                )
+            )
+        }
+    }
+
+    let payload = SemanticRecordingCLIMacroLinksPayload(
+        macrosRoot: resolvedMacrosDirectory.path,
+        recordingsRoot: resolvedRecordingsRoot.path,
+        totalMacroCount: manifests.count,
+        requiresOCRObservations: requiresOCRReadiness,
+        requiresWindowOrAXObservations: requiresWindowOrAXReadiness,
+        links: links
+    )
+    let envelope = AutomationCLIResultEnvelope<SemanticRecordingCLIMacroLinksPayload>
+        .semanticRecordingMacroLinks(
+            command: command,
+            payload: payload,
+            recordingsRootSourceOption: recordingsRoot.map {
+                recordingCLISourceOption("--recordings-root", url: $0)
+            }
+        )
+
+    if wantsJSON {
+        writeWorkflowJSON(envelope)
+    } else {
+        writeRecordingMacroLinksSummary(envelope.data)
+    }
+    return 0
+}
+
 private func runRecordingList(
     _ arguments: [String],
     command: String,
@@ -1658,11 +1897,31 @@ private func runRecordingList(
             path: "--recordings-root"
         )
     case (nil, nil):
-        throw WorkflowCLIError(
-            "missingArgument",
-            "recording list requires --recordings-root <path> or --fixture checkout.",
-            path: "--recordings-root"
-        )
+        let defaultRoot = RecordingBundleStore.defaultRootDirectory
+        let store = RecordingBundleStore(rootDirectory: defaultRoot)
+        let catalog = try waitForWorkflowCLIAsync {
+            try await store.listBundleCatalog()
+        }
+        let entries = catalog.map { entry in
+            SemanticRecordingCLICatalogEntry(
+                recordingID: entry.recordingID,
+                source: .storedBundle,
+                modifiedAt: entry.modifiedAt,
+                manifestAvailable: true
+            )
+        }
+        let envelope = AutomationCLIResultEnvelope<SemanticRecordingCLIListPayload>
+            .semanticRecordingList(
+                command: command,
+                recordings: entries,
+                recordingsRoot: defaultRoot.path
+            )
+        if wantsJSON {
+            writeWorkflowJSON(envelope)
+        } else {
+            writeRecordingListSummary(envelope.data)
+        }
+        return 0
     }
 }
 
@@ -2188,14 +2447,7 @@ private func loadRecordingCLIBundle(
     }
 
     let sourceCount = [fixture != nil, recordingsRoot != nil, bundlePath != nil].filter { $0 }.count
-    guard sourceCount == 1 else {
-        if sourceCount == 0 {
-            throw WorkflowCLIError(
-                "missingArgument",
-                "recording commands require --fixture checkout, --recordings-root <path>, or --bundle-path <path>.",
-                path: "--recordings-root"
-            )
-        }
+    guard sourceCount <= 1 else {
         throw WorkflowCLIError(
             "conflictingRecordingSource",
             "Use only one recording source: --fixture, --recordings-root, or --bundle-path.",
@@ -2231,7 +2483,21 @@ private func loadRecordingCLIBundle(
     }
 
     guard let bundlePath else {
-        throw WorkflowCLIError("missingArgument", "Missing recording source.", path: "recording-id")
+        let defaultRoot = RecordingBundleStore.defaultRootDirectory
+        let store = RecordingBundleStore(rootDirectory: defaultRoot)
+        let bundle = try waitForWorkflowCLIAsync {
+            try await store.loadBundle(recordingID: requestedUUID)
+        }
+        return RecordingCLIBundle(
+            requestedRecordingID: requestedRecordingID,
+            fixture: nil,
+            sourceOption: nil,
+            bundleDirectory: defaultRoot.appendingPathComponent(
+                SemanticRecordingBundleDirectoryIdentity.directoryName(for: requestedUUID),
+                isDirectory: true
+            ),
+            bundle: bundle
+        )
     }
     let store = RecordingBundleStore(rootDirectory: bundlePath.deletingLastPathComponent())
     let bundle = try waitForWorkflowCLIAsync {
@@ -2250,6 +2516,137 @@ private func loadRecordingCLIBundle(
         sourceOption: recordingCLISourceOption("--bundle-path", url: bundlePath),
         bundleDirectory: bundlePath,
         bundle: bundle
+    )
+}
+
+private func loadRecordingCLIBundleTolerant(
+    _ arguments: [String],
+    additionalOptionHandler: ((String, Int, [String]) throws -> Int?)? = nil
+) throws -> RecordingCLIBundleLoad {
+    guard let requestedRecordingID = arguments.first,
+          !requestedRecordingID.hasPrefix("--") else {
+        throw WorkflowCLIError(
+            "missingArgument",
+            "Expected a recording id, such as 'checkout-demo'."
+        )
+    }
+
+    var fixture: String?
+    var recordingsRoot: URL?
+    var bundlePath: URL?
+    var index = 1
+    while index < arguments.count {
+        let token = arguments[index]
+        switch token {
+        case "--json":
+            break
+        case "--fixture":
+            guard index + 1 < arguments.count else {
+                throw WorkflowCLIError("missingArgument", "--fixture requires a fixture name.", path: token)
+            }
+            fixture = arguments[index + 1]
+            index += 1
+        case "--recordings-root":
+            guard index + 1 < arguments.count else {
+                throw WorkflowCLIError("missingArgument", "--recordings-root requires a path.", path: token)
+            }
+            recordingsRoot = URL(fileURLWithPath: arguments[index + 1], isDirectory: true)
+                .standardizedFileURL
+            index += 1
+        case "--bundle-path", "--bundle-dir":
+            guard index + 1 < arguments.count else {
+                throw WorkflowCLIError("missingArgument", "\(token) requires a path.", path: token)
+            }
+            bundlePath = URL(fileURLWithPath: arguments[index + 1], isDirectory: true)
+                .standardizedFileURL
+            index += 1
+        default:
+            if let consumed = try additionalOptionHandler?(token, index, arguments) {
+                index += consumed
+            } else if token.hasPrefix("--") {
+                throw WorkflowCLIError("unsupportedOption", "Unsupported option '\(token)'.", path: token)
+            } else {
+                throw WorkflowCLIError("unexpectedArgument", "Unexpected argument '\(token)'.", path: token)
+            }
+        }
+        index += 1
+    }
+
+    let sourceCount = [fixture != nil, recordingsRoot != nil, bundlePath != nil].filter { $0 }.count
+    guard sourceCount <= 1 else {
+        throw WorkflowCLIError(
+            "conflictingRecordingSource",
+            "Use only one recording source: --fixture, --recordings-root, or --bundle-path.",
+            path: "--recordings-root"
+        )
+    }
+
+    if let fixture {
+        try validateRecordingCLIFixture(fixture)
+        try validateRecordingCLIFixtureRecordingID(requestedRecordingID)
+        return RecordingCLIBundleLoad(
+            requestedRecordingID: requestedRecordingID,
+            fixture: fixture,
+            sourceOption: nil,
+            bundleDirectory: nil,
+            loadResult: SemanticRecordingBundleLoadResult(
+                manifest: SemanticRecordingFixture.checkoutBundle()
+            )
+        )
+    }
+
+    let requestedUUID = try parseWorkflowCLIUUID(requestedRecordingID, path: "recording-id")
+    if let recordingsRoot {
+        let store = RecordingBundleStore(rootDirectory: recordingsRoot)
+        let loadResult = try waitForWorkflowCLIAsync {
+            try await store.loadBundleTolerant(recordingID: requestedUUID)
+        }
+        return RecordingCLIBundleLoad(
+            requestedRecordingID: requestedRecordingID,
+            fixture: nil,
+            sourceOption: recordingCLISourceOption("--recordings-root", url: recordingsRoot),
+            bundleDirectory: recordingsRoot.appendingPathComponent(
+                SemanticRecordingBundleDirectoryIdentity.directoryName(for: requestedUUID),
+                isDirectory: true
+            ),
+            loadResult: loadResult
+        )
+    }
+
+    guard let bundlePath else {
+        let defaultRoot = RecordingBundleStore.defaultRootDirectory
+        let store = RecordingBundleStore(rootDirectory: defaultRoot)
+        let loadResult = try waitForWorkflowCLIAsync {
+            try await store.loadBundleTolerant(recordingID: requestedUUID)
+        }
+        return RecordingCLIBundleLoad(
+            requestedRecordingID: requestedRecordingID,
+            fixture: nil,
+            sourceOption: nil,
+            bundleDirectory: defaultRoot.appendingPathComponent(
+                SemanticRecordingBundleDirectoryIdentity.directoryName(for: requestedUUID),
+                isDirectory: true
+            ),
+            loadResult: loadResult
+        )
+    }
+    let store = RecordingBundleStore(rootDirectory: bundlePath.deletingLastPathComponent())
+    let loadResult = try waitForWorkflowCLIAsync {
+        try await store.loadBundleTolerant(from: bundlePath)
+    }
+    guard loadResult.bundle.id == requestedUUID else {
+        throw WorkflowCLIError(
+            "recordingMismatch",
+            "Bundle at '\(bundlePath.path)' contains recording '\(loadResult.bundle.id.uuidString)', not '\(requestedUUID.uuidString)'.",
+            path: "--bundle-path"
+        )
+    }
+    return RecordingCLIBundleLoad(
+        requestedRecordingID: requestedRecordingID,
+        fixture: nil,
+        sourceOption: recordingCLISourceOption("--bundle-path", url: bundlePath),
+        bundleDirectory: bundlePath,
+        loadResult: loadResult
     )
 }
 
@@ -2507,6 +2904,60 @@ private func writeRecordingShowSummary(_ payload: SemanticRecordingCLISummaryPay
     - suppressions: \(payload.suppressionSummary.totalSuppressedCount)
 
     """.utf8))
+}
+
+private func writeRecordingReadinessSummary(_ payload: SemanticRecordingCLIReadinessPayload?) {
+    guard let payload else {
+        return
+    }
+    var lines = [
+        "SparkleRecorder: semantic recording readiness \(payload.requestedRecordingID) [\(payload.fixtureMode ? "fixture" : "stored")].",
+        "- recording: \(payload.recordingID.uuidString)",
+        "- status: \(payload.status.rawValue)",
+        "- issues: \(payload.issueCount) (blocking: \(payload.blockingIssueCount), degraded: \(payload.degradedIssueCount))",
+        "- loaded sidecars: \(semanticRecordingDebugSmokeSidecarKindSummary(payload.load.sidecarDiagnostics.loadedKinds))",
+        "- missing sidecars: \(semanticRecordingDebugSmokeSidecarKindSummary(payload.load.sidecarDiagnostics.missingKinds))",
+        "- failed sidecars: \(semanticRecordingDebugSmokeFailedSidecarSummary(payload.load.sidecarDiagnostics.failedIssues))"
+    ]
+    if let artifactFiles = payload.artifactFiles {
+        lines.append(
+            "- artifact files: \(artifactFiles.presentCount)/\(artifactFiles.checkedCount) present, missing: \(artifactFiles.missingCount), empty: \(artifactFiles.emptyCount), directory: \(artifactFiles.directoryCount), unsafe: \(artifactFiles.unsafeCount)"
+        )
+    }
+    if let bundleDirectory = payload.bundleDirectory {
+        lines.append("- bundle: \(bundleDirectory)")
+    }
+    for issue in payload.readiness.issues.prefix(6) {
+        lines.append("- \(issue.code.rawValue) [\(issue.severity.rawValue)]: \(issue.message)")
+    }
+    for followUp in payload.followUps {
+        lines.append("- follow-up: \(followUp)")
+    }
+    FileHandle.standardOutput.write(Data((lines.joined(separator: "\n") + "\n").utf8))
+}
+
+private func writeRecordingMacroLinksSummary(_ payload: SemanticRecordingCLIMacroLinksPayload?) {
+    guard let payload else {
+        return
+    }
+    var lines = [
+        "SparkleRecorder: semantic recording macro links.",
+        "- macros root: \(payload.macrosRoot ?? "unknown")",
+        "- recordings root: \(payload.recordingsRoot)",
+        "- macros: \(payload.totalMacroCount), linked: \(payload.linkedMacroCount), returned: \(payload.returnedCount)",
+        "- ready: \(payload.readyCount), degraded: \(payload.degradedCount), not ready: \(payload.notReadyCount), failed: \(payload.failedCount), unlinked: \(payload.unlinkedCount)"
+    ]
+    for link in payload.links.prefix(12) {
+        let recordingID = link.recordingID?.uuidString ?? "none"
+        lines.append("- \(link.macroID.uuidString) \(link.macroName): \(link.status.rawValue) recording=\(recordingID)")
+        if let artifactFiles = link.artifactFiles {
+            lines.append("  artifact files: \(artifactFiles.presentCount)/\(artifactFiles.checkedCount) present")
+        }
+        for issue in link.issues.prefix(3) {
+            lines.append("  issue: \(issue)")
+        }
+    }
+    FileHandle.standardOutput.write(Data((lines.joined(separator: "\n") + "\n").utf8))
 }
 
 private func writeRecordingExplainSummary(_ payload: SemanticRecordingCLIExplainPayload?) {
@@ -4944,6 +5395,7 @@ private func runWorkflowDraftConditionSet(
     var imageRef: String?
     var baselineRef: String?
     var colorHex: String?
+    var pixelSampleRadius: Int?
     var threshold: Double?
     var pixelX: Double?
     var pixelY: Double?
@@ -4978,6 +5430,11 @@ private func runWorkflowDraftConditionSet(
             baselineRef = try workflowCLIValue(after: token, in: arguments, at: &index)
         case "--color", "--color-hex":
             colorHex = try workflowCLIValue(after: token, in: arguments, at: &index)
+        case "--pixel-sample-radius", "--sample-radius":
+            pixelSampleRadius = try parseWorkflowCLIInt(
+                workflowCLIValue(after: token, in: arguments, at: &index),
+                path: token
+            )
         case "--threshold":
             threshold = try parseWorkflowCLIDouble(workflowCLIValue(after: token, in: arguments, at: &index), path: token)
         case "--pixel-x":
@@ -5018,6 +5475,7 @@ private func runWorkflowDraftConditionSet(
         baselineRef: baselineRef,
         pixel: try workflowCLIOptionalPoint(x: pixelX, y: pixelY),
         colorHex: colorHex,
+        pixelSampleRadius: pixelSampleRadius,
         threshold: threshold
     )
     let context = try loadWorkflowDraftValidationContext(macroCatalogPath: macroCatalogPath)
@@ -6317,10 +6775,14 @@ private func recordingCommandName(_ recordingArgs: [String]) -> String {
         return "recording"
     }
     switch command {
+    case "macro-links":
+        return "recording.macroLinks"
     case "show":
         return "recording.show"
     case "explain":
         return "recording.explain"
+    case "readiness":
+        return "recording.readiness"
     case "frames":
         return "recording.frames"
     case "frame":

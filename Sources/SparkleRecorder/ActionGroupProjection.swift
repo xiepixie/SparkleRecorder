@@ -1,13 +1,35 @@
 import Foundation
 
+public enum BehaviorBindReadiness: String, Codable, Equatable, Sendable {
+    case ready
+    case noSelection
+    case needsTwoRecordedActions
+    case nonContiguousRecordedActions
+    case containsBehavior
+
+    public var canBind: Bool {
+        self == .ready
+    }
+}
+
 public struct ActionGroupSelectionSnapshot: Equatable, Sendable {
     public var groupIDs: [UUID]
     public var eventIndices: [Int]
+    public var eventBackedGroupCount: Int
+    public var eventBackedSelectionIsContiguous: Bool
     public var containsBehavior: Bool
 
-    public init(groupIDs: [UUID] = [], eventIndices: [Int] = [], containsBehavior: Bool = false) {
+    public init(
+        groupIDs: [UUID] = [],
+        eventIndices: [Int] = [],
+        eventBackedGroupCount: Int? = nil,
+        eventBackedSelectionIsContiguous: Bool = true,
+        containsBehavior: Bool = false
+    ) {
         self.groupIDs = groupIDs
         self.eventIndices = eventIndices
+        self.eventBackedGroupCount = eventBackedGroupCount ?? (eventIndices.isEmpty ? 0 : groupIDs.count)
+        self.eventBackedSelectionIsContiguous = eventBackedSelectionIsContiguous
         self.containsBehavior = containsBehavior
     }
 
@@ -15,8 +37,16 @@ public struct ActionGroupSelectionSnapshot: Equatable, Sendable {
         groupIDs.isEmpty
     }
 
+    public var behaviorBindReadiness: BehaviorBindReadiness {
+        guard !groupIDs.isEmpty else { return .noSelection }
+        guard !containsBehavior else { return .containsBehavior }
+        guard eventBackedGroupCount >= 2 else { return .needsTwoRecordedActions }
+        guard eventBackedSelectionIsContiguous else { return .nonContiguousRecordedActions }
+        return .ready
+    }
+
     public var canBindBehavior: Bool {
-        eventIndices.count >= 2
+        behaviorBindReadiness.canBind
     }
 }
 
@@ -101,6 +131,45 @@ public enum ActionGroupProjection {
         })
     }
 
+    public static func eventIndices(
+        matching eventsToMatch: [RecordedEvent],
+        in events: [RecordedEvent]
+    ) -> Set<Int> {
+        guard !eventsToMatch.isEmpty else { return [] }
+
+        var remaining = eventsToMatch
+        var indices = Set<Int>()
+        for (index, event) in events.enumerated() {
+            guard let matchIndex = remaining.firstIndex(of: event) else { continue }
+            indices.insert(index)
+            remaining.remove(at: matchIndex)
+            if remaining.isEmpty { break }
+        }
+        return indices
+    }
+
+    public static func firstGroup(
+        matching eventsToMatch: [RecordedEvent],
+        in events: [RecordedEvent],
+        groups: [ActionGroup]
+    ) -> ActionGroup? {
+        let indices = eventIndices(matching: eventsToMatch, in: events)
+        guard !indices.isEmpty else { return nil }
+        return groups.first(where: { group in
+            group.eventIndices.contains { indices.contains($0) }
+        })
+    }
+
+    public static func groups(
+        containingEventIndices eventIndices: Set<Int>,
+        groups: [ActionGroup]
+    ) -> [ActionGroup] {
+        guard !eventIndices.isEmpty else { return [] }
+        return groups.filter { group in
+            group.eventIndices.contains { eventIndices.contains($0) }
+        }
+    }
+
     public static func firstWaitGroup(
         start: TimeInterval,
         end: TimeInterval,
@@ -134,11 +203,26 @@ public enum ActionGroupProjection {
 
         var groupIDs: [UUID] = []
         var eventIndices: [Int] = []
+        var eventBackedGroupCount = 0
+        var eventBackedOrdinal = 0
+        var selectedEventBackedOrdinals: [Int] = []
         var containsBehavior = false
 
-        for group in groups where selectedGroupIDs.contains(group.id) {
+        for group in groups {
+            let isEventBacked = !group.eventIndices.isEmpty
+            defer {
+                if isEventBacked {
+                    eventBackedOrdinal += 1
+                }
+            }
+
+            guard selectedGroupIDs.contains(group.id) else { continue }
             groupIDs.append(group.id)
             eventIndices.append(contentsOf: group.eventIndices)
+            if isEventBacked {
+                eventBackedGroupCount += 1
+                selectedEventBackedOrdinals.append(eventBackedOrdinal)
+            }
 
             if group.behaviorGroupID != nil {
                 containsBehavior = true
@@ -153,9 +237,19 @@ public enum ActionGroupProjection {
         }
 
         eventIndices.sort()
+        let eventBackedSelectionIsContiguous: Bool = {
+            guard selectedEventBackedOrdinals.count > 1,
+                  let first = selectedEventBackedOrdinals.first,
+                  let last = selectedEventBackedOrdinals.last else {
+                return true
+            }
+            return (last - first + 1) == selectedEventBackedOrdinals.count
+        }()
         return ActionGroupSelectionSnapshot(
             groupIDs: groupIDs,
             eventIndices: eventIndices,
+            eventBackedGroupCount: eventBackedGroupCount,
+            eventBackedSelectionIsContiguous: eventBackedSelectionIsContiguous,
             containsBehavior: containsBehavior
         )
     }
@@ -455,28 +549,54 @@ public struct ActionGroupTextClickConversionPlan: Equatable, Sendable {
     }
 }
 
+public enum TextClickConversionReadiness: String, Codable, Equatable, Sendable {
+    case ready
+    case unsupportedAction
+    case missingSourceEvent
+    case sourceEventMismatch
+
+    public var canConvert: Bool {
+        self == .ready
+    }
+}
+
 public enum ActionGroupTextClickConversionPlanner {
     private static let clickDuration: TimeInterval = 0.1
+
+    public static func readiness(
+        for group: ActionGroup,
+        events: [RecordedEvent]
+    ) -> TextClickConversionReadiness {
+        guard group.kind == .waitForText else {
+            return .unsupportedAction
+        }
+        guard let sourceIndex = group.eventIndices.first,
+              events.indices.contains(sourceIndex) else {
+            return .missingSourceEvent
+        }
+        guard events[sourceIndex].kind == .waitForText else {
+            return .sourceEventMismatch
+        }
+        return .ready
+    }
 
     public static func plan(
         for group: ActionGroup,
         events: [RecordedEvent],
         liveDuration: TimeInterval,
+        textAnchorOverride: TextAnchor? = nil,
+        textTimeoutOverride: TimeInterval? = nil,
         fallbackPolicy: LocatorFallbackPolicy = .fail
     ) -> ActionGroupTextClickConversionPlan {
-        guard group.kind == .waitForText,
-              let sourceIndex = group.eventIndices.first,
-              events.indices.contains(sourceIndex) else {
+        guard readiness(for: group, events: events).canConvert,
+              let sourceIndex = group.eventIndices.first else {
             return ActionGroupTextClickConversionPlan()
         }
 
         let sourceEvent = events[sourceIndex]
-        guard sourceEvent.kind == .waitForText else {
-            return ActionGroupTextClickConversionPlan()
-        }
-
         let anchor = TextTargetAnchorFactory.clickableAnchor(
-            sourceEvent.textAnchor
+            textAnchorOverride
+                ?? sourceEvent.textAnchor
                 ?? group.textAnchor
                 ?? TextAnchor(text: "", observedFrame: RectValue(x: 0, y: 0, width: 0, height: 0)),
             fallbackEvent: sourceEvent
@@ -484,7 +604,7 @@ public enum ActionGroupTextClickConversionPlanner {
         let insertedEvents = TextClickEventFactory.makeEvents(
             startTime: sourceEvent.time,
             textAnchor: anchor,
-            timeout: sourceEvent.textTimeout ?? group.textTimeout ?? 10.0,
+            timeout: textTimeoutOverride ?? sourceEvent.textTimeout ?? group.textTimeout ?? 10.0,
             fallbackPolicy: sourceEvent.locatorFallbackPolicy ?? fallbackPolicy,
             surfaceId: sourceEvent.surfaceId
         )

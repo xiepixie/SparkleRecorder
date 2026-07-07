@@ -177,6 +177,16 @@ struct SemanticRecordingReviewFixtureView: View {
         )
     }
 
+    private var repeatUntilBodyResolution: SemanticRecordingReviewRepeatUntilBodyResolution? {
+        guard let bundle else {
+            return nil
+        }
+        return SemanticRecordingReviewRepeatUntilBodyResolver.resolve(
+            recordingID: bundle.id,
+            macros: macros
+        )
+    }
+
     var body: some View {
         ZStack(alignment: .topLeading) {
             Color(red: 0.08, green: 0.09, blue: 0.10)
@@ -711,12 +721,25 @@ struct SemanticRecordingReviewFixtureView: View {
                         conditionCandidateReviewActionContract(candidate)
 
                         HStack(spacing: 8) {
+                            let repeatUntilResolution = repeatUntilBodyResolution
                             Button(NSLocalizedString("Draft Patch", comment: ""), systemImage: "doc.badge.gearshape") {
                                 createDraftPatch(for: candidate)
                             }
                             .buttonStyle(.bordered)
                             .controlSize(.small)
                             .disabled(bundle == nil)
+
+                            Button(NSLocalizedString("Repeat Until", comment: ""), systemImage: "repeat") {
+                                createRepeatUntilDraftPatch(for: candidate)
+                            }
+                            .buttonStyle(.bordered)
+                            .controlSize(.small)
+                            .disabled(bundle == nil || repeatUntilResolution?.isResolved != true)
+                            .help(NSLocalizedString(
+                                repeatUntilResolution?.message
+                                    ?? "Open a linked semantic recording before creating a Repeat-Until loop.",
+                                comment: ""
+                            ))
 
                             if let reviewState, candidate.artifactPath != nil {
                                 Button("", systemImage: "arrow.up.forward.app") {
@@ -1852,6 +1875,52 @@ struct SemanticRecordingReviewFixtureView: View {
         }
     }
 
+    private func createRepeatUntilDraftPatch(
+        for candidate: SemanticRecordingReviewProjection.ConditionCandidateRow
+    ) {
+        guard let bundle else {
+            draftPatchResult = nil
+            draftPatchErrorMessage = NSLocalizedString("Open a live bundle before creating a Repeat-Until loop.", comment: "")
+            return
+        }
+
+        let bodyResolution = SemanticRecordingReviewRepeatUntilBodyResolver.resolve(
+            recordingID: bundle.id,
+            macros: macros
+        )
+        guard bodyResolution.isResolved else {
+            draftPatchResult = nil
+            draftPatchErrorMessage = NSLocalizedString(bodyResolution.message, comment: "")
+            return
+        }
+
+        selectedCandidateID = candidate.id
+        let effectiveSelection = regionSelection?.frameID == candidate.sourceFrameID ? regionSelection : nil
+        do {
+            draftPatchResult = try SemanticRecordingReviewDraftPatchBuilder.makePatch(
+                bundle: bundle,
+                request: SemanticRecordingReviewDraftPatchRequest(
+                    candidate: candidate,
+                    regionSelection: effectiveSelection,
+                    repeatUntil: SemanticRecordingReviewRepeatUntilDraft(
+                        bodyTasks: bodyResolution.bodyTasks,
+                        onFailure: AutomationWorkflowDraftLoopFailurePolicy.requireManualApproval
+                    ),
+                    pixelColorHex: pixelColorHex(for: candidate)
+                )
+            )
+            draftPreviewActionPresentations = []
+            draftPatchSourceSuggestionID = nil
+            draftPatchErrorMessage = ""
+            patchSaveMessage = ""
+        } catch {
+            draftPatchResult = nil
+            draftPreviewActionPresentations = []
+            draftPatchSourceSuggestionID = nil
+            draftPatchErrorMessage = String(describing: error)
+        }
+    }
+
     private func acceptSuggestion(
         _ suggestion: SemanticRecordingReviewProjection.SuggestionRow
     ) {
@@ -2022,7 +2091,11 @@ struct SemanticRecordingReviewFixtureView: View {
     }
 
     private func patchDetail(_ result: SemanticRecordingReviewDraftPatchResult) -> String {
-        var parts = [result.appliesToExistingTask ? "setCondition" : "addTask"]
+        var parts = [
+            result.createsRepeatUntilLoop
+                ? "addRepeatUntil"
+                : result.appliesToExistingTask ? "setCondition" : "addTask"
+        ]
         if let region = result.region {
             parts.append("region \(region.key)")
         }

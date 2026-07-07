@@ -769,13 +769,14 @@ final class MenuBarController: NSObject, NSPopoverDelegate {
             return
         }
 
-        let bundleName = bundleDirectory.lastPathComponent
-        let bundleRelativePath = "SemanticRecordings/\(bundleName)"
-        let manifestRelativePath = "\(bundleRelativePath)/\(SemanticRecordingSchema.manifestFileName)"
         let reference = MacroSemanticRecordingReference(
             recordingID: bundleID,
-            bundleRelativePath: bundleRelativePath,
-            manifestRelativePath: manifestRelativePath,
+            bundleRelativePath: MacroSemanticRecordingReference.defaultBundleRelativePath(
+                recordingID: bundleID
+            ),
+            manifestRelativePath: MacroSemanticRecordingReference.defaultManifestRelativePath(
+                recordingID: bundleID
+            ),
             capturedAt: Date(),
             eventCount: eventCount
         )

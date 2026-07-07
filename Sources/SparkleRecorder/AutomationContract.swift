@@ -590,6 +590,9 @@ public enum AutomationVisualConditionType: String, Codable, Equatable, Sendable 
 }
 
 public struct AutomationVisualCondition: Codable, Equatable, Sendable {
+    public static let defaultPixelSampleRadius = 1
+    public static let maximumPixelSampleRadius = 8
+
     public var type: AutomationVisualConditionType
     public var regionRef: String?
     public var searchRegion: RectValue?
@@ -598,6 +601,7 @@ public struct AutomationVisualCondition: Codable, Equatable, Sendable {
     public var baselineRef: String?
     public var pixel: AutomationGraphPoint?
     public var targetColorHex: String?
+    public var pixelSampleRadius: Int?
     public var threshold: Double?
     public var requireVisible: Bool
 
@@ -610,6 +614,7 @@ public struct AutomationVisualCondition: Codable, Equatable, Sendable {
         baselineRef: String? = nil,
         pixel: AutomationGraphPoint? = nil,
         targetColorHex: String? = nil,
+        pixelSampleRadius: Int? = nil,
         threshold: Double? = nil,
         requireVisible: Bool = true
     ) {
@@ -621,8 +626,13 @@ public struct AutomationVisualCondition: Codable, Equatable, Sendable {
         self.baselineRef = baselineRef?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmptyForAutomationCondition
         self.pixel = pixel
         self.targetColorHex = targetColorHex?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmptyForAutomationCondition
+        self.pixelSampleRadius = pixelSampleRadius.map(Self.clampedPixelSampleRadius)
         self.threshold = threshold.map { min(max($0, 0), 1) }
         self.requireVisible = requireVisible
+    }
+
+    public static func clampedPixelSampleRadius(_ radius: Int) -> Int {
+        min(max(radius, 0), maximumPixelSampleRadius)
     }
 
     public func searchRegionResolution(

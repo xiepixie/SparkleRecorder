@@ -3,6 +3,34 @@ import Foundation
 import CoreGraphics
 import SparkleRecorderCore
 
+public struct RecordedEventTimeShiftPlan: Equatable, Sendable {
+    public var delta: TimeInterval
+    public var liveDurationAfterShift: TimeInterval
+
+    public var canApply: Bool {
+        delta != 0
+    }
+
+    public init(delta: TimeInterval, liveDurationAfterShift: TimeInterval) {
+        self.delta = delta
+        self.liveDurationAfterShift = liveDurationAfterShift
+    }
+}
+
+public struct MacroEditMutationSnapshot: Equatable, Sendable {
+    public var events: [RecordedEvent]
+    public var liveDuration: TimeInterval
+
+    public init(events: [RecordedEvent], liveDuration: TimeInterval) {
+        self.events = events
+        self.liveDuration = liveDuration
+    }
+
+    public func differs(from other: MacroEditMutationSnapshot) -> Bool {
+        events != other.events || liveDuration != other.liveDuration
+    }
+}
+
 extension Array where Element == RecordedEvent {
     public mutating func sortByTimePreservingOrder() {
         self = enumerated()
@@ -242,6 +270,17 @@ extension Array where Element == RecordedEvent {
         }
         self = newEvents
     }
+
+    public mutating func renameBehavior(id: BehaviorGroupID, name: String) {
+        let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedName.isEmpty else { return }
+
+        var newEvents = self
+        for idx in newEvents.indices where newEvents[idx].behaviorGroupID == id {
+            newEvents[idx].behaviorGroupName = trimmedName
+        }
+        self = newEvents
+    }
     
     public mutating func unbindBehavior(at indices: [Int]) {
         var newEvents = self
@@ -278,6 +317,87 @@ extension Array where Element == RecordedEvent {
         let stretchedDuration = Swift.max(0, liveDuration * f)
         let lastEventTime = (self.map(\.time).max() ?? 0) * f
         return Swift.max(stretchedDuration, lastEventTime)
+    }
+
+    public func liveDurationAfterShifting(
+        _ liveDuration: TimeInterval,
+        indices: IndexSet,
+        by delta: TimeInterval
+    ) -> TimeInterval {
+        var maxEventTime = self.map(\.time).max() ?? 0
+        for index in indices where self.indices.contains(index) {
+            maxEventTime = Swift.max(maxEventTime, Swift.max(0, self[index].time + delta))
+        }
+        return Swift.max(Swift.max(0, liveDuration), maxEventTime)
+    }
+
+    public func shiftDeltaClampedToTimelineStart(
+        indices: IndexSet,
+        by delta: TimeInterval
+    ) -> TimeInterval {
+        guard delta < 0 else { return delta }
+        let selectedTimes = indices.compactMap { index -> TimeInterval? in
+            guard self.indices.contains(index) else { return nil }
+            return self[index].time
+        }
+        guard let earliestTime = selectedTimes.min() else { return delta }
+        return Swift.max(delta, -Swift.max(0, earliestTime))
+    }
+
+    public func timeShiftPlan(
+        liveDuration: TimeInterval,
+        indices: IndexSet,
+        requestedDelta: TimeInterval
+    ) -> RecordedEventTimeShiftPlan {
+        let effectiveDelta = shiftDeltaClampedToTimelineStart(
+            indices: indices,
+            by: requestedDelta
+        )
+        let liveDuration = liveDurationAfterShifting(
+            liveDuration,
+            indices: indices,
+            by: effectiveDelta
+        )
+        return RecordedEventTimeShiftPlan(
+            delta: effectiveDelta,
+            liveDurationAfterShift: liveDuration
+        )
+    }
+
+    public func liveDurationPreservingTrailingWait(
+        previousLiveDuration: TimeInterval,
+        previousLastEventTime: TimeInterval?
+    ) -> TimeInterval {
+        let currentLastEventTime = Swift.max(0, self.map(\.time).max() ?? 0)
+        guard let previousLastEventTime else {
+            return currentLastEventTime
+        }
+
+        let trailingWait = Swift.max(0, previousLiveDuration - Swift.max(0, previousLastEventTime))
+        return currentLastEventTime + trailingWait
+    }
+
+    public func liveDurationAfterPassiveWaitInsertion(
+        previousLiveDuration: TimeInterval,
+        previousLastEventTime: TimeInterval?,
+        previousEventCount: Int,
+        insertionIndex: Int,
+        waitDelta: TimeInterval
+    ) -> TimeInterval {
+        guard let previousLastEventTime else {
+            return Swift.max(0, previousLiveDuration)
+        }
+
+        let delta = Swift.max(0, waitDelta)
+        let clampedPreviousCount = Swift.max(0, previousEventCount)
+        if delta > 0, insertionIndex >= clampedPreviousCount {
+            return Swift.max(Swift.max(0, previousLiveDuration), Swift.max(0, previousLastEventTime)) + delta
+        }
+
+        return liveDurationPreservingTrailingWait(
+            previousLiveDuration: previousLiveDuration,
+            previousLastEventTime: previousLastEventTime
+        )
     }
 
     /// Add or subtract a constant from the timestamps of selected events.
@@ -382,9 +502,68 @@ extension Array where Element == RecordedEvent {
         }
     }
 
-    public mutating func insertClick(at index: Int) {
-        let t = self.isEmpty ? 0 : (index > 0 && index <= self.count ? self[index - 1].time + 0.1 : self.last!.time + 0.1)
+    public mutating func convertClickType(
+        at indices: [Int],
+        from currentKind: ActionGroupKind,
+        to newKind: ActionGroupKind
+    ) {
+        guard currentKind != newKind else { return }
+        let validIndices = indices.sorted().filter { self.indices.contains($0) }
+        guard !validIndices.isEmpty else { return }
+
+        switch newKind {
+        case .click:
+            updateClickType(at: validIndices, to: 1)
+            shortenLongPressClickIfNeeded(validIndices, currentKind: currentKind)
+        case .doubleClick:
+            updateClickType(at: validIndices, to: 2)
+            shortenLongPressClickIfNeeded(validIndices, currentKind: currentKind)
+        case .repeatedClick:
+            updateClickType(at: validIndices, to: 3)
+            shortenLongPressClickIfNeeded(validIndices, currentKind: currentKind)
+        case .longPress:
+            updateClickType(at: validIndices, to: 1)
+            if validIndices.count >= 2,
+               let firstIndex = validIndices.first,
+               let lastIndex = validIndices.last {
+                let desiredTime = self[firstIndex].time + 1.0
+                let currentLast = self[lastIndex]
+                if currentLast.time < desiredTime {
+                    shiftTime(of: IndexSet([lastIndex]), by: desiredTime - currentLast.time)
+                }
+            }
+        default:
+            break
+        }
+    }
+
+    private mutating func shortenLongPressClickIfNeeded(
+        _ validIndices: [Int],
+        currentKind: ActionGroupKind
+    ) {
+        guard currentKind == .longPress,
+              validIndices.count >= 2,
+              let firstIndex = validIndices.first,
+              let lastIndex = validIndices.last else {
+            return
+        }
+
+        let desiredTime = self[firstIndex].time + 0.1
+        let currentLast = self[lastIndex]
+        if currentLast.time > desiredTime {
+            shiftTime(of: IndexSet([lastIndex]), by: desiredTime - currentLast.time)
+        }
+    }
+
+    private func insertionStartTime(at index: Int, spacing: TimeInterval = 0.1) -> TimeInterval {
         let clamped = Swift.max(0, Swift.min(index, self.count))
+        guard !self.isEmpty, clamped > 0 else { return 0 }
+        return self[clamped - 1].time + Swift.max(0, spacing)
+    }
+
+    public mutating func insertClick(at index: Int) {
+        let clamped = Swift.max(0, Swift.min(index, self.count))
+        let t = insertionStartTime(at: clamped)
         let down = RecordedEvent(kind: .leftMouseDown, time: t, x: 100, y: 100, keyCode: 0, flags: 0, mouseButton: 0, clickCount: 1, scrollDeltaY: 0, scrollDeltaX: 0)
         let up = RecordedEvent(kind: .leftMouseUp, time: t + 0.1, x: 100, y: 100, keyCode: 0, flags: 0, mouseButton: 0, clickCount: 1, scrollDeltaY: 0, scrollDeltaX: 0)
         for i in clamped..<self.count { self[i].time += 0.2 }
@@ -394,8 +573,8 @@ extension Array where Element == RecordedEvent {
     }
     
     public mutating func insertDoubleClick(at index: Int) {
-        let t = self.isEmpty ? 0 : (index > 0 && index <= self.count ? self[index - 1].time + 0.1 : self.last!.time + 0.1)
         let clamped = Swift.max(0, Swift.min(index, self.count))
+        let t = insertionStartTime(at: clamped)
         let down = RecordedEvent(kind: .leftMouseDown, time: t, x: 100, y: 100, keyCode: 0, flags: 0, mouseButton: 0, clickCount: 2, scrollDeltaY: 0, scrollDeltaX: 0)
         let up = RecordedEvent(kind: .leftMouseUp, time: t + 0.1, x: 100, y: 100, keyCode: 0, flags: 0, mouseButton: 0, clickCount: 2, scrollDeltaY: 0, scrollDeltaX: 0)
         for i in clamped..<self.count { self[i].time += 0.2 }
@@ -404,8 +583,8 @@ extension Array where Element == RecordedEvent {
     }
 
     public mutating func insertMultiPointClick(at index: Int) {
-        let t = self.isEmpty ? 0 : (index > 0 && index <= self.count ? self[index - 1].time + 0.1 : self.last!.time + 0.1)
         let clamped = Swift.max(0, Swift.min(index, self.count))
+        let t = insertionStartTime(at: clamped)
         let points = [
             CGPoint(x: 100, y: 100),
             CGPoint(x: 150, y: 100),
@@ -426,8 +605,8 @@ extension Array where Element == RecordedEvent {
         fallbackPolicy: LocatorFallbackPolicy = .fail,
         surfaceId: String? = nil
     ) -> Range<Int> {
-        let t = self.isEmpty ? 0 : (index > 0 && index <= self.count ? self[index - 1].time + 0.1 : self.last!.time + 0.1)
         let clamped = Swift.max(0, Swift.min(index, self.count))
+        let t = insertionStartTime(at: clamped)
         let inserted = TextClickEventFactory.makeEvents(
             startTime: t,
             textAnchor: textAnchor,
@@ -442,8 +621,8 @@ extension Array where Element == RecordedEvent {
     }
     
     public mutating func insertDrag(at index: Int) {
-        let t = self.isEmpty ? 0 : (index > 0 && index <= self.count ? self[index - 1].time + 0.1 : self.last!.time + 0.1)
         let clamped = Swift.max(0, Swift.min(index, self.count))
+        let t = insertionStartTime(at: clamped)
         let down = RecordedEvent(kind: .leftMouseDown, time: t, x: 100, y: 100, keyCode: 0, flags: 0, mouseButton: 0, clickCount: 1, scrollDeltaY: 0, scrollDeltaX: 0)
         let drag = RecordedEvent(kind: .leftMouseDragged, time: t + 0.2, x: 200, y: 200, keyCode: 0, flags: 0, mouseButton: 0, clickCount: 1, scrollDeltaY: 0, scrollDeltaX: 0)
         let up = RecordedEvent(kind: .leftMouseUp, time: t + 0.4, x: 200, y: 200, keyCode: 0, flags: 0, mouseButton: 0, clickCount: 1, scrollDeltaY: 0, scrollDeltaX: 0)
@@ -454,8 +633,8 @@ extension Array where Element == RecordedEvent {
     }
     
     public mutating func insertScroll(at index: Int) {
-        let t = self.isEmpty ? 0 : (index > 0 && index <= self.count ? self[index - 1].time + 0.1 : self.last!.time + 0.1)
         let clamped = Swift.max(0, Swift.min(index, self.count))
+        let t = insertionStartTime(at: clamped)
         let scroll = RecordedEvent(kind: .scrollWheel, time: t, x: 100, y: 100, keyCode: 0, flags: 0, mouseButton: 0, clickCount: 0, scrollDeltaY: 10, scrollDeltaX: 0, scrollPayload: ScrollPayload(deltaX: 0, deltaY: 10, phase: 0, isContinuous: false))
         for i in clamped..<self.count { self[i].time += 0.2 }
         self.insert(scroll, at: clamped)
@@ -463,7 +642,7 @@ extension Array where Element == RecordedEvent {
     }
 
     public mutating func appendMultiPointClick(at indices: [Int], point: CGPoint) {
-        let sorted = indices.sorted()
+        let sorted: [Int] = Set(indices).sorted().filter { self.indices.contains($0) }
         guard let lastIndex = sorted.last, self.indices.contains(lastIndex) else { return }
         let insertIndex = Swift.min(lastIndex + 1, self.count)
         let startTime = self[lastIndex].time + 0.04
@@ -498,10 +677,38 @@ extension Array where Element == RecordedEvent {
     }
 
     public mutating func removeLastMultiPointClick(at indices: [Int]) {
-        let sorted = indices.sorted()
-        guard sorted.count > 2 else { return }
-        let removable = [Int](sorted.suffix(2))
+        let pairs = multiPointClickPairs(in: indices)
+        guard pairs.count > 2, let removable = pairs.last else { return }
         deleteEvents(at: IndexSet(removable))
+    }
+
+    private func multiPointClickPairs(in indices: [Int]) -> [[Int]] {
+        let validIndices = indices.sorted().filter { self.indices.contains($0) }
+        var pairs: [[Int]] = []
+
+        for (position, downIndex) in validIndices.enumerated() {
+            guard isMouseDownKind(self[downIndex].kind),
+                  let expectedUpKind = mouseUpKind(for: self[downIndex].kind) else {
+                continue
+            }
+
+            var pair = [downIndex]
+            for idx in validIndices.dropFirst(position + 1) where self.indices.contains(idx) {
+                if isMouseDownKind(self[idx].kind) {
+                    break
+                }
+                if self[idx].kind == expectedUpKind && self[idx].mouseButton == self[downIndex].mouseButton {
+                    pair.append(idx)
+                    break
+                }
+            }
+
+            if pair.count == 2 {
+                pairs.append(pair)
+            }
+        }
+
+        return pairs
     }
 
     private func makeRapidClickEvents(points: [CGPoint], startingAt startTime: TimeInterval) -> [RecordedEvent] {
@@ -537,8 +744,8 @@ extension Array where Element == RecordedEvent {
     }
     
     public mutating func insertKeystroke(at index: Int) {
-        let t = self.isEmpty ? 0 : (index > 0 && index <= self.count ? self[index - 1].time + 0.1 : self.last!.time + 0.1)
         let clamped = Swift.max(0, Swift.min(index, self.count))
+        let t = insertionStartTime(at: clamped)
         // default to space bar (49)
         let down = RecordedEvent(kind: .keyDown, time: t, x: 0, y: 0, keyCode: 49, flags: 0, mouseButton: 0, clickCount: 0, scrollDeltaY: 0, scrollDeltaX: 0)
         let up = RecordedEvent(kind: .keyUp, time: t + 0.1, x: 0, y: 0, keyCode: 49, flags: 0, mouseButton: 0, clickCount: 0, scrollDeltaY: 0, scrollDeltaX: 0)
@@ -549,8 +756,8 @@ extension Array where Element == RecordedEvent {
     }
     
     public mutating func insertWaitForText(at index: Int) {
-        let t = self.isEmpty ? 0 : (index > 0 && index <= self.count ? self[index - 1].time + 0.1 : self.last!.time + 0.1)
         let clamped = Swift.max(0, Swift.min(index, self.count))
+        let t = insertionStartTime(at: clamped)
         let ev = RecordedEvent(kind: .waitForText, time: t, x: 0, y: 0, keyCode: 0, flags: 0, mouseButton: 0, clickCount: 0, scrollDeltaY: 0, scrollDeltaX: 0, textAnchor: TextAnchor(text: "", observedFrame: RectValue(x: 0, y: 0, width: 0, height: 0)), textTimeout: 10.0, verifyMustExist: true)
         for i in clamped..<self.count { self[i].time += 0.2 }
         self.insert(ev, at: clamped)
@@ -559,8 +766,8 @@ extension Array where Element == RecordedEvent {
     }
 
     public mutating func insertWaitForTextGone(at index: Int) {
-        let t = self.isEmpty ? 0 : (index > 0 && index <= self.count ? self[index - 1].time + 0.1 : self.last!.time + 0.1)
         let clamped = Swift.max(0, Swift.min(index, self.count))
+        let t = insertionStartTime(at: clamped)
         let ev = RecordedEvent(kind: .waitForText, time: t, x: 0, y: 0, keyCode: 0, flags: 0, mouseButton: 0, clickCount: 0, scrollDeltaY: 0, scrollDeltaX: 0, textAnchor: TextAnchor(text: "", observedFrame: RectValue(x: 0, y: 0, width: 0, height: 0)), textTimeout: 10.0, verifyMustExist: false)
         for i in clamped..<self.count { self[i].time += 0.2 }
         self.insert(ev, at: clamped)
@@ -568,8 +775,8 @@ extension Array where Element == RecordedEvent {
     }
     
     public mutating func insertVerifyText(at index: Int) {
-        let t = self.isEmpty ? 0 : (index > 0 && index <= self.count ? self[index - 1].time + 0.1 : self.last!.time + 0.1)
         let clamped = Swift.max(0, Swift.min(index, self.count))
+        let t = insertionStartTime(at: clamped)
         let ev = RecordedEvent(kind: .verifyText, time: t, x: 0, y: 0, keyCode: 0, flags: 0, mouseButton: 0, clickCount: 0, scrollDeltaY: 0, scrollDeltaX: 0, textAnchor: TextAnchor(text: "", observedFrame: RectValue(x: 0, y: 0, width: 0, height: 0)), verifyMustExist: true)
         for i in clamped..<self.count { self[i].time += 0.2 }
         self.insert(ev, at: clamped)
@@ -672,7 +879,7 @@ extension Array where Element == RecordedEvent {
     /// Duplicate a group of events. The copies are placed right after the originals
     /// and subsequent events are shifted forward in time.
     public mutating func duplicateEvents(at indices: [Int]) {
-        let sorted = indices.sorted()
+        let sorted: [Int] = Set(indices).sorted().filter { self.indices.contains($0) }
         guard !sorted.isEmpty else { return }
 
         let sourceEvents = sorted.map { self[$0] }
@@ -683,11 +890,36 @@ extension Array where Element == RecordedEvent {
         let afterIdx = (sorted.last! + 1)
         for i in afterIdx..<self.count { self[i].time += srcDuration }
 
-        // Create copies with shifted timestamps
+        let sourceBehaviorNames = sourceEvents.reduce(into: [BehaviorGroupID: String]()) { partial, event in
+            guard let id = event.behaviorGroupID,
+                  partial[id] == nil,
+                  let name = event.behaviorGroupName?.trimmingCharacters(in: .whitespacesAndNewlines),
+                  !name.isEmpty else { return }
+            partial[id] = name
+        }
+        var copiedBehaviorIDs: [BehaviorGroupID: BehaviorGroupID] = [:]
+        var copiedBehaviorNames: [BehaviorGroupID: String] = [:]
+
+        // Create copies with shifted timestamps. Behavior copies intentionally
+        // receive fresh group IDs so the duplicate remains its own sequence.
         var copies: [RecordedEvent] = []
         for ev in sourceEvents {
             var copy = ev
             copy.time += srcDuration
+            if let sourceBehaviorID = ev.behaviorGroupID {
+                let copiedID = copiedBehaviorIDs[sourceBehaviorID] ?? BehaviorGroupID()
+                copiedBehaviorIDs[sourceBehaviorID] = copiedID
+                copy.behaviorGroupID = copiedID
+
+                if copiedBehaviorNames[sourceBehaviorID] == nil,
+                   let sourceName = sourceBehaviorNames[sourceBehaviorID] {
+                    copiedBehaviorNames[sourceBehaviorID] = String(
+                        format: NSLocalizedString("Copy of %@", comment: ""),
+                        sourceName
+                    )
+                }
+                copy.behaviorGroupName = copiedBehaviorNames[sourceBehaviorID] ?? ev.behaviorGroupName
+            }
             copies.append(copy)
         }
 

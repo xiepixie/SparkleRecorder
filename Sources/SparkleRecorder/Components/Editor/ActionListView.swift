@@ -25,22 +25,32 @@ struct ActionListView: View {
                     .foregroundStyle(.tertiary)
                 Spacer()
                 if !selection.isEmpty {
+                    let moveUpReadiness = actionRowReorderReadiness(
+                        for: selectedGroupsForReorderHelp,
+                        canMove: canMoveSelection(.up),
+                        direction: .up
+                    )
+                    let moveDownReadiness = actionRowReorderReadiness(
+                        for: selectedGroupsForReorderHelp,
+                        canMove: canMoveSelection(.down),
+                        direction: .down
+                    )
                     ControlGroup {
                         Button {
                             moveSelection(.up)
                         } label: {
                             Image(systemName: "arrow.up")
                         }
-                        .help(NSLocalizedString("Move selected actions up", comment: ""))
-                        .disabled(!canMoveSelection(.up))
+                        .help(actionRowReorderReadinessHelp(moveUpReadiness, direction: .up))
+                        .disabled(!moveUpReadiness.canMove)
 
                         Button {
                             moveSelection(.down)
                         } label: {
                             Image(systemName: "arrow.down")
                         }
-                        .help(NSLocalizedString("Move selected actions down", comment: ""))
-                        .disabled(!canMoveSelection(.down))
+                        .help(actionRowReorderReadinessHelp(moveDownReadiness, direction: .down))
+                        .disabled(!moveDownReadiness.canMove)
                     }
                     .controlGroupStyle(.navigation)
                     .font(.system(size: 10.5, weight: .semibold))
@@ -49,6 +59,13 @@ struct ActionListView: View {
                     Text(String(format: NSLocalizedString("%d selected", comment: ""), selection.count))
                         .font(.system(size: 10.5, weight: .medium))
                         .foregroundStyle(Brand.accent(library.currentMacro?.accent))
+
+                    if !moveUpReadiness.canMove && !moveDownReadiness.canMove {
+                        Image(systemName: "info.circle")
+                            .font(.system(size: 10.5, weight: .semibold))
+                            .foregroundStyle(.secondary)
+                            .help(actionRowReorderDisabledSummary(up: moveUpReadiness, down: moveDownReadiness))
+                    }
                 }
             }
 
@@ -159,18 +176,24 @@ struct ActionListView: View {
     }
 
     func withUndo(_ name: String, _ mutate: () -> Void) {
-        let snapshot = recorder.events
-        let snapshotDur = recorder.liveDuration
+        let before = MacroEditMutationSnapshot(
+            events: recorder.events,
+            liveDuration: recorder.liveDuration
+        )
+        mutate()
+        let after = MacroEditMutationSnapshot(
+            events: recorder.events,
+            liveDuration: recorder.liveDuration
+        )
+        guard after.differs(from: before) else { return }
+
         undoManager?.registerUndo(withTarget: recorder) { [weak undoManager] r in
-            let redoSnapshot = r.events
-            let redoDur = r.liveDuration
-            r.loadEvents(snapshot, duration: snapshotDur)
+            r.loadEvents(before.events, duration: before.liveDuration)
             undoManager?.registerUndo(withTarget: r) { r2 in
-                r2.loadEvents(redoSnapshot, duration: redoDur)
+                r2.loadEvents(after.events, duration: after.liveDuration)
             }
         }
         undoManager?.setActionName(name)
-        mutate()
         recorder.recalculateStats()
     }
 
@@ -186,6 +209,10 @@ struct ActionListView: View {
     private var selectedReorderableIDs: Set<UUID> {
         let reorderableIDs = Set(reorderableRows.map(\.id))
         return selection.intersection(reorderableIDs)
+    }
+
+    private var selectedGroupsForReorderHelp: [ActionGroup] {
+        rows.filter { selection.contains($0.id) }.map(\.group)
     }
 
     func canMoveSelection(_ direction: MoveDirection) -> Bool {
@@ -504,12 +531,14 @@ struct ActionListView: View {
         .disabled(snapshot.eventIndices.isEmpty && passiveWaitDuplicationPlan(anchor: row).isEmpty)
 
         if row.group.kind == .waitForText {
+            let conversionReadiness = textClickConversionReadiness(anchor: row)
             Button {
                 convertWaitToClickText(anchor: row)
             } label: {
                 Label(NSLocalizedString("Convert to Click Text", comment: ""), systemImage: "cursorarrow.click")
             }
-            .disabled(textClickConversionPlan(anchor: row).isEmpty)
+            .disabled(!conversionReadiness.canConvert)
+            .help(textClickConversionReadinessHelp(conversionReadiness))
         }
         
         Button(role: .destructive) {
@@ -524,8 +553,9 @@ struct ActionListView: View {
         Button {
             bindRows(anchor: row)
         } label: {
-            Label(NSLocalizedString("Bind Behavior", comment: ""), systemImage: "square.stack.3d.down.right")
+            Label(NSLocalizedString("Create Behavior", comment: ""), systemImage: "square.stack.3d.down.right")
         }
+        .help(behaviorBindReadinessHelp(snapshot.behaviorBindReadiness))
         .disabled(!snapshot.canBindBehavior)
         
         Button {
@@ -571,6 +601,13 @@ struct ActionListView: View {
             for: row.group,
             events: recorder.events,
             liveDuration: recorder.liveDuration
+        )
+    }
+
+    func textClickConversionReadiness(anchor row: ActionRow) -> TextClickConversionReadiness {
+        ActionGroupTextClickConversionPlanner.readiness(
+            for: row.group,
+            events: recorder.events
         )
     }
 
@@ -689,25 +726,58 @@ struct ActionListView: View {
     }
     
     func bindRows(anchor row: ActionRow) {
-        let indices = contextSnapshot(anchor: row).eventIndices
-        guard indices.count >= 2 else { return }
+        let snapshot = contextSnapshot(anchor: row)
+        guard snapshot.canBindBehavior else { return }
+        let indices = snapshot.eventIndices
         let existing = recorder.events.compactMap(\.behaviorGroupID).reduce(into: Set<BehaviorGroupID>()) { partial, item in
             partial.insert(item)
         }
         let id = BehaviorGroupID()
         let name = String(format: NSLocalizedString("Behavior %d", comment: ""), existing.count + 1)
         
-        withUndo(NSLocalizedString("Bind Behavior", comment: "")) {
+        withUndo(NSLocalizedString("Create Behavior", comment: "")) {
             recorder.events.bindBehavior(at: indices, id: id, name: name)
         }
+
+        selectBehavior(id)
     }
     
     func unbindRows(anchor row: ActionRow) {
         let snapshot = contextSnapshot(anchor: row)
         let indices = snapshot.eventIndices
         guard !indices.isEmpty, snapshot.containsBehavior else { return }
+        let affectedEventIndices = Set(indices)
         withUndo(NSLocalizedString("Unbind Behavior", comment: "")) {
             recorder.events.unbindBehavior(at: indices)
+        }
+
+        selectRows(containingEventIndices: affectedEventIndices)
+    }
+
+    func selectBehavior(_ id: BehaviorGroupID) {
+        DispatchQueue.main.async {
+            let groups = self.onRefreshRows().map(\.group)
+            if let bound = ActionGroupProjection.firstBehaviorGroup(id: id, groups: groups) {
+                self.selection = [bound.id]
+                self.lastAnchor = bound.id
+            }
+        }
+    }
+
+    func selectRows(containingEventIndices eventIndices: Set<Int>) {
+        DispatchQueue.main.async {
+            let groups = self.onRefreshRows().map(\.group)
+            let exposedGroups = ActionGroupProjection.groups(
+                containingEventIndices: eventIndices,
+                groups: groups
+            )
+            if exposedGroups.isEmpty {
+                self.selection = []
+                self.lastAnchor = nil
+            } else {
+                self.selection = Set(exposedGroups.map(\.id))
+                self.lastAnchor = exposedGroups.first?.id
+            }
         }
     }
 }

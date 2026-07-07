@@ -71,14 +71,7 @@ struct ActionRowView: View {
 	                    .truncationMode(.tail)
 	                    .help(g.summary)
                 
-                if g.eventIndices.count > 1 {
-                    let countLabel = g.kind.previewsPointSequence
-                        ? String(format: NSLocalizedString("%d points", comment: ""), max(g.path.count, g.clickCount))
-                        : (g.kind == .scroll
-                           ? String(format: NSLocalizedString("%d wheel ticks", comment: ""), g.eventIndices.count)
-                        : (g.kind == .sequence
-                           ? String(format: NSLocalizedString("Behavior (%d)", comment: ""), g.eventIndices.count)
-                           : String(format: NSLocalizedString("Merged (%d)", comment: ""), g.eventIndices.count)))
+                if let countLabel = actionRowCountLabel(for: g) {
                     let countTint = g.kind.previewsPointSequence
                         ? actionKindColor(g.kind)
                         : (g.kind == .scroll ? actionKindColor(g.kind) : (g.kind == .sequence ? Brand.sigAmber : Brand.accent(library.currentMacro?.accent)))
@@ -96,8 +89,8 @@ struct ActionRowView: View {
 	            .frame(maxWidth: .infinity, alignment: .leading)
 
             Group {
-                if g.textTargetReadiness.needsUserTarget {
-                    Text(NSLocalizedString("No target text", comment: ""))
+                if let statusLabel = actionRowTextTargetStatusLabel(g.textTargetReadiness) {
+                    Text(statusLabel)
                         .lineLimit(1)
                         .truncationMode(.tail)
                         .foregroundStyle(Brand.sigAmber)

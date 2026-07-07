@@ -48,8 +48,12 @@ struct SavedMacroPreviewCacheTests {
         let capturedAt = Date(timeIntervalSince1970: 1_000)
         let reference = MacroSemanticRecordingReference(
             recordingID: recordingID,
-            bundleRelativePath: "SemanticRecordings/\(recordingID.uuidString)",
-            manifestRelativePath: "SemanticRecordings/\(recordingID.uuidString)/manifest.json",
+            bundleRelativePath: MacroSemanticRecordingReference.defaultBundleRelativePath(
+                recordingID: recordingID
+            ),
+            manifestRelativePath: MacroSemanticRecordingReference.defaultManifestRelativePath(
+                recordingID: recordingID
+            ),
             capturedAt: capturedAt,
             eventCount: 3
         )
@@ -63,6 +67,8 @@ struct SavedMacroPreviewCacheTests {
         let decoded = try JSONDecoder().decode(SavedMacro.self, from: encoded)
 
         #expect(decoded.semanticRecording == reference)
+        #expect(reference.bundleRelativePath == "SemanticRecordings/\(recordingID.uuidString)")
+        #expect(reference.manifestRelativePath == "SemanticRecordings/\(recordingID.uuidString)/manifest.json")
     }
 
     @Test("Manifest round trips playable sanitization summary")

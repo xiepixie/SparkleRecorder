@@ -350,29 +350,50 @@ private final class LiveAutomationVisualConditionEvaluator: @unchecked Sendable 
         bitmap: VisualBitmap,
         searchTarget: VisualSearchTarget
     ) throws -> VisualConditionObservation {
-        guard let targetHex = condition.targetColorHex,
-              let targetColor = VisualRGBAColor(hex: targetHex) else {
+        guard let targetColor = condition.targetColorHex.flatMap({ VisualRGBAColor(hex: $0) }) else {
             throw VisualConditionConfigurationError.missingTargetColor
         }
 
+        let sampleRadius = condition.pixelSampleRadius.map(AutomationVisualCondition.clampedPixelSampleRadius)
+            ?? AutomationVisualCondition.defaultPixelSampleRadius
         guard let point = pixelPoint(for: condition, searchTarget: searchTarget, bitmap: bitmap),
-              let current = bitmap.color(atX: Int(point.x), y: Int(point.y)) else {
+              let sample = bitmap.colorSample(centeredAt: point, radius: sampleRadius) else {
             throw VisualConditionConfigurationError.missingPixelTarget
         }
 
         let threshold = condition.threshold ?? 0.95
-        let score = current.similarity(to: targetColor)
+        let score = sample.averageColor.similarity(to: targetColor)
         return VisualConditionObservation(
             matched: score >= threshold,
-            observedSummary: String(format: "Pixel similarity %.2f", score),
+            observedSummary: String(
+                format: "Pixel similarity %.2f (%@ avg vs %@, samples %d)",
+                score,
+                sample.averageColor.hexDescription,
+                targetColor.hexDescription,
+                sample.sampleCount
+            ),
             score: score,
             threshold: threshold,
             fields: [
                 AutomationConditionDiagnosticField(id: "pixel", title: "Pixel", value: point.coordinateLabel),
-                AutomationConditionDiagnosticField(id: "currentColor", title: "Current color", value: current.hexDescription),
-                AutomationConditionDiagnosticField(id: "targetColor", title: "Target color", value: targetHex),
-                AutomationConditionDiagnosticField(id: "score", title: "Similarity", value: score.scoreLabel),
-                AutomationConditionDiagnosticField(id: "threshold", title: "Threshold", value: threshold.scoreLabel)
+                AutomationConditionDiagnosticField(
+                    id: "sampledColor",
+                    title: "Sampled color",
+                    value: sample.averageColor.hexDescription
+                ),
+                AutomationConditionDiagnosticField(
+                    id: "targetColor",
+                    title: "Target color",
+                    value: targetColor.hexDescription
+                ),
+                AutomationConditionDiagnosticField(id: "similarity", title: "Similarity", value: score.scoreLabel),
+                AutomationConditionDiagnosticField(id: "threshold", title: "Threshold", value: threshold.scoreLabel),
+                AutomationConditionDiagnosticField(
+                    id: "sampleRadius",
+                    title: "Sample radius",
+                    value: "\(sample.radius)"
+                ),
+                AutomationConditionDiagnosticField(id: "sampleCount", title: "Samples", value: "\(sample.sampleCount)")
             ]
         )
     }
@@ -394,11 +415,13 @@ private final class LiveAutomationVisualConditionEvaluator: @unchecked Sendable 
         }
 
         let threshold = condition.threshold ?? 0.92
-        let score = VisualImageMatcher.bestSimilarity(
+        let match = VisualImageMatcher.bestMatch(
             template: template,
             in: bitmap,
-            searchRect: searchTarget.rect
+            searchRect: searchTarget.rect,
+            threshold: threshold
         )
+        let score = match.similarity
         let found = score >= threshold
 
         switch condition.type {
@@ -408,11 +431,14 @@ private final class LiveAutomationVisualConditionEvaluator: @unchecked Sendable 
                 observedSummary: String(format: "Template similarity %.2f", score),
                 score: score,
                 threshold: threshold,
-                fields: [
-                    AutomationConditionDiagnosticField(id: "imageRef", title: "Image", value: imageRef),
-                    AutomationConditionDiagnosticField(id: "score", title: "Best similarity", value: score.scoreLabel),
-                    AutomationConditionDiagnosticField(id: "threshold", title: "Threshold", value: threshold.scoreLabel)
-                ]
+                fields: imageMatchFields(
+                    imageRef: imageRef,
+                    score: score,
+                    threshold: threshold,
+                    thresholdTitle: "Threshold",
+                    match: match,
+                    searchTarget: searchTarget
+                )
             )
         case .imageDisappeared:
             return VisualConditionObservation(
@@ -422,15 +448,76 @@ private final class LiveAutomationVisualConditionEvaluator: @unchecked Sendable 
                     : String(format: "Template absent %.2f", score),
                 score: score,
                 threshold: threshold,
-                fields: [
-                    AutomationConditionDiagnosticField(id: "imageRef", title: "Image", value: imageRef),
-                    AutomationConditionDiagnosticField(id: "score", title: "Best similarity", value: score.scoreLabel),
-                    AutomationConditionDiagnosticField(id: "threshold", title: "Disappearance threshold", value: threshold.scoreLabel)
-                ]
+                fields: imageMatchFields(
+                    imageRef: imageRef,
+                    score: score,
+                    threshold: threshold,
+                    thresholdTitle: "Disappearance threshold",
+                    match: match,
+                    searchTarget: searchTarget
+                )
             )
         case .pixelMatched, .regionChanged:
             return VisualConditionObservation(matched: false, observedSummary: "Unsupported image observation")
         }
+    }
+
+    private func imageMatchFields(
+        imageRef: String,
+        score: Double,
+        threshold: Double,
+        thresholdTitle: String,
+        match: VisualImageMatchResult,
+        searchTarget: VisualSearchTarget
+    ) -> [AutomationConditionDiagnosticField] {
+        var fields = [
+            AutomationConditionDiagnosticField(id: "imageRef", title: "Image", value: imageRef),
+            AutomationConditionDiagnosticField(id: "score", title: "Best similarity", value: score.scoreLabel),
+            AutomationConditionDiagnosticField(id: "threshold", title: thresholdTitle, value: threshold.scoreLabel),
+            AutomationConditionDiagnosticField(
+                id: "locatorSimilarity",
+                title: "Locator similarity",
+                value: match.similarity.scoreLabel
+            ),
+            AutomationConditionDiagnosticField(
+                id: "locatorThreshold",
+                title: "Locator threshold",
+                value: match.threshold.scoreLabel
+            )
+        ]
+
+        if let matchedRect = match.matchedRect {
+            let localRect = CGRect(
+                x: matchedRect.minX - searchTarget.rect.minX,
+                y: matchedRect.minY - searchTarget.rect.minY,
+                width: matchedRect.width,
+                height: matchedRect.height
+            )
+            fields.append(contentsOf: [
+                AutomationConditionDiagnosticField(
+                    id: "locatorX",
+                    title: "Locator x",
+                    value: Double(localRect.minX).scoreLabel
+                ),
+                AutomationConditionDiagnosticField(
+                    id: "locatorY",
+                    title: "Locator y",
+                    value: Double(localRect.minY).scoreLabel
+                ),
+                AutomationConditionDiagnosticField(
+                    id: "locatorWidth",
+                    title: "Locator width",
+                    value: Double(localRect.width).scoreLabel
+                ),
+                AutomationConditionDiagnosticField(
+                    id: "locatorHeight",
+                    title: "Locator height",
+                    value: Double(localRect.height).scoreLabel
+                )
+            ])
+        }
+
+        return fields
     }
 
     private func evaluateRegionChanged(
@@ -833,6 +920,53 @@ private struct VisualBitmap: Sendable {
         )
     }
 
+    func colorSample(centeredAt point: CGPoint, radius: Int) -> VisualPixelSample? {
+        let centerX = min(max(Int(point.x), 0), width - 1)
+        let centerY = min(max(Int(point.y), 0), height - 1)
+        let sampleRadius = AutomationVisualCondition.clampedPixelSampleRadius(radius)
+        let minX = max(0, centerX - sampleRadius)
+        let maxX = min(width - 1, centerX + sampleRadius)
+        let minY = max(0, centerY - sampleRadius)
+        let maxY = min(height - 1, centerY + sampleRadius)
+
+        var red = 0.0
+        var green = 0.0
+        var blue = 0.0
+        var alpha = 0.0
+        var count = 0
+        for y in minY...maxY {
+            for x in minX...maxX {
+                guard let color = color(atX: x, y: y) else {
+                    continue
+                }
+                red += color.red
+                green += color.green
+                blue += color.blue
+                alpha += color.alpha
+                count += 1
+            }
+        }
+        guard count > 0 else {
+            return nil
+        }
+
+        return VisualPixelSample(
+            center: CGPoint(x: centerX, y: centerY),
+            radius: sampleRadius,
+            minX: minX,
+            minY: minY,
+            maxX: maxX,
+            maxY: maxY,
+            sampleCount: count,
+            averageColor: VisualRGBAColor(
+                red: red / Double(count),
+                green: green / Double(count),
+                blue: blue / Double(count),
+                alpha: alpha / Double(count)
+            )
+        )
+    }
+
     func pixelRect(for rect: CGRect) -> CGRect? {
         let clipped = rect.standardized.intersection(bounds)
         guard !clipped.isNull, clipped.width > 0, clipped.height > 0 else {
@@ -849,6 +983,17 @@ private struct VisualBitmap: Sendable {
 
         return CGRect(x: minX, y: minY, width: maxX - minX, height: maxY - minY)
     }
+}
+
+private struct VisualPixelSample: Equatable, Sendable {
+    var center: CGPoint
+    var radius: Int
+    var minX: Int
+    var minY: Int
+    var maxX: Int
+    var maxY: Int
+    var sampleCount: Int
+    var averageColor: VisualRGBAColor
 }
 
 private struct VisualRGBAColor: Equatable, Sendable {
@@ -904,6 +1049,18 @@ private struct VisualRGBAColor: Equatable, Sendable {
     }
 }
 
+private struct VisualImageMatchResult: Equatable, Sendable {
+    var similarity: Double
+    var threshold: Double
+    var matchedRect: CGRect?
+
+    init(similarity: Double, threshold: Double, matchedRect: CGRect?) {
+        self.similarity = max(0, min(1, similarity))
+        self.threshold = max(0, min(1, threshold))
+        self.matchedRect = matchedRect
+    }
+}
+
 private enum VisualImageMatcher {
     static func contains(
         template: VisualBitmap,
@@ -911,7 +1068,13 @@ private enum VisualImageMatcher {
         searchRect: CGRect,
         threshold: Double
     ) -> Bool {
-        bestSimilarity(template: template, in: haystack, searchRect: searchRect) >= threshold
+        bestMatch(
+            template: template,
+            in: haystack,
+            searchRect: searchRect,
+            threshold: threshold
+        )
+        .matchedRect != nil
     }
 
     static func bestSimilarity(
@@ -919,8 +1082,17 @@ private enum VisualImageMatcher {
         in haystack: VisualBitmap,
         searchRect: CGRect
     ) -> Double {
+        bestMatch(template: template, in: haystack, searchRect: searchRect, threshold: 1).similarity
+    }
+
+    static func bestMatch(
+        template: VisualBitmap,
+        in haystack: VisualBitmap,
+        searchRect: CGRect,
+        threshold: Double
+    ) -> VisualImageMatchResult {
         guard let rect = haystack.pixelRect(for: searchRect) else {
-            return 0
+            return VisualImageMatchResult(similarity: 0, threshold: threshold, matchedRect: nil)
         }
 
         let templateWidth = template.width
@@ -929,7 +1101,7 @@ private enum VisualImageMatcher {
               templateHeight > 0,
               templateWidth <= Int(rect.width),
               templateHeight <= Int(rect.height) else {
-            return 0
+            return VisualImageMatchResult(similarity: 0, threshold: threshold, matchedRect: nil)
         }
 
         let minX = Int(rect.minX)
@@ -938,14 +1110,23 @@ private enum VisualImageMatcher {
         let maxY = Int(rect.maxY) - templateHeight
         let step = max(1, min(templateWidth, templateHeight) / 6)
         var best = 0.0
+        var bestRect: CGRect?
 
         for y in candidatePositions(from: minY, through: maxY, step: step) {
             for x in candidatePositions(from: minX, through: maxX, step: step) {
-                best = max(best, similarity(template: template, in: haystack, originX: x, originY: y))
+                let candidate = similarity(template: template, in: haystack, originX: x, originY: y)
+                if candidate > best {
+                    best = candidate
+                    bestRect = CGRect(x: x, y: y, width: templateWidth, height: templateHeight)
+                }
             }
         }
 
-        return best
+        return VisualImageMatchResult(
+            similarity: best,
+            threshold: threshold,
+            matchedRect: best >= threshold ? bestRect : nil
+        )
     }
 
     static func changeScore(
@@ -1000,8 +1181,8 @@ private enum VisualImageMatcher {
         originX: Int,
         originY: Int
     ) -> Double {
-        let samplesX = sampleCount(for: template.width)
-        let samplesY = sampleCount(for: template.height)
+        let samplesX = imageSampleCount(for: template.width)
+        let samplesY = imageSampleCount(for: template.height)
         var totalSimilarity = 0.0
         var samples = 0
 
@@ -1032,6 +1213,10 @@ private enum VisualImageMatcher {
 
     private static func sampleCount(for size: Int) -> Int {
         min(12, max(3, size / 16))
+    }
+
+    private static func imageSampleCount(for size: Int) -> Int {
+        min(16, max(3, size))
     }
 
     private static func sampleCoordinate(_ index: Int, size: Int, count: Int) -> Int {

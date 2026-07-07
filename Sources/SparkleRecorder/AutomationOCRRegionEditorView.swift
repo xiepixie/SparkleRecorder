@@ -20,6 +20,20 @@ struct AutomationOCRRegionEditorView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
+            AutomationConditionObservationCard(
+                systemImage: "text.viewfinder",
+                title: AutomationConditionObservationPresentation.ocrDetectorTitle(),
+                detail: AutomationConditionObservationPresentation.ocrDetectorDetail(),
+                tint: Brand.sigAmber
+            )
+
+            AutomationConditionObservationCard(
+                systemImage: hasRegion ? "rectangle.dashed" : "display",
+                title: AutomationConditionObservationPresentation.scopeTitle(hasRegion: hasRegion),
+                detail: AutomationConditionObservationPresentation.ocrScopeDetail(hasRegion: hasRegion),
+                tint: hasRegion ? Brand.libraryGreen : Brand.sigAmber
+            )
+
             Label(statusTitle, systemImage: statusImage)
                 .font(.caption)
                 .foregroundStyle(statusTint)

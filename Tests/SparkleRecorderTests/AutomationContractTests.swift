@@ -114,6 +114,7 @@ struct AutomationContractTests {
             baselineRef: "battle_result_baseline",
             pixel: AutomationGraphPoint(x: 0.5, y: 0.75),
             targetColorHex: "#FFCC00",
+            pixelSampleRadius: 3,
             threshold: 0.82,
             requireVisible: true
         )
@@ -130,6 +131,18 @@ struct AutomationContractTests {
         )
 
         #expect(decoded == spec)
+    }
+
+    @Test("Visual condition clamps pixel sample radius")
+    func visualConditionClampsPixelSampleRadius() {
+        #expect(AutomationVisualCondition(
+            type: .pixelMatched,
+            pixelSampleRadius: -1
+        ).pixelSampleRadius == 0)
+        #expect(AutomationVisualCondition(
+            type: .pixelMatched,
+            pixelSampleRadius: 99
+        ).pixelSampleRadius == AutomationVisualCondition.maximumPixelSampleRadius)
     }
 
     @Test("OCR search region resolves display, window, and content spaces")

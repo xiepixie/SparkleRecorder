@@ -130,6 +130,12 @@ struct AutomationConditionProgressView: View {
         if let colorHex = progress.colorHex {
             badge(colorHex, systemImage: "paintpalette")
         }
+        if let pixelSampleRadius = progress.pixelSampleRadius {
+            badge(
+                String(format: NSLocalizedString("Radius %d", comment: ""), pixelSampleRadius),
+                systemImage: "circle.grid.3x3"
+            )
+        }
         if let threshold = progress.threshold {
             badge(threshold.formatted(.number.precision(.fractionLength(2))), systemImage: "slider.horizontal.3")
         }
@@ -157,6 +163,7 @@ struct AutomationConditionProgressView: View {
             progress.imageRef != nil ||
             progress.baselineRef != nil ||
             progress.colorHex != nil ||
+            progress.pixelSampleRadius != nil ||
             progress.threshold != nil
     }
 

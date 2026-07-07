@@ -75,6 +75,7 @@ struct EditorView: View {
     @State private var inspFallbackPolicy: LocatorFallbackPolicy = .fail
     @State private var inspTimeout: Double = 10.0
     @State private var inspVerifyMustExist: Bool = true
+    @State private var inspBehaviorName: String = ""
     @State private var activeDragSession: DragEditSession? = nil
     @State private var hoveredRow: UUID? = nil
     @State private var smartMergeGestures = true
@@ -160,6 +161,7 @@ struct EditorView: View {
                         inspFallbackPolicy: $inspFallbackPolicy,
                         inspTimeout: $inspTimeout,
                         inspVerifyMustExist: $inspVerifyMustExist,
+                        inspBehaviorName: $inspBehaviorName,
                         recorder: recorder,
                         surfaces: library.currentMacro?.surfaces ?? [:],
                         onLoadInspector: loadInspector,
@@ -273,22 +275,36 @@ struct EditorView: View {
                 inspFallbackPolicy = ev.locatorFallbackPolicy ?? .fail
                 inspTimeout = ev.textTimeout ?? 10.0
                 inspVerifyMustExist = ev.verifyMustExist ?? true
+                inspBehaviorName = grp.behaviorGroupName ?? ev.behaviorGroupName ?? ""
             } else {
                 inspStrategy = .windowLocalPreferred
                 inspOCRText = ""
                 inspFallbackPolicy = .fail
                 inspTimeout = 10.0
                 inspVerifyMustExist = true
+                inspBehaviorName = grp.behaviorGroupName ?? ""
             }
         } else if selection.count > 1 {
             let textRows = textTargetRowsForCurrentSelection()
             var firstTextEvent: RecordedEvent?
+            var firstBehaviorName: String?
             for row in textRows where firstTextEvent == nil {
                 for index in row.group.eventIndices where recorder.events.indices.contains(index) {
                     let event = recorder.events[index]
                     if event.textAnchor != nil || event.coordinateStrategy == .locatorOnly {
                         firstTextEvent = event
                         break
+                    }
+                }
+            }
+            for row in rows where selection.contains(row.id) && firstBehaviorName == nil {
+                firstBehaviorName = row.group.behaviorGroupName
+                if firstBehaviorName == nil {
+                    for index in row.group.eventIndices where recorder.events.indices.contains(index) {
+                        if let name = recorder.events[index].behaviorGroupName {
+                            firstBehaviorName = name
+                            break
+                        }
                     }
                 }
             }
@@ -299,6 +315,7 @@ struct EditorView: View {
             inspFallbackPolicy = firstTextEvent?.locatorFallbackPolicy ?? .fail
             inspTimeout = firstTextEvent?.textTimeout ?? 10.0
             inspVerifyMustExist = firstTextEvent?.verifyMustExist ?? true
+            inspBehaviorName = firstBehaviorName ?? ""
         } else {
             inspTime = ""; inspX = ""; inspY = ""; inspEndX = ""; inspEndY = ""; inspKey = ""; inspFlags = 0
             inspStrategy = .windowLocalPreferred
@@ -306,6 +323,7 @@ struct EditorView: View {
             inspFallbackPolicy = .fail
             inspTimeout = 10.0
             inspVerifyMustExist = true
+            inspBehaviorName = ""
         }
     }
 
@@ -544,18 +562,24 @@ struct EditorView: View {
     }
 
     func withUndo(_ name: String, _ mutate: () -> Void) {
-        let snapshot = recorder.events
-        let snapshotDur = recorder.liveDuration
+        let before = MacroEditMutationSnapshot(
+            events: recorder.events,
+            liveDuration: recorder.liveDuration
+        )
+        mutate()
+        let after = MacroEditMutationSnapshot(
+            events: recorder.events,
+            liveDuration: recorder.liveDuration
+        )
+        guard after.differs(from: before) else { return }
+
         undoManager?.registerUndo(withTarget: recorder) { [weak undoManager] r in
-            let redoSnapshot = r.events
-            let redoDur = r.liveDuration
-            r.loadEvents(snapshot, duration: snapshotDur)
+            r.loadEvents(before.events, duration: before.liveDuration)
             undoManager?.registerUndo(withTarget: r) { r2 in
-                r2.loadEvents(redoSnapshot, duration: redoDur)
+                r2.loadEvents(after.events, duration: after.liveDuration)
             }
         }
         undoManager?.setActionName(name)
-        mutate()
         recorder.recalculateStats()
     }
 
@@ -640,8 +664,14 @@ struct EditorView: View {
             }
 
             guard let rec = recorder else { return }
+            let previousLiveDuration = rec.liveDuration
+            let previousLastEventTime = rec.events.last?.time
             self.withUndo(NSLocalizedString("Add Click Point", comment: "")) {
                 rec.events.appendMultiPointClick(at: row.group.eventIndices, point: finalPt)
+                rec.liveDuration = rec.events.liveDurationPreservingTrailingWait(
+                    previousLiveDuration: previousLiveDuration,
+                    previousLastEventTime: previousLastEventTime
+                )
             }
             self.updateCachedRows()
             self.loadInspector()

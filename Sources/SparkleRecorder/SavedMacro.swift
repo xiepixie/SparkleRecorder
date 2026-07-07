@@ -41,6 +41,16 @@ public struct MacroSemanticRecordingReference: Codable, Equatable, Sendable {
     }
 }
 
+public extension MacroSemanticRecordingReference {
+    static func defaultBundleRelativePath(recordingID: UUID) -> String {
+        "SemanticRecordings/\(SemanticRecordingBundleDirectoryIdentity.directoryName(for: recordingID))"
+    }
+
+    static func defaultManifestRelativePath(recordingID: UUID) -> String {
+        "\(defaultBundleRelativePath(recordingID: recordingID))/\(SemanticRecordingSchema.manifestFileName)"
+    }
+}
+
 public struct MacroPlayableSanitizationSummary: Codable, Equatable, Sendable {
     public var recordingID: UUID?
     public var appliedAt: Date

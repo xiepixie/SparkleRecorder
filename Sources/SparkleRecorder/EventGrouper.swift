@@ -80,6 +80,7 @@ public struct ActionGroup: Identifiable, Equatable, Sendable {
     public var textTargetReadiness: TextTargetReadiness
     public var behaviorGroupID: BehaviorGroupID?
     public var behaviorGroupName: String?
+    public var containedActionCount: Int?
     
     public init(
         id: UUID = UUID(),
@@ -104,7 +105,8 @@ public struct ActionGroup: Identifiable, Equatable, Sendable {
         verifyMustExist: Bool? = nil,
         textTargetReadiness: TextTargetReadiness = .notTextTarget,
         behaviorGroupID: BehaviorGroupID? = nil,
-        behaviorGroupName: String? = nil
+        behaviorGroupName: String? = nil,
+        containedActionCount: Int? = nil
     ) {
         self.id = id
         self.kind = kind
@@ -129,6 +131,7 @@ public struct ActionGroup: Identifiable, Equatable, Sendable {
         self.textTargetReadiness = textTargetReadiness
         self.behaviorGroupID = behaviorGroupID
         self.behaviorGroupName = behaviorGroupName
+        self.containedActionCount = containedActionCount
     }
 }
 
@@ -771,7 +774,8 @@ public struct EventGrouper: Sendable {
                 textTimeout: nil,
                 verifyMustExist: nil,
                 behaviorGroupID: behaviorID,
-                behaviorGroupName: name
+                behaviorGroupName: name,
+                containedActionCount: nonWaitCount
             ))
             
             i = j

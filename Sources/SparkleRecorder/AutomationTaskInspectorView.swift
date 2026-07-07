@@ -53,6 +53,7 @@ struct AutomationTaskInspectorView: View {
     @State private var visualPixelXDraft = 0.0
     @State private var visualPixelYDraft = 0.0
     @State private var visualColorHexDraft = ""
+    @State private var visualPixelSampleRadiusDraft = AutomationVisualCondition.defaultPixelSampleRadius
     @State private var hasVisualThresholdDraft = false
     @State private var visualThresholdDraft = 0.9
     @State private var visualRequiresVisibleDraft = true
@@ -334,6 +335,7 @@ struct AutomationTaskInspectorView: View {
                 pixelX: $visualPixelXDraft,
                 pixelY: $visualPixelYDraft,
                 colorHex: $visualColorHexDraft,
+                pixelSampleRadius: $visualPixelSampleRadiusDraft,
                 hasThreshold: $hasVisualThresholdDraft,
                 threshold: $visualThresholdDraft,
                 requiresVisible: $visualRequiresVisibleDraft,
@@ -760,6 +762,8 @@ struct AutomationTaskInspectorView: View {
             visualPixelYDraft = 0
         }
         visualColorHexDraft = condition?.targetColorHex ?? ""
+        visualPixelSampleRadiusDraft = condition?.pixelSampleRadius
+            ?? AutomationVisualCondition.defaultPixelSampleRadius
         hasVisualThresholdDraft = condition?.threshold != nil
         visualThresholdDraft = condition?.threshold ?? 0.9
         visualRequiresVisibleDraft = condition?.requireVisible ?? true
@@ -990,6 +994,9 @@ struct AutomationTaskInspectorView: View {
             baselineRef: visualTypeDraft == .regionChanged ? visualBaselineRefDraft : nil,
             pixel: visualTypeDraft == .pixelMatched ? draftedVisualPixel : nil,
             targetColorHex: visualTypeDraft == .pixelMatched ? visualColorHexDraft : nil,
+            pixelSampleRadius: visualTypeDraft == .pixelMatched
+                ? visualPixelSampleRadiusDraft
+                : nil,
             threshold: hasVisualThresholdDraft ? visualThresholdDraft : nil,
             requireVisible: visualRequiresVisibleDraft
         )

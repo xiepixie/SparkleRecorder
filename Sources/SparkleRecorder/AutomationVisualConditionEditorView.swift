@@ -26,6 +26,7 @@ struct AutomationVisualConditionEditorView: View {
     @Binding var pixelX: Double
     @Binding var pixelY: Double
     @Binding var colorHex: String
+    @Binding var pixelSampleRadius: Int
     @Binding var hasThreshold: Bool
     @Binding var threshold: Double
     @Binding var requiresVisible: Bool
@@ -46,6 +47,20 @@ struct AutomationVisualConditionEditorView: View {
                 }
                 .pickerStyle(.menu)
             }
+
+            AutomationConditionObservationCard(
+                systemImage: AutomationVisualConditionPresentation.systemImage(for: type),
+                title: AutomationVisualConditionPresentation.detectorTitle(for: type),
+                detail: AutomationVisualConditionPresentation.detectorDetail(for: type),
+                tint: detectorTint
+            )
+
+            AutomationConditionObservationCard(
+                systemImage: hasRegion ? "rectangle.dashed" : "display",
+                title: AutomationConditionObservationPresentation.scopeTitle(hasRegion: hasRegion),
+                detail: AutomationConditionObservationPresentation.visualScopeDetail(hasRegion: hasRegion),
+                tint: hasRegion ? Brand.libraryGreen : Brand.sigAmber
+            )
 
             AutomationVisualReferenceFieldView(
                 title: NSLocalizedString("Region reference", comment: ""),
@@ -89,6 +104,17 @@ struct AutomationVisualConditionEditorView: View {
         }
     }
 
+    private var detectorTint: Color {
+        switch type {
+        case .regionChanged:
+            return Brand.libraryBlue
+        case .imageAppeared, .imageDisappeared:
+            return Brand.sigTeal
+        case .pixelMatched:
+            return Brand.sigAmber
+        }
+    }
+
     @ViewBuilder
     private var typeSpecificFields: some View {
         switch type {
@@ -121,6 +147,20 @@ struct AutomationVisualConditionEditorView: View {
                     numericField(NSLocalizedString("Pixel X", comment: ""), value: $pixelX, width: 74)
                     numericField(NSLocalizedString("Pixel Y", comment: ""), value: $pixelY, width: 74)
                 }
+            }
+            Stepper(
+                value: $pixelSampleRadius,
+                in: 0...AutomationVisualCondition.maximumPixelSampleRadius,
+                step: 1
+            ) {
+                Label(
+                    String(
+                        format: NSLocalizedString("Sample radius %d", comment: ""),
+                        pixelSampleRadius
+                    ),
+                    systemImage: "circle.grid.3x3"
+                )
+                .font(.caption)
             }
             thresholdFields
         }

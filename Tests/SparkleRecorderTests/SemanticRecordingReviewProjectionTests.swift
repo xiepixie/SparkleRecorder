@@ -343,6 +343,214 @@ struct SemanticRecordingReviewProjectionTests {
         #expect(writtenAssets[expectedPath] == croppedData)
     }
 
+    @Test("Review image candidate can create a draft-only repeat-until loop")
+    func reviewImageCandidateCanCreateDraftOnlyRepeatUntilLoop() throws {
+        let bundle = SemanticRecordingFixture.checkoutBundle()
+        let projection = SemanticRecordingReviewProjection(
+            bundle: bundle,
+            selectedEventID: SemanticRecordingFixture.clickEventID
+        )
+        let candidate = try #require(
+            projection.selectedFrame?.conditionCandidates.first { $0.kind == .imageDisappeared }
+        )
+        let selection = SemanticRecordingFrameRegionSelection(
+            frameID: SemanticRecordingFixture.beforeClickFrameID,
+            surfaceID: SemanticRecordingFixture.surfaceID,
+            bounds: RecordingBounds(
+                rect: RecordingRect(x: 880, y: 620, width: 180, height: 48),
+                coordinateSpace: .windowPixels
+            ),
+            imageSize: RecordingImageSize(width: 1_440, height: 900),
+            label: "Checkout button crop",
+            candidateKind: .imageDisappeared,
+            sourcePreviewRefID: candidate.sourcePreviewRefID,
+            observationID: candidate.observationID,
+            artifactPath: candidate.artifactPath
+        )
+
+        let result = try SemanticRecordingReviewDraftPatchBuilder.makePatch(
+            bundle: bundle,
+            request: SemanticRecordingReviewDraftPatchRequest(
+                candidate: candidate,
+                newTaskKey: "repeat_until_checkout_button_gone",
+                regionSelection: selection,
+                repeatUntil: SemanticRecordingReviewRepeatUntilDraft(
+                    bodyTasks: [
+                        AutomationWorkflowDraftTask(
+                            key: "retry_checkout_click",
+                            type: "macro",
+                            name: "Retry checkout click",
+                            macroRef: AutomationWorkflowDraftMacroRef(name: "Click Checkout")
+                        )
+                    ],
+                    maxAttempts: 4,
+                    timeoutSeconds: 20,
+                    pollingSeconds: 0.5,
+                    onFailure: AutomationWorkflowDraftLoopFailurePolicy.requireManualApproval
+                ),
+                threshold: 0.84
+            )
+        )
+        let document = AutomationWorkflowDraftDocument(workflow: AutomationWorkflowDraft(name: "Checkout"))
+        let patched = try AutomationWorkflowDraftPatchApplier.apply(result.patch, to: document)
+        let task = try #require(patched.document.workflow.tasks.first)
+        let loop = try #require(task.loop)
+        let loopUntil = try #require(loop.until)
+        let importResult = AutomationWorkflowDraftImporter.dryRun(patched.document)
+        let previewProjection = AutomationWorkflowDraftPreviewProjection(
+            document: patched.document,
+            validationEnvelope: .workflowDraftValidation(command: "workflow draft validate", result: patched.validation),
+            macroCatalogEnvelope: .workflowMacroCatalog(command: "workflow macros", macros: []),
+            importEnvelope: .workflowDraftImport(command: "workflow import --dry-run", result: importResult)
+        )
+        let loopRow = try #require(previewProjection.loopExpansionRows.first)
+
+        #expect(result.createsRepeatUntilLoop)
+        #expect(!result.appliesToExistingTask)
+        #expect(result.patch.ops.map(\.op) == ["upsertVisualRegion", "upsertVisualImage", "addTask"])
+        #expect(result.condition.type == "imageDisappeared")
+        #expect(result.condition.threshold == 0.84)
+        #expect(result.condition.regionRef == result.region?.key)
+        #expect(result.condition.imageRef == result.imageAsset?.key)
+        #expect(result.assetExtractions.first?.kind == .image)
+        #expect(result.assetExtractions.first?.sourceFrameImagePath == "frames/000014-before-click.png")
+        #expect(result.actionEvidence.draftTaskKey == "repeat_until_checkout_button_gone")
+        #expect(result.actionEvidence.draftConditionType == "imageDisappeared")
+        #expect(result.actionEvidence.visualAssetKind == .image)
+
+        #expect(task.key == "repeat_until_checkout_button_gone")
+        #expect(task.type == "loop")
+        #expect(task.name == "Repeat until image disappears")
+        #expect(loop.kind == AutomationWorkflowDraftLoopKind.repeatUntil)
+        #expect(loop.tasks.map(\.key) == ["retry_checkout_click"])
+        #expect(loopUntil == result.condition)
+        #expect(loop.maxAttempts == 4)
+        #expect(loop.timeoutSeconds == 20)
+        #expect(loop.pollingSeconds == 0.5)
+        #expect(loop.onFailure == AutomationWorkflowDraftLoopFailurePolicy.requireManualApproval)
+        #expect(!patched.validation.isValid)
+        #expect(patched.validation.issues.contains {
+            $0.code == .invalidLoop &&
+                $0.path == "$.workflow.tasks[0].loop.kind" &&
+                $0.message.contains("draft-only")
+        })
+        #expect(!importResult.isImportable)
+        #expect(previewProjection.statusLabel == "Import blocked")
+        #expect(loopRow.modeLabel == "Repeat until")
+        #expect(loopRow.untilLabel == "image disappears")
+        #expect(loopRow.guardrailLabel == "max 4 attempts, 20.0s timeout, 0.5s polling, on failure: requireManualApproval")
+    }
+
+    @Test("Repeat-until body resolver uses only evidence-linked macros")
+    func repeatUntilBodyResolverUsesOnlyEvidenceLinkedMacros() throws {
+        let bundle = SemanticRecordingFixture.checkoutBundle()
+        let checkoutMacroID = UUID(uuidString: "81000000-0000-0000-0000-0000000000AA")!
+        let secondaryMacroID = UUID(uuidString: "81000000-0000-0000-0000-0000000000BB")!
+        let unrelatedMacroID = UUID(uuidString: "81000000-0000-0000-0000-0000000000CC")!
+        let checkoutMacro = linkedMacro(
+            id: checkoutMacroID,
+            name: "Click Checkout",
+            recordingID: bundle.id,
+            modifiedAt: Date(timeIntervalSince1970: 200)
+        )
+        let secondaryMacro = linkedMacro(
+            id: secondaryMacroID,
+            name: "Confirm Checkout",
+            recordingID: bundle.id,
+            modifiedAt: Date(timeIntervalSince1970: 100)
+        )
+        let unrelatedMacro = linkedMacro(
+            id: unrelatedMacroID,
+            name: "Open Settings",
+            recordingID: UUID(),
+            modifiedAt: Date(timeIntervalSince1970: 300)
+        )
+
+        let resolved = SemanticRecordingReviewRepeatUntilBodyResolver.resolve(
+            recordingID: bundle.id,
+            macros: [unrelatedMacro, checkoutMacro]
+        )
+        let resolvedTask = try #require(resolved.bodyTasks.first)
+
+        #expect(resolved.status == .resolved)
+        #expect(resolved.linkedMacroIDs == [checkoutMacroID])
+        #expect(resolvedTask.key == "run_click_checkout_000000aa")
+        #expect(resolvedTask.type == "macro")
+        #expect(resolvedTask.name == "Click Checkout")
+        #expect(resolvedTask.macroRef == AutomationWorkflowDraftMacroRef(id: checkoutMacroID, name: "Click Checkout"))
+
+        let ambiguous = SemanticRecordingReviewRepeatUntilBodyResolver.resolve(
+            recordingID: bundle.id,
+            macros: [secondaryMacro, checkoutMacro]
+        )
+        #expect(ambiguous.status == .ambiguousLinkedMacros)
+        #expect(ambiguous.bodyTasks.isEmpty)
+        #expect(ambiguous.linkedMacroIDs == [checkoutMacroID, secondaryMacroID])
+
+        let preferred = SemanticRecordingReviewRepeatUntilBodyResolver.resolve(
+            recordingID: bundle.id,
+            macros: [secondaryMacro, checkoutMacro],
+            preferredMacroID: secondaryMacroID
+        )
+        let preferredTask = try #require(preferred.bodyTasks.first)
+
+        #expect(preferred.status == .resolved)
+        #expect(preferredTask.key == "run_confirm_checkout_000000bb")
+        #expect(preferredTask.macroRef?.id == secondaryMacroID)
+
+        let missing = SemanticRecordingReviewRepeatUntilBodyResolver.resolve(
+            recordingID: bundle.id,
+            macros: [unrelatedMacro]
+        )
+        #expect(missing.status == .noLinkedMacro)
+        #expect(missing.bodyTasks.isEmpty)
+    }
+
+    @Test("Review repeat-until patch can use resolved macro body")
+    func reviewRepeatUntilPatchCanUseResolvedMacroBody() throws {
+        let bundle = SemanticRecordingFixture.checkoutBundle()
+        let macroID = UUID(uuidString: "82000000-0000-0000-0000-0000000000AA")!
+        let macro = linkedMacro(
+            id: macroID,
+            name: "Retry Checkout",
+            recordingID: bundle.id,
+            modifiedAt: Date(timeIntervalSince1970: 200)
+        )
+        let bodyResolution = SemanticRecordingReviewRepeatUntilBodyResolver.resolve(
+            recordingID: bundle.id,
+            macros: [macro]
+        )
+        let projection = SemanticRecordingReviewProjection(
+            bundle: bundle,
+            selectedEventID: SemanticRecordingFixture.clickEventID
+        )
+        let candidate = try #require(
+            projection.selectedFrame?.conditionCandidates.first { $0.kind == .imageDisappeared }
+        )
+
+        let result = try SemanticRecordingReviewDraftPatchBuilder.makePatch(
+            bundle: bundle,
+            request: SemanticRecordingReviewDraftPatchRequest(
+                candidate: candidate,
+                repeatUntil: SemanticRecordingReviewRepeatUntilDraft(
+                    bodyTasks: bodyResolution.bodyTasks,
+                    onFailure: AutomationWorkflowDraftLoopFailurePolicy.requireManualApproval
+                )
+            )
+        )
+        let patched = try AutomationWorkflowDraftPatchApplier.apply(
+            result.patch,
+            to: AutomationWorkflowDraftDocument(workflow: AutomationWorkflowDraft(name: "Checkout"))
+        )
+        let task = try #require(patched.document.workflow.tasks.first)
+        let loopTask = try #require(task.loop?.tasks.first)
+
+        #expect(result.createsRepeatUntilLoop)
+        #expect(loopTask.type == "macro")
+        #expect(loopTask.macroRef == AutomationWorkflowDraftMacroRef(id: macroID, name: "Retry Checkout"))
+        #expect(!patched.validation.isValid)
+    }
+
     @Test("Manual frame region selection can override candidate bounds")
     func manualFrameRegionSelectionCanOverrideCandidateBounds() throws {
         let bundle = SemanticRecordingFixture.checkoutBundle()
@@ -638,5 +846,31 @@ struct SemanticRecordingReviewProjectionTests {
         #expect(evidence.rows.contains {
             $0.kind == .matchedEventIndex && $0.value == "Event #5"
         })
+    }
+
+    private func linkedMacro(
+        id: UUID,
+        name: String,
+        recordingID: UUID,
+        modifiedAt: Date
+    ) -> SavedMacro {
+        SavedMacro(
+            id: id,
+            name: name,
+            events: [],
+            createdAt: Date(timeIntervalSince1970: 0),
+            modifiedAt: modifiedAt,
+            semanticRecording: MacroSemanticRecordingReference(
+                recordingID: recordingID,
+                bundleRelativePath: MacroSemanticRecordingReference.defaultBundleRelativePath(
+                    recordingID: recordingID
+                ),
+                manifestRelativePath: MacroSemanticRecordingReference.defaultManifestRelativePath(
+                    recordingID: recordingID
+                ),
+                capturedAt: Date(timeIntervalSince1970: 10),
+                eventCount: 3
+            )
+        )
     }
 }

@@ -35,12 +35,38 @@ public struct AutomationMacroReviewSourcePresentation: Equatable, Sendable {
         }
     }
 
+    public struct DecisionRow: Equatable, Sendable {
+        public enum Tone: String, Equatable, Sendable {
+            case ready
+            case needsInput
+            case reviewOnly
+        }
+
+        public var title: String
+        public var value: String
+        public var detail: String
+        public var tone: Tone
+
+        public init(
+            title: String,
+            value: String,
+            detail: String,
+            tone: Tone
+        ) {
+            self.title = title
+            self.value = value
+            self.detail = detail
+            self.tone = tone
+        }
+    }
+
     public var sourceKind: SourceKind
     public var macroID: UUID?
     public var macroName: String?
     public var recordingReference: MacroSemanticRecordingReference?
     public var summary: String
     public var readinessBadges: [Badge]
+    public var decisionRows: [DecisionRow]
 
     public init(
         sourceKind: SourceKind,
@@ -48,7 +74,8 @@ public struct AutomationMacroReviewSourcePresentation: Equatable, Sendable {
         macroName: String? = nil,
         recordingReference: MacroSemanticRecordingReference? = nil,
         summary: String,
-        readinessBadges: [Badge]
+        readinessBadges: [Badge],
+        decisionRows: [DecisionRow]
     ) {
         self.sourceKind = sourceKind
         self.macroID = macroID
@@ -56,6 +83,7 @@ public struct AutomationMacroReviewSourcePresentation: Equatable, Sendable {
         self.recordingReference = recordingReference
         self.summary = summary
         self.readinessBadges = readinessBadges
+        self.decisionRows = decisionRows
     }
 
     public static func make(
@@ -81,6 +109,26 @@ public struct AutomationMacroReviewSourcePresentation: Equatable, Sendable {
                     Badge(title: "Run", value: "Not bound")
                 ] + reviewTargetBadges(for: run) + [
                     Badge(title: "Fallback", value: "Bundle Picker")
+                ],
+                decisionRows: [
+                    DecisionRow(
+                        title: "Next step",
+                        value: "Open linked review",
+                        detail: "Uses the semantic recording attached to the saved macro and preselects the closest event or condition evidence when the run outcome provides a target.",
+                        tone: .ready
+                    ),
+                    DecisionRow(
+                        title: "Evidence binding",
+                        value: "Macro-level",
+                        detail: "This run does not yet carry a per-run semantic bundle, so review evidence is useful for repair but not accepted as live run proof.",
+                        tone: .needsInput
+                    ),
+                    DecisionRow(
+                        title: "Mutation boundary",
+                        value: "Review only",
+                        detail: "Opening Macro Review never mutates the workflow; reviewed changes still need Draft Preview and confirmed import.",
+                        tone: .reviewOnly
+                    )
                 ]
             )
         }
@@ -97,6 +145,26 @@ public struct AutomationMacroReviewSourcePresentation: Equatable, Sendable {
                 Badge(title: "Run", value: "Not bound")
             ] + reviewTargetBadges(for: run) + [
                 Badge(title: "Fallback", value: "Bundle Picker")
+            ],
+            decisionRows: [
+                DecisionRow(
+                    title: "Next step",
+                    value: "Choose bundle",
+                    detail: "No semantic recording link was found for this macro or run; choose a bundle before reviewing frames, OCR, or visual evidence.",
+                    tone: .needsInput
+                ),
+                DecisionRow(
+                    title: "Evidence binding",
+                    value: "Manual selection",
+                    detail: "The selected bundle is not proven to belong to this run, so use it for local review until S2 provides a saved-macro-linked live bundle.",
+                    tone: .needsInput
+                ),
+                DecisionRow(
+                    title: "Mutation boundary",
+                    value: "Review only",
+                    detail: "Opening Macro Review never mutates the workflow; reviewed changes still need Draft Preview and confirmed import.",
+                    tone: .reviewOnly
+                )
             ]
         )
     }

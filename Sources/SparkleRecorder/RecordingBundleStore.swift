@@ -95,16 +95,17 @@ enum RecordingBundleStoreRedactionError: Error, Equatable, Sendable {
 actor RecordingBundleStore {
     static let redactedFrameIndexRelativePath = "redacted/frames/index.json"
     static let redactedVideoIndexRelativePath = "redacted/video/index.json"
-
-    let rootDirectory: URL
-
-    init(
-        rootDirectory: URL = FileManager.default
+    nonisolated static var defaultRootDirectory: URL {
+        FileManager.default
             .urls(for: .applicationSupportDirectory, in: .userDomainMask)
             .first!
             .appendingPathComponent("SparkleRecorder", isDirectory: true)
             .appendingPathComponent("SemanticRecordings", isDirectory: true)
-    ) {
+    }
+
+    let rootDirectory: URL
+
+    init(rootDirectory: URL = RecordingBundleStore.defaultRootDirectory) {
         self.rootDirectory = rootDirectory
     }
 

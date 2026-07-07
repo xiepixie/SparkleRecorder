@@ -61,6 +61,26 @@ struct AutomationViewProjectionTests {
             .init(title: "Run", value: "Not bound"),
             .init(title: "Fallback", value: "Bundle Picker")
         ])
+        #expect(presentation.decisionRows == [
+            .init(
+                title: "Next step",
+                value: "Open linked review",
+                detail: "Uses the semantic recording attached to the saved macro and preselects the closest event or condition evidence when the run outcome provides a target.",
+                tone: .ready
+            ),
+            .init(
+                title: "Evidence binding",
+                value: "Macro-level",
+                detail: "This run does not yet carry a per-run semantic bundle, so review evidence is useful for repair but not accepted as live run proof.",
+                tone: .needsInput
+            ),
+            .init(
+                title: "Mutation boundary",
+                value: "Review only",
+                detail: "Opening Macro Review never mutates the workflow; reviewed changes still need Draft Preview and confirmed import.",
+                tone: .reviewOnly
+            )
+        ])
     }
 
     @Test("Macro Review source presentation resolves macro from workflow task")
@@ -153,6 +173,137 @@ struct AutomationViewProjectionTests {
             .init(title: "Run", value: "Not bound"),
             .init(title: "Fallback", value: "Bundle Picker")
         ])
+        #expect(presentation.decisionRows == [
+            .init(
+                title: "Next step",
+                value: "Choose bundle",
+                detail: "No semantic recording link was found for this macro or run; choose a bundle before reviewing frames, OCR, or visual evidence.",
+                tone: .needsInput
+            ),
+            .init(
+                title: "Evidence binding",
+                value: "Manual selection",
+                detail: "The selected bundle is not proven to belong to this run, so use it for local review until S2 provides a saved-macro-linked live bundle.",
+                tone: .needsInput
+            ),
+            .init(
+                title: "Mutation boundary",
+                value: "Review only",
+                detail: "Opening Macro Review never mutates the workflow; reviewed changes still need Draft Preview and confirmed import.",
+                tone: .reviewOnly
+            )
+        ])
+    }
+
+    @Test("Macro Review source presentation copy has localized catalog entries")
+    func macroReviewSourcePresentationCopyHasLocalizedCatalogEntries() throws {
+        let workflowID = UUID()
+        let taskID = UUID()
+        let macroID = UUID()
+        let workflow = AutomationWorkflow(
+            id: workflowID,
+            name: "Review flow",
+            tasks: [
+                AutomationTask(
+                    id: taskID,
+                    name: "Upload report",
+                    kind: .macro(macroID: macroID)
+                )
+            ]
+        )
+        let reference = MacroSemanticRecordingReference(
+            recordingID: UUID(),
+            bundleRelativePath: "SemanticRecordings/demo",
+            manifestRelativePath: "SemanticRecordings/demo/manifest.json",
+            eventCount: 4
+        )
+        let linkedMacro = SavedMacro(
+            id: macroID,
+            name: "Upload report",
+            events: [TestFixtures.clickEvent()],
+            semanticRecording: reference
+        )
+        let manualMacro = SavedMacro(
+            id: macroID,
+            name: "Upload report",
+            events: [TestFixtures.clickEvent()]
+        )
+        let runs = [
+            AutomationTaskRun(workflowID: workflowID, taskID: taskID, macroID: macroID),
+            AutomationTaskRun(
+                workflowID: workflowID,
+                taskID: taskID,
+                macroID: macroID,
+                outcome: .failed(report: nil)
+            ),
+            AutomationTaskRun(
+                workflowID: workflowID,
+                taskID: taskID,
+                macroID: macroID,
+                outcome: .timedOut(deadline: Date(timeIntervalSince1970: 2_000))
+            ),
+            AutomationTaskRun(
+                workflowID: workflowID,
+                taskID: taskID,
+                macroID: macroID,
+                outcome: .conditionNotMatched
+            )
+        ]
+        let presentations = runs.flatMap { run in
+            [
+                AutomationMacroReviewSourcePresentation.make(
+                    run: run,
+                    workflow: workflow,
+                    macros: [linkedMacro]
+                ),
+                AutomationMacroReviewSourcePresentation.make(
+                    run: run,
+                    workflow: workflow,
+                    macros: [manualMacro]
+                )
+            ]
+        }
+        let summaryFormat = "Open the semantic recording captured with %@. It includes %d timeline events; this run does not carry a separate semantic bundle yet."
+        let keys = presentations.reduce(into: Set([summaryFormat])) { keys, presentation in
+            if presentation.sourceKind == .manualBundle {
+                keys.insert(presentation.summary)
+            }
+            keys.insert(presentation.buttonTitle(isOpening: false))
+            keys.insert(presentation.buttonTitle(isOpening: true))
+            for badge in presentation.readinessBadges {
+                keys.insert(badge.title)
+                if !badge.value.hasPrefix("Event #") {
+                    keys.insert(badge.value)
+                }
+            }
+            for row in presentation.decisionRows {
+                keys.insert(row.title)
+                keys.insert(row.value)
+                keys.insert(row.detail)
+            }
+        }
+        let catalog = try localizationCatalog()
+
+        var missingEntries: [String] = []
+        var missingEnglish: [String] = []
+        var missingSimplifiedChinese: [String] = []
+        for key in keys.sorted() {
+            guard let entry = catalog[key] as? [String: Any] else {
+                missingEntries.append(key)
+                continue
+            }
+            let localizations = entry["localizations"] as? [String: Any] ?? [:]
+            if localizations["en"] == nil {
+                missingEnglish.append(key)
+            }
+            if localizations["zh-Hans"] == nil {
+                missingSimplifiedChinese.append(key)
+            }
+        }
+
+        #expect(missingEntries.isEmpty, "Missing Localizable.xcstrings entries: \(missingEntries)")
+        #expect(missingEnglish.isEmpty, "Missing English localizations: \(missingEnglish)")
+        #expect(missingSimplifiedChinese.isEmpty, "Missing Simplified Chinese localizations: \(missingSimplifiedChinese)")
     }
 
     @Test("Macro Review source presentation exposes failed event target")
@@ -883,6 +1034,49 @@ struct AutomationViewProjectionTests {
         #expect(projection.workflows.first?.nodes.first?.timeoutCountdown == nil)
     }
 
+    @Test("Pixel condition progress includes sample radius")
+    func pixelConditionProgressIncludesSampleRadius() throws {
+        let workflowID = UUID()
+        let taskID = UUID()
+        let condition = AutomationConditionSpec(
+            name: "Status color",
+            kind: .visual(AutomationVisualCondition(
+                type: .pixelMatched,
+                regionRef: "status_light",
+                targetColorHex: "#00FF00",
+                pixelSampleRadius: 2,
+                threshold: 0.93
+            )),
+            pollingInterval: 0.25
+        )
+        let task = AutomationTask(
+            id: taskID,
+            name: "Wait status color",
+            kind: .condition(condition),
+            resourceRequirement: .backgroundReadOnly
+        )
+        let run = AutomationTaskRun(
+            workflowID: workflowID,
+            taskID: taskID,
+            actualStartTime: Date(timeIntervalSince1970: 300),
+            status: .running,
+            createdAt: Date(timeIntervalSince1970: 300)
+        )
+
+        let projection = AutomationViewProjection.overview(from: AutomationRunState(
+            workflows: [AutomationWorkflow(id: workflowID, name: "Pixel wait", tasks: [task])],
+            runs: [run],
+            now: Date(timeIntervalSince1970: 301)
+        ))
+        let progress = try #require(projection.workflows.first?.nodes.first?.conditionProgress)
+
+        #expect(progress.kind == .pixelMatched)
+        #expect(progress.targetLabel == "#00FF00")
+        #expect(progress.detail.contains("Sample radius 2"))
+        #expect(progress.pixelSampleRadius == 2)
+        #expect(progress.threshold == 0.93)
+    }
+
     @Test("Dependency status is computed outside SwiftUI")
     func dependencyStatusIsComputedOutsideSwiftUI() throws {
         let workflowID = UUID()
@@ -1032,5 +1226,22 @@ struct AutomationViewProjectionTests {
         let node = try #require(projection.workflows.first?.nodes.first)
 
         #expect(node.position == position)
+    }
+
+    private func localizationCatalog() throws -> [String: Any] {
+        let url = repositoryRoot()
+            .appendingPathComponent("Sources/SparkleRecorder/Localizable.xcstrings")
+        let data = try Data(contentsOf: url)
+        let rootObject = try #require(
+            try JSONSerialization.jsonObject(with: data) as? [String: Any]
+        )
+        return try #require(rootObject["strings"] as? [String: Any])
+    }
+
+    private func repositoryRoot() -> URL {
+        URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
     }
 }

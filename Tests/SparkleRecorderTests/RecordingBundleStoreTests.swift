@@ -5,6 +5,19 @@ import Testing
 
 @Suite("Recording Bundle Store Tests")
 struct RecordingBundleStoreTests {
+    @Test("Default root uses stable App Support semantic recordings directory")
+    func defaultRootUsesStableSemanticRecordingsDirectory() {
+        let root = RecordingBundleStore.defaultRootDirectory.standardizedFileURL
+        let appSupport = FileManager.default
+            .urls(for: .applicationSupportDirectory, in: .userDomainMask)
+            .first!
+            .standardizedFileURL
+
+        #expect(root.path.hasPrefix(appSupport.path))
+        #expect(root.lastPathComponent == "SemanticRecordings")
+        #expect(root.deletingLastPathComponent().lastPathComponent == "SparkleRecorder")
+    }
+
     @Test("Store writes, loads, and catalogs bundle sidecars in a scratch root")
     func storeWritesLoadsAndCatalogsBundleSidecars() async throws {
         let root = scratchRoot()
