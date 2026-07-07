@@ -692,4 +692,183 @@ struct SemanticRecordingCLITests {
         #expect(showEnvelope.nextActions.contains { $0.command.contains(sourceOption) })
         #expect(explainEnvelope.nextActions.contains { $0.command.contains(sourceOption) })
     }
+
+    @Test("Default stored recording source omits explicit root from next actions")
+    func defaultStoredRecordingSourceOmitsExplicitRootFromNextActions() throws {
+        let bundle = SemanticRecordingFixture.checkoutBundle()
+        let defaultRoot = "/Users/example/Library/Application Support/SparkleRecorder/SemanticRecordings"
+        let listEntry = SemanticRecordingCLICatalogEntry(
+            recordingID: bundle.id,
+            source: .storedBundle,
+            modifiedAt: Date(timeIntervalSince1970: 1_800_000_200)
+        )
+        let listEnvelope = AutomationCLIResultEnvelope<SemanticRecordingCLIListPayload>
+            .semanticRecordingList(
+                command: "recording.list",
+                recordings: [listEntry],
+                recordingsRoot: defaultRoot
+            )
+        let showEnvelope = AutomationCLIResultEnvelope<SemanticRecordingCLISummaryPayload>
+            .semanticRecordingShow(
+                command: "recording.show",
+                requestedRecordingID: bundle.id.uuidString,
+                bundle: bundle
+            )
+
+        let listPayload = try #require(listEnvelope.data)
+        let showPayload = try #require(showEnvelope.data)
+        #expect(!listPayload.fixtureMode)
+        #expect(!showPayload.fixtureMode)
+        #expect(listPayload.recordingsRoot == defaultRoot)
+        #expect(listEnvelope.warnings.isEmpty)
+        #expect(showEnvelope.warnings.isEmpty)
+        #expect(listEnvelope.nextActions.first?.command.contains("--recordings-root") == false)
+        #expect(showEnvelope.nextActions.allSatisfy { !$0.command.contains("--recordings-root") })
+        #expect(listEnvelope.nextActions.first?.command.contains("recording show \(bundle.id.uuidString) --json") == true)
+    }
+
+    @Test("Recording readiness envelope exposes sidecar diagnostics and readiness warnings")
+    func recordingReadinessEnvelopeExposesDiagnosticsAndWarnings() throws {
+        let bundle = SemanticRecordingFixture.checkoutBundle()
+        var diagnostics = SemanticRecordingBundleSidecarLoadDiagnostics(
+            loadedKinds: [.videoSegments, .frames]
+        )
+        diagnostics.recordFailed(
+            .visualObservations,
+            relativePath: "ocr/observations.jsonl",
+            message: "Could not decode sidecar."
+        )
+        let loadResult = SemanticRecordingBundleLoadResult(
+            manifest: bundle,
+            sidecarDiagnostics: diagnostics
+        )
+        let readiness = SemanticRecordingBundleReadiness.evaluate(
+            loadResult.bundle,
+            policy: SemanticRecordingBundleReadinessPolicy(
+                capturePolicy: bundle.capturePolicy,
+                requiresOCRObservations: true,
+                requiresWindowOrAXObservations: true
+            )
+        )
+        let envelope = AutomationCLIResultEnvelope<SemanticRecordingCLIReadinessPayload>
+            .semanticRecordingReadiness(
+                command: "recording.readiness",
+                requestedRecordingID: bundle.id.uuidString,
+                loadResult: loadResult,
+                readiness: readiness,
+                bundleDirectory: "/tmp/SemanticRecordings/\(bundle.id.uuidString)",
+                followUps: ["Inspect ocr/observations.jsonl."],
+                artifactFiles: SemanticRecordingCLIArtifactFileSummary(evidence: [
+                    SemanticRecordingCLIArtifactFileEvidence(
+                        kind: .video,
+                        ref: try RecordingArtifactRef("video/recording.mov"),
+                        status: .present,
+                        byteCount: 128
+                    ),
+                    SemanticRecordingCLIArtifactFileEvidence(
+                        kind: .frame,
+                        ref: try RecordingArtifactRef("frames/missing.png"),
+                        status: .missing
+                    )
+                ])
+            )
+
+        let payload = try #require(envelope.data)
+        #expect(envelope.ok)
+        #expect(payload.status == .notReady)
+        #expect(payload.issueCount == readiness.issues.count)
+        #expect(payload.blockingIssueCount == readiness.blockingIssueCount)
+        #expect(payload.degradedIssueCount == readiness.degradedIssueCount)
+        #expect(payload.load.sidecarDiagnostics.failedIssues.map(\.kind) == [.visualObservations])
+        #expect(payload.followUps == ["Inspect ocr/observations.jsonl."])
+        #expect(payload.artifactAvailability.videoRefs == bundle.videoSegments.map(\.artifactRef))
+        #expect(payload.artifactFiles?.checkedCount == 2)
+        #expect(payload.artifactFiles?.presentCount == 1)
+        #expect(payload.artifactFiles?.missingCount == 1)
+        #expect(payload.artifactFiles?.videoPresentCount == 1)
+        #expect(envelope.warnings.map(\.code).contains("recordingReadinessNotReady"))
+        #expect(envelope.warnings.map(\.code).contains("recordingSidecarsDegraded"))
+        #expect(envelope.warnings.map(\.code).contains("recordingArtifactsDegraded"))
+        #expect(envelope.nextActions.first?.command.contains("--recordings-root") == false)
+    }
+
+    @Test("Recording macro links envelope audits saved macro semantic bundle references")
+    func recordingMacroLinksEnvelopeAuditsSavedMacroSemanticBundleReferences() throws {
+        let bundle = SemanticRecordingFixture.checkoutBundle()
+        let linkedMacro = SavedMacro(
+            id: UUID(uuidString: "31000000-0000-0000-0000-000000000001")!,
+            name: "Linked checkout",
+            events: [
+                .make(.leftMouseDown, time: 0.1, x: 10, y: 20),
+                .make(.leftMouseUp, time: 0.2, x: 10, y: 20)
+            ],
+            semanticRecording: MacroSemanticRecordingReference(
+                recordingID: bundle.id,
+                bundleRelativePath: "SemanticRecordings/\(bundle.id.uuidString)",
+                manifestRelativePath: "SemanticRecordings/\(bundle.id.uuidString)/manifest.json",
+                eventCount: 2
+            )
+        )
+        let unlinkedMacro = SavedMacro(
+            id: UUID(uuidString: "31000000-0000-0000-0000-000000000002")!,
+            name: "Unlinked",
+            events: []
+        )
+        let readiness = SemanticRecordingBundleReadiness.evaluate(
+            bundle,
+            policy: SemanticRecordingBundleReadinessPolicy(
+                capturePolicy: bundle.capturePolicy,
+                requiresOCRObservations: true,
+                requiresWindowOrAXObservations: true
+            )
+        )
+        let linkedEntry = SemanticRecordingCLIMacroLinkEntry(
+            macro: linkedMacro,
+            bundleDirectory: "/tmp/SemanticRecordings/\(bundle.id.uuidString)",
+            loadResult: SemanticRecordingBundleLoadResult(manifest: bundle),
+            readiness: readiness,
+            artifactFiles: SemanticRecordingCLIArtifactFileSummary(evidence: [
+                SemanticRecordingCLIArtifactFileEvidence(
+                    kind: .video,
+                    ref: try RecordingArtifactRef("video/recording.mov"),
+                    status: .empty,
+                    byteCount: 0
+                )
+            ])
+        )
+        let unlinkedEntry = SemanticRecordingCLIMacroLinkEntry(
+            macro: unlinkedMacro,
+            status: .unlinked
+        )
+        let payload = SemanticRecordingCLIMacroLinksPayload(
+            macrosRoot: "/tmp/Macros",
+            recordingsRoot: "/tmp/SemanticRecordings",
+            totalMacroCount: 2,
+            requiresOCRObservations: true,
+            requiresWindowOrAXObservations: true,
+            links: [linkedEntry, unlinkedEntry]
+        )
+        let envelope = AutomationCLIResultEnvelope<SemanticRecordingCLIMacroLinksPayload>
+            .semanticRecordingMacroLinks(
+                command: "recording.macroLinks",
+                payload: payload,
+                recordingsRootSourceOption: " --recordings-root /tmp/SemanticRecordings"
+            )
+
+        let decoded = try JSONDecoder().decode(
+            AutomationCLIResultEnvelope<SemanticRecordingCLIMacroLinksPayload>.self,
+            from: try JSONEncoder().encode(envelope)
+        )
+        let decodedPayload = try #require(decoded.data)
+        #expect(decodedPayload.totalMacroCount == 2)
+        #expect(decodedPayload.linkedMacroCount == 1)
+        #expect(decodedPayload.unlinkedCount == 1)
+        #expect(decodedPayload.notReadyCount == 1)
+        #expect(decodedPayload.links.first?.recordingID == bundle.id)
+        #expect(decodedPayload.links.first?.artifactAvailability?.videoRefs == bundle.videoSegments.map(\.artifactRef))
+        #expect(decodedPayload.links.first?.artifactFiles?.emptyCount == 1)
+        #expect(decoded.warnings.map(\.code).contains("macroSemanticRecordingNotReady"))
+        #expect(decoded.warnings.map(\.code).contains("macroSemanticRecordingArtifactsDegraded"))
+        #expect(decoded.nextActions.first?.command.contains("recording readiness \(bundle.id.uuidString) --recordings-root /tmp/SemanticRecordings --json") == true)
+    }
 }

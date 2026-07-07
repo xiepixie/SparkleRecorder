@@ -202,6 +202,81 @@ public struct SemanticRecordingCLIArtifactAvailability: Codable, Equatable, Send
     }
 }
 
+public enum SemanticRecordingCLIArtifactFileKind: String, Codable, Equatable, Sendable {
+    case video
+    case redactedVideo
+    case frame
+    case redactedFrame
+    case sourcePreview
+    case runtimeSample
+    case diff
+}
+
+public enum SemanticRecordingCLIArtifactFileStatus: String, Codable, Equatable, Sendable {
+    case present
+    case missing
+    case empty
+    case directory
+    case unsafe
+}
+
+public struct SemanticRecordingCLIArtifactFileEvidence: Codable, Equatable, Sendable, Identifiable {
+    public var id: String { "\(kind.rawValue):\(ref.path)" }
+    public var kind: SemanticRecordingCLIArtifactFileKind
+    public var ref: RecordingArtifactRef
+    public var status: SemanticRecordingCLIArtifactFileStatus
+    public var byteCount: Int?
+    public var reason: String?
+
+    public init(
+        kind: SemanticRecordingCLIArtifactFileKind,
+        ref: RecordingArtifactRef,
+        status: SemanticRecordingCLIArtifactFileStatus,
+        byteCount: Int? = nil,
+        reason: String? = nil
+    ) {
+        self.kind = kind
+        self.ref = ref
+        self.status = status
+        self.byteCount = byteCount
+        self.reason = reason
+    }
+}
+
+public struct SemanticRecordingCLIArtifactFileSummary: Codable, Equatable, Sendable {
+    public var checkedCount: Int
+    public var presentCount: Int
+    public var missingCount: Int
+    public var emptyCount: Int
+    public var directoryCount: Int
+    public var unsafeCount: Int
+    public var videoPresentCount: Int
+    public var framePresentCount: Int
+    public var evidence: [SemanticRecordingCLIArtifactFileEvidence]
+
+    public init(
+        evidence: [SemanticRecordingCLIArtifactFileEvidence]
+    ) {
+        self.checkedCount = evidence.count
+        self.presentCount = evidence.filter { $0.status == .present }.count
+        self.missingCount = evidence.filter { $0.status == .missing }.count
+        self.emptyCount = evidence.filter { $0.status == .empty }.count
+        self.directoryCount = evidence.filter { $0.status == .directory }.count
+        self.unsafeCount = evidence.filter { $0.status == .unsafe }.count
+        self.videoPresentCount = evidence.filter {
+            ($0.kind == .video || $0.kind == .redactedVideo) && $0.status == .present
+        }.count
+        self.framePresentCount = evidence.filter {
+            ($0.kind == .frame || $0.kind == .redactedFrame) && $0.status == .present
+        }.count
+        self.evidence = evidence
+    }
+
+    public var hasIssues: Bool {
+        missingCount > 0 || emptyCount > 0 || directoryCount > 0 || unsafeCount > 0
+    }
+}
+
 public struct SemanticRecordingCLIFrameSummary: Codable, Equatable, Sendable, Identifiable {
     public var id: UUID
     public var recordingTime: TimeInterval
@@ -312,6 +387,157 @@ public struct SemanticRecordingCLISummaryPayload: Codable, Equatable, Sendable {
         self.keyframesAvailable = !bundle.frames.isEmpty
         self.suppressionSummary = SemanticRecordingCLISuppressionSummary(records: bundle.suppressions)
         self.artifactAvailability = SemanticRecordingCLIArtifactAvailability(bundle: bundle)
+    }
+}
+
+public struct SemanticRecordingCLIReadinessPayload: Codable, Equatable, Sendable {
+    public var requestedRecordingID: String
+    public var recordingID: UUID
+    public var fixtureMode: Bool
+    public var fixture: String?
+    public var sourceOption: String?
+    public var bundleDirectory: String?
+    public var load: SemanticRecordingDebugSmokePersistedBundleLoadEvidence
+    public var readiness: SemanticRecordingBundleReadiness
+    public var status: SemanticRecordingBundleReadinessStatus
+    public var issueCount: Int
+    public var blockingIssueCount: Int
+    public var degradedIssueCount: Int
+    public var followUps: [String]
+    public var artifactAvailability: SemanticRecordingCLIArtifactAvailability
+    public var artifactFiles: SemanticRecordingCLIArtifactFileSummary?
+
+    public init(
+        requestedRecordingID: String,
+        loadResult: SemanticRecordingBundleLoadResult,
+        readiness: SemanticRecordingBundleReadiness,
+        fixture: String? = nil,
+        sourceOption: String? = nil,
+        bundleDirectory: String? = nil,
+        followUps: [String] = [],
+        artifactFiles: SemanticRecordingCLIArtifactFileSummary? = nil
+    ) {
+        self.requestedRecordingID = requestedRecordingID
+        self.recordingID = loadResult.bundle.id
+        self.fixtureMode = fixture != nil
+        self.fixture = fixture
+        self.sourceOption = sourceOption
+        self.bundleDirectory = bundleDirectory
+        self.load = SemanticRecordingDebugSmokePersistedBundleLoadEvidence(loadResult: loadResult)
+        self.readiness = readiness
+        self.status = readiness.status
+        self.issueCount = readiness.issues.count
+        self.blockingIssueCount = readiness.blockingIssueCount
+        self.degradedIssueCount = readiness.degradedIssueCount
+        self.followUps = followUps
+        self.artifactAvailability = SemanticRecordingCLIArtifactAvailability(bundle: loadResult.bundle)
+        self.artifactFiles = artifactFiles
+    }
+}
+
+public enum SemanticRecordingCLIMacroLinkStatus: String, Codable, Equatable, Sendable {
+    case unlinked
+    case ready
+    case degraded
+    case notReady
+    case failedToLoad
+}
+
+public struct SemanticRecordingCLIMacroLinkEntry: Codable, Equatable, Sendable, Identifiable {
+    public var id: UUID { macroID }
+    public var macroID: UUID
+    public var macroName: String
+    public var macroEventCount: Int
+    public var recordingReference: MacroSemanticRecordingReference?
+    public var recordingID: UUID?
+    public var bundleDirectory: String?
+    public var status: SemanticRecordingCLIMacroLinkStatus
+    public var issues: [String]
+    public var load: SemanticRecordingDebugSmokePersistedBundleLoadEvidence?
+    public var readiness: SemanticRecordingBundleReadiness?
+    public var readinessStatus: SemanticRecordingBundleReadinessStatus?
+    public var artifactAvailability: SemanticRecordingCLIArtifactAvailability?
+    public var artifactFiles: SemanticRecordingCLIArtifactFileSummary?
+
+    public init(
+        macro: SavedMacro,
+        bundleDirectory: String? = nil,
+        loadResult: SemanticRecordingBundleLoadResult? = nil,
+        readiness: SemanticRecordingBundleReadiness? = nil,
+        artifactFiles: SemanticRecordingCLIArtifactFileSummary? = nil,
+        issues: [String] = [],
+        status: SemanticRecordingCLIMacroLinkStatus? = nil
+    ) {
+        self.macroID = macro.id
+        self.macroName = macro.name
+        self.macroEventCount = macro.eventCount
+        self.recordingReference = macro.semanticRecording
+        self.recordingID = macro.semanticRecording?.recordingID ?? loadResult?.bundle.id
+        self.bundleDirectory = bundleDirectory
+        self.issues = issues
+        self.load = loadResult.map(SemanticRecordingDebugSmokePersistedBundleLoadEvidence.init(loadResult:))
+        self.readiness = readiness
+        self.readinessStatus = readiness?.status
+        self.artifactAvailability = loadResult.map { SemanticRecordingCLIArtifactAvailability(bundle: $0.bundle) }
+        self.artifactFiles = artifactFiles
+
+        if let status {
+            self.status = status
+        } else if macro.semanticRecording == nil {
+            self.status = .unlinked
+        } else if loadResult == nil {
+            self.status = .failedToLoad
+        } else {
+            switch readiness?.status {
+            case .ready:
+                self.status = .ready
+            case .degraded:
+                self.status = .degraded
+            case .notReady:
+                self.status = .notReady
+            case nil:
+                self.status = .failedToLoad
+            }
+        }
+    }
+}
+
+public struct SemanticRecordingCLIMacroLinksPayload: Codable, Equatable, Sendable {
+    public var macrosRoot: String?
+    public var recordingsRoot: String
+    public var totalMacroCount: Int
+    public var linkedMacroCount: Int
+    public var returnedCount: Int
+    public var readyCount: Int
+    public var degradedCount: Int
+    public var notReadyCount: Int
+    public var failedCount: Int
+    public var unlinkedCount: Int
+    public var requiresOCRObservations: Bool
+    public var requiresWindowOrAXObservations: Bool
+    public var links: [SemanticRecordingCLIMacroLinkEntry]
+
+    public init(
+        macrosRoot: String? = nil,
+        recordingsRoot: String,
+        totalMacroCount: Int,
+        requiresOCRObservations: Bool = false,
+        requiresWindowOrAXObservations: Bool = false,
+        links: [SemanticRecordingCLIMacroLinkEntry]
+    ) {
+        self.macrosRoot = macrosRoot
+        self.recordingsRoot = recordingsRoot
+        self.totalMacroCount = max(0, totalMacroCount)
+        self.linkedMacroCount = links.filter { $0.recordingReference != nil }.count
+        self.returnedCount = links.count
+        self.readyCount = links.filter { $0.status == .ready }.count
+        self.degradedCount = links.filter { $0.status == .degraded }.count
+        self.notReadyCount = links.filter { $0.status == .notReady }.count
+        self.failedCount = links.filter { $0.status == .failedToLoad }.count
+        self.unlinkedCount = links.filter { $0.status == .unlinked }.count
+        self.requiresOCRObservations = requiresOCRObservations
+        self.requiresWindowOrAXObservations = requiresWindowOrAXObservations
+        self.links = links
     }
 }
 
@@ -1245,6 +1471,88 @@ public extension AutomationCLIResultEnvelope where Value == SemanticRecordingCLI
     }
 }
 
+public extension AutomationCLIResultEnvelope where Value == SemanticRecordingCLIReadinessPayload {
+    static func semanticRecordingReadiness(
+        command: String,
+        requestedRecordingID: String,
+        loadResult: SemanticRecordingBundleLoadResult,
+        readiness: SemanticRecordingBundleReadiness,
+        fixture: String? = nil,
+        sourceOption: String? = nil,
+        bundleDirectory: String? = nil,
+        followUps: [String] = [],
+        artifactFiles: SemanticRecordingCLIArtifactFileSummary? = nil
+    ) -> AutomationCLIResultEnvelope<SemanticRecordingCLIReadinessPayload> {
+        let sourceArgument = semanticRecordingCLISourceOption(
+            fixture: fixture,
+            sourceOption: sourceOption
+        )
+        return AutomationCLIResultEnvelope<SemanticRecordingCLIReadinessPayload>(
+            ok: true,
+            command: command,
+            data: SemanticRecordingCLIReadinessPayload(
+                requestedRecordingID: requestedRecordingID,
+                loadResult: loadResult,
+                readiness: readiness,
+                fixture: fixture,
+                sourceOption: sourceOption,
+                bundleDirectory: bundleDirectory,
+                followUps: followUps,
+                artifactFiles: artifactFiles
+            ),
+            warnings: semanticRecordingCLIFixtureWarnings(fixture)
+                + semanticRecordingCLIReadinessWarnings(
+                    readiness,
+                    loadResult: loadResult,
+                    artifactFiles: artifactFiles
+                ),
+            nextActions: [
+                AutomationCLINextAction(
+                    command: "SparkleRecorder recording show \(requestedRecordingID)\(sourceArgument) --json",
+                    reason: "Inspect the same loaded bundle summary and safe artifact refs before using it for Review or AI."
+                ),
+                AutomationCLINextAction(
+                    command: "SparkleRecorder recording explain \(requestedRecordingID)\(sourceArgument) --json",
+                    reason: "Read the AI-safe semantic events and evidence notes after readiness issues are understood."
+                )
+            ]
+        )
+    }
+}
+
+public extension AutomationCLIResultEnvelope where Value == SemanticRecordingCLIMacroLinksPayload {
+    static func semanticRecordingMacroLinks(
+        command: String,
+        payload: SemanticRecordingCLIMacroLinksPayload,
+        recordingsRootSourceOption: String? = nil
+    ) -> AutomationCLIResultEnvelope<SemanticRecordingCLIMacroLinksPayload> {
+        let firstLinked = payload.links.first { $0.recordingReference != nil }
+        let sourceArgument = recordingsRootSourceOption ?? ""
+        var nextActions: [AutomationCLINextAction] = []
+        if let recordingID = firstLinked?.recordingID {
+            nextActions.append(
+                AutomationCLINextAction(
+                    command: "SparkleRecorder recording readiness \(recordingID.uuidString)\(sourceArgument) --json",
+                    reason: "Audit the linked semantic recording bundle before using the saved macro as live Review or AI evidence."
+                )
+            )
+            nextActions.append(
+                AutomationCLINextAction(
+                    command: "SparkleRecorder recording show \(recordingID.uuidString)\(sourceArgument) --json",
+                    reason: "Inspect the linked bundle summary and safe artifact refs."
+                )
+            )
+        }
+        return AutomationCLIResultEnvelope<SemanticRecordingCLIMacroLinksPayload>(
+            ok: true,
+            command: command,
+            data: payload,
+            warnings: semanticRecordingCLIMacroLinkWarnings(payload),
+            nextActions: nextActions
+        )
+    }
+}
+
 public extension AutomationCLIResultEnvelope where Value == SemanticRecordingCLIExplainPayload {
     static func semanticRecordingExplain(
         command: String,
@@ -1635,6 +1943,92 @@ private func semanticRecordingCLISuggestionWarnings(
                 ?? "Stored bundle suggestion synthesis is not implemented yet; this command returns only available deterministic suggestions."
         )
     ]
+}
+
+private func semanticRecordingCLIReadinessWarnings(
+    _ readiness: SemanticRecordingBundleReadiness,
+    loadResult: SemanticRecordingBundleLoadResult,
+    artifactFiles: SemanticRecordingCLIArtifactFileSummary? = nil
+) -> [AutomationCLIMessage] {
+    var warnings: [AutomationCLIMessage] = []
+    if readiness.status != .ready {
+        warnings.append(
+            AutomationCLIMessage(
+                code: semanticRecordingCLIReadinessWarningCode(readiness.status),
+                message: "Semantic recording readiness is \(readiness.status.rawValue); inspect issues before treating this bundle as product-ready evidence."
+            )
+        )
+    }
+    if loadResult.sidecarDiagnostics.isDegraded {
+        warnings.append(
+            AutomationCLIMessage(
+                code: "recordingSidecarsDegraded",
+                message: "One or more semantic recording sidecars are missing or failed to load; inspect load.sidecarDiagnostics before using this bundle for Review or AI."
+            )
+        )
+    }
+    if artifactFiles?.hasIssues == true {
+        warnings.append(
+            AutomationCLIMessage(
+                code: "recordingArtifactsDegraded",
+                message: "One or more semantic recording artifact refs are missing, empty, unsafe or directories; inspect artifactFiles before treating this as live product evidence."
+            )
+        )
+    }
+    return warnings
+}
+
+private func semanticRecordingCLIReadinessWarningCode(
+    _ status: SemanticRecordingBundleReadinessStatus
+) -> String {
+    switch status {
+    case .ready:
+        return "recordingReadinessReady"
+    case .degraded:
+        return "recordingReadinessDegraded"
+    case .notReady:
+        return "recordingReadinessNotReady"
+    }
+}
+
+private func semanticRecordingCLIMacroLinkWarnings(
+    _ payload: SemanticRecordingCLIMacroLinksPayload
+) -> [AutomationCLIMessage] {
+    var warnings: [AutomationCLIMessage] = []
+    if payload.failedCount > 0 {
+        warnings.append(
+            AutomationCLIMessage(
+                code: "macroSemanticRecordingLinkFailed",
+                message: "\(payload.failedCount) saved macro semantic recording link(s) could not be loaded from the selected recordings root."
+            )
+        )
+    }
+    if payload.notReadyCount > 0 {
+        warnings.append(
+            AutomationCLIMessage(
+                code: "macroSemanticRecordingNotReady",
+                message: "\(payload.notReadyCount) saved macro semantic recording link(s) loaded but are not ready for product evidence."
+            )
+        )
+    }
+    if payload.degradedCount > 0 {
+        warnings.append(
+            AutomationCLIMessage(
+                code: "macroSemanticRecordingDegraded",
+                message: "\(payload.degradedCount) saved macro semantic recording link(s) are degraded; inspect readiness issues before using them."
+            )
+        )
+    }
+    let artifactIssueCount = payload.links.filter { $0.artifactFiles?.hasIssues == true }.count
+    if artifactIssueCount > 0 {
+        warnings.append(
+            AutomationCLIMessage(
+                code: "macroSemanticRecordingArtifactsDegraded",
+                message: "\(artifactIssueCount) linked semantic recording bundle(s) have missing, empty, unsafe or directory artifact refs."
+            )
+        )
+    }
+    return warnings
 }
 
 private func semanticRecordingCLIFixtureOption(_ fixture: String?) -> String {

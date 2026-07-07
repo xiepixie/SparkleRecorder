@@ -947,6 +947,7 @@ public struct SemanticRecordingReviewDraftPatchRequest: Equatable, Sendable {
     public var newTaskKey: String?
     public var taskName: String?
     public var regionSelection: SemanticRecordingFrameRegionSelection?
+    public var repeatUntil: SemanticRecordingReviewRepeatUntilDraft?
     public var text: String?
     public var threshold: Double?
     public var timeoutSeconds: TimeInterval
@@ -962,6 +963,7 @@ public struct SemanticRecordingReviewDraftPatchRequest: Equatable, Sendable {
         newTaskKey: String? = nil,
         taskName: String? = nil,
         regionSelection: SemanticRecordingFrameRegionSelection? = nil,
+        repeatUntil: SemanticRecordingReviewRepeatUntilDraft? = nil,
         text: String? = nil,
         threshold: Double? = nil,
         timeoutSeconds: TimeInterval = 15,
@@ -976,6 +978,7 @@ public struct SemanticRecordingReviewDraftPatchRequest: Equatable, Sendable {
         self.newTaskKey = newTaskKey?.trimmedForSemanticReviewPatch.nilIfEmptyForSemanticReviewPatch
         self.taskName = taskName?.trimmedForSemanticReviewPatch.nilIfEmptyForSemanticReviewPatch
         self.regionSelection = regionSelection
+        self.repeatUntil = repeatUntil
         self.text = text?.trimmedForSemanticReviewPatch.nilIfEmptyForSemanticReviewPatch
         self.threshold = threshold.map { min(max($0, 0), 1) }
         self.timeoutSeconds = max(0, timeoutSeconds)
@@ -984,6 +987,143 @@ public struct SemanticRecordingReviewDraftPatchRequest: Equatable, Sendable {
         self.pixelColorHex = pixelColorHex?.trimmedForSemanticReviewPatch.nilIfEmptyForSemanticReviewPatch
         self.sourceSuggestionID = sourceSuggestionID
         self.sourceEvidence = sourceEvidence
+    }
+}
+
+public struct SemanticRecordingReviewRepeatUntilDraft: Equatable, Sendable {
+    public var bodyTasks: [AutomationWorkflowDraftTask]
+    public var maxAttempts: Int?
+    public var timeoutSeconds: TimeInterval?
+    public var pollingSeconds: TimeInterval?
+    public var onFailure: String
+
+    public init(
+        bodyTasks: [AutomationWorkflowDraftTask],
+        maxAttempts: Int? = 5,
+        timeoutSeconds: TimeInterval? = 30,
+        pollingSeconds: TimeInterval? = 0.5,
+        onFailure: String = AutomationWorkflowDraftLoopFailurePolicy.failRun
+    ) {
+        self.bodyTasks = bodyTasks
+        self.maxAttempts = maxAttempts.map { max(1, $0) }
+        self.timeoutSeconds = timeoutSeconds.map { max(0, $0) }
+        self.pollingSeconds = pollingSeconds.map { max(0, $0) }
+        self.onFailure = onFailure.trimmedForSemanticReviewPatch.nilIfEmptyForSemanticReviewPatch
+            ?? AutomationWorkflowDraftLoopFailurePolicy.failRun
+    }
+}
+
+public struct SemanticRecordingReviewRepeatUntilBodyResolution: Equatable, Sendable {
+    public enum Status: String, Equatable, Sendable {
+        case resolved
+        case noLinkedMacro
+        case ambiguousLinkedMacros
+    }
+
+    public var status: Status
+    public var bodyTasks: [AutomationWorkflowDraftTask]
+    public var linkedMacroIDs: [UUID]
+    public var message: String
+
+    public init(
+        status: Status,
+        bodyTasks: [AutomationWorkflowDraftTask] = [],
+        linkedMacroIDs: [UUID] = [],
+        message: String
+    ) {
+        self.status = status
+        self.bodyTasks = bodyTasks
+        self.linkedMacroIDs = linkedMacroIDs
+        self.message = message
+    }
+
+    public var isResolved: Bool {
+        status == .resolved && !bodyTasks.isEmpty
+    }
+}
+
+public enum SemanticRecordingReviewRepeatUntilBodyResolver {
+    public static func resolve(
+        recordingID: UUID,
+        macros: [SavedMacro],
+        preferredMacroID: UUID? = nil
+    ) -> SemanticRecordingReviewRepeatUntilBodyResolution {
+        let linkedMacros = macros
+            .filter { $0.semanticRecording?.recordingID == recordingID }
+            .sorted(by: macroSort)
+        let linkedMacroIDs = linkedMacros.map(\.id)
+
+        if let preferredMacroID,
+           let preferredMacro = linkedMacros.first(where: { $0.id == preferredMacroID }) {
+            return resolved(preferredMacro, linkedMacroIDs: linkedMacroIDs)
+        }
+
+        guard !linkedMacros.isEmpty else {
+            return SemanticRecordingReviewRepeatUntilBodyResolution(
+                status: .noLinkedMacro,
+                message: "Save or link this semantic recording to a macro before creating a Repeat-Until body."
+            )
+        }
+
+        guard linkedMacros.count == 1,
+              let macro = linkedMacros.first else {
+            return SemanticRecordingReviewRepeatUntilBodyResolution(
+                status: .ambiguousLinkedMacros,
+                linkedMacroIDs: linkedMacroIDs,
+                message: "Multiple macros are linked to this recording. Choose one before creating a Repeat-Until body."
+            )
+        }
+
+        return resolved(macro, linkedMacroIDs: linkedMacroIDs)
+    }
+
+    private static func resolved(
+        _ macro: SavedMacro,
+        linkedMacroIDs: [UUID]
+    ) -> SemanticRecordingReviewRepeatUntilBodyResolution {
+        SemanticRecordingReviewRepeatUntilBodyResolution(
+            status: .resolved,
+            bodyTasks: [
+                AutomationWorkflowDraftTask(
+                    key: "run_\(safeKey(macro.name, fallback: "macro"))_\(shortID(macro.id))",
+                    type: "macro",
+                    name: macro.name,
+                    macroRef: AutomationWorkflowDraftMacroRef(id: macro.id, name: macro.name)
+                )
+            ],
+            linkedMacroIDs: linkedMacroIDs,
+            message: "Repeat-Until body will replay \(macro.name)."
+        )
+    }
+
+    private static func macroSort(_ left: SavedMacro, _ right: SavedMacro) -> Bool {
+        if left.modifiedAt == right.modifiedAt {
+            if left.name == right.name {
+                return left.id.uuidString < right.id.uuidString
+            }
+            return left.name.localizedStandardCompare(right.name) == .orderedAscending
+        }
+        return left.modifiedAt > right.modifiedAt
+    }
+
+    private static func safeKey(_ value: String, fallback: String) -> String {
+        var result = ""
+        var lastWasSeparator = false
+        for scalar in value.lowercased().unicodeScalars {
+            if CharacterSet.alphanumerics.contains(scalar) {
+                result.unicodeScalars.append(scalar)
+                lastWasSeparator = false
+            } else if !lastWasSeparator {
+                result.append("_")
+                lastWasSeparator = true
+            }
+        }
+        let trimmed = result.trimmingCharacters(in: CharacterSet(charactersIn: "_"))
+        return trimmed.isEmpty ? fallback : trimmed
+    }
+
+    private static func shortID(_ id: UUID) -> String {
+        String(id.uuidString.suffix(8)).lowercased()
     }
 }
 
@@ -997,6 +1137,7 @@ public struct SemanticRecordingReviewDraftPatchResult: Equatable, Sendable {
     public var assetExtractions: [SemanticRecordingReviewAssetExtraction]
     public var actionEvidence: SemanticRecordingReviewActionSemantics.EvidenceAlignment
     public var appliesToExistingTask: Bool
+    public var createsRepeatUntilLoop: Bool
 
     public init(
         patch: AutomationWorkflowDraftPatchDocument,
@@ -1007,7 +1148,8 @@ public struct SemanticRecordingReviewDraftPatchResult: Equatable, Sendable {
         baselineAsset: AutomationWorkflowDraftVisualImageAsset? = nil,
         assetExtractions: [SemanticRecordingReviewAssetExtraction] = [],
         actionEvidence: SemanticRecordingReviewActionSemantics.EvidenceAlignment = .init(),
-        appliesToExistingTask: Bool
+        appliesToExistingTask: Bool,
+        createsRepeatUntilLoop: Bool = false
     ) {
         self.patch = patch
         self.taskKey = taskKey
@@ -1018,6 +1160,7 @@ public struct SemanticRecordingReviewDraftPatchResult: Equatable, Sendable {
         self.assetExtractions = assetExtractions
         self.actionEvidence = actionEvidence
         self.appliesToExistingTask = appliesToExistingTask
+        self.createsRepeatUntilLoop = createsRepeatUntilLoop
     }
 }
 
@@ -1131,7 +1274,7 @@ public enum SemanticRecordingReviewDraftPatchBuilder {
         let region = try selection.visualRegion(key: regionKey)
         let taskKey = request.targetTaskKey ??
             request.newTaskKey ??
-            "wait_\(keySeed)"
+            (request.repeatUntil == nil ? "wait_\(keySeed)" : "repeat_until_\(keySeed)")
 
         let condition: AutomationWorkflowDraftCondition
         var imageAsset: AutomationWorkflowDraftVisualImageAsset?
@@ -1254,10 +1397,10 @@ public enum SemanticRecordingReviewDraftPatchBuilder {
             ))
         }
 
-        let appliesToExistingTask = request.targetTaskKey != nil
+        let appliesToExistingTask = request.targetTaskKey != nil && request.repeatUntil == nil
         operations.append(taskOperation(
             taskKey: taskKey,
-            taskName: request.taskName ?? taskName(for: condition, candidate: candidate),
+            taskName: request.taskName ?? taskName(for: condition, candidate: candidate, repeatsUntil: request.repeatUntil != nil),
             condition: condition,
             request: request,
             appliesToExistingTask: appliesToExistingTask
@@ -1287,7 +1430,8 @@ public enum SemanticRecordingReviewDraftPatchBuilder {
             baselineAsset: baselineAsset,
             assetExtractions: assetExtractions,
             actionEvidence: actionEvidence,
-            appliesToExistingTask: appliesToExistingTask
+            appliesToExistingTask: appliesToExistingTask,
+            createsRepeatUntilLoop: request.repeatUntil != nil
         )
     }
 
@@ -1346,6 +1490,28 @@ public enum SemanticRecordingReviewDraftPatchBuilder {
         request: SemanticRecordingReviewDraftPatchRequest,
         appliesToExistingTask: Bool
     ) -> AutomationWorkflowDraftPatchOperation {
+        if let repeatUntil = request.repeatUntil {
+            return AutomationWorkflowDraftPatchOperation(
+                op: "addTask",
+                key: taskKey,
+                task: AutomationWorkflowDraftTask(
+                    key: taskKey,
+                    type: "loop",
+                    name: taskName,
+                    loop: AutomationWorkflowDraftLoop(
+                        count: 1,
+                        tasks: repeatUntil.bodyTasks,
+                        kind: AutomationWorkflowDraftLoopKind.repeatUntil,
+                        until: condition,
+                        maxAttempts: repeatUntil.maxAttempts,
+                        timeoutSeconds: repeatUntil.timeoutSeconds ?? request.timeoutSeconds,
+                        pollingSeconds: repeatUntil.pollingSeconds ?? request.pollingSeconds,
+                        onFailure: repeatUntil.onFailure
+                    )
+                )
+            )
+        }
+
         if appliesToExistingTask {
             return AutomationWorkflowDraftPatchOperation(
                 op: "setCondition",
@@ -1426,8 +1592,30 @@ public enum SemanticRecordingReviewDraftPatchBuilder {
 
     private static func taskName(
         for condition: AutomationWorkflowDraftCondition,
-        candidate: SemanticRecordingReviewProjection.ConditionCandidateRow
+        candidate: SemanticRecordingReviewProjection.ConditionCandidateRow,
+        repeatsUntil: Bool = false
     ) -> String {
+        if repeatsUntil {
+            switch candidate.kind {
+            case .ocrWait:
+                if let text = condition.text, !text.isEmpty {
+                    return "Repeat until \(text)"
+                }
+                return "Repeat until text appears"
+            case .imageAppeared:
+                return "Repeat until image appears"
+            case .imageDisappeared:
+                return "Repeat until image disappears"
+            case .regionChanged:
+                return "Repeat until region changes"
+            case .pixelMatched:
+                if let colorHex = condition.colorHex, !colorHex.isEmpty {
+                    return "Repeat until pixel matches \(colorHex)"
+                }
+                return "Repeat until pixel color"
+            }
+        }
+
         switch candidate.kind {
         case .ocrWait:
             if let text = condition.text, !text.isEmpty {
