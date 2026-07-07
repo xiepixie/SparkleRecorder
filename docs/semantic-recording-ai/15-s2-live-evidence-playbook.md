@@ -109,6 +109,7 @@ Accepted evidence:
 - readiness policy includes video, keyframes, timeline, AI-safe events, OCR and window/AX requirement
 - readiness status is ready, or any degraded status has a reviewed known-gap note that does not contradict the checked gate
 - bundle directory contains real `.mov`, keyframe PNGs, manifest and sidecars
+- `recording readiness --json` `artifactFiles` shows expected video/keyframe refs as present and non-empty, not only declared in the manifest
 - `RecordingBundleStore.loadBundleTolerant` diagnostics show no corrupt required sidecar
 
 Not enough to close S2:
@@ -125,6 +126,7 @@ Use the stored-bundle commands only as inspection, not as product-ready S4 proof
 ```bash
 .build/debug/SparkleRecorder recording show <recording-uuid> --bundle-path <bundle-dir> --json
 .build/debug/SparkleRecorder recording explain <recording-uuid> --bundle-path <bundle-dir> --json
+.build/debug/SparkleRecorder recording readiness <recording-uuid> --bundle-path <bundle-dir> --require-ocr --require-window-or-ax --json
 .build/debug/SparkleRecorder recording frames <recording-uuid> --bundle-path <bundle-dir> --json
 .build/debug/SparkleRecorder recording ocr search <recording-uuid> --bundle-path <bundle-dir> --text "<visible text>" --json
 .build/debug/SparkleRecorder recording visual search <recording-uuid> --bundle-path <bundle-dir> --json
@@ -136,12 +138,13 @@ Accepted evidence:
 
 - commands return `sparkle.cli.result.v1`
 - output uses safe refs and evidence IDs
+- readiness output includes artifact file status/byte counts without media bytes
 - OCR search reports `availability: persistedBundle`
 - missing artifact state is explicit when an artifact is absent
 
 Not enough to close S4:
 
-- explicit `--bundle-path` proof as product-ready default/live catalog
+- explicit `--bundle-path` proof as product-ready live catalog
 - metadata-only visual search as image-byte similarity
 - stored/live suggestions returning unavailable
 
@@ -156,11 +159,19 @@ After the debug smoke bundle is accepted, prove the actual user recording path:
 5. Verify the playable macro is saved.
 6. Verify `SavedMacro.semanticRecording` points to the persisted bundle manifest.
 7. Open Macro Review from that saved macro without manual path guessing.
+8. Save CLI audit output:
+
+```bash
+.build/debug/SparkleRecorder workflow macros --json
+.build/debug/SparkleRecorder recording macro-links --require-ocr --require-window-or-ax --json
+```
 
 Accepted evidence:
 
 - installed-app recording clip or screenshots for start/preflight/stop/save
 - saved macro manifest excerpt or CLI/repository inspection proving `SavedMacro.semanticRecording`
+- `workflow macros --json` shows the saved macro semantic recording reference
+- `recording macro-links --json` loads the linked bundle from the default root, reports readiness status, canonical relative-path mismatches and missing/degraded sidecar or artifact-file issues
 - bundle directory reloads from the saved macro reference
 - linked Macro Review opens through `SemanticRecordingReviewPresenter`
 - discard/cancel/failure cleanup proof exists for a separate run or sidecar
@@ -228,9 +239,10 @@ When S2 is ready to hand a bundle to S3/S4, the handoff package should include:
 - evidence sidecar path
 - command JSON output path if saved
 - saved macro id/name and `SavedMacro.semanticRecording` metadata
+- `workflow macros --json` / `recording macro-links --json` audit output paths when available
 - readiness status and issue summary
 - known privacy/suppression/redaction notes
 - accepted root/id policy note
 - explicit statement of which gates remain open
 
-S3 should use the handoff through app-edge presenter/store boundaries. S4 should use default-root/catalog work only after S2 root/id policy is accepted; until then, S4 remains limited to fixtures and explicit stored-bundle reads.
+S3 should use the handoff through app-edge presenter/store boundaries. S4 can use the default-root read-only first pass for smoke and future accepted bundles, but product-ready live catalog/search/suggestion must wait for accepted S2 live bundle evidence, installed-app saved macro links and artifact availability status.

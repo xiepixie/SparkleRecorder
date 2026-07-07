@@ -194,6 +194,6 @@ MCP 继续暂缓。未来 MCP 只能包装这些 CLI/shared service 语义，不
 3. Review UI 中 source frame / runtime sample / decision 的真实接线。
 4. S2 live `.mov` + event-aligned keyframe + bundle storage API spike。
 5. S3 frame-to-condition 竖切。
-6. S4 在已完成 fixture-backed `recording list/show/explain/frames/frame show/events-near/ocr search/visual search/asset extract/asset baseline/suggest waits/conditions` 后，已补 explicit stored-bundle read-only `recording list/show/explain/frames/frame show/events-near/ocr search/visual search`、explicit-source frame-region asset extraction 和 fixture/review-only `workflow draft from-recording`；后续继续做 product-ready default/live catalog/search/suggestions、stored suggestion synthesis、image-byte visual similarity 和 product-ready stored/live draft-from-recording。
+6. S4 在已完成 fixture-backed `recording list/show/explain/frames/frame show/events-near/ocr search/visual search/asset extract/asset baseline/suggest waits/conditions` 后，已补 explicit stored-bundle/default-root read-only `recording list/show/explain/frames/frame show/events-near/ocr search/visual search`、explicit-source frame-region asset extraction 和 fixture/review-only `workflow draft from-recording`；后续继续做 product-ready live catalog/search/suggestions、stored suggestion synthesis、image-byte visual similarity 和 product-ready stored/live draft-from-recording。
 
 只有这些闭环能证明“录完能看懂、失败能解释、修正有证据、组合前可审阅”时，才进入更大的 AI/App Knowledge 阶段。

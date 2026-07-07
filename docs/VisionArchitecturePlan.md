@@ -159,3 +159,5 @@ func resolve(anchor: TextAnchor, detections: [TextDetection]) -> TextDetection? 
 3. **运行时 SearchRegion**：运行时识别必须只在 `searchRegion` 区域内裁切截图并进行 OCR，而非全屏。
 4. **失败截图保存**：若定位或断言失败，将当前 `searchRegion`（或全屏）的截图以及 Detection JSON 保存作为诊断证据。
 5. **不引入过度功能**：当前阶段不开发状态树、复杂 FlowGraph、AX Tree 语义映射或每次运行的全屏视频录制。
+
+2026-07-07 update: `LocatorEngine` already crops text-locator OCR to the selected `TextAnchor.searchRegion` / content-normalized region. Workflow OCR conditions now follow the same rule in `LiveAutomationConditionEvaluatorClient`: resolved regions are cropped before `VNRecognizeTextRequest`; unrestricted conditions are the only full-display scan path. Icon/button/pattern waits remain visual conditions, not OCR text recognition.

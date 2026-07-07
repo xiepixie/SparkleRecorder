@@ -39,9 +39,16 @@ AI should generate:
 SparkleRecorder recording list --json
 SparkleRecorder recording show <recording-id> --json
 SparkleRecorder recording explain <recording-id> --json
+SparkleRecorder recording readiness <recording-id> --json
+SparkleRecorder recording macro-links --json
+SparkleRecorder workflow macros --json
 ```
 
 `explain` returns a compact local summary: app surfaces, user-visible purpose, key steps, possible fragile steps, available visual evidence.
+
+`readiness` returns a compact audit of schema/reference validity, sidecar load diagnostics, expected video/keyframes/timeline/events, optional OCR/window/AX requirements and follow-up actions. It should stay read-only and should not load image or video bytes by default.
+
+`macro-links` audits saved macro `semanticRecording` references against the selected/default recording root. `workflow macros --json` should expose the reference so AI can discover which playable macros already have local semantic evidence without reading `macro.json` directly.
 
 ### Frame And Video Queries
 

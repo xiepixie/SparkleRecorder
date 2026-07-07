@@ -76,7 +76,7 @@ Record video
 | Semantic bundle | S1 bundle/schema/fixture first pass 已有 | S2/S3/S4 可以基于同一事实层并行 |
 | S2 capture | fake capture session、preflight、suppression、Recorder bridge、redaction plan、redacted frame PNG writing hook、redacted `.mov` renderer/store hook、live finish redaction application 和 Review/CLI redacted-frame preference first pass 已有 | 下一步是 live `.mov`/keyframe product evidence 和 redacted frame/video product evidence，不是继续扩 schema |
 | S3 Review | Review projection、Run Detail entry、frame region selection、Draft Preview handoff、package-local materialization、Run Target provenance、pixel picking first pass 已有 | S3 first pass 暂停；下一步等待 S2 live bundle + saved macro metadata 后再做 installed-app linked Review、frame-to-condition live evidence 和 Review -> Draft Preview live evidence |
-| S4 CLI | fixture `recording list/show/explain/frames/frame show/events-near/ocr search/visual search/asset extract/asset baseline/suggest waits/conditions`、fixture/review-only `workflow draft from-recording`、explicit stored-bundle read-only `recording list/show/explain/frames/frame show/events-near/ocr search/visual search`、explicit-source frame-region asset extraction、low-token CLI transcript 和 suggestion-without-evidence low-confidence guard 已有 | Product-ready default/live catalog/search/suggestions、stored suggestion synthesis、image-byte visual similarity、product-ready stored/live draft-from-recording 暂停到 S2 live evidence/default root 和 S3 Review boundary 稳定后；MCP 仍后置 |
+| S4 CLI | fixture `recording list/show/explain/frames/frame show/events-near/ocr search/visual search/asset extract/asset baseline/suggest waits/conditions`、fixture/review-only `workflow draft from-recording`、explicit stored-bundle/default-root read-only `recording list/show/explain/frames/frame show/events-near/ocr search/visual search`、explicit-source frame-region asset extraction、low-token CLI transcript 和 suggestion-without-evidence low-confidence guard 已有 | Product-ready live catalog/search/suggestions、stored suggestion synthesis、image-byte visual similarity、product-ready stored/live draft-from-recording 暂停到 S2 live evidence 和 S3 Review boundary 稳定后；MCP 仍后置 |
 
 ## 4. Remaining Slices
 
@@ -183,7 +183,7 @@ MCP 仍然不做第一优先级。未来 MCP 只能包装这些 CLI/shared servi
 | AI direct-run workflow | 用户不可审阅，失败难解释 | AI 只写 suggestion/draft |
 | full App Knowledge graph | 还没有足够 live semantic bundles | 先 app/surface/macro/anchor 轻量分组 |
 | Player full rewrite as prerequisite | 会把用户价值拖成长期重构 | 增量抽 pure state/evidence helpers |
-| dependency-cycle loops | 会绕过 DAG validation、run history 和 failure evidence 语义 | 固定次数 draft loop expansion 已有 first pass；repeat-until / foreach、authoring UI、runtime evidence 和 live proof 后置，仍不允许 graph back-edge |
+| dependency-cycle loops | 会绕过 DAG validation、run history 和 failure evidence 语义 | 固定次数 draft loop authoring/expansion 已有 editor/CLI/Draft Preview first pass；product authoring UI、repeat-until / foreach、runtime evidence 和 live proof 后置，仍不允许 graph back-edge |
 | SwiftUI Vision/file IO | 卡顿、权限边界混乱、不可测 | app-edge presenter/adapters + core value data |
 | video replaces playback truth | 会破坏 deterministic playback | `RecordedEvent` stays execution truth |
 
