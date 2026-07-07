@@ -196,7 +196,7 @@ private struct CountdownView: View {
                     .contentTransition(.numericText(countsDown: true))
                     .shadow(color: .black.opacity(0.15), radius: 4, y: 2)
 
-                Text(NSLocalizedString("RECORDING", comment: ""))
+                Text(NSLocalizedString("RECORDING IN", comment: ""))
                     .font(.system(size: 13, weight: .bold, design: .rounded))
                     .foregroundStyle(.secondary)
                     .tracking(3.5)
