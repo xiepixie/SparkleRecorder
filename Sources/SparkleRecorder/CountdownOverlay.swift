@@ -2,7 +2,7 @@ import Cocoa
 import SwiftUI
 import Combine
 
-/// Big floating "3 · 2 · 1" overlay shown before recording starts so the user
+/// Compact floating "3 · 2 · 1" overlay shown before recording starts so the user
 /// can switch to the right window before keyboard/mouse is being captured.
 @MainActor
 final class CountdownOverlayController {
@@ -13,6 +13,11 @@ final class CountdownOverlayController {
     /// completion both check it, so a cancelled countdown can never fire
     /// onComplete — even if cancel lands during the final fade.
     private var session: UInt64 = 0
+
+    private enum Metrics {
+        static let size = NSSize(width: 200, height: 200)
+        static let cornerRadius: CGFloat = 100
+    }
 
     /// True while a countdown is pending (used to make the record hotkey toggle).
     private(set) var isActive = false
@@ -83,7 +88,7 @@ final class CountdownOverlayController {
 
     private func create() {
         let panel = NSPanel(
-            contentRect: NSRect(x: 0, y: 0, width: 280, height: 280),
+            contentRect: NSRect(origin: .zero, size: Metrics.size),
             styleMask: [.borderless, .nonactivatingPanel],
             backing: .buffered,
             defer: false
@@ -92,7 +97,7 @@ final class CountdownOverlayController {
         panel.collectionBehavior = [.canJoinAllSpaces, .stationary, .ignoresCycle]
         panel.isOpaque = false
         panel.backgroundColor = .clear
-        panel.hasShadow = false
+        panel.hasShadow = true
         panel.ignoresMouseEvents = true
         panel.isMovable = false
 
@@ -100,11 +105,11 @@ final class CountdownOverlayController {
         // instead of swapping in a brand-new hosting controller every second.
         let host = NSHostingView(rootView: CountdownView(model: model))
 
-        // A Liquid Glass disc floating over the desktop (macOS 26+); a material
-        // circle on earlier systems. cornerRadius 140 = half of 280 → a circle.
+        // A small Liquid Glass capsule leaves the target window visible while the
+        // countdown is still obvious enough to trust.
         if #available(macOS 26.0, *) {
             let glass = NSGlassEffectView()
-            glass.cornerRadius = 140
+            glass.cornerRadius = Metrics.cornerRadius
             glass.contentView = host
             panel.contentView = glass
         } else {
@@ -113,7 +118,7 @@ final class CountdownOverlayController {
             fx.blendingMode = .behindWindow
             fx.state = .active
             fx.wantsLayer = true
-            fx.layer?.cornerRadius = 140
+            fx.layer?.cornerRadius = Metrics.cornerRadius
             fx.layer?.masksToBounds = true
             host.frame = fx.bounds
             host.autoresizingMask = [.width, .height]
@@ -133,7 +138,7 @@ final class CountdownOverlayController {
         let visible = screen.visibleFrame
         let size = win.frame.size
         let x = visible.midX - size.width / 2
-        let y = visible.midY - size.height / 2
+        let y = visible.midY - size.height / 2 // Center it on screen for more impact
         win.setFrame(NSRect(origin: NSPoint(x: x, y: y), size: size), display: true)
     }
 }
@@ -159,25 +164,46 @@ private struct CountdownView: View {
 
     var body: some View {
         ZStack {
-            // The host NSGlassEffectView provides the glass disc; no material here.
+            // Subtle glowing background
             Circle()
-                .strokeBorder(Color.red.opacity(0.55), lineWidth: 3)
-                .scaleEffect(pulse ? 1.04 : 1.0)
+                .fill(Color.red.opacity(0.12))
+                .blur(radius: 24)
+
+            // Outer pulsing ring
+            Circle()
+                .strokeBorder(Color.red.opacity(0.4), lineWidth: 3)
+                .scaleEffect(pulse ? 1.08 : 0.95)
                 .opacity(pulse ? 0.0 : 1.0)
-                .animation(.easeOut(duration: 0.7).repeatForever(autoreverses: false), value: pulse)
-            VStack(spacing: 4) {
+                .animation(.easeOut(duration: 1.0).repeatForever(autoreverses: false), value: pulse)
+
+            // Sleek inner ring
+            Circle()
+                .strokeBorder(
+                    LinearGradient(
+                        colors: [Color.red.opacity(0.85), Color.orange.opacity(0.75)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ),
+                    lineWidth: 4
+                )
+                .frame(width: 180, height: 180)
+
+            // Content
+            VStack(spacing: -6) {
                 Text("\(model.remaining)")
-                    .font(.system(size: 130, weight: .heavy, design: .rounded))
+                    .font(.system(size: 96, weight: .light, design: .rounded))
                     .foregroundStyle(.primary)
                     .contentTransition(.numericText(countsDown: true))
-                Text(NSLocalizedString("RECORDING IN", comment: ""))
-                    .font(.system(size: 11, weight: .heavy, design: .rounded))
-                    .tracking(2.0)
+                    .shadow(color: .black.opacity(0.15), radius: 4, y: 2)
+
+                Text(NSLocalizedString("RECORDING", comment: ""))
+                    .font(.system(size: 13, weight: .bold, design: .rounded))
                     .foregroundStyle(.secondary)
+                    .tracking(3.5)
+                    .padding(.top, 4)
             }
-            .padding(20)
         }
-        .frame(width: 280, height: 280)
+        .frame(width: 200, height: 200)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(Text(String(format: NSLocalizedString("Recording starts in %d seconds", comment: ""), model.remaining)))
         .onAppear { pulse = true }
