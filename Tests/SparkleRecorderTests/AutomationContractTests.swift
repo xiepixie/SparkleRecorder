@@ -567,6 +567,83 @@ struct AutomationContractTests {
         #expect(AutomationDependencyTrigger.onOutcome(.anyTerminal).matches(.missingMacro(macroID: UUID())))
     }
 
+    @Test("Dynamic dependency delay reads durations from condition evidence")
+    func dynamicDependencyDelayReadsDurationsFromConditionEvidence() throws {
+        let workflowID = UUID()
+        let sourceTaskID = UUID()
+        let targetTaskID = UUID()
+        let runID = UUID()
+        let conditionID = UUID()
+        let evidence = AutomationConditionEvaluationEvidence(
+            runID: runID,
+            workflowID: workflowID,
+            taskID: sourceTaskID,
+            conditionID: conditionID,
+            kind: .ocrText,
+            outcome: .conditionMatched,
+            evaluatedAt: Date(timeIntervalSince1970: 100),
+            targetDescription: "Crop timer",
+            observedSummary: "Detected text: ready in 3h 12m 5s",
+            fields: [
+                AutomationConditionDiagnosticField(id: "lastTexts", title: "Last texts", value: "剩余 1天2小时3分4秒")
+            ]
+        )
+        let sourceRun = AutomationTaskRun(
+            id: runID,
+            workflowID: workflowID,
+            taskID: sourceTaskID,
+            completedAt: Date(timeIntervalSince1970: 100),
+            status: .completed,
+            outcome: .conditionMatched,
+            conditionEvidence: evidence
+        )
+        let dependency = AutomationDependency(
+            fromTaskID: sourceTaskID,
+            toTaskID: targetTaskID,
+            trigger: .onConditionMatched,
+            delay: 30,
+            dynamicDelay: AutomationDependencyDynamicDelay(
+                fallbackDelay: 30,
+                maximumDelay: 12_000
+            )
+        )
+
+        let resolution = dependency.delayResolution(after: sourceRun)
+        let chineseDuration = try #require(AutomationConditionEvidenceDurationParser.duration(
+            in: evidence,
+            sourceFieldID: "lastTexts"
+        ))
+        let cappedResolution = AutomationDependency(
+            fromTaskID: sourceTaskID,
+            toTaskID: targetTaskID,
+            trigger: .onConditionMatched,
+            delay: 30,
+            dynamicDelay: AutomationDependencyDynamicDelay(fallbackDelay: 30, maximumDelay: 3_600)
+        ).delayResolution(after: sourceRun)
+        let noTimerEvidence = AutomationConditionEvaluationEvidence(
+            runID: runID,
+            workflowID: workflowID,
+            taskID: sourceTaskID,
+            conditionID: conditionID,
+            kind: .ocrText,
+            outcome: .conditionMatched,
+            evaluatedAt: Date(timeIntervalSince1970: 100),
+            targetDescription: "Crop timer",
+            observedSummary: "Detected text: ready"
+        )
+        var noTimerRun = sourceRun
+        noTimerRun.conditionEvidence = noTimerEvidence
+        let fallbackResolution = dependency.delayResolution(after: noTimerRun)
+
+        #expect(resolution.source == .recognizedDuration)
+        #expect(resolution.delay == 11_525)
+        #expect(chineseDuration.duration == 93_784)
+        #expect(cappedResolution.delay == 3_600)
+        #expect(cappedResolution.wasClamped)
+        #expect(fallbackResolution.source == .fallback)
+        #expect(fallbackResolution.delay == 30)
+    }
+
     @Test("Workflow validation catches broken edges and cycles")
     func workflowValidationCatchesBrokenEdgesAndCycles() {
         let firstTaskID = UUID()

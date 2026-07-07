@@ -206,6 +206,7 @@ struct SemanticRecordingReviewProjectionTests {
         #expect(result.imageAsset?.path == "visual-index/templates/checkout-button.png")
         #expect(result.imageAsset?.sha256 == "fixture-template-digest")
         #expect(result.imageAsset?.sourceFrameID == SemanticRecordingFixture.beforeClickFrameID)
+        #expect(result.imageAsset?.sourceSurfaceID == SemanticRecordingFixture.surfaceID)
         #expect(result.imageAsset?.sourceArtifactPath == "frames/000014-before-click.png")
         #expect(result.imageAsset?.sourceBounds == RectValue(x: 880, y: 620, width: 180, height: 48))
         #expect(result.imageAsset?.sourceBoundsSpace == .windowLocal)
@@ -223,6 +224,86 @@ struct SemanticRecordingReviewProjectionTests {
         #expect(task.condition == result.condition)
         #expect(patched.document.visualAssets?.regions == [region])
         #expect(patched.document.visualAssets?.images == [imageAsset])
+    }
+
+    @Test("Region baseline candidate writes provenance and previews visual evidence row")
+    func regionBaselineCandidateWritesProvenanceAndPreviewsVisualEvidenceRow() throws {
+        let baselinePreviewID = UUID(uuidString: "74000000-0000-0000-0000-0000000000bb")!
+        var bundle = SemanticRecordingFixture.checkoutBundle()
+        bundle.sourcePreviews.append(RecordingSourcePreviewReference(
+            id: baselinePreviewID,
+            kind: .regionBaseline,
+            recordingID: bundle.id,
+            frameID: SemanticRecordingFixture.beforeClickFrameID,
+            eventID: SemanticRecordingFixture.clickEventID,
+            surfaceID: SemanticRecordingFixture.surfaceID,
+            artifactRef: try RecordingArtifactRef("visual-index/baselines/checkout-region.png"),
+            bounds: RecordingBounds(
+                rect: RecordingRect(x: 860, y: 600, width: 220, height: 90),
+                coordinateSpace: .windowPixels
+            ),
+            imageSize: RecordingImageSize(width: 220, height: 90),
+            createdAt: Date(timeIntervalSince1970: 10),
+            recordingTime: 2.1,
+            contentDigest: RecordingContentDigest(algorithm: "sha256", value: "fixture-baseline-digest"),
+            label: "Checkout region baseline"
+        ))
+        let projection = SemanticRecordingReviewProjection(
+            bundle: bundle,
+            selectedEventID: SemanticRecordingFixture.clickEventID
+        )
+        let candidate = try #require(
+            projection.selectedFrame?.conditionCandidates.first { $0.kind == .regionChanged }
+        )
+
+        let result = try SemanticRecordingReviewDraftPatchBuilder.makePatch(
+            bundle: bundle,
+            request: SemanticRecordingReviewDraftPatchRequest(
+                candidate: candidate,
+                newTaskKey: "wait_checkout_region_change",
+                threshold: 0.83
+            )
+        )
+        let document = AutomationWorkflowDraftDocument(workflow: AutomationWorkflowDraft(name: "Checkout"))
+        let patched = try AutomationWorkflowDraftPatchApplier.apply(result.patch, to: document)
+        let previewProjection = AutomationWorkflowDraftPreviewProjection(
+            document: patched.document,
+            validationEnvelope: .workflowDraftValidation(command: "workflow draft validate", result: patched.validation),
+            macroCatalogEnvelope: .workflowMacroCatalog(command: "workflow macros", macros: [])
+        )
+        let baselineAsset = try #require(result.baselineAsset)
+        let region = try #require(result.region)
+        let task = try #require(patched.document.workflow.tasks.first)
+        let visualRow = try #require(previewProjection.visualAssetRows.first)
+
+        #expect(result.patch.ops.map(\.op) == ["upsertVisualRegion", "upsertVisualBaseline", "addTask"])
+        #expect(result.condition.type == "regionChanged")
+        #expect(result.condition.baselineRef == baselineAsset.key)
+        #expect(result.condition.regionRef == region.key)
+        #expect(result.condition.threshold == 0.83)
+        #expect(baselineAsset.path == "visual-index/baselines/checkout-region.png")
+        #expect(baselineAsset.sha256 == "fixture-baseline-digest")
+        #expect(baselineAsset.sourceFrameID == SemanticRecordingFixture.beforeClickFrameID)
+        #expect(baselineAsset.sourceSurfaceID == SemanticRecordingFixture.surfaceID)
+        #expect(baselineAsset.sourceArtifactPath == "frames/000014-before-click.png")
+        #expect(baselineAsset.sourceBounds == RectValue(x: 860, y: 600, width: 220, height: 90))
+        #expect(baselineAsset.sourceBoundsSpace == .windowLocal)
+        #expect(patched.document.visualAssets?.regions == [region])
+        #expect(patched.document.visualAssets?.baselines == [baselineAsset])
+        #expect(task.condition == result.condition)
+
+        #expect(visualRow.assetKind == .baseline)
+        #expect(visualRow.taskKey == "wait_checkout_region_change")
+        #expect(visualRow.assetKey == baselineAsset.key)
+        #expect(visualRow.sourceFrameID == SemanticRecordingFixture.beforeClickFrameID)
+        #expect(visualRow.sourceSurfaceID == SemanticRecordingFixture.surfaceID)
+        #expect(visualRow.sourceArtifactPath == "frames/000014-before-click.png")
+        #expect(visualRow.sourceBounds == RectValue(x: 860, y: 600, width: 220, height: 90))
+        #expect(visualRow.sourceBoundsSpace == .windowLocal)
+        #expect(visualRow.regionKey == region.key)
+        #expect(visualRow.regionBounds == region.bounds)
+        #expect(visualRow.regionSpace == .windowLocal)
+        #expect(visualRow.threshold == 0.83)
     }
 
     @Test("Review visual assets materialize into package local patch paths")
@@ -474,6 +555,8 @@ struct SemanticRecordingReviewProjectionTests {
 
         #expect(resolved.status == .resolved)
         #expect(resolved.linkedMacroIDs == [checkoutMacroID])
+        #expect(resolved.bodyOptions.map(\.macroID) == [checkoutMacroID])
+        #expect(resolved.bodyOptions.map(\.title) == ["Click Checkout"])
         #expect(resolvedTask.key == "run_click_checkout_000000aa")
         #expect(resolvedTask.type == "macro")
         #expect(resolvedTask.name == "Click Checkout")
@@ -486,6 +569,8 @@ struct SemanticRecordingReviewProjectionTests {
         #expect(ambiguous.status == .ambiguousLinkedMacros)
         #expect(ambiguous.bodyTasks.isEmpty)
         #expect(ambiguous.linkedMacroIDs == [checkoutMacroID, secondaryMacroID])
+        #expect(ambiguous.bodyOptions.map(\.macroID) == [checkoutMacroID, secondaryMacroID])
+        #expect(ambiguous.bodyOptions.map(\.title) == ["Click Checkout", "Confirm Checkout"])
 
         let preferred = SemanticRecordingReviewRepeatUntilBodyResolver.resolve(
             recordingID: bundle.id,
@@ -495,8 +580,16 @@ struct SemanticRecordingReviewProjectionTests {
         let preferredTask = try #require(preferred.bodyTasks.first)
 
         #expect(preferred.status == .resolved)
+        #expect(preferred.bodyOptions.map(\.macroID) == [checkoutMacroID, secondaryMacroID])
         #expect(preferredTask.key == "run_confirm_checkout_000000bb")
         #expect(preferredTask.macroRef?.id == secondaryMacroID)
+
+        let bodyOptions = SemanticRecordingReviewRepeatUntilBodyResolver.options(
+            recordingID: bundle.id,
+            macros: [secondaryMacro, unrelatedMacro, checkoutMacro]
+        )
+        #expect(bodyOptions.map(\.macroID) == [checkoutMacroID, secondaryMacroID])
+        #expect(bodyOptions.map(\.title) == ["Click Checkout", "Confirm Checkout"])
 
         let missing = SemanticRecordingReviewRepeatUntilBodyResolver.resolve(
             recordingID: bundle.id,
@@ -504,6 +597,7 @@ struct SemanticRecordingReviewProjectionTests {
         )
         #expect(missing.status == .noLinkedMacro)
         #expect(missing.bodyTasks.isEmpty)
+        #expect(missing.bodyOptions.isEmpty)
     }
 
     @Test("Review repeat-until patch can use resolved macro body")

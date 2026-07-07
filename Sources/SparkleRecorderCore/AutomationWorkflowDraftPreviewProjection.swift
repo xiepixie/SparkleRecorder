@@ -9,6 +9,7 @@ public struct AutomationWorkflowDraftPreviewProjection: Codable, Equatable, Send
     public var taskRows: [TaskRow]
     public var dependencyRows: [DependencyRow]
     public var loopExpansionRows: [LoopExpansionRow]
+    public var visualAssetRows: [VisualAssetRow]
     public var simulationRows: [SimulationRow]
     public var branchRows: [BranchRow]
     public var resourceRows: [ResourceRow]
@@ -36,6 +37,7 @@ public struct AutomationWorkflowDraftPreviewProjection: Codable, Equatable, Send
         }
         dependencyRows = document.workflow.dependencies.map(DependencyRow.init(dependency:))
         loopExpansionRows = document.workflow.tasks.compactMap(LoopExpansionRow.init(task:))
+        visualAssetRows = Self.visualAssetRows(for: document)
         simulationRows = simulation?.steps.map(SimulationRow.init(step:)) ?? []
         branchRows = simulation?.branchDecisions.map(BranchRow.init(decision:)) ?? []
         resourceRows = simulation?.resourceTimeline.map(ResourceRow.init(occupancy:)) ?? []
@@ -441,6 +443,153 @@ public struct AutomationWorkflowDraftPreviewProjection: Codable, Equatable, Send
         }
     }
 
+    public struct VisualAssetRow: Codable, Equatable, Identifiable, Sendable {
+        public enum AssetKind: String, Codable, Equatable, Sendable {
+            case imageTemplate
+            case baseline
+            case pixelSample
+        }
+
+        public var id: String
+        public var taskKey: String
+        public var roleLabel: String
+        public var conditionType: String
+        public var conditionLabel: String
+        public var assetKind: AssetKind
+        public var assetKindLabel: String
+        public var assetKey: String?
+        public var assetPath: String?
+        public var sha256: String?
+        public var sourceFrameID: UUID?
+        public var sourceFrameShortID: String?
+        public var sourceSurfaceID: String?
+        public var sourceArtifactPath: String?
+        public var sourceBounds: RectValue?
+        public var sourceBoundsLabel: String?
+        public var sourceBoundsSpace: AutomationOCRSearchRegionSpace?
+        public var sourceBoundsSpaceLabel: String?
+        public var regionKey: String?
+        public var regionLabel: String?
+        public var regionBounds: RectValue?
+        public var regionBoundsLabel: String?
+        public var regionSpace: AutomationOCRSearchRegionSpace?
+        public var regionSpaceLabel: String?
+        public var threshold: Double?
+        public var thresholdLabel: String
+
+        fileprivate init?(
+            reference: VisualConditionReference,
+            assets: AutomationWorkflowDraftVisualAssets?
+        ) {
+            let condition = reference.condition
+            let kind: AssetKind
+            let referencedAssetKey: String?
+            let asset: AutomationWorkflowDraftVisualImageAsset?
+
+            switch condition.type {
+            case "imageAppeared", "imageDisappeared":
+                kind = .imageTemplate
+                referencedAssetKey = condition.imageRef?.nilIfBlankForDraftPreview
+                asset = assets?.image(for: referencedAssetKey)
+            case "regionChanged":
+                kind = .baseline
+                referencedAssetKey = condition.baselineRef?.nilIfBlankForDraftPreview
+                asset = assets?.baseline(for: referencedAssetKey)
+            case "pixelMatched":
+                kind = .pixelSample
+                referencedAssetKey = nil
+                asset = nil
+            default:
+                return nil
+            }
+
+            let region = assets?.region(for: condition.regionRef)
+            let normalizedAssetKey = asset?.key.nilIfBlankForDraftPreview ?? referencedAssetKey
+
+            id = [
+                reference.taskKey,
+                reference.roleLabel,
+                condition.type,
+                normalizedAssetKey ?? condition.regionRef ?? "visual"
+            ].joined(separator: ":")
+            taskKey = reference.taskKey
+            roleLabel = reference.roleLabel
+            conditionType = condition.type
+            conditionLabel = LoopExpansionRow.conditionSummary(condition) ?? condition.type
+            assetKind = kind
+            assetKindLabel = Self.assetKindLabel(for: kind)
+            assetKey = normalizedAssetKey
+            assetPath = asset?.path
+            sha256 = asset?.sha256
+            sourceFrameID = asset?.sourceFrameID
+            sourceFrameShortID = asset?.sourceFrameID.map { String($0.uuidString.prefix(8)) }
+            sourceSurfaceID = asset?.sourceSurfaceID
+            sourceArtifactPath = asset?.sourceArtifactPath
+            sourceBounds = asset?.sourceBounds
+            sourceBoundsLabel = asset?.sourceBounds.map(Self.boundsLabel(for:))
+            sourceBoundsSpace = asset?.sourceBoundsSpace
+            sourceBoundsSpaceLabel = asset?.sourceBoundsSpace.map(Self.spaceLabel(for:))
+            regionKey = region?.key ?? condition.regionRef?.nilIfBlankForDraftPreview
+            regionLabel = region?.label
+            regionBounds = region?.bounds
+            if let bounds = region?.bounds {
+                regionBoundsLabel = Self.boundsLabel(for: bounds)
+            } else {
+                regionBoundsLabel = nil
+            }
+            regionSpace = region?.space
+            if let space = region?.space {
+                regionSpaceLabel = Self.spaceLabel(for: space)
+            } else {
+                regionSpaceLabel = nil
+            }
+            threshold = condition.threshold
+            thresholdLabel = condition.threshold.map {
+                String(format: NSLocalizedString("%.2f threshold", comment: ""), $0)
+            } ?? NSLocalizedString("Default threshold", comment: "")
+        }
+
+        private static func assetKindLabel(for kind: AssetKind) -> String {
+            switch kind {
+            case .imageTemplate:
+                return NSLocalizedString("Image template", comment: "")
+            case .baseline:
+                return NSLocalizedString("Baseline", comment: "")
+            case .pixelSample:
+                return NSLocalizedString("Pixel sample", comment: "")
+            }
+        }
+
+        private static func boundsLabel(for bounds: RectValue) -> String {
+            String(
+                format: NSLocalizedString("x %.1f, y %.1f, w %.1f, h %.1f", comment: ""),
+                bounds.x,
+                bounds.y,
+                bounds.width,
+                bounds.height
+            )
+        }
+
+        private static func spaceLabel(for space: AutomationOCRSearchRegionSpace) -> String {
+            switch space {
+            case .automatic:
+                return NSLocalizedString("Automatic", comment: "")
+            case .displayAbsolute:
+                return NSLocalizedString("Display absolute", comment: "")
+            case .displayNormalized:
+                return NSLocalizedString("Display normalized", comment: "")
+            case .windowLocal:
+                return NSLocalizedString("Window local", comment: "")
+            case .windowNormalized:
+                return NSLocalizedString("Window normalized", comment: "")
+            case .contentLocal:
+                return NSLocalizedString("Content local", comment: "")
+            case .contentNormalized:
+                return NSLocalizedString("Content normalized", comment: "")
+            }
+        }
+    }
+
     public struct IssueRow: Codable, Equatable, Identifiable, Sendable {
         public var id: String
         public var severity: Severity
@@ -596,6 +745,50 @@ public struct AutomationWorkflowDraftPreviewProjection: Codable, Equatable, Send
             return .resolved(name: matches[0].name, id: matches[0].id)
         default:
             return .ambiguous(reference: name, candidateCount: matches.count)
+        }
+    }
+
+    fileprivate struct VisualConditionReference {
+        var taskKey: String
+        var roleLabel: String
+        var condition: AutomationWorkflowDraftCondition
+    }
+
+    private static func visualAssetRows(for document: AutomationWorkflowDraftDocument) -> [VisualAssetRow] {
+        visualConditionReferences(in: document.workflow.tasks).compactMap { reference in
+            VisualAssetRow(reference: reference, assets: document.visualAssets)
+        }
+    }
+
+    private static func visualConditionReferences(
+        in tasks: [AutomationWorkflowDraftTask],
+        parentKey: String? = nil
+    ) -> [VisualConditionReference] {
+        tasks.flatMap { task -> [VisualConditionReference] in
+            let taskKey = parentKey.map { "\($0)/\(task.key)" } ?? task.key
+            var references: [VisualConditionReference] = []
+
+            if let condition = task.condition {
+                references.append(VisualConditionReference(
+                    taskKey: taskKey,
+                    roleLabel: NSLocalizedString("Task condition", comment: ""),
+                    condition: condition
+                ))
+            }
+
+            if let until = task.loop?.until {
+                references.append(VisualConditionReference(
+                    taskKey: taskKey,
+                    roleLabel: NSLocalizedString("Loop until", comment: ""),
+                    condition: until
+                ))
+            }
+
+            if let loop = task.loop {
+                references += visualConditionReferences(in: loop.tasks, parentKey: taskKey)
+            }
+
+            return references
         }
     }
 }

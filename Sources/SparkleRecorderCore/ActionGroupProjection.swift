@@ -192,6 +192,21 @@ public enum ActionGroupProjection {
         groups.first(where: { $0.behaviorGroupID == id })
     }
 
+    public static func behaviorGroups(
+        containingEventIndices eventIndices: Set<Int>,
+        excluding excludedBehaviorIDs: Set<BehaviorGroupID> = [],
+        groups: [ActionGroup]
+    ) -> [ActionGroup] {
+        guard !eventIndices.isEmpty else { return [] }
+        return groups.filter { group in
+            guard let behaviorID = group.behaviorGroupID,
+                  !excludedBehaviorIDs.contains(behaviorID) else {
+                return false
+            }
+            return group.eventIndices.contains { eventIndices.contains($0) }
+        }
+    }
+
     public static func selectionSnapshot(
         groups: [ActionGroup],
         selectedGroupIDs: Set<UUID>,
@@ -795,18 +810,26 @@ public enum ActionGroupPassiveWaitDuplicationPlanner {
             guard delta != 0 else { return nil }
             return (index, delta)
         }
+        var grouped: [TimeInterval: [(index: Int, delta: TimeInterval)]] = [:]
+        for item in indexedDeltas {
+            grouped[item.delta, default: []].append(item)
+        }
 
-        let grouped = Dictionary(grouping: indexedDeltas, by: \.delta)
-        return grouped
-            .map { delta, rows in
+        var mapped: [ActionGroupEventTimeShift] = []
+        for (delta, rows) in grouped {
+            mapped.append(
                 ActionGroupEventTimeShift(
                     eventIndices: rows.map(\.index).sorted(),
                     delta: delta
                 )
-            }
-            .sorted {
-                ($0.eventIndices.first ?? Int.max) < ($1.eventIndices.first ?? Int.max)
-            }
+            )
+        }
+
+        return mapped.sorted { a, b in
+            let firstA = a.eventIndices.first ?? Int.max
+            let firstB = b.eventIndices.first ?? Int.max
+            return firstA < firstB
+        }
     }
 }
 
@@ -883,17 +906,25 @@ public enum ActionGroupDeletionPlanner {
             guard delta != 0 else { return nil }
             return (index, delta)
         }
+        var grouped: [TimeInterval: [(index: Int, delta: TimeInterval)]] = [:]
+        for item in indexedDeltas {
+            grouped[item.delta, default: []].append(item)
+        }
 
-        let grouped = Dictionary(grouping: indexedDeltas, by: \.delta)
-        return grouped
-            .map { delta, rows in
+        var mapped: [ActionGroupEventTimeShift] = []
+        for (delta, rows) in grouped {
+            mapped.append(
                 ActionGroupEventTimeShift(
                     eventIndices: rows.map(\.index).sorted(),
                     delta: delta
                 )
-            }
-            .sorted {
-                ($0.eventIndices.first ?? Int.max) < ($1.eventIndices.first ?? Int.max)
-            }
+            )
+        }
+
+        return mapped.sorted { a, b in
+            let firstA = a.eventIndices.first ?? Int.max
+            let firstB = b.eventIndices.first ?? Int.max
+            return firstA < firstB
+        }
     }
 }

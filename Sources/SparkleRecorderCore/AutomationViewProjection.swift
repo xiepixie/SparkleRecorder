@@ -217,7 +217,7 @@ public enum AutomationViewProjection {
             fromTaskID: dependency.fromTaskID,
             toTaskID: dependency.toTaskID,
             triggerLabel: triggerLabel(for: dependency.trigger),
-            delayLabel: delayLabel(for: dependency.delay),
+            delayLabel: delayLabel(for: dependency, sourceRun: sourceRun),
             status: edgeStatus(for: dependency, sourceRun: sourceRun),
             branchDecision: branchDecision(
                 for: dependency,
@@ -283,8 +283,14 @@ public enum AutomationViewProjection {
             lane: timelineLane(for: task, run: run),
             status: displayStatus(for: task, run: run),
             resourceLabel: resourceLabel(for: task.resourceRequirement),
+            resourceKeys: resourceKeys(for: task.resourceRequirement),
+            kindLabel: kindLabel(for: task.kind),
+            statusDetail: statusDetail(for: task, run: run),
+            scheduledAt: run.scheduledStartTime,
+            earliestStartAt: run.earliestStartTime,
             startedAt: run.actualStartTime,
             completedAt: run.completedAt,
+            createdAt: run.createdAt,
             resourceWaiting: resourceWaitingProjection(
                 for: task,
                 run: run,
@@ -1077,8 +1083,8 @@ public enum AutomationViewProjection {
         let maxX = positions.values.map(\.x).max() ?? graphInset
         let maxY = positions.values.map(\.y).max() ?? graphInset
         return AutomationGraphSize(
-            width: max(640, maxX + nodeSize.width + graphInset),
-            height: max(320, maxY + nodeSize.height + graphInset)
+            width: max(2000, maxX + nodeSize.width + graphInset * 8),
+            height: max(2000, maxY + nodeSize.height + graphInset * 8)
         )
     }
 
@@ -1166,11 +1172,61 @@ public enum AutomationViewProjection {
         }
     }
 
+    private static func delayLabel(for dependency: AutomationDependency, sourceRun: AutomationTaskRun?) -> String {
+        guard dependency.dynamicDelay != nil else {
+            return delayLabel(for: dependency.delay)
+        }
+        guard let sourceRun else {
+            return NSLocalizedString("Observed time", comment: "")
+        }
+
+        let resolution = dependency.delayResolution(after: sourceRun)
+        switch resolution.source {
+        case .fixed:
+            return delayLabel(for: resolution.delay)
+        case .recognizedDuration:
+            return String(
+                format: NSLocalizedString("Observed %@", comment: ""),
+                compactDelayLabel(for: resolution.delay)
+            )
+        case .fallback:
+            return String(
+                format: NSLocalizedString("Fallback %@", comment: ""),
+                compactDelayLabel(for: resolution.delay)
+            )
+        }
+    }
+
     private static func delayLabel(for delay: TimeInterval) -> String {
         guard delay > 0 else {
             return NSLocalizedString("No delay", comment: "")
         }
         return String(format: NSLocalizedString("%ds delay", comment: ""), Int(delay.rounded()))
+    }
+
+    private static func compactDelayLabel(for delay: TimeInterval) -> String {
+        let totalSeconds = Int(max(0, delay).rounded())
+        guard totalSeconds > 0 else {
+            return NSLocalizedString("no delay", comment: "")
+        }
+        let days = totalSeconds / 86_400
+        let hours = (totalSeconds % 86_400) / 3_600
+        let minutes = (totalSeconds % 3_600) / 60
+        let seconds = totalSeconds % 60
+        var parts: [String] = []
+        if days > 0 {
+            parts.append("\(days)d")
+        }
+        if hours > 0 {
+            parts.append("\(hours)h")
+        }
+        if minutes > 0, parts.count < 2 {
+            parts.append("\(minutes)m")
+        }
+        if seconds > 0, parts.isEmpty {
+            parts.append("\(seconds)s")
+        }
+        return parts.prefix(2).joined(separator: " ")
     }
 
     private static func resourceLabel(for requirement: AutomationResourceRequirement) -> String {
@@ -1181,6 +1237,10 @@ public enum AutomationViewProjection {
         return sortedResources(in: requirement)
             .map(resourceLabel(for:))
             .joined(separator: ", ")
+    }
+
+    private static func resourceKeys(for requirement: AutomationResourceRequirement) -> [String] {
+        sortedResources(in: requirement).map(\.rawValue)
     }
 
     private static func resourceWaitingDetail(

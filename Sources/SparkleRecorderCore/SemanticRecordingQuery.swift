@@ -1,7 +1,9 @@
+import CryptoKit
 import Foundation
 
 public enum SemanticRecordingSuggestionAvailability: String, Codable, Equatable, Sendable {
     case deterministicFixture
+    case persistedBundle
     case unavailable
 }
 
@@ -231,6 +233,10 @@ public enum SemanticRecordingQueryEngine {
         fixture: String?,
         query: SemanticRecordingSuggestionQuery
     ) -> SemanticRecordingSuggestionResult {
+        guard let fixture else {
+            return persistedSuggestions(for: bundle, query: query)
+        }
+
         guard fixture == "checkout" else {
             return SemanticRecordingSuggestionResult(
                 availability: .unavailable,
@@ -243,6 +249,18 @@ public enum SemanticRecordingQueryEngine {
         let suggestions = SemanticRecordingFixture.checkoutSuggestions(bundle: bundle)
         return SemanticRecordingSuggestionResult(
             availability: .deterministicFixture,
+            query: query,
+            suggestions: filterAndSort(suggestions: suggestions, allowedKinds: query.allowedKinds)
+        )
+    }
+
+    public static func persistedSuggestions(
+        for bundle: SemanticRecordingBundle,
+        query: SemanticRecordingSuggestionQuery
+    ) -> SemanticRecordingSuggestionResult {
+        let suggestions = persistedSuggestionCandidates(for: bundle)
+        return SemanticRecordingSuggestionResult(
+            availability: .persistedBundle,
             query: query,
             suggestions: filterAndSort(suggestions: suggestions, allowedKinds: query.allowedKinds)
         )
@@ -300,5 +318,181 @@ public enum SemanticRecordingQueryEngine {
                 }
                 return lhs.title < rhs.title
             }
+    }
+
+    private static func persistedSuggestionCandidates(for bundle: SemanticRecordingBundle) -> [RecordingSuggestion] {
+        let eventsByFrameID = Dictionary(grouping: bundle.timelineEvents.compactMap { event -> (UUID, RecordingTimelineEvent)? in
+            guard let frameID = event.frameID else {
+                return nil
+            }
+            return (frameID, event)
+        }, by: \.0)
+            .mapValues { pairs in
+                pairs.map(\.1).sorted { left, right in
+                    if left.recordingTime == right.recordingTime {
+                        return left.id.uuidString < right.id.uuidString
+                    }
+                    return left.recordingTime < right.recordingTime
+                }
+            }
+
+        return bundle.visualObservations.flatMap { observation in
+            persistedSuggestionCandidates(
+                for: observation,
+                bundleID: bundle.id,
+                eventsByFrameID: eventsByFrameID
+            )
+        }
+    }
+
+    private static func persistedSuggestionCandidates(
+        for observation: RecordingVisualObservation,
+        bundleID: UUID,
+        eventsByFrameID: [UUID: [RecordingTimelineEvent]]
+    ) -> [RecordingSuggestion] {
+        let evidence = RecordingEvidenceReference(
+            frameID: observation.frameID,
+            eventIDs: observation.frameID.flatMap { eventsByFrameID[$0]?.map(\.id) } ?? [],
+            observationIDs: [observation.id],
+            artifactRef: observation.artifactRef,
+            bounds: observation.bounds,
+            summary: persistedEvidenceSummary(for: observation)
+        )
+
+        switch observation.kind {
+        case .ocrText:
+            guard let text = observation.text?.nilIfBlankForSemanticQuery else {
+                return []
+            }
+            return [
+                RecordingSuggestion(
+                    id: deterministicSuggestionID(bundleID: bundleID, observationID: observation.id, kind: .conditionCandidate),
+                    recordingID: bundleID,
+                    kind: .conditionCandidate,
+                    title: "Create OCR wait for \"\(text)\"",
+                    summary: "Persisted OCR text can become a reviewed wait condition without sending frame pixels to AI.",
+                    confidence: confidence(from: observation.confidence, fallback: 0.72),
+                    risk: "Requires Review confirmation; OCR text may be stale, partial, or suppressed.",
+                    evidence: [evidence]
+                )
+            ]
+
+        case .imageTemplateCandidate, .patternCandidate:
+            let label = persistedObservationLabel(observation, fallback: "recorded pattern")
+            return [
+                RecordingSuggestion(
+                    id: deterministicSuggestionID(bundleID: bundleID, observationID: observation.id, kind: .conditionCandidate),
+                    recordingID: bundleID,
+                    kind: .conditionCandidate,
+                    title: "Create image condition for \(label)",
+                    summary: "Persisted image or pattern evidence can become an image appeared/disappeared condition after Review.",
+                    confidence: confidence(from: observation.score ?? observation.confidence, fallback: 0.68),
+                    risk: "Review the crop and fallback before replacing timing or coordinate assumptions.",
+                    evidence: [evidence]
+                ),
+                RecordingSuggestion(
+                    id: deterministicSuggestionID(bundleID: bundleID, observationID: observation.id, kind: .locatorReplacement),
+                    recordingID: bundleID,
+                    kind: .locatorReplacement,
+                    title: "Review image locator for \(label)",
+                    summary: "The recorded crop can be reviewed as a safer locator candidate for fragile coordinate playback.",
+                    confidence: confidence(from: observation.score ?? observation.confidence, fallback: 0.64),
+                    risk: "Keep coordinate fallback until the locator is accepted and tested.",
+                    evidence: [evidence]
+                )
+            ]
+
+        case .regionBaseline, .regionDiff:
+            let label = persistedObservationLabel(observation, fallback: "recorded region")
+            return [
+                RecordingSuggestion(
+                    id: deterministicSuggestionID(bundleID: bundleID, observationID: observation.id, kind: .conditionCandidate),
+                    recordingID: bundleID,
+                    kind: .conditionCandidate,
+                    title: "Create region-change condition for \(label)",
+                    summary: "Persisted baseline or region-diff evidence can become a reviewed regionChanged condition.",
+                    confidence: confidence(from: observation.score ?? observation.confidence, fallback: 0.66),
+                    risk: "Review the watched region and threshold before using it to branch or repeat.",
+                    evidence: [evidence]
+                )
+            ]
+
+        case .pixelSample:
+            let color = observation.metadata["colorHex"]?.nilIfBlankForSemanticQuery ?? "sampled color"
+            return [
+                RecordingSuggestion(
+                    id: deterministicSuggestionID(bundleID: bundleID, observationID: observation.id, kind: .conditionCandidate),
+                    recordingID: bundleID,
+                    kind: .conditionCandidate,
+                    title: "Create pixel condition for \(color)",
+                    summary: "Persisted pixel sample evidence can become a reviewed pixelMatched condition.",
+                    confidence: confidence(from: observation.score ?? observation.confidence, fallback: 0.62),
+                    risk: "Pixel color can shift across displays; Review should confirm tolerance and fallback.",
+                    evidence: [evidence]
+                )
+            ]
+
+        case .axElement, .windowSnapshot:
+            return []
+        }
+    }
+
+    private static func persistedEvidenceSummary(for observation: RecordingVisualObservation) -> String {
+        switch observation.kind {
+        case .ocrText:
+            return "Persisted OCR observation"
+        case .imageTemplateCandidate:
+            return "Persisted image-template observation"
+        case .patternCandidate:
+            return "Persisted pattern observation"
+        case .regionBaseline:
+            return "Persisted region-baseline observation"
+        case .regionDiff:
+            return "Persisted region-diff observation"
+        case .pixelSample:
+            return "Persisted pixel-sample observation"
+        case .axElement:
+            return "Persisted Accessibility observation"
+        case .windowSnapshot:
+            return "Persisted window observation"
+        }
+    }
+
+    private static func persistedObservationLabel(
+        _ observation: RecordingVisualObservation,
+        fallback: String
+    ) -> String {
+        observation.labels.first?.nilIfBlankForSemanticQuery ??
+            observation.text?.nilIfBlankForSemanticQuery ??
+            fallback
+    }
+
+    private static func confidence(from value: Double?, fallback: Double) -> Double {
+        min(0.89, max(0.35, value ?? fallback))
+    }
+
+    private static func deterministicSuggestionID(
+        bundleID: UUID,
+        observationID: UUID,
+        kind: RecordingSuggestionKind
+    ) -> UUID {
+        let seed = "sparkle.semantic.suggestion.v1:\(bundleID.uuidString):\(observationID.uuidString):\(kind.rawValue)"
+        var bytes = Array(SHA256.hash(data: Data(seed.utf8)).prefix(16))
+        bytes[6] = (bytes[6] & 0x0F) | 0x50
+        bytes[8] = (bytes[8] & 0x3F) | 0x80
+        return UUID(uuid: (
+            bytes[0], bytes[1], bytes[2], bytes[3],
+            bytes[4], bytes[5],
+            bytes[6], bytes[7],
+            bytes[8], bytes[9],
+            bytes[10], bytes[11], bytes[12], bytes[13], bytes[14], bytes[15]
+        ))
+    }
+}
+
+private extension String {
+    var nilIfBlankForSemanticQuery: String? {
+        let trimmed = trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? nil : trimmed
     }
 }

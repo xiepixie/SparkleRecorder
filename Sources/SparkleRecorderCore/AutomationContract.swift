@@ -651,6 +651,10 @@ private extension String {
     var nilIfEmptyForAutomationCondition: String? {
         isEmpty ? nil : self
     }
+
+    var nilIfEmptyForDynamicDependencyDelay: String? {
+        isEmpty ? nil : self
+    }
 }
 
 private extension RectValue {
@@ -768,12 +772,87 @@ public enum AutomationNotificationSeverity: String, Codable, Equatable, Sendable
     case error
 }
 
+public enum AutomationDependencyDynamicDelaySource: String, Codable, Equatable, Sendable {
+    case conditionEvidenceDuration
+}
+
+public struct AutomationDependencyDynamicDelay: Codable, Equatable, Sendable {
+    public var source: AutomationDependencyDynamicDelaySource
+    public var sourceFieldID: String?
+    public var fallbackDelay: TimeInterval?
+    public var minimumDelay: TimeInterval?
+    public var maximumDelay: TimeInterval?
+
+    public init(
+        source: AutomationDependencyDynamicDelaySource = .conditionEvidenceDuration,
+        sourceFieldID: String? = nil,
+        fallbackDelay: TimeInterval? = nil,
+        minimumDelay: TimeInterval? = nil,
+        maximumDelay: TimeInterval? = nil
+    ) {
+        self.source = source
+        self.sourceFieldID = sourceFieldID?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .nilIfEmptyForDynamicDependencyDelay
+        self.fallbackDelay = fallbackDelay.map { max(0, $0) }
+        self.minimumDelay = minimumDelay.map { max(0, $0) }
+        self.maximumDelay = maximumDelay.map { max(0, $0) }
+    }
+
+    public func normalizedDelay(_ delay: TimeInterval) -> (delay: TimeInterval, wasClamped: Bool) {
+        var normalized = max(0, delay)
+        var wasClamped = false
+        if let minimumDelay, normalized < minimumDelay {
+            normalized = minimumDelay
+            wasClamped = true
+        }
+        if let maximumDelay, normalized > maximumDelay {
+            normalized = maximumDelay
+            wasClamped = true
+        }
+        return (normalized, wasClamped)
+    }
+}
+
+public enum AutomationDependencyDelayResolutionSource: String, Codable, Equatable, Sendable {
+    case fixed
+    case recognizedDuration
+    case fallback
+}
+
+public struct AutomationDependencyDelayResolution: Codable, Equatable, Sendable {
+    public var delay: TimeInterval
+    public var source: AutomationDependencyDelayResolutionSource
+    public var observedText: String?
+    public var reason: String?
+    public var wasClamped: Bool
+
+    public init(
+        delay: TimeInterval,
+        source: AutomationDependencyDelayResolutionSource,
+        observedText: String? = nil,
+        reason: String? = nil,
+        wasClamped: Bool = false
+    ) {
+        self.delay = max(0, delay)
+        self.source = source
+        self.observedText = observedText?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .nilIfEmptyForDynamicDependencyDelay
+        self.reason = reason?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .nilIfEmptyForDynamicDependencyDelay
+        self.wasClamped = wasClamped
+    }
+}
+
 public struct AutomationDependency: Codable, Equatable, Sendable, Identifiable {
     public var id: UUID
     public var fromTaskID: UUID
     public var toTaskID: UUID
     public var trigger: AutomationDependencyTrigger
     public var delay: TimeInterval
+    public var dynamicDelay: AutomationDependencyDynamicDelay?
     public var isEnabled: Bool
 
     public init(
@@ -782,6 +861,7 @@ public struct AutomationDependency: Codable, Equatable, Sendable, Identifiable {
         toTaskID: UUID,
         trigger: AutomationDependencyTrigger,
         delay: TimeInterval = 0,
+        dynamicDelay: AutomationDependencyDynamicDelay? = nil,
         isEnabled: Bool = true
     ) {
         self.id = id
@@ -789,6 +869,7 @@ public struct AutomationDependency: Codable, Equatable, Sendable, Identifiable {
         self.toTaskID = toTaskID
         self.trigger = trigger
         self.delay = max(0, delay)
+        self.dynamicDelay = dynamicDelay
         self.isEnabled = isEnabled
     }
 
@@ -1158,6 +1239,185 @@ public struct AutomationConditionEvaluationResult: Codable, Equatable, Sendable 
     ) {
         self.outcome = outcome
         self.evidence = evidence
+    }
+}
+
+public enum AutomationConditionEvidenceDurationParser {
+    public struct ParsedDuration: Equatable, Sendable {
+        public var duration: TimeInterval
+        public var sourceText: String
+
+        public init(duration: TimeInterval, sourceText: String) {
+            self.duration = max(0, duration)
+            self.sourceText = sourceText
+        }
+    }
+
+    public static func duration(
+        in evidence: AutomationConditionEvaluationEvidence,
+        sourceFieldID: String? = nil
+    ) -> ParsedDuration? {
+        let candidates: [String]
+        if let sourceFieldID = sourceFieldID?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .nilIfEmptyForDynamicDependencyDelay {
+            candidates = evidence.fields
+                .filter { $0.id == sourceFieldID }
+                .map(\.value)
+        } else {
+            candidates = [evidence.observedSummary] + evidence.fields.map(\.value)
+        }
+
+        var seen = Set<String>()
+        for candidate in candidates {
+            let trimmed = candidate.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !trimmed.isEmpty, seen.insert(trimmed).inserted else {
+                continue
+            }
+            if let parsed = duration(in: trimmed) {
+                return parsed
+            }
+        }
+        return nil
+    }
+
+    public static func duration(in text: String) -> ParsedDuration? {
+        let normalized = text.replacingOccurrences(of: "：", with: ":")
+        let segments = durationSegments(in: normalized)
+        for segment in segments {
+            if let parsed = unitDuration(in: segment) {
+                return parsed
+            }
+            if let parsed = colonDuration(in: segment) {
+                return parsed
+            }
+        }
+        return nil
+    }
+
+    private static func durationSegments(in text: String) -> [String] {
+        let whole = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        let pieces = text
+            .split(whereSeparator: { character in
+                character == "\n" || character == "\r" || character == "|" || character == ";"
+            })
+            .map { String($0).trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+        return ([whole] + pieces).filter { !$0.isEmpty }
+    }
+
+    private static func unitDuration(in text: String) -> ParsedDuration? {
+        let days = firstNumericValue(
+            in: text,
+            pattern: #"(\d+(?:[\.,]\d+)?)\s*(?:d|day|days|天|日)"#
+        ) ?? 0
+        let hours = firstNumericValue(
+            in: text,
+            pattern: #"(\d+(?:[\.,]\d+)?)\s*(?:h|hr|hrs|hour|hours|小时|小時|时|時)"#
+        ) ?? 0
+        let minutes = firstNumericValue(
+            in: text,
+            pattern: #"(\d+(?:[\.,]\d+)?)\s*(?:m|min|mins|minute|minutes|分钟|分鐘|分)"#
+        ) ?? 0
+        let seconds = firstNumericValue(
+            in: text,
+            pattern: #"(\d+(?:[\.,]\d+)?)\s*(?:s|sec|secs|second|seconds|秒)"#
+        ) ?? 0
+        let total = days * 86_400 + hours * 3_600 + minutes * 60 + seconds
+        guard total > 0 else {
+            return nil
+        }
+        return ParsedDuration(duration: total, sourceText: text.trimmingCharacters(in: .whitespacesAndNewlines))
+    }
+
+    private static func colonDuration(in text: String) -> ParsedDuration? {
+        let pattern = #"(^|[^\d])(\d{1,2}):(\d{2})(?::(\d{2}))?($|[^\d])"#
+        guard let regex = try? NSRegularExpression(pattern: pattern) else {
+            return nil
+        }
+        let nsText = text as NSString
+        let range = NSRange(location: 0, length: nsText.length)
+        guard let match = regex.firstMatch(in: text, options: [], range: range),
+              let first = doubleValue(in: nsText, match: match, group: 2),
+              let second = doubleValue(in: nsText, match: match, group: 3) else {
+            return nil
+        }
+
+        let total: TimeInterval
+        if let third = doubleValue(in: nsText, match: match, group: 4) {
+            total = first * 3_600 + second * 60 + third
+        } else {
+            total = first * 60 + second
+        }
+        guard total > 0 else {
+            return nil
+        }
+        return ParsedDuration(duration: total, sourceText: text.trimmingCharacters(in: .whitespacesAndNewlines))
+    }
+
+    private static func firstNumericValue(in text: String, pattern: String) -> Double? {
+        guard let regex = try? NSRegularExpression(pattern: pattern, options: [.caseInsensitive]) else {
+            return nil
+        }
+        let nsText = text as NSString
+        let range = NSRange(location: 0, length: nsText.length)
+        guard let match = regex.firstMatch(in: text, options: [], range: range) else {
+            return nil
+        }
+        return doubleValue(in: nsText, match: match, group: 1)
+    }
+
+    private static func doubleValue(in text: NSString, match: NSTextCheckingResult, group: Int) -> Double? {
+        guard group < match.numberOfRanges else {
+            return nil
+        }
+        let range = match.range(at: group)
+        guard range.location != NSNotFound, range.length > 0 else {
+            return nil
+        }
+        let value = text.substring(with: range).replacingOccurrences(of: ",", with: ".")
+        return Double(value)
+    }
+}
+
+public extension AutomationDependency {
+    func delayResolution(after sourceRun: AutomationTaskRun) -> AutomationDependencyDelayResolution {
+        guard let dynamicDelay else {
+            return AutomationDependencyDelayResolution(delay: delay, source: .fixed)
+        }
+
+        switch dynamicDelay.source {
+        case .conditionEvidenceDuration:
+            guard let evidence = sourceRun.conditionEvidence else {
+                return fallbackDelayResolution(dynamicDelay, reason: "No condition evidence")
+            }
+            guard let parsed = AutomationConditionEvidenceDurationParser.duration(
+                in: evidence,
+                sourceFieldID: dynamicDelay.sourceFieldID
+            ) else {
+                return fallbackDelayResolution(dynamicDelay, reason: "No recognizable duration")
+            }
+            let normalized = dynamicDelay.normalizedDelay(parsed.duration)
+            return AutomationDependencyDelayResolution(
+                delay: normalized.delay,
+                source: .recognizedDuration,
+                observedText: parsed.sourceText,
+                wasClamped: normalized.wasClamped
+            )
+        }
+    }
+
+    private func fallbackDelayResolution(
+        _ dynamicDelay: AutomationDependencyDynamicDelay,
+        reason: String
+    ) -> AutomationDependencyDelayResolution {
+        let normalized = dynamicDelay.normalizedDelay(dynamicDelay.fallbackDelay ?? delay)
+        return AutomationDependencyDelayResolution(
+            delay: normalized.delay,
+            source: .fallback,
+            reason: reason,
+            wasClamped: normalized.wasClamped
+        )
     }
 }
 

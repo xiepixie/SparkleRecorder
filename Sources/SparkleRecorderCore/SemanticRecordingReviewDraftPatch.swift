@@ -1013,6 +1013,26 @@ public struct SemanticRecordingReviewRepeatUntilDraft: Equatable, Sendable {
     }
 }
 
+public struct SemanticRecordingReviewRepeatUntilBodyOption: Equatable, Sendable, Identifiable {
+    public var id: UUID { macroID }
+    public var macroID: UUID
+    public var title: String
+    public var eventCount: Int
+    public var modifiedAt: Date
+
+    public init(
+        macroID: UUID,
+        title: String,
+        eventCount: Int,
+        modifiedAt: Date
+    ) {
+        self.macroID = macroID
+        self.title = title
+        self.eventCount = max(0, eventCount)
+        self.modifiedAt = modifiedAt
+    }
+}
+
 public struct SemanticRecordingReviewRepeatUntilBodyResolution: Equatable, Sendable {
     public enum Status: String, Equatable, Sendable {
         case resolved
@@ -1023,17 +1043,20 @@ public struct SemanticRecordingReviewRepeatUntilBodyResolution: Equatable, Senda
     public var status: Status
     public var bodyTasks: [AutomationWorkflowDraftTask]
     public var linkedMacroIDs: [UUID]
+    public var bodyOptions: [SemanticRecordingReviewRepeatUntilBodyOption]
     public var message: String
 
     public init(
         status: Status,
         bodyTasks: [AutomationWorkflowDraftTask] = [],
         linkedMacroIDs: [UUID] = [],
+        bodyOptions: [SemanticRecordingReviewRepeatUntilBodyOption] = [],
         message: String
     ) {
         self.status = status
         self.bodyTasks = bodyTasks
         self.linkedMacroIDs = linkedMacroIDs
+        self.bodyOptions = bodyOptions
         self.message = message
     }
 
@@ -1043,24 +1066,36 @@ public struct SemanticRecordingReviewRepeatUntilBodyResolution: Equatable, Senda
 }
 
 public enum SemanticRecordingReviewRepeatUntilBodyResolver {
+    public static func options(
+        recordingID: UUID,
+        macros: [SavedMacro]
+    ) -> [SemanticRecordingReviewRepeatUntilBodyOption] {
+        linkedMacros(recordingID: recordingID, macros: macros)
+            .map(bodyOption)
+    }
+
     public static func resolve(
         recordingID: UUID,
         macros: [SavedMacro],
         preferredMacroID: UUID? = nil
     ) -> SemanticRecordingReviewRepeatUntilBodyResolution {
-        let linkedMacros = macros
-            .filter { $0.semanticRecording?.recordingID == recordingID }
-            .sorted(by: macroSort)
+        let linkedMacros = linkedMacros(recordingID: recordingID, macros: macros)
         let linkedMacroIDs = linkedMacros.map(\.id)
+        let bodyOptions = linkedMacros.map(bodyOption)
 
         if let preferredMacroID,
            let preferredMacro = linkedMacros.first(where: { $0.id == preferredMacroID }) {
-            return resolved(preferredMacro, linkedMacroIDs: linkedMacroIDs)
+            return resolved(
+                preferredMacro,
+                linkedMacroIDs: linkedMacroIDs,
+                bodyOptions: bodyOptions
+            )
         }
 
         guard !linkedMacros.isEmpty else {
             return SemanticRecordingReviewRepeatUntilBodyResolution(
                 status: .noLinkedMacro,
+                bodyOptions: bodyOptions,
                 message: "Save or link this semantic recording to a macro before creating a Repeat-Until body."
             )
         }
@@ -1070,16 +1105,22 @@ public enum SemanticRecordingReviewRepeatUntilBodyResolver {
             return SemanticRecordingReviewRepeatUntilBodyResolution(
                 status: .ambiguousLinkedMacros,
                 linkedMacroIDs: linkedMacroIDs,
+                bodyOptions: bodyOptions,
                 message: "Multiple macros are linked to this recording. Choose one before creating a Repeat-Until body."
             )
         }
 
-        return resolved(macro, linkedMacroIDs: linkedMacroIDs)
+        return resolved(
+            macro,
+            linkedMacroIDs: linkedMacroIDs,
+            bodyOptions: bodyOptions
+        )
     }
 
     private static func resolved(
         _ macro: SavedMacro,
-        linkedMacroIDs: [UUID]
+        linkedMacroIDs: [UUID],
+        bodyOptions: [SemanticRecordingReviewRepeatUntilBodyOption]
     ) -> SemanticRecordingReviewRepeatUntilBodyResolution {
         SemanticRecordingReviewRepeatUntilBodyResolution(
             status: .resolved,
@@ -1092,7 +1133,28 @@ public enum SemanticRecordingReviewRepeatUntilBodyResolver {
                 )
             ],
             linkedMacroIDs: linkedMacroIDs,
+            bodyOptions: bodyOptions,
             message: "Repeat-Until body will replay \(macro.name)."
+        )
+    }
+
+    private static func linkedMacros(
+        recordingID: UUID,
+        macros: [SavedMacro]
+    ) -> [SavedMacro] {
+        macros
+            .filter { $0.semanticRecording?.recordingID == recordingID }
+            .sorted(by: macroSort)
+    }
+
+    private static func bodyOption(
+        _ macro: SavedMacro
+    ) -> SemanticRecordingReviewRepeatUntilBodyOption {
+        SemanticRecordingReviewRepeatUntilBodyOption(
+            macroID: macro.id,
+            title: macro.name,
+            eventCount: macro.eventCount,
+            modifiedAt: macro.modifiedAt
         )
     }
 

@@ -94,6 +94,75 @@ struct RecordingBundleStoreTests {
         }
     }
 
+    @Test("Pruned artifacts reload as user-deleted artifact evidence")
+    func prunedArtifactsReloadAsUserDeletedArtifactEvidence() async throws {
+        let root = scratchRoot()
+        try? FileManager.default.removeItem(at: root)
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let recordingID = try #require(UUID(uuidString: "92000000-0000-0000-0000-000000000201"))
+        let videoRef = try RecordingArtifactRef("video/recording.mov")
+        let frameRef = try RecordingArtifactRef("frames/start.png")
+        let createdAt = Date(timeIntervalSince1970: 1_000)
+        let evaluatedAt = createdAt.addingTimeInterval(120)
+        let bundle = SemanticRecordingBundle(
+            id: recordingID,
+            createdAt: createdAt,
+            videoSegments: [
+                RecordingVideoSegment(
+                    id: try #require(UUID(uuidString: "92000000-0000-0000-0000-000000000202")),
+                    artifactRef: videoRef,
+                    startTime: 0,
+                    duration: 1.0
+                )
+            ],
+            frames: [
+                RecordingFrameReference(
+                    id: try #require(UUID(uuidString: "92000000-0000-0000-0000-000000000203")),
+                    recordingTime: 0,
+                    imageRef: frameRef,
+                    source: .recordingStart
+                )
+            ]
+        )
+
+        let store = RecordingBundleStore(rootDirectory: root)
+        let directory = try await store.createBundleDirectory(recordingID: bundle.id)
+        try await store.write(bundle, to: directory)
+        try Data([0, 1, 2]).write(to: directory.appendingRecordingArtifactRef(videoRef))
+        try Data([3, 4]).write(to: directory.appendingRecordingArtifactRef(frameRef))
+
+        let plan = SemanticRecordingRetentionPlanner.plan(
+            for: bundle,
+            policy: SemanticRecordingRetentionPolicy(
+                maximumArtifactAge: 60,
+                expiredDisposition: .pruneArtifacts
+            ),
+            evaluatedAt: evaluatedAt
+        )
+        let result = try await store.applyRetentionPlan(plan, dryRun: false)
+
+        #expect(result.deletedRelativePaths.sorted() == [frameRef.path, videoRef.path].sorted())
+
+        let loaded = try await store.loadBundleTolerant(recordingID: recordingID).bundle
+        let deletedRefs = loaded.suppressions
+            .filter { $0.reason == .userDeleted }
+            .compactMap(\.redactedArtifactRef?.path)
+            .sorted()
+        #expect(deletedRefs == [frameRef.path, videoRef.path].sorted())
+
+        let summary = try #require(
+            SemanticRecordingArtifactFileAuditor.summary(
+                bundle: loaded,
+                bundleDirectory: directory
+            )
+        )
+        #expect(summary.deletedCount == 2)
+        #expect(summary.missingCount == 0)
+        #expect(summary.evidence.first { $0.ref == videoRef }?.status == .deleted)
+        #expect(summary.evidence.first { $0.ref == frameRef }?.status == .deleted)
+    }
+
     private func scratchRoot() -> URL {
         FileManager.default.temporaryDirectory
             .appendingPathComponent("SparkleRecorder-RecordingBundleStoreTests", isDirectory: true)

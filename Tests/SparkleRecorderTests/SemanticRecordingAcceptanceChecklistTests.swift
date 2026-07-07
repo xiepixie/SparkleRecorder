@@ -320,7 +320,6 @@ struct SemanticRecordingAcceptanceChecklistTests {
         "Show recorded video/keyframes in Macro Review.",
         "Run OCR on selected/key frames through app-edge Vision adapter.",
         "Support pixel sampling from recorded frames.",
-        "Store source frame ID, surface ID, crop bounds, search region and threshold for every extracted visual asset.",
         "User can create image appeared/disappeared condition from recorded frame crop.",
         "User can create region changed baseline from recorded frame region.",
         "User can replace one fragile coordinate click with visual locator suggestion.",
@@ -439,11 +438,6 @@ struct SemanticRecordingAcceptanceChecklistTests {
             "Support pixel sampling from recorded frames.",
             "S2 authorized live bundle",
             "pixel sampling"
-        ),
-        (
-            "Store source frame ID, surface ID, crop bounds, search region and threshold for every extracted visual asset.",
-            "S2 authorized live bundle",
-            "remaining visual-index live production"
         ),
         (
             "User can create image appeared/disappeared condition from recorded frame crop.",
@@ -601,6 +595,7 @@ struct SemanticRecordingAcceptanceChecklistTests {
         "Time Stretch",
         "MacroTransformerTimingTests",
         "Draft Preview loop explanation",
+        "Review visual asset provenance rows",
         "Review action contract",
         "S2 bundle-store first pass",
         "Live evidence intake guard",

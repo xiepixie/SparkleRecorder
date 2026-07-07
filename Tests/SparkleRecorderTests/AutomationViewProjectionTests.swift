@@ -1109,6 +1109,65 @@ struct AutomationViewProjectionTests {
         #expect(edge.status == .blocked)
     }
 
+    @Test("Dependency edge label projects recognized dynamic delay")
+    func dependencyEdgeLabelProjectsRecognizedDynamicDelay() throws {
+        let workflowID = UUID()
+        let firstID = UUID()
+        let secondID = UUID()
+        let runID = UUID()
+        let conditionID = UUID()
+        let dependencyID = UUID()
+        let condition = AutomationConditionSpec(
+            id: conditionID,
+            name: "Read timer",
+            kind: .ocrText(AutomationOCRCondition(text: "mature"))
+        )
+        let first = AutomationTask(id: firstID, name: "Read timer", kind: .condition(condition), resourceRequirement: .none)
+        let second = AutomationTask(id: secondID, name: "Harvest", kind: .delay(1), resourceRequirement: .none)
+        let workflow = AutomationWorkflow(
+            id: workflowID,
+            name: "Edges",
+            tasks: [first, second],
+            dependencies: [
+                AutomationDependency(
+                    id: dependencyID,
+                    fromTaskID: firstID,
+                    toTaskID: secondID,
+                    trigger: .onConditionMatched,
+                    delay: 30,
+                    dynamicDelay: AutomationDependencyDynamicDelay(fallbackDelay: 30, maximumDelay: 7_200)
+                )
+            ]
+        )
+        let evidence = AutomationConditionEvaluationEvidence(
+            runID: runID,
+            workflowID: workflowID,
+            taskID: firstID,
+            conditionID: conditionID,
+            kind: .ocrText,
+            outcome: .conditionMatched,
+            evaluatedAt: Date(timeIntervalSince1970: 10),
+            targetDescription: "Timer",
+            observedSummary: "Detected text: 1h 30m"
+        )
+        let run = AutomationTaskRun(
+            id: runID,
+            workflowID: workflowID,
+            taskID: firstID,
+            completedAt: Date(timeIntervalSince1970: 10),
+            status: .completed,
+            outcome: .conditionMatched,
+            createdAt: Date(timeIntervalSince1970: 9),
+            conditionEvidence: evidence
+        )
+
+        let projection = AutomationViewProjection.overview(from: AutomationRunState(workflows: [workflow], runs: [run]))
+        let edge = try #require(projection.workflows.first?.edges.first)
+
+        #expect(edge.id == dependencyID)
+        #expect(edge.delayLabel == "Observed 1h 30m")
+    }
+
     @Test("Branch decisions are projected on dependency edges")
     func branchDecisionsAreProjectedOnDependencyEdges() throws {
         let workflowID = UUID()

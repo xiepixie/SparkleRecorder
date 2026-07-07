@@ -158,6 +158,158 @@ struct AutomationWorkflowDraftPreviewProjectionTests {
         })
     }
 
+    @Test("Preview projection exposes visual asset provenance and thresholds")
+    func previewProjectionExposesVisualAssetProvenanceAndThresholds() throws {
+        let imageFrameID = UUID(uuidString: "70000000-0000-0000-0000-000000000001")!
+        let baselineFrameID = UUID(uuidString: "70000000-0000-0000-0000-000000000002")!
+        let document = AutomationWorkflowDraftDocument(
+            workflow: AutomationWorkflowDraft(
+                name: "Visual Evidence",
+                tasks: [
+                    AutomationWorkflowDraftTask(
+                        key: "watch_image",
+                        type: "condition",
+                        condition: AutomationWorkflowDraftCondition(
+                            type: "imageAppeared",
+                            regionRef: "checkout_area",
+                            imageRef: "checkout_template",
+                            threshold: 0.88
+                        )
+                    ),
+                    AutomationWorkflowDraftTask(
+                        key: "watch_baseline",
+                        type: "condition",
+                        condition: AutomationWorkflowDraftCondition(
+                            type: "regionChanged",
+                            regionRef: "status_area",
+                            baselineRef: "status_baseline",
+                            threshold: 0.74
+                        )
+                    ),
+                    AutomationWorkflowDraftTask(
+                        key: "repeat_until_pixel",
+                        type: "loop",
+                        loop: AutomationWorkflowDraftLoop(
+                            count: 1,
+                            tasks: [
+                                AutomationWorkflowDraftTask(
+                                    key: "retry",
+                                    type: "delay",
+                                    delaySeconds: 0.2
+                                )
+                            ],
+                            kind: AutomationWorkflowDraftLoopKind.repeatUntil,
+                            until: AutomationWorkflowDraftCondition(
+                                type: "pixelMatched",
+                                regionRef: "status_pixel",
+                                colorHex: "#FFFFFF",
+                                threshold: 0.96
+                            )
+                        )
+                    )
+                ]
+            ),
+            visualAssets: AutomationWorkflowDraftVisualAssets(
+                regions: [
+                    AutomationWorkflowDraftVisualRegion(
+                        key: "checkout_area",
+                        label: "Checkout button",
+                        bounds: RectValue(x: 10, y: 20, width: 120, height: 48),
+                        space: .windowLocal
+                    ),
+                    AutomationWorkflowDraftVisualRegion(
+                        key: "status_area",
+                        bounds: RectValue(x: 200, y: 40, width: 160, height: 60),
+                        space: .displayAbsolute
+                    ),
+                    AutomationWorkflowDraftVisualRegion(
+                        key: "status_pixel",
+                        bounds: RectValue(x: 0.45, y: 0.52, width: 0.02, height: 0.02),
+                        space: .displayNormalized
+                    )
+                ],
+                images: [
+                    AutomationWorkflowDraftVisualImageAsset(
+                        key: "checkout_template",
+                        path: "assets/images/checkout.png",
+                        sha256: "abc123template",
+                        sourceFrameID: imageFrameID,
+                        sourceSurfaceID: "window:checkout",
+                        sourceArtifactPath: "frames/000014-before-click.png",
+                        sourceBounds: RectValue(x: 880, y: 620, width: 180, height: 48),
+                        sourceBoundsSpace: .windowLocal
+                    )
+                ],
+                baselines: [
+                    AutomationWorkflowDraftVisualImageAsset(
+                        key: "status_baseline",
+                        path: "assets/baselines/status.png",
+                        sha256: "def456baseline",
+                        sourceFrameID: baselineFrameID,
+                        sourceSurfaceID: "window:checkout",
+                        sourceArtifactPath: "frames/000018-after-click.png",
+                        sourceBounds: RectValue(x: 200, y: 40, width: 160, height: 60),
+                        sourceBoundsSpace: .displayAbsolute
+                    )
+                ]
+            )
+        )
+        let validation = AutomationWorkflowDraftValidator.validate(document)
+
+        let projection = AutomationWorkflowDraftPreviewProjection(
+            document: document,
+            validationEnvelope: .workflowDraftValidation(command: "workflow draft validate", result: validation),
+            macroCatalogEnvelope: .workflowMacroCatalog(command: "workflow macros", macros: [])
+        )
+
+        #expect(projection.visualAssetRows.count == 3)
+
+        let imageRow = try #require(projection.visualAssetRows.first { $0.assetKind == .imageTemplate })
+        #expect(imageRow.taskKey == "watch_image")
+        #expect(imageRow.roleLabel == "Task condition")
+        #expect(imageRow.conditionLabel == "image appears")
+        #expect(imageRow.assetKey == "checkout_template")
+        #expect(imageRow.assetPath == "assets/images/checkout.png")
+        #expect(imageRow.sha256 == "abc123template")
+        #expect(imageRow.sourceFrameID == imageFrameID)
+        #expect(imageRow.sourceFrameShortID == "70000000")
+        #expect(imageRow.sourceSurfaceID == "window:checkout")
+        #expect(imageRow.sourceArtifactPath == "frames/000014-before-click.png")
+        #expect(imageRow.sourceBounds == RectValue(x: 880, y: 620, width: 180, height: 48))
+        #expect(imageRow.sourceBoundsLabel == "x 880.0, y 620.0, w 180.0, h 48.0")
+        #expect(imageRow.sourceBoundsSpace == .windowLocal)
+        #expect(imageRow.sourceBoundsSpaceLabel == "Window local")
+        #expect(imageRow.regionKey == "checkout_area")
+        #expect(imageRow.regionLabel == "Checkout button")
+        #expect(imageRow.regionBounds == RectValue(x: 10, y: 20, width: 120, height: 48))
+        #expect(imageRow.regionBoundsLabel == "x 10.0, y 20.0, w 120.0, h 48.0")
+        #expect(imageRow.regionSpace == .windowLocal)
+        #expect(imageRow.regionSpaceLabel == "Window local")
+        #expect(imageRow.threshold == 0.88)
+        #expect(imageRow.thresholdLabel == "0.88 threshold")
+
+        let baselineRow = try #require(projection.visualAssetRows.first { $0.assetKind == .baseline })
+        #expect(baselineRow.taskKey == "watch_baseline")
+        #expect(baselineRow.conditionLabel == "region changes")
+        #expect(baselineRow.assetKey == "status_baseline")
+        #expect(baselineRow.assetPath == "assets/baselines/status.png")
+        #expect(baselineRow.sourceFrameID == baselineFrameID)
+        #expect(baselineRow.sourceBoundsSpace == .displayAbsolute)
+        #expect(baselineRow.regionKey == "status_area")
+        #expect(baselineRow.regionBounds == RectValue(x: 200, y: 40, width: 160, height: 60))
+        #expect(baselineRow.threshold == 0.74)
+
+        let pixelRow = try #require(projection.visualAssetRows.first { $0.assetKind == .pixelSample })
+        #expect(pixelRow.taskKey == "repeat_until_pixel")
+        #expect(pixelRow.roleLabel == "Loop until")
+        #expect(pixelRow.conditionLabel == "pixel matches #FFFFFF")
+        #expect(pixelRow.assetKey == nil)
+        #expect(pixelRow.sourceFrameID == nil)
+        #expect(pixelRow.regionKey == "status_pixel")
+        #expect(pixelRow.regionSpace == .displayNormalized)
+        #expect(pixelRow.thresholdLabel == "0.96 threshold")
+    }
+
     @Test("Preview projection exposes fixed loop draft and expanded import")
     func previewProjectionExposesFixedLoopDraftAndExpandedImport() throws {
         let document = AutomationWorkflowDraftDocument(workflow: AutomationWorkflowDraft(

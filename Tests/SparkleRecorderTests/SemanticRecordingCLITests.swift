@@ -504,8 +504,8 @@ struct SemanticRecordingCLITests {
         #expect(envelope.nextActions.contains { $0.reason.contains("non-destructive evidence proposals") })
     }
 
-    @Test("Recording suggestion envelope exposes unavailable stored query contract")
-    func recordingSuggestionEnvelopeExposesUnavailableStoredQueryContract() throws {
+    @Test("Recording suggestion envelope exposes persisted stored query contract")
+    func recordingSuggestionEnvelopeExposesPersistedStoredQueryContract() throws {
         let bundle = SemanticRecordingFixture.checkoutBundle()
         let suggestionResult = SemanticRecordingQueryEngine.deterministicSuggestions(
             for: bundle,
@@ -524,13 +524,56 @@ struct SemanticRecordingCLITests {
         let payload = try #require(envelope.data)
         #expect(envelope.ok)
         #expect(payload.fixtureMode == false)
-        #expect(payload.availability == .unavailable)
+        #expect(payload.availability == .persistedBundle)
         #expect(payload.query.allowedKinds == [.conditionCandidate])
-        #expect(payload.unavailableReason?.contains("checkout fixture") == true)
-        #expect(payload.count == 0)
-        #expect(payload.suggestions.isEmpty)
-        #expect(envelope.warnings.map(\.code) == ["suggestionsUnavailable"])
-        #expect(envelope.warnings.first?.message.contains("checkout fixture") == true)
+        #expect(payload.unavailableReason == nil)
+        #expect(payload.count == 2)
+        #expect(payload.suggestions.map(\.kind) == [.conditionCandidate, .conditionCandidate])
+        #expect(payload.suggestions.contains {
+            $0.title == "Create OCR wait for \"Order confirmed\"" &&
+                $0.evidence.contains { $0.observationIDs == [SemanticRecordingFixture.ocrObservationID] }
+        })
+        #expect(payload.suggestions.contains {
+            $0.title == "Create image condition for button" &&
+                $0.evidence.contains { $0.observationIDs == [SemanticRecordingFixture.templateObservationID] }
+        })
+        #expect(envelope.warnings.isEmpty)
+    }
+
+    @Test("Recording suggestion envelope surfaces artifact file status")
+    func recordingSuggestionEnvelopeSurfacesArtifactFileStatus() throws {
+        let bundle = SemanticRecordingFixture.checkoutBundle()
+        let ocrArtifact = try #require(
+            bundle.visualObservations.first { $0.id == SemanticRecordingFixture.ocrObservationID }?.artifactRef
+        )
+        let suggestionResult = SemanticRecordingQueryEngine.deterministicSuggestions(
+            for: bundle,
+            fixture: nil,
+            query: .kinds([.conditionCandidate])
+        )
+        let envelope = AutomationCLIResultEnvelope<SemanticRecordingCLISuggestionsPayload>
+            .semanticRecordingSuggestions(
+                command: "recording.suggest.conditions",
+                requestedRecordingID: bundle.id.uuidString,
+                bundle: bundle,
+                category: .conditions,
+                suggestionResult: suggestionResult,
+                artifactFiles: SemanticRecordingCLIArtifactFileSummary(evidence: [
+                    SemanticRecordingCLIArtifactFileEvidence(
+                        kind: .visualObservation,
+                        ref: ocrArtifact,
+                        status: .missing
+                    )
+                ])
+            )
+
+        let payload = try #require(envelope.data)
+        #expect(payload.artifactFiles?.checkedCount == 1)
+        #expect(payload.artifactFiles?.missingCount == 1)
+        #expect(payload.artifactFiles?.evidence.first?.kind == .visualObservation)
+        #expect(payload.artifactFiles?.evidence.first?.ref == ocrArtifact)
+        #expect(envelope.warnings.map(\.code).contains("recordingArtifactsDegraded"))
+        #expect(envelope.warnings.first { $0.code == "recordingArtifactsDegraded" }?.message.contains("before accepting suggestions") == true)
     }
 
     @Test("Recording suggestions without evidence stay low confidence")

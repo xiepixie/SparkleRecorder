@@ -9,8 +9,14 @@ public struct AutomationResourceTimelineItem: Identifiable, Codable, Equatable, 
     public var lane: AutomationResourceTimelineLane
     public var status: AutomationDisplayStatus
     public var resourceLabel: String
+    public var resourceKeys: [String]?
+    public var kindLabel: String?
+    public var statusDetail: String?
+    public var scheduledAt: Date?
+    public var earliestStartAt: Date?
     public var startedAt: Date?
     public var completedAt: Date?
+    public var createdAt: Date?
     public var resourceWaiting: AutomationResourceWaitingProjection?
     public var timeoutCountdown: AutomationTimeoutCountdownProjection?
     public var retryAttemptSummary: AutomationRetryAttemptSummary?
@@ -26,8 +32,14 @@ public struct AutomationResourceTimelineItem: Identifiable, Codable, Equatable, 
         lane: AutomationResourceTimelineLane,
         status: AutomationDisplayStatus,
         resourceLabel: String,
+        resourceKeys: [String]? = nil,
+        kindLabel: String? = nil,
+        statusDetail: String? = nil,
+        scheduledAt: Date? = nil,
+        earliestStartAt: Date? = nil,
         startedAt: Date? = nil,
         completedAt: Date? = nil,
+        createdAt: Date? = nil,
         resourceWaiting: AutomationResourceWaitingProjection? = nil,
         timeoutCountdown: AutomationTimeoutCountdownProjection? = nil,
         retryAttemptSummary: AutomationRetryAttemptSummary? = nil,
@@ -42,8 +54,14 @@ public struct AutomationResourceTimelineItem: Identifiable, Codable, Equatable, 
         self.lane = lane
         self.status = status
         self.resourceLabel = resourceLabel
+        self.resourceKeys = resourceKeys?.isEmpty == true ? nil : resourceKeys
+        self.kindLabel = kindLabel
+        self.statusDetail = statusDetail
+        self.scheduledAt = scheduledAt
+        self.earliestStartAt = earliestStartAt
         self.startedAt = startedAt
         self.completedAt = completedAt
+        self.createdAt = createdAt
         self.resourceWaiting = resourceWaiting
         self.timeoutCountdown = timeoutCountdown
         self.retryAttemptSummary = retryAttemptSummary

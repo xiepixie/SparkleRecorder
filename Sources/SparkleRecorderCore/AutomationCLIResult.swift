@@ -207,6 +207,7 @@ public enum SemanticRecordingCLIArtifactFileKind: String, Codable, Equatable, Se
     case redactedVideo
     case frame
     case redactedFrame
+    case visualObservation
     case sourcePreview
     case runtimeSample
     case diff
@@ -215,6 +216,7 @@ public enum SemanticRecordingCLIArtifactFileKind: String, Codable, Equatable, Se
 public enum SemanticRecordingCLIArtifactFileStatus: String, Codable, Equatable, Sendable {
     case present
     case missing
+    case deleted
     case empty
     case directory
     case unsafe
@@ -247,6 +249,7 @@ public struct SemanticRecordingCLIArtifactFileSummary: Codable, Equatable, Senda
     public var checkedCount: Int
     public var presentCount: Int
     public var missingCount: Int
+    public var deletedCount: Int
     public var emptyCount: Int
     public var directoryCount: Int
     public var unsafeCount: Int
@@ -260,6 +263,7 @@ public struct SemanticRecordingCLIArtifactFileSummary: Codable, Equatable, Senda
         self.checkedCount = evidence.count
         self.presentCount = evidence.filter { $0.status == .present }.count
         self.missingCount = evidence.filter { $0.status == .missing }.count
+        self.deletedCount = evidence.filter { $0.status == .deleted }.count
         self.emptyCount = evidence.filter { $0.status == .empty }.count
         self.directoryCount = evidence.filter { $0.status == .directory }.count
         self.unsafeCount = evidence.filter { $0.status == .unsafe }.count
@@ -273,7 +277,7 @@ public struct SemanticRecordingCLIArtifactFileSummary: Codable, Equatable, Senda
     }
 
     public var hasIssues: Bool {
-        missingCount > 0 || emptyCount > 0 || directoryCount > 0 || unsafeCount > 0
+        missingCount > 0 || deletedCount > 0 || emptyCount > 0 || directoryCount > 0 || unsafeCount > 0
     }
 }
 
@@ -1328,16 +1332,18 @@ public struct SemanticRecordingCLISuggestionsPayload: Codable, Equatable, Sendab
     public var unavailableReason: String?
     public var count: Int
     public var suggestions: [SemanticRecordingCLISuggestionSummary]
+    public var artifactFiles: SemanticRecordingCLIArtifactFileSummary?
 
     public init(
         requestedRecordingID: String,
         bundle: SemanticRecordingBundle,
         fixture: String? = nil,
         category: SemanticRecordingCLISuggestionCategory,
-        suggestions: [RecordingSuggestion]
+        suggestions: [RecordingSuggestion],
+        artifactFiles: SemanticRecordingCLIArtifactFileSummary? = nil
     ) {
         let availability: SemanticRecordingSuggestionAvailability = fixture == nil
-            ? .unavailable
+            ? .persistedBundle
             : .deterministicFixture
         self.init(
             requestedRecordingID: requestedRecordingID,
@@ -1348,10 +1354,9 @@ public struct SemanticRecordingCLISuggestionsPayload: Codable, Equatable, Sendab
                 availability: availability,
                 query: .kinds(category.suggestionKinds),
                 suggestions: suggestions,
-                unavailableReason: availability == .unavailable
-                    ? "Stored bundle suggestion synthesis is not implemented yet; this payload only includes caller-provided suggestions."
-                    : nil
-            )
+                unavailableReason: nil
+            ),
+            artifactFiles: artifactFiles
         )
     }
 
@@ -1360,7 +1365,8 @@ public struct SemanticRecordingCLISuggestionsPayload: Codable, Equatable, Sendab
         bundle: SemanticRecordingBundle,
         fixture: String? = nil,
         category: SemanticRecordingCLISuggestionCategory,
-        suggestionResult: SemanticRecordingSuggestionResult
+        suggestionResult: SemanticRecordingSuggestionResult,
+        artifactFiles: SemanticRecordingCLIArtifactFileSummary? = nil
     ) {
         let selectedSuggestions = SemanticRecordingQueryEngine
             .filterAndSort(
@@ -1379,6 +1385,7 @@ public struct SemanticRecordingCLISuggestionsPayload: Codable, Equatable, Sendab
         self.unavailableReason = suggestionResult.unavailableReason
         self.count = selectedSuggestions.count
         self.suggestions = selectedSuggestions
+        self.artifactFiles = artifactFiles
     }
 }
 
@@ -1860,10 +1867,11 @@ public extension AutomationCLIResultEnvelope where Value == SemanticRecordingCLI
         fixture: String? = nil,
         sourceOption: String? = nil,
         category: SemanticRecordingCLISuggestionCategory,
-        suggestions: [RecordingSuggestion]
+        suggestions: [RecordingSuggestion],
+        artifactFiles: SemanticRecordingCLIArtifactFileSummary? = nil
     ) -> AutomationCLIResultEnvelope<SemanticRecordingCLISuggestionsPayload> {
         let availability: SemanticRecordingSuggestionAvailability = fixture == nil
-            ? .unavailable
+            ? .persistedBundle
             : .deterministicFixture
         return semanticRecordingSuggestions(
             command: command,
@@ -1876,10 +1884,9 @@ public extension AutomationCLIResultEnvelope where Value == SemanticRecordingCLI
                 availability: availability,
                 query: .kinds(category.suggestionKinds),
                 suggestions: suggestions,
-                unavailableReason: availability == .unavailable
-                    ? "Stored bundle suggestion synthesis is not implemented yet; this command returns only available deterministic suggestions."
-                    : nil
-            )
+                unavailableReason: nil
+            ),
+            artifactFiles: artifactFiles
         )
     }
 
@@ -1890,7 +1897,8 @@ public extension AutomationCLIResultEnvelope where Value == SemanticRecordingCLI
         fixture: String? = nil,
         sourceOption: String? = nil,
         category: SemanticRecordingCLISuggestionCategory,
-        suggestionResult: SemanticRecordingSuggestionResult
+        suggestionResult: SemanticRecordingSuggestionResult,
+        artifactFiles: SemanticRecordingCLIArtifactFileSummary? = nil
     ) -> AutomationCLIResultEnvelope<SemanticRecordingCLISuggestionsPayload> {
         return AutomationCLIResultEnvelope<SemanticRecordingCLISuggestionsPayload>(
             ok: true,
@@ -1900,10 +1908,14 @@ public extension AutomationCLIResultEnvelope where Value == SemanticRecordingCLI
                 bundle: bundle,
                 fixture: fixture,
                 category: category,
-                suggestionResult: suggestionResult
+                suggestionResult: suggestionResult,
+                artifactFiles: artifactFiles
             ),
             warnings: semanticRecordingCLIFixtureWarnings(fixture)
-                + semanticRecordingCLISuggestionWarnings(suggestionResult),
+                + semanticRecordingCLISuggestionWarnings(
+                    suggestionResult,
+                    artifactFiles: artifactFiles
+                ),
             nextActions: [
                 AutomationCLINextAction(
                     command: "Open the cited frame IDs in Macro Review before accepting any suggestion.",
@@ -1931,18 +1943,28 @@ private func semanticRecordingCLIFixtureWarnings(_ fixture: String?) -> [Automat
 }
 
 private func semanticRecordingCLISuggestionWarnings(
-    _ result: SemanticRecordingSuggestionResult
+    _ result: SemanticRecordingSuggestionResult,
+    artifactFiles: SemanticRecordingCLIArtifactFileSummary? = nil
 ) -> [AutomationCLIMessage] {
-    guard result.availability == .unavailable else {
-        return []
-    }
-    return [
-        AutomationCLIMessage(
-            code: "suggestionsUnavailable",
-            message: result.unavailableReason
-                ?? "Stored bundle suggestion synthesis is not implemented yet; this command returns only available deterministic suggestions."
+    var warnings: [AutomationCLIMessage] = []
+    if result.availability == .unavailable {
+        warnings.append(
+            AutomationCLIMessage(
+                code: "suggestionsUnavailable",
+                message: result.unavailableReason
+                    ?? "Stored bundle suggestion synthesis is not implemented yet; this command returns only available deterministic suggestions."
+            )
         )
-    ]
+    }
+    if artifactFiles?.hasIssues == true {
+        warnings.append(
+            AutomationCLIMessage(
+                code: "recordingArtifactsDegraded",
+                message: "One or more semantic recording bundle artifact refs are missing, deleted, empty, unsafe or directories; inspect artifactFiles before accepting suggestions."
+            )
+        )
+    }
+    return warnings
 }
 
 private func semanticRecordingCLIReadinessWarnings(
@@ -1971,7 +1993,7 @@ private func semanticRecordingCLIReadinessWarnings(
         warnings.append(
             AutomationCLIMessage(
                 code: "recordingArtifactsDegraded",
-                message: "One or more semantic recording artifact refs are missing, empty, unsafe or directories; inspect artifactFiles before treating this as live product evidence."
+                message: "One or more semantic recording artifact refs are missing, deleted, empty, unsafe or directories; inspect artifactFiles before treating this as live product evidence."
             )
         )
     }

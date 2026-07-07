@@ -590,8 +590,8 @@ public struct EventGrouper: Sendable {
         // Post-process: merge consecutive clicks into multi-clicks
         groups = mergeScrollSegments(groups, events: events)
         groups = mergeConsecutiveClicks(groups, events: events)
-        groups = mergeRapidMultiPointClicks(groups)
-        groups = mergeTextInputGroups(groups)
+        groups = mergeTextInputGroups(groups, events: events)
+        groups = mergeRapidMultiPointClicks(groups, events: events)
         groups = mergeBehaviorGroups(groups, events: events)
         
         return groups
@@ -820,6 +820,7 @@ public struct EventGrouper: Sendable {
                     let next = groups[j]
                     if isMergeableCoordinateClick(next), let sp1 = merged.startPoint, let sp2 = next.startPoint {
                         guard merged.mouseButton == next.mouseButton else { break }
+                        guard behaviorGroupID(for: merged, events: events) == behaviorGroupID(for: next, events: events) else { break }
                         let dist = hypot(sp2.x - sp1.x, sp2.y - sp1.y)
                         let gap = next.startTime - merged.endTime
                         
@@ -865,7 +866,7 @@ public struct EventGrouper: Sendable {
         return result
     }
     
-    private func mergeTextInputGroups(_ groups: [ActionGroup]) -> [ActionGroup] {
+    private func mergeTextInputGroups(_ groups: [ActionGroup], events: [RecordedEvent]) -> [ActionGroup] {
         var result: [ActionGroup] = []
         var i = 0
         while i < groups.count {
@@ -886,7 +887,8 @@ public struct EventGrouper: Sendable {
                 guard next.kind == .keyPress,
                       next.startTime - merged.endTime <= options.clickMergeGap,
                       let nextText = next.unicodeString,
-                      isTextInputCandidate(nextText, flags: next.keyFlags ?? 0) else {
+                      isTextInputCandidate(nextText, flags: next.keyFlags ?? 0),
+                      behaviorGroupID(for: merged, events: events) == behaviorGroupID(for: next, events: events) else {
                     break
                 }
                 typed += nextText
@@ -907,7 +909,7 @@ public struct EventGrouper: Sendable {
         return result
     }
 
-    private func mergeRapidMultiPointClicks(_ groups: [ActionGroup]) -> [ActionGroup] {
+    private func mergeRapidMultiPointClicks(_ groups: [ActionGroup], events: [RecordedEvent]) -> [ActionGroup] {
         var result: [ActionGroup] = []
         var i = 0
         while i < groups.count {
@@ -924,7 +926,8 @@ public struct EventGrouper: Sendable {
                 let next = groups[j]
                 guard isMergeableCoordinateClick(next),
                       next.startPoint != nil,
-                      next.startTime - mergedGroups.last!.endTime <= options.multiPointClickGap else {
+                      next.startTime - mergedGroups.last!.endTime <= options.multiPointClickGap,
+                      behaviorGroupID(for: mergedGroups.last!, events: events) == behaviorGroupID(for: next, events: events) else {
                     break
                 }
                 mergedGroups.append(next)

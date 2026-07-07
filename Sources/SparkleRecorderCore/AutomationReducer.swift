@@ -872,6 +872,9 @@ public enum AutomationReducer {
                     )
                 }
 
+                let delay = status == .triggered
+                    ? dependency.delayResolution(after: completedRun).delay
+                    : dependency.delay
                 return AutomationBranchDecisionEvidence(
                     sourceRunID: completedRun.id,
                     sourceTaskID: completedRun.taskID,
@@ -883,7 +886,7 @@ public enum AutomationReducer {
                     executionID: completedRun.executionID,
                     sourceOutcome: outcome,
                     decidedAt: completedAt,
-                    delay: dependency.delay,
+                    delay: delay,
                     targetJoinPolicy: targetTask?.joinPolicy,
                     reason: reason
                 )
@@ -1210,10 +1213,11 @@ public enum AutomationReducer {
                   }) else {
                 return nil
             }
+            let delayResolution = dependency.delayResolution(after: run)
             return DependencyMatch(
                 dependency: dependency,
                 run: run,
-                readyAt: completedAt.addingTimeInterval(dependency.delay)
+                readyAt: completedAt.addingTimeInterval(delayResolution.delay)
             )
         }
         guard !matches.isEmpty else {
@@ -1249,10 +1253,11 @@ public enum AutomationReducer {
             let completedAt = matchingRun.completedAt else {
             return nil
         }
+        let delayResolution = dependency.delayResolution(after: matchingRun)
         return DependencyMatch(
             dependency: dependency,
             run: matchingRun,
-            readyAt: completedAt.addingTimeInterval(dependency.delay)
+            readyAt: completedAt.addingTimeInterval(delayResolution.delay)
         )
     }
 

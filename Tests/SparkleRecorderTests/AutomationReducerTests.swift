@@ -1504,6 +1504,80 @@ struct AutomationReducerTests {
         })
     }
 
+    @Test("Dynamic dependency delay schedules downstream from condition evidence duration")
+    func dynamicDependencyDelaySchedulesDownstreamFromConditionEvidenceDuration() throws {
+        let ids = TestIDs()
+        let start = Date(timeIntervalSince1970: 100)
+        let completedAt = Date(timeIntervalSince1970: 104)
+        let conditionID = UUID(uuidString: "00000000-0000-0000-0000-000000000017")!
+        let condition = AutomationConditionSpec(
+            id: conditionID,
+            name: "Read crop timer",
+            kind: .ocrText(AutomationOCRCondition(text: "mature"))
+        )
+        let conditionTask = AutomationTask(
+            id: ids.taskA,
+            name: "Read crop timer",
+            kind: .condition(condition),
+            resourceRequirement: .none
+        )
+        let targetTask = delayTask(id: ids.taskB)
+        let dependency = AutomationDependency(
+            fromTaskID: ids.taskA,
+            toTaskID: ids.taskB,
+            trigger: .onConditionMatched,
+            delay: 30,
+            dynamicDelay: AutomationDependencyDynamicDelay(
+                fallbackDelay: 30,
+                maximumDelay: 7_200
+            )
+        )
+        let workflow = AutomationWorkflow(
+            id: ids.workflow,
+            name: "Crop timer",
+            tasks: [conditionTask, targetTask],
+            dependencies: [dependency]
+        )
+        let evidence = AutomationConditionEvaluationEvidence(
+            runID: ids.runA,
+            workflowID: ids.workflow,
+            taskID: ids.taskA,
+            conditionID: conditionID,
+            kind: .ocrText,
+            outcome: .conditionMatched,
+            evaluatedAt: completedAt,
+            targetDescription: "Crop timer",
+            observedSummary: "Detected text: mature in 1h 30m",
+            fields: [
+                AutomationConditionDiagnosticField(id: "lastTexts", title: "Last texts", value: "1h 30m")
+            ]
+        )
+        let env = environment(ids.runA, ids.runB)
+        let started = AutomationReducer.reduce(
+            state: AutomationRunState(workflows: [workflow]),
+            action: .manualStart(workflowID: ids.workflow, taskID: ids.taskA, requestedAt: start),
+            environment: env
+        )
+
+        let completed = AutomationReducer.reduce(
+            state: started.state,
+            action: .conditionEvaluationCompleted(
+                runID: ids.runA,
+                result: AutomationConditionEvaluationResult(outcome: .conditionMatched, evidence: evidence),
+                at: completedAt
+            ),
+            environment: env
+        )
+
+        let downstreamRun = try #require(completed.state.run(id: ids.runB))
+        let sourceRun = try #require(completed.state.run(id: ids.runA))
+        let branchEvidence = try #require(sourceRun.branchEvidence?.first)
+        #expect(downstreamRun.status == .planned)
+        #expect(downstreamRun.earliestStartTime == completedAt.addingTimeInterval(5_400))
+        #expect(downstreamRun.upstreamRunIDs == [ids.runA])
+        #expect(branchEvidence.delay == 5_400)
+    }
+
     @Test("Condition effect includes completed upstream outcomes")
     func conditionEffectIncludesCompletedUpstreamOutcomes() throws {
         let ids = TestIDs()

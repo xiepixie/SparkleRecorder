@@ -96,8 +96,8 @@ struct SemanticRecordingQueryTests {
         #expect(unmatched.isEmpty)
     }
 
-    @Test("Deterministic suggestions are fixture-only and category filtered")
-    func deterministicSuggestionsAreFixtureOnlyAndCategoryFiltered() throws {
+    @Test("Deterministic suggestions include persisted-bundle evidence proposals")
+    func deterministicSuggestionsIncludePersistedBundleEvidenceProposals() throws {
         let bundle = SemanticRecordingFixture.checkoutBundle()
 
         let conditionResult = SemanticRecordingQueryEngine.deterministicSuggestions(
@@ -115,6 +115,11 @@ struct SemanticRecordingQueryTests {
             fixture: nil,
             query: .kinds([.conditionCandidate])
         )
+        let storedLocatorResult = SemanticRecordingQueryEngine.deterministicSuggestions(
+            for: bundle,
+            fixture: nil,
+            query: .kinds([.locatorReplacement, .fragileClick])
+        )
 
         #expect(conditionResult.availability == .deterministicFixture)
         #expect(conditionResult.suggestions.map(\.id) == [SemanticRecordingFixture.suggestionID])
@@ -122,10 +127,24 @@ struct SemanticRecordingQueryTests {
         #expect(locatorResult.availability == .deterministicFixture)
         #expect(locatorResult.query.allowedKinds == [.locatorReplacement, .fragileClick])
         #expect(locatorResult.suggestions.isEmpty)
-        #expect(storedResult.availability == .unavailable)
+        #expect(storedResult.availability == .persistedBundle)
         #expect(storedResult.query.allowedKinds == [.conditionCandidate])
-        #expect(storedResult.suggestions.isEmpty)
-        #expect(storedResult.unavailableReason?.contains("checkout fixture") == true)
+        #expect(storedResult.unavailableReason == nil)
+        #expect(storedResult.suggestions.map(\.kind) == [.conditionCandidate, .conditionCandidate])
+        #expect(storedResult.suggestions.contains {
+            $0.title == "Create OCR wait for \"Order confirmed\"" &&
+                $0.evidence.first?.observationIDs == [SemanticRecordingFixture.ocrObservationID] &&
+                $0.evidence.first?.artifactRef?.path == "visual-index/ocr/confirmation-region.png"
+        })
+        #expect(storedResult.suggestions.contains {
+            $0.title == "Create image condition for button" &&
+                $0.evidence.first?.observationIDs == [SemanticRecordingFixture.templateObservationID] &&
+                $0.evidence.first?.artifactRef?.path == "visual-index/templates/checkout-button.png"
+        })
+        #expect(storedLocatorResult.availability == .persistedBundle)
+        #expect(storedLocatorResult.query.allowedKinds == [.locatorReplacement, .fragileClick])
+        #expect(storedLocatorResult.suggestions.map(\.kind) == [.locatorReplacement])
+        #expect(storedLocatorResult.suggestions.first?.title == "Review image locator for button")
     }
 
     @Test("Deterministic query results are codable for CLI and future MCP callers")

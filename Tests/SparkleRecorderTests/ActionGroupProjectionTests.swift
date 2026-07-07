@@ -147,6 +147,38 @@ struct ActionGroupProjectionTests {
         #expect(exposedGroups.map(\.eventIndices) == [[0, 1], [2]])
     }
 
+    @Test("Projection finds copied behavior group before raw copied rows")
+    func projectionFindsCopiedBehaviorGroupBeforeRawCopiedRows() throws {
+        let sourceID = BehaviorGroupID()
+        var events = [
+            RecordedEvent.make(.leftMouseDown, time: 0.0, x: 10, y: 20),
+            RecordedEvent.make(.leftMouseUp, time: 0.1, x: 10, y: 20),
+            RecordedEvent.make(.keyDown, time: 0.2, keyCode: 36),
+            RecordedEvent.make(.keyUp, time: 0.3, keyCode: 36)
+        ]
+        events.bindBehavior(at: [0, 1, 2, 3], id: sourceID, name: "Login")
+        events.duplicateEvents(at: [0, 1, 2, 3])
+
+        let groups = ActionGroupProjection.groups(
+            from: events,
+            liveDuration: nil,
+            hidesMouseMoves: false,
+            smartMergeGestures: true
+        )
+        let copied = ActionGroupProjection.behaviorGroups(
+            containingEventIndices: Set(4..<8),
+            excluding: Set([sourceID]),
+            groups: groups
+        )
+
+        let copiedBehavior = try #require(copied.first)
+        #expect(copied.count == 1)
+        #expect(copiedBehavior.kind == .sequence)
+        #expect(copiedBehavior.eventIndices == [4, 5, 6, 7])
+        #expect(copiedBehavior.behaviorGroupID != sourceID)
+        #expect(copiedBehavior.behaviorGroupName == "Copy of Login")
+    }
+
     @Test("Selection snapshot keeps group order and sorts event indices once")
     func selectionSnapshotKeepsGroupOrderAndSortsEventIndices() {
         let firstID = UUID()
