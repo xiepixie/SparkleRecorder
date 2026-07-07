@@ -71,6 +71,19 @@ enum AutomationDependencyTriggerDraft: String, CaseIterable, Identifiable {
         }
     }
 
+    static func options(for sourceTask: AutomationTask?) -> [AutomationDependencyTriggerDraft] {
+        guard let sourceTask else {
+            return allCases
+        }
+
+        switch sourceTask.kind {
+        case .condition:
+            return [.onConditionMatched, .onConditionNotMatched, .onTimeout, .onFailure, .onCancelled, .always]
+        case .macro, .delay, .notification:
+            return [.onSuccess, .onFailure, .onTimeout, .onCancelled, .always]
+        }
+    }
+
     private static func draft(for predicate: AutomationOutcomePredicate) -> AutomationDependencyTriggerDraft {
         switch predicate {
         case .success:

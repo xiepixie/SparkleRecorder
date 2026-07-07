@@ -2,6 +2,7 @@ import SwiftUI
 
 struct AutomationFlowGraphLinkingToolbar: View {
     let trigger: AutomationDependencyTriggerDraft
+    let triggerOptions: [AutomationDependencyTriggerDraft]
     let onSetTrigger: (AutomationDependencyTriggerDraft) -> Void
     let onCancel: () -> Void
 
@@ -15,7 +16,7 @@ struct AutomationFlowGraphLinkingToolbar: View {
                 .opacity(0.5)
 
             Menu {
-                ForEach(AutomationDependencyTriggerDraft.allCases) { option in
+                ForEach(triggerOptions) { option in
                     Button(option.title, action: { onSetTrigger(option) })
                 }
             } label: {

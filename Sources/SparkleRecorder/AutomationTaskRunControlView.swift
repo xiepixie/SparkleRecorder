@@ -46,8 +46,7 @@ struct AutomationTaskRunControlView: View {
                 }
             }
         }
-        .padding(10)
-        .sectionSurface(cornerRadius: 10)
+        .padding(.vertical, 8)
         .alert(runConfirmationTitle, isPresented: $isConfirmingRun) {
             Button(NSLocalizedString("Run Task", comment: ""), action: onRun)
             Button(NSLocalizedString("Cancel", comment: ""), role: .cancel) {}

@@ -25,8 +25,7 @@ struct AutomationTaskBranchPanelView: View {
                 branchGroup(branchID)
             }
         }
-        .padding(10)
-        .sectionSurface(cornerRadius: 10)
+        .padding(.vertical, 8)
         .accessibilityElement(children: .contain)
     }
 
@@ -213,6 +212,15 @@ struct AutomationTaskBranchPanelView: View {
 
     private func branchDetail(for dependency: AutomationDependency, branchID: String) -> String {
         let trigger = AutomationDependencyTriggerDraft.draft(for: dependency.trigger).title
+        if dependency.dynamicDelay != nil {
+            let delayLabel = dependencyEdgesByID[dependency.id]?.delayLabel ??
+                NSLocalizedString("Observed time", comment: "")
+            return String(
+                format: NSLocalizedString("%@ · %@", comment: ""),
+                trigger,
+                delayLabel
+            )
+        }
         if dependency.delay <= 0 {
             return trigger
         }

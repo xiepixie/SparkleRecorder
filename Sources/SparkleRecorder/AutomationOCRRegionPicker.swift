@@ -34,30 +34,37 @@ enum AutomationOCRRegionPicker {
         searchRegionSpace: AutomationOCRSearchRegionSpace,
         onPicked: @escaping (AutomationOCRCondition) -> Void
     ) {
-        AutomationOCRRegionPickerOverlay.shared.onPicked = { selection in
-            defer {
-                AutomationOCRRegionPickerOverlay.shared.onPicked = nil
-                AutomationOCRRegionPickerOverlay.shared.onCancelled = nil
-            }
-
-            guard let region = selection.searchRegion(in: searchRegionSpace) else {
-                NSSound.beep()
-                return
-            }
-
-            onPicked(currentCondition.updatingTextMatchRegionAndSpace(
-                text: currentCondition.text,
-                matchMode: currentCondition.matchMode,
-                searchRegion: region,
-                searchRegionSpace: searchRegionSpace,
-                requireVisible: currentCondition.requireVisible
-            ))
+        pickArea(
+            currentCondition: currentCondition,
+            searchRegionSpace: searchRegionSpace
+        ) { condition, _ in
+            onPicked(condition)
         }
-        AutomationOCRRegionPickerOverlay.shared.onCancelled = {
-            AutomationOCRRegionPickerOverlay.shared.onPicked = nil
-            AutomationOCRRegionPickerOverlay.shared.onCancelled = nil
-        }
-        AutomationOCRRegionPickerOverlay.shared.start()
+    }
+
+    static func pickArea(
+        currentCondition: AutomationOCRCondition,
+        searchRegionSpace: AutomationOCRSearchRegionSpace,
+        onPicked: @escaping (AutomationOCRCondition, AutomationRegionCapturePreview?) -> Void
+    ) {
+        AutomationScreenRegionPicker.pickRegion(
+            instructionTitle: NSLocalizedString("Drag to select OCR region", comment: ""),
+            onPicked: { selection in
+                let resolvedSpace = selection.resolvedSpace(for: searchRegionSpace)
+                guard let region = selection.searchRegion(in: resolvedSpace) else {
+                    NSSound.beep()
+                    return
+                }
+
+                onPicked(currentCondition.updatingTextMatchRegionAndSpace(
+                    text: currentCondition.text,
+                    matchMode: currentCondition.matchMode,
+                    searchRegion: region,
+                    searchRegionSpace: resolvedSpace,
+                    requireVisible: currentCondition.requireVisible
+                ), selection.preview)
+            }
+        )
     }
 
     private static func condition(

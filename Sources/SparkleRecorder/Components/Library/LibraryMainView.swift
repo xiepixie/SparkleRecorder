@@ -108,83 +108,114 @@ struct LibraryMainView: View {
                     .padding(.top, 2)
                     .padding(.bottom, 6)
 
-                    LazyVGrid(
-                        columns: isWindow
-                            ? [GridItem(.adaptive(minimum: 250, maximum: 320), spacing: 12)]
-                            : [GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8)],
-                        spacing: isWindow ? 12 : 8
-                    ) {
-                        ForEach(filtered) { macro in
-                            MacroCard(
-                                macro: macro,
-                                controller: controller,
-                                isCurrent: macro.id == library.currentMacroID,
-                                isSelected: selection.contains(macro.id),
-                                isRenaming: renamingID == macro.id,
-                                renameText: $renameText,
-                                onSelect: { event in
-                                    handleCardSelect(macro, event)
-                                },
-                                onPlay: {
-                                    selection.removeAll()
-                                    controller.playMacroByID(macro.id)
-                                },
-                                onEdit: {
-                                    selection.removeAll()
-                                    controller.selectMacro(macro.id)
-                                    controller.openEditor()
-                                },
-                                onDelete: {
-                                    selection.remove(macro.id)
-                                    controller.deleteMacro(macro.id)
-                                },
-                                onDuplicate: {
-                                    controller.duplicateMacro(macro.id)
-                                },
-                                onExport: {
-                                    controller.exportMacroToFile(macro.id)
-                                },
-                                onExportText: {
-                                    controller.exportMacroAsText(macro.id)
-                                },
-                                onStartRename: {
-                                    renamingID = macro.id
-                                    renameText = macro.name
-                                },
-                                onCommitRename: {
-                                    if let id = renamingID {
-                                        controller.renameMacro(id, to: renameText)
-                                    }
-                                    renamingID = nil
-                                },
-                                onSetLoops: { newLoops in
-                                    controller.setMacroLoops(macro.id, to: newLoops)
-                                },
-                                onAssignHotkey: { showAssignHotkey = macro },
-                                onClearHotkey: { controller.setMacroHotkey(macro.id, to: nil) },
-                                onToggleFavorite: { controller.toggleFavorite(macro.id) },
-                                onSetIcon: { icon in controller.setMacroIcon(macro.id, to: icon) },
-                                onAddTag: { showAddTag = macro },
-                                onDragMove: { fromID, toID in
-                                    library.move(id: fromID, before: toID)
-                                },
-                                onOpenNotes: { showNotesFor = macro },
-                                onSetSpeed: { speed in
-                                    controller.setMacroSpeed(macro.id, to: speed)
-                                },
-                                onSetAccent: { color in
-                                    controller.setMacroAccent(macro.id, to: color)
-                                },
-                                onSetChain: { target in
-                                    controller.setChain(macro.id, to: target)
-                                },
-                                chainCandidates: chainCandidates,
-                                chainTargetName: macro.chainTo.flatMap { chainNameByID[$0] }
-                            )
+                    if isWindow {
+                        LazyVGrid(
+                            columns: [GridItem(.adaptive(minimum: 250, maximum: 320), spacing: 12, alignment: .top)],
+                            spacing: 12
+                        ) {
+                            ForEach(filtered) { macro in
+                                MacroCard(
+                                    macro: macro,
+                                    controller: controller,
+                                    isCurrent: macro.id == library.currentMacroID,
+                                    isSelected: selection.contains(macro.id),
+                                    isRenaming: renamingID == macro.id,
+                                    renameText: $renameText,
+                                    onSelect: { event in
+                                        handleCardSelect(macro, event)
+                                    },
+                                    onPlay: {
+                                        selection.removeAll()
+                                        controller.playMacroByID(macro.id)
+                                    },
+                                    onEdit: {
+                                        selection.removeAll()
+                                        controller.selectMacro(macro.id)
+                                        controller.openEditor()
+                                    },
+                                    onDelete: {
+                                        selection.remove(macro.id)
+                                        controller.deleteMacro(macro.id)
+                                    },
+                                    onDuplicate: {
+                                        controller.duplicateMacro(macro.id)
+                                    },
+                                    onExport: {
+                                        controller.exportMacroToFile(macro.id)
+                                    },
+                                    onExportText: {
+                                        controller.exportMacroAsText(macro.id)
+                                    },
+                                    onStartRename: {
+                                        renamingID = macro.id
+                                        renameText = macro.name
+                                    },
+                                    onCommitRename: {
+                                        if let id = renamingID {
+                                            controller.renameMacro(id, to: renameText)
+                                        }
+                                        renamingID = nil
+                                    },
+                                    onSetLoops: { newLoops in
+                                        controller.setMacroLoops(macro.id, to: newLoops)
+                                    },
+                                    onAssignHotkey: { showAssignHotkey = macro },
+                                    onClearHotkey: { controller.setMacroHotkey(macro.id, to: nil) },
+                                    onToggleFavorite: { controller.toggleFavorite(macro.id) },
+                                    onSetIcon: { icon in controller.setMacroIcon(macro.id, to: icon) },
+                                    onAddTag: { showAddTag = macro },
+                                    onDragMove: { fromID, toID in
+                                        library.move(id: fromID, before: toID)
+                                    },
+                                    onOpenNotes: { showNotesFor = macro },
+                                    onSetSpeed: { speed in
+                                        controller.setMacroSpeed(macro.id, to: speed)
+                                    },
+                                    onSetAccent: { color in
+                                        controller.setMacroAccent(macro.id, to: color)
+                                    },
+                                    onSetChain: { target in
+                                        controller.setChain(macro.id, to: target)
+                                    },
+                                    chainCandidates: chainCandidates,
+                                    chainTargetName: macro.chainTo.flatMap { chainNameByID[$0] }
+                                )
+                            }
                         }
+                        .padding(.horizontal, 12)
+                        .padding(.bottom, 6)
+                    } else {
+                        LazyVStack(spacing: 6) {
+                            ForEach(filtered) { macro in
+                                CompactMacroRow(
+                                    macro: macro,
+                                    controller: controller,
+                                    isCurrent: macro.id == library.currentMacroID,
+                                    isSelected: selection.contains(macro.id),
+                                    onSelect: { event in
+                                        handleCardSelect(macro, event)
+                                    },
+                                    onPlay: {
+                                        selection.removeAll()
+                                        controller.playMacroByID(macro.id)
+                                    },
+                                    onEdit: {
+                                        selection.removeAll()
+                                        controller.selectMacro(macro.id)
+                                        controller.openEditor()
+                                    },
+                                    onSetIcon: { icon in
+                                        controller.setMacroIcon(macro.id, to: icon)
+                                    },
+                                    onAssignHotkey: {
+                                        showAssignHotkey = macro
+                                    }
+                                )
+                            }
+                        }
+                        .padding(.horizontal, 12)
+                        .padding(.bottom, 6)
                     }
-                    .padding(.horizontal, 12)
-                    .padding(.bottom, 6)
                 }
             }
         }

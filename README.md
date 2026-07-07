@@ -12,13 +12,13 @@ The app is built with Swift, SwiftUI, AppKit, Carbon hotkeys, `CGEventTap`, and 
 - Replays against absolute screen coordinates, recorded window offsets, or OCR/text anchors when available.
 - Imports native `.tinyrec` JSON, legacy Windows `.rec` files, and editable `.txt` / `.trm` text macros.
 - Exports native `.tinyrec`, editable text, and self-running `.command` scripts.
-- Provides a full library window, menu-bar popover, recording HUD, countdown overlay, welcome flow, and preferences.
+- Provides a full library window, menu-bar popover, compact/expanded recording status UI, countdown overlay, welcome flow, and preferences.
 
 ## User Flow
 
 1. Launch SparkleRecorder and grant Accessibility plus Input Monitoring permissions.
 2. Press Record from the library, menu bar, menu item, or hotkey.
-3. After the countdown, perform the workflow you want to automate.
+3. After the countdown, perform the workflow you want to automate while the menu bar and optional compact HUD show live recording status.
 4. Stop recording. The macro is saved into the library.
 5. Play the macro, assign a per-macro hotkey, edit its timeline, bind it to a window, or export it.
 

@@ -16,6 +16,7 @@ struct SemanticRecordingReviewFixtureView: View {
     @State private var selectedEventID: UUID?
     @State private var selectedFrameID: UUID?
     @State private var selectedCandidateID: String?
+    @State private var selectedRepeatUntilMacroID: UUID?
     @State private var regionSelection: SemanticRecordingFrameRegionSelection?
     @State private var pixelColorHexes: [String: String] = [:]
     @State private var suggestionReviewDecisions: [UUID: SuggestionReviewDecision] = [:]
@@ -183,8 +184,34 @@ struct SemanticRecordingReviewFixtureView: View {
         }
         return SemanticRecordingReviewRepeatUntilBodyResolver.resolve(
             recordingID: bundle.id,
+            macros: macros,
+            preferredMacroID: preferredRepeatUntilMacroID
+        )
+    }
+
+    private var repeatUntilBodyOptions: [SemanticRecordingReviewRepeatUntilBodyOption] {
+        guard let bundle else {
+            return []
+        }
+        return SemanticRecordingReviewRepeatUntilBodyResolver.options(
+            recordingID: bundle.id,
             macros: macros
         )
+    }
+
+    private var preferredRepeatUntilMacroID: UUID? {
+        guard let selectedRepeatUntilMacroID,
+              repeatUntilBodyOptions.contains(where: { $0.macroID == selectedRepeatUntilMacroID }) else {
+            return nil
+        }
+        return selectedRepeatUntilMacroID
+    }
+
+    private var selectedRepeatUntilBodyOption: SemanticRecordingReviewRepeatUntilBodyOption? {
+        guard let preferredRepeatUntilMacroID else {
+            return nil
+        }
+        return repeatUntilBodyOptions.first { $0.macroID == preferredRepeatUntilMacroID }
     }
 
     var body: some View {
@@ -741,6 +768,8 @@ struct SemanticRecordingReviewFixtureView: View {
                                 comment: ""
                             ))
 
+                            repeatUntilBodyMenu
+
                             if let reviewState, candidate.artifactPath != nil {
                                 Button("", systemImage: "arrow.up.forward.app") {
                                     artifactFeedback = SemanticRecordingReviewPresenter.openArtifact(
@@ -772,6 +801,33 @@ struct SemanticRecordingReviewFixtureView: View {
             } else {
                 emptyInspectorText("No condition candidates on this frame.")
             }
+        }
+    }
+
+    @ViewBuilder
+    private var repeatUntilBodyMenu: some View {
+        let options = repeatUntilBodyOptions
+        if options.count > 1 {
+            Menu {
+                ForEach(options) { option in
+                    Button {
+                        selectedRepeatUntilMacroID = option.macroID
+                    } label: {
+                        Label(
+                            option.title,
+                            systemImage: option.macroID == preferredRepeatUntilMacroID
+                                ? "checkmark.circle.fill"
+                                : "circle"
+                        )
+                    }
+                }
+            } label: {
+                Label(NSLocalizedString("Body", comment: ""), systemImage: "list.bullet")
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.small)
+            .help(repeatUntilBodyMenuHelp(options: options))
+            .accessibilityLabel(NSLocalizedString("Choose Repeat-Until body macro", comment: ""))
         }
     }
 
@@ -1860,7 +1916,7 @@ struct SemanticRecordingReviewFixtureView: View {
                 request: SemanticRecordingReviewDraftPatchRequest(
                     candidate: candidate,
                     regionSelection: effectiveSelection,
-                    pixelColorHex: pixelColorHex(for: candidate)
+                    pixelColorHex: pixelColorHexForDraft(for: candidate, bundle: bundle)
                 )
             )
             draftPreviewActionPresentations = []
@@ -1886,7 +1942,8 @@ struct SemanticRecordingReviewFixtureView: View {
 
         let bodyResolution = SemanticRecordingReviewRepeatUntilBodyResolver.resolve(
             recordingID: bundle.id,
-            macros: macros
+            macros: macros,
+            preferredMacroID: preferredRepeatUntilMacroID
         )
         guard bodyResolution.isResolved else {
             draftPatchResult = nil
@@ -1906,7 +1963,7 @@ struct SemanticRecordingReviewFixtureView: View {
                         bodyTasks: bodyResolution.bodyTasks,
                         onFailure: AutomationWorkflowDraftLoopFailurePolicy.requireManualApproval
                     ),
-                    pixelColorHex: pixelColorHex(for: candidate)
+                    pixelColorHex: pixelColorHexForDraft(for: candidate, bundle: bundle)
                 )
             )
             draftPreviewActionPresentations = []
@@ -1943,7 +2000,7 @@ struct SemanticRecordingReviewFixtureView: View {
         selectedFrameID = match.frameID
         selectedCandidateID = match.candidate.id
         var request = match.request
-        request.pixelColorHex = pixelColorHex(for: match.candidate)
+        request.pixelColorHex = pixelColorHexForDraft(for: match.candidate, bundle: bundle)
         do {
             draftPatchResult = try SemanticRecordingReviewDraftPatchBuilder.makePatch(
                 bundle: bundle,
@@ -2056,6 +2113,26 @@ struct SemanticRecordingReviewFixtureView: View {
         return value?.isEmpty == false ? value : nil
     }
 
+    private func pixelColorHexForDraft(
+        for candidate: SemanticRecordingReviewProjection.ConditionCandidateRow,
+        bundle: SemanticRecordingBundle
+    ) -> String? {
+        if let colorHex = pixelColorHex(for: candidate) {
+            return colorHex
+        }
+        guard candidate.kind == .pixelMatched,
+              let bundleDirectory = reviewState?.bundleDirectory,
+              let sample = try? SemanticRecordingReviewPresenter.pixelColorSample(
+                for: candidate,
+                bundle: bundle,
+                bundleDirectory: bundleDirectory
+              ) else {
+            return nil
+        }
+        pixelColorHexes[candidate.id] = sample.colorHex
+        return sample.colorHex
+    }
+
     private func saveDraftPatch(_ patch: AutomationWorkflowDraftPatchDocument) {
         let defaultName = "macro-review-\(shortID(projection.recordingID))-patch.json"
         SemanticRecordingReviewPresenter.savePatch(patch, defaultName: defaultName) { result in
@@ -2106,6 +2183,21 @@ struct SemanticRecordingReviewFixtureView: View {
             parts.append("baseline \(baselineAsset.key)")
         }
         return parts.joined(separator: " · ")
+    }
+
+    private func repeatUntilBodyMenuHelp(
+        options: [SemanticRecordingReviewRepeatUntilBodyOption]
+    ) -> String {
+        if let selectedRepeatUntilBodyOption {
+            return String(
+                format: NSLocalizedString("Repeat-Until body: %@", comment: ""),
+                selectedRepeatUntilBodyOption.title
+            )
+        }
+        return String(
+            format: NSLocalizedString("Choose one of %d linked macros as the Repeat-Until body.", comment: ""),
+            options.count
+        )
     }
 
     private func regionSelectionDetail(

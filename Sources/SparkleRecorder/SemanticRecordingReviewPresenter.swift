@@ -50,7 +50,11 @@ enum SemanticRecordingReviewPresenterError: LocalizedError {
     case applicationSupportDirectoryUnavailable
     case couldNotDecodeFrameImage(String)
     case emptyCropRegion(String)
+    case emptyPixelSample(String)
+    case missingPixelSampleBounds(String)
+    case missingPixelSampleFrame(UUID)
     case pngEncodingFailed(String)
+    case unsupportedPixelSampleCandidate(String)
 
     var errorDescription: String? {
         switch self {
@@ -60,8 +64,16 @@ enum SemanticRecordingReviewPresenterError: LocalizedError {
             return String(format: NSLocalizedString("Could not decode frame image %@.", comment: ""), path)
         case .emptyCropRegion(let key):
             return String(format: NSLocalizedString("Selected crop region is empty for %@.", comment: ""), key)
+        case .emptyPixelSample(let key):
+            return String(format: NSLocalizedString("Could not sample pixel color for %@.", comment: ""), key)
+        case .missingPixelSampleBounds(let key):
+            return String(format: NSLocalizedString("Pixel sample %@ does not have bounds.", comment: ""), key)
+        case .missingPixelSampleFrame(let frameID):
+            return String(format: NSLocalizedString("Pixel sample frame %@ is missing.", comment: ""), frameID.uuidString)
         case .pngEncodingFailed(let key):
             return String(format: NSLocalizedString("Could not encode cropped asset %@.", comment: ""), key)
+        case .unsupportedPixelSampleCandidate(let key):
+            return String(format: NSLocalizedString("Candidate %@ is not a pixel sample.", comment: ""), key)
         }
     }
 }
@@ -72,6 +84,28 @@ struct SemanticRecordingReviewDraftPreviewResult {
     var importAction: SemanticRecordingReviewActionSemantics
 }
 
+struct SemanticRecordingReviewPixelColorSample: Equatable {
+    var candidateID: String
+    var frameID: UUID
+    var sourcePreviewRefID: UUID?
+    var observationID: UUID?
+    var frameImagePath: String
+    var bounds: RecordingBounds
+    var pixelX: Int
+    var pixelY: Int
+    var colorHex: String
+
+    var observationMetadataPatch: [String: String] {
+        [
+            "colorHex": colorHex,
+            "samplePixelX": String(pixelX),
+            "samplePixelY": String(pixelY),
+            "sampleFrameID": frameID.uuidString,
+            "sampleFrameImageRef": frameImagePath
+        ]
+    }
+}
+
 private struct SemanticRecordingReviewMaterializedPatch {
     var patch: AutomationWorkflowDraftPatchDocument
     var packageDirectory: URL?
@@ -80,6 +114,65 @@ private struct SemanticRecordingReviewMaterializedPatch {
 
 @MainActor
 enum SemanticRecordingReviewPresenter {
+    static func pixelColorSample(
+        for candidate: SemanticRecordingReviewProjection.ConditionCandidateRow,
+        bundle: SemanticRecordingBundle,
+        bundleDirectory: URL
+    ) throws -> SemanticRecordingReviewPixelColorSample {
+        guard candidate.kind == .pixelMatched else {
+            throw SemanticRecordingReviewPresenterError.unsupportedPixelSampleCandidate(candidate.id)
+        }
+        guard let frame = bundle.frames.first(where: { $0.id == candidate.sourceFrameID }) else {
+            throw SemanticRecordingReviewPresenterError.missingPixelSampleFrame(candidate.sourceFrameID)
+        }
+
+        let sourcePreview = candidate.sourcePreviewRefID.flatMap { sourcePreviewID in
+            bundle.sourcePreviews.first { $0.id == sourcePreviewID }
+        }
+        let observation = candidate.observationID.flatMap { observationID in
+            bundle.visualObservations.first { $0.id == observationID }
+        } ?? sourcePreview.flatMap { sourcePreview in
+            bundle.visualObservations.first { $0.sourcePreviewRefID == sourcePreview.id && $0.kind == .pixelSample }
+        }
+        guard let bounds = candidate.bounds ?? observation?.bounds ?? sourcePreview?.bounds else {
+            throw SemanticRecordingReviewPresenterError.missingPixelSampleBounds(candidate.id)
+        }
+
+        let effectiveFrameRef = bundle.redactedFrames
+            .first { $0.frameID == frame.id }
+            .map(\.redactedImageRef) ?? frame.imageRef
+        let imageURL = bundleDirectory.appendingRecordingArtifactRef(effectiveFrameRef)
+        guard let source = CGImageSourceCreateWithURL(imageURL as CFURL, nil),
+              let image = CGImageSourceCreateImageAtIndex(source, 0, nil) else {
+            throw SemanticRecordingReviewPresenterError
+                .couldNotDecodeFrameImage(effectiveFrameRef.path)
+        }
+
+        let point = pixelPoint(for: bounds, image: image)
+        let bitmap = NSBitmapImageRep(cgImage: image)
+        guard let color = bitmap.colorAt(x: point.x, y: point.y)?.usingColorSpace(.sRGB) else {
+            throw SemanticRecordingReviewPresenterError.emptyPixelSample(candidate.id)
+        }
+        let colorHex = String(
+            format: "#%02X%02X%02X",
+            Int((color.redComponent * 255).rounded()),
+            Int((color.greenComponent * 255).rounded()),
+            Int((color.blueComponent * 255).rounded())
+        )
+
+        return SemanticRecordingReviewPixelColorSample(
+            candidateID: candidate.id,
+            frameID: frame.id,
+            sourcePreviewRefID: candidate.sourcePreviewRefID,
+            observationID: candidate.observationID ?? observation?.id,
+            frameImagePath: effectiveFrameRef.path,
+            bounds: bounds,
+            pixelX: point.x,
+            pixelY: point.y,
+            colorHex: colorHex
+        )
+    }
+
     static func openBundle(
         suggestions: [RecordingSuggestion] = [],
         onReview: @escaping (Result<SemanticRecordingReviewState, Error>) -> Void
@@ -455,6 +548,27 @@ enum SemanticRecordingReviewPresenter {
             return nil
         }
         return clipped
+    }
+
+    private static func pixelPoint(
+        for bounds: RecordingBounds,
+        image: CGImage
+    ) -> (x: Int, y: Int) {
+        let rawX: Double
+        let rawY: Double
+        switch bounds.coordinateSpace {
+        case .normalizedFrame:
+            rawX = (bounds.rect.x + bounds.rect.width / 2) * Double(image.width)
+            rawY = (bounds.rect.y + bounds.rect.height / 2) * Double(image.height)
+        case .screenPixels, .displayPixels, .windowPixels, .contentPixels, .framePixels:
+            rawX = bounds.rect.x + bounds.rect.width / 2
+            rawY = bounds.rect.y + bounds.rect.height / 2
+        }
+
+        return (
+            x: min(max(0, Int(rawX.rounded(.down))), max(0, image.width - 1)),
+            y: min(max(0, Int(rawY.rounded(.down))), max(0, image.height - 1))
+        )
     }
 
     static func savePatch(

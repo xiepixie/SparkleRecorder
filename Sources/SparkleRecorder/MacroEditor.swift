@@ -46,6 +46,7 @@ struct DragEditSession {
     let group: ActionGroup
     let eventIndices: [Int]
     let snapshot: [RecordedEvent]
+    let liveDuration: TimeInterval
 }
 
 // MARK: - Editor view
@@ -83,6 +84,10 @@ struct EditorView: View {
 
     @State private var cachedRows: [ActionRow] = []
     @State private var cachedTimelineSamples: [TimelineSampledEvent] = []
+    @State private var repeatUntilDraftPreviewState: AutomationWorkflowDraftPreviewState?
+    @State private var repeatUntilDraftAlertTitle = ""
+    @State private var repeatUntilDraftAlertMessage = ""
+    @State private var isShowingRepeatUntilDraftAlert = false
 
     var rows: [ActionRow] { cachedRows }
 
@@ -175,7 +180,8 @@ struct EditorView: View {
                         onPickText: {
                             self.startPickingText()
                         },
-                        onRefreshRows: updateCachedRows
+                        onRefreshRows: updateCachedRows,
+                        onCreateRepeatUntilDraft: createRepeatUntilDraftFromSelection
                     )
                     .frame(minWidth: 280, idealWidth: 310, maxWidth: 360)
 
@@ -238,6 +244,23 @@ struct EditorView: View {
             controller.persistEdits()
             CoordinatePreviewOverlay.shared.hide()
         }
+        .sheet(item: $repeatUntilDraftPreviewState) { previewState in
+            AutomationWorkflowDraftPreviewSheet(
+                state: previewState,
+                existingWorkflowName: nil,
+                onImportWorkflow: { _, _ in
+                    showRepeatUntilDraftAlert(
+                        title: NSLocalizedString("Open Workflow to import", comment: ""),
+                        message: NSLocalizedString("Repeat-Until drafts from Macro Editor stay in preview until structured loop runtime support lands.", comment: "")
+                    )
+                }
+            )
+        }
+        .alert(repeatUntilDraftAlertTitle, isPresented: $isShowingRepeatUntilDraftAlert) {
+            Button(NSLocalizedString("OK", comment: ""), role: .cancel) {}
+        } message: {
+            Text(repeatUntilDraftAlertMessage)
+        }
     }
 
     func loadInspector() {
@@ -245,9 +268,9 @@ struct EditorView: View {
            let row = rows.first(where: { $0.id == groupID }) {
             let grp = row.group
             if grp.kind.isPassiveWait {
-                inspTime = String(format: "%.4f", grp.duration)
+                inspTime = formatInspectorTime(grp.duration)
             } else {
-                inspTime = String(format: "%.4f", grp.startTime)
+                inspTime = formatInspectorTime(grp.startTime)
             }
             if let sp = grp.startPoint {
                 inspX = String(format: "%.0f", sp.x)
@@ -439,13 +462,14 @@ struct EditorView: View {
                         groupID: groupID,
                         group: grp,
                         eventIndices: grp.eventIndices,
-                        snapshot: rec.events
+                        snapshot: rec.events,
+                        liveDuration: rec.liveDuration
                     )
                 }
             }
             CoordinatePreviewOverlay.shared.onDragStartPointEnded = { [weak recorder] groupID, dx, dy in
                 guard let session = self.activeDragSession, session.groupID == groupID, let rec = recorder else { return }
-                rec.loadEvents(session.snapshot)
+                rec.loadEvents(session.snapshot, duration: session.liveDuration)
                 self.activeDragSession = nil
                 self.withUndo(NSLocalizedString("Adjust Drag Start", comment: "")) {
                     if let start = session.group.startPoint,
@@ -466,7 +490,7 @@ struct EditorView: View {
             }
             CoordinatePreviewOverlay.shared.onDragEndPointEnded = { [weak recorder] groupID, dx, dy in
                 guard let session = self.activeDragSession, session.groupID == groupID, let rec = recorder else { return }
-                rec.loadEvents(session.snapshot)
+                rec.loadEvents(session.snapshot, duration: session.liveDuration)
                 self.activeDragSession = nil
                 self.withUndo(NSLocalizedString("Adjust Swipe Destination", comment: "")) {
                     if let start = session.group.startPoint,
@@ -480,7 +504,7 @@ struct EditorView: View {
             }
             CoordinatePreviewOverlay.shared.onDragPathEnded = { [weak recorder] groupID, dx, dy in
                 guard let session = self.activeDragSession, session.groupID == groupID, let rec = recorder else { return }
-                rec.loadEvents(session.snapshot)
+                rec.loadEvents(session.snapshot, duration: session.liveDuration)
                 self.activeDragSession = nil
                 let undoName = session.group.kind.previewsPointSequence
                     ? NSLocalizedString("Move Click Points", comment: "")
@@ -493,7 +517,7 @@ struct EditorView: View {
             }
             CoordinatePreviewOverlay.shared.onDragPathPointEnded = { [weak recorder] groupID, pointIndex, dx, dy in
                 guard let session = self.activeDragSession, session.groupID == groupID, let rec = recorder else { return }
-                rec.loadEvents(session.snapshot)
+                rec.loadEvents(session.snapshot, duration: session.liveDuration)
                 self.activeDragSession = nil
                 self.withUndo(NSLocalizedString("Move Click Point", comment: "")) {
                     rec.events.translateMultiPointClickPoint(
@@ -753,6 +777,103 @@ struct EditorView: View {
             .map(\.id)
         )
         return rows.filter { targetIDs.contains($0.id) }
+    }
+
+    func createRepeatUntilDraftFromSelection() {
+        guard let currentMacro = library.currentMacro else {
+            showRepeatUntilDraftAlert(
+                title: NSLocalizedString("No macro selected", comment: ""),
+                message: NSLocalizedString("Select a saved macro before creating a Repeat-Until draft.", comment: "")
+            )
+            return
+        }
+
+        let bodyMacroID = UUID()
+        let bodyMacroName = repeatUntilBodyMacroName(for: currentMacro)
+        let plan = MacroEditorRepeatUntilDraftBuilder.plan(
+            request: MacroEditorRepeatUntilDraftRequest(
+                sourceMacroName: currentMacro.name,
+                bodyMacroID: bodyMacroID,
+                bodyMacroName: bodyMacroName,
+                events: recorder.events,
+                groups: rows.map(\.group),
+                selectedGroupIDs: selection
+            )
+        )
+
+        guard plan.readiness.canCreate,
+              let document = plan.document else {
+            showRepeatUntilDraftAlert(
+                title: NSLocalizedString("Repeat Until unavailable", comment: ""),
+                message: macroEditorRepeatUntilReadinessHelp(plan.readiness)
+            )
+            return
+        }
+
+        let date = Date()
+        let bodyMacro = SavedMacro(
+            id: bodyMacroID,
+            name: bodyMacroName,
+            events: plan.bodyEvents,
+            createdAt: date,
+            modifiedAt: date,
+            surfaces: currentMacro.surfaces,
+            followWindowOffset: currentMacro.followWindowOffset,
+            icon: currentMacro.icon,
+            accent: currentMacro.accent,
+            tags: repeatUntilBodyMacroTags(from: currentMacro)
+        )
+        library.insert(bodyMacro, select: false)
+
+        let catalog = library.macros.map(AutomationWorkflowDraftMacroCatalogEntry.init(macro:))
+        repeatUntilDraftPreviewState = AutomationWorkflowDraftPreviewPresenter.previewState(
+            document: document,
+            sourceName: NSLocalizedString("Macro Editor Repeat Until", comment: ""),
+            macroCatalog: catalog
+        )
+    }
+
+    func repeatUntilBodyMacroName(for macro: SavedMacro) -> String {
+        let selectedBehaviorName = rows
+            .filter { selection.contains($0.id) }
+            .compactMap { $0.group.behaviorGroupName?.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .first { !$0.isEmpty }
+        if let selectedBehaviorName {
+            return "\(macro.name) - \(selectedBehaviorName)"
+        }
+        return "\(macro.name) - \(NSLocalizedString("Repeat Body", comment: ""))"
+    }
+
+    func repeatUntilBodyMacroTags(from macro: SavedMacro) -> [String] {
+        var tags = macro.tags
+        let behaviorTag = NSLocalizedString("Behavior", comment: "")
+        if !tags.contains(behaviorTag) {
+            tags.append(behaviorTag)
+        }
+        return tags.sorted()
+    }
+
+    func showRepeatUntilDraftAlert(title: String, message: String) {
+        repeatUntilDraftAlertTitle = title
+        repeatUntilDraftAlertMessage = message
+        isShowingRepeatUntilDraftAlert = true
+    }
+
+    func macroEditorRepeatUntilReadinessHelp(_ readiness: MacroEditorRepeatUntilDraftReadiness) -> String {
+        switch readiness {
+        case .ready:
+            return NSLocalizedString("Create a reusable behavior macro and preview the Repeat-Until workflow draft.", comment: "")
+        case .noSelection:
+            return NSLocalizedString("Select a behavior body and one text wait condition.", comment: "")
+        case .missingBody:
+            return NSLocalizedString("Select at least one recorded action as the Repeat-Until body.", comment: "")
+        case .multipleUntilConditions:
+            return NSLocalizedString("Select only one Wait Text, Wait Text Gone, or Verify Text condition.", comment: "")
+        case .missingUntilCondition:
+            return NSLocalizedString("Select one Wait Text, Wait Text Gone, or Verify Text condition as the Until check.", comment: "")
+        case .missingUntilText:
+            return NSLocalizedString("Pick or type target text before creating Repeat Until.", comment: "")
+        }
     }
 
 }

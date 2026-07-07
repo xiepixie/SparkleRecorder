@@ -2374,6 +2374,10 @@ private func runRecordingSuggest(
         for: recordingBundle,
         category: category
     )
+    let artifactFiles = SemanticRecordingArtifactFileAuditor.summary(
+        bundle: recordingBundle.bundle,
+        bundleDirectory: recordingBundle.bundleDirectory
+    )
     let envelope = AutomationCLIResultEnvelope<SemanticRecordingCLISuggestionsPayload>
         .semanticRecordingSuggestions(
             command: command,
@@ -2382,7 +2386,8 @@ private func runRecordingSuggest(
             fixture: recordingBundle.fixture,
             sourceOption: recordingBundle.sourceOption,
             category: category,
-            suggestionResult: suggestionResult
+            suggestionResult: suggestionResult,
+            artifactFiles: artifactFiles
         )
 
     if wantsJSON {
@@ -2921,7 +2926,7 @@ private func writeRecordingReadinessSummary(_ payload: SemanticRecordingCLIReadi
     ]
     if let artifactFiles = payload.artifactFiles {
         lines.append(
-            "- artifact files: \(artifactFiles.presentCount)/\(artifactFiles.checkedCount) present, missing: \(artifactFiles.missingCount), empty: \(artifactFiles.emptyCount), directory: \(artifactFiles.directoryCount), unsafe: \(artifactFiles.unsafeCount)"
+            "- artifact files: \(artifactFiles.presentCount)/\(artifactFiles.checkedCount) present, missing: \(artifactFiles.missingCount), deleted: \(artifactFiles.deletedCount), empty: \(artifactFiles.emptyCount), directory: \(artifactFiles.directoryCount), unsafe: \(artifactFiles.unsafeCount)"
         )
     }
     if let bundleDirectory = payload.bundleDirectory {
@@ -3078,6 +3083,11 @@ private func writeRecordingSuggestionsSummary(_ payload: SemanticRecordingCLISug
         "SparkleRecorder: recording suggestions \(payload.category.rawValue) [\(payload.fixtureMode ? "fixture" : "live")].",
         "- suggestions: \(payload.count)"
     ]
+    if let artifactFiles = payload.artifactFiles {
+        lines.append(
+            "- artifact files: \(artifactFiles.presentCount)/\(artifactFiles.checkedCount) present, missing: \(artifactFiles.missingCount), deleted: \(artifactFiles.deletedCount), empty: \(artifactFiles.emptyCount), directory: \(artifactFiles.directoryCount), unsafe: \(artifactFiles.unsafeCount)"
+        )
+    }
     for suggestion in payload.suggestions {
         lines.append(
             "- \(suggestion.id.uuidString) \(suggestion.kind.rawValue) confidence=\(suggestion.confidence): \(suggestion.title)"

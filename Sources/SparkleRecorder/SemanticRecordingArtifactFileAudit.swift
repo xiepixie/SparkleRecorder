@@ -15,11 +15,13 @@ struct SemanticRecordingArtifactFileAuditor {
             return SemanticRecordingCLIArtifactFileSummary(evidence: [])
         }
 
+        let deletedArtifactReasons = deletedArtifactReasons(bundle: bundle)
         let evidence = refs.map { kind, ref in
             fileEvidence(
                 kind: kind,
                 ref: ref,
-                bundleDirectory: bundleDirectory
+                bundleDirectory: bundleDirectory,
+                deletedArtifactReasons: deletedArtifactReasons
             )
         }
         return SemanticRecordingCLIArtifactFileSummary(evidence: evidence)
@@ -33,6 +35,9 @@ struct SemanticRecordingArtifactFileAuditor {
         refs.append(contentsOf: bundle.redactedVideos.map { (.redactedVideo, $0.redactedVideoRef) })
         refs.append(contentsOf: bundle.frames.map { (.frame, $0.imageRef) })
         refs.append(contentsOf: bundle.redactedFrames.map { (.redactedFrame, $0.redactedImageRef) })
+        refs.append(contentsOf: bundle.visualObservations.compactMap { observation in
+            observation.artifactRef.map { (.visualObservation, $0) }
+        })
         refs.append(contentsOf: bundle.sourcePreviews.compactMap { preview in
             preview.artifactRef.map { (.sourcePreview, $0) }
         })
@@ -43,10 +48,25 @@ struct SemanticRecordingArtifactFileAuditor {
         return refs
     }
 
+    private static func deletedArtifactReasons(
+        bundle: SemanticRecordingBundle
+    ) -> [String: String] {
+        var reasons: [String: String] = [:]
+        for suppression in bundle.suppressions
+            where suppression.reason == .userDeleted {
+            guard let ref = suppression.redactedArtifactRef else {
+                continue
+            }
+            reasons[ref.path] = suppression.detail ?? "Artifact was deleted by user or retention cleanup."
+        }
+        return reasons
+    }
+
     private static func fileEvidence(
         kind: SemanticRecordingCLIArtifactFileKind,
         ref: RecordingArtifactRef,
-        bundleDirectory: URL
+        bundleDirectory: URL,
+        deletedArtifactReasons: [String: String]
     ) -> SemanticRecordingCLIArtifactFileEvidence {
         let rootURL = bundleDirectory.standardizedFileURL.resolvingSymlinksInPath()
         let artifactURL = bundleDirectory
@@ -66,6 +86,14 @@ struct SemanticRecordingArtifactFileAuditor {
         let fileManager = FileManager.default
         var isDirectory = ObjCBool(false)
         guard fileManager.fileExists(atPath: artifactURL.path, isDirectory: &isDirectory) else {
+            if let reason = deletedArtifactReasons[ref.path] {
+                return SemanticRecordingCLIArtifactFileEvidence(
+                    kind: kind,
+                    ref: ref,
+                    status: .deleted,
+                    reason: reason
+                )
+            }
             return SemanticRecordingCLIArtifactFileEvidence(
                 kind: kind,
                 ref: ref,

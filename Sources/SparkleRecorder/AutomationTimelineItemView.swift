@@ -3,19 +3,24 @@ import SparkleRecorderCore
 
 struct AutomationTimelineItemView: View {
     let item: AutomationResourceTimelineItem
+    var hasConflict = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 8) {
-                Circle()
-                    .fill(item.lane.tint)
-                    .frame(width: 8, height: 8)
-                    .accessibilityHidden(true)
-
-                Text(item.lane.displayName)
+                Label(item.kindLabel ?? item.lane.displayName, systemImage: item.status.systemImage)
                     .font(.caption)
-                    .bold()
-                    .foregroundStyle(item.lane.tint)
+                    .fontWeight(.semibold)
+                    .foregroundStyle(item.status.tint)
+                    .lineLimit(1)
+
+                if hasConflict {
+                    Label(NSLocalizedString("Conflict", comment: ""), systemImage: "exclamationmark.triangle.fill")
+                        .font(.caption)
+                        .fontWeight(.semibold)
+                        .foregroundStyle(Brand.red500)
+                        .lineLimit(1)
+                }
 
                 Spacer(minLength: 0)
 
@@ -33,10 +38,19 @@ struct AutomationTimelineItemView: View {
                 .bold()
                 .lineLimit(2)
 
-            Text(item.resourceLabel)
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .lineLimit(1)
+            if let statusDetail = item.statusDetail, !statusDetail.isEmpty {
+                Text(statusDetail)
+                    .font(.caption)
+                    .foregroundStyle(statusDetailTint)
+                    .lineLimit(2)
+            }
+
+            if let waiting = item.resourceWaiting {
+                Text(waiting.detail)
+                    .font(.caption)
+                    .foregroundStyle(Brand.sigAmber)
+                    .lineLimit(2)
+            }
 
             AutomationRuntimeDetailStrip(
                 statusDetail: nil,
@@ -55,16 +69,16 @@ struct AutomationTimelineItemView: View {
             }
 
             HStack(spacing: 8) {
-                if let startedAt = item.startedAt {
+                if let startedAt = item.timelineStart {
                     Label {
-                        Text(startedAt, style: .time)
+                        Text(AutomationTimelineTimeFormatter.timeString(startedAt))
                     } icon: {
-                        Image(systemName: "play")
+                        Image(systemName: item.startedAt == nil ? "clock" : "play")
                     }
                 }
                 if let completedAt = item.completedAt {
                     Label {
-                        Text(completedAt, style: .time)
+                        Text(AutomationTimelineTimeFormatter.timeString(completedAt))
                     } icon: {
                         Image(systemName: "checkmark")
                     }
@@ -81,7 +95,9 @@ struct AutomationTimelineItemView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .sectionSurface(cornerRadius: 8)
         .overlay(alignment: .top) {
-            AutomationRuntimeStatusHairline(status: item.status)
+            Rectangle()
+                .fill(hasConflict ? Brand.red500 : item.status.tint)
+                .frame(height: 3)
                 .padding(.horizontal, 10)
                 .padding(.top, 4)
         }
@@ -93,9 +109,15 @@ struct AutomationTimelineItemView: View {
         var summary = String(
             format: NSLocalizedString("%@, %@, %@", comment: ""),
             item.title,
-            item.lane.displayName,
+            item.kindLabel ?? item.lane.displayName,
             item.status.label
         )
+        if let statusDetail = item.statusDetail, !statusDetail.isEmpty {
+            summary += ", " + statusDetail
+        }
+        if hasConflict {
+            summary += ", " + NSLocalizedString("Conflict", comment: "")
+        }
         if item.hasEvidence {
             summary += ", " + NSLocalizedString("Evidence available", comment: "")
         }
@@ -109,5 +131,16 @@ struct AutomationTimelineItemView: View {
             summary += ", " + AutomationConditionProgressFormatter.accessibilitySummary(for: conditionProgress)
         }
         return summary
+    }
+
+    private var statusDetailTint: Color {
+        switch item.status {
+        case .failed, .timedOut, .blocked:
+            return item.status.tint
+        case .cancelled:
+            return .secondary
+        default:
+            return .secondary
+        }
     }
 }

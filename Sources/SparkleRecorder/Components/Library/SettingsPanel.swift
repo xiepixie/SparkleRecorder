@@ -112,11 +112,18 @@ struct SettingsPanel: View {
                         .labelsHidden()
                         .frame(width: 110)
                     }
-                    Toggle(isOn: $state.showRecordingHUD) {
-                        Text(NSLocalizedString("Show floating HUD", comment: "")).font(.system(size: 11.5))
+                    HStack {
+                        Text(NSLocalizedString("Status UI", comment: "")).font(.system(size: 11.5))
+                        Spacer()
+                        Picker("", selection: $state.recordingHUDMode) {
+                            ForEach(RecordingHUDMode.allCases) { mode in
+                                Text(mode.title).tag(mode)
+                            }
+                        }
+                        .labelsHidden()
+                        .pickerStyle(.segmented)
+                        .frame(width: 210)
                     }
-                    .toggleStyle(.switch)
-                    .controlSize(.mini)
                     Toggle(isOn: $state.soundEnabled) {
                         Text(NSLocalizedString("Sound effects", comment: "")).font(.system(size: 11.5))
                     }

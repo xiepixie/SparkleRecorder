@@ -32,30 +32,39 @@ struct AutomationInspectorView: View {
                 .padding(.top, 12)
 
             if let workflow {
+                if let pendingDependencySourceID,
+                   let source = workflow.task(id: pendingDependencySourceID) {
+                    HStack(spacing: 8) {
+                        Label(source.name, systemImage: "link")
+                            .font(.caption)
+                            .lineLimit(1)
+                        Spacer(minLength: 0)
+                        Button("Cancel", systemImage: "xmark", action: onCancelLink)
+                            .labelStyle(.iconOnly)
+                            .buttonStyle(.borderless)
+                            .frame(width: 24, height: 24)
+                    }
+                    .padding(10)
+                    .background(
+                        RoundedRectangle(cornerRadius: 10, style: .continuous)
+                            .fill(Brand.sigAmber.opacity(0.15))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                    .strokeBorder(Brand.sigAmber.opacity(0.3), lineWidth: 1)
+                            )
+                    )
+                    .padding(.horizontal, 12)
+                }
+
                 ScrollView {
                     switch selection {
                     case .workflow:
-                        AutomationWorkflowInspectorView(
-                            workflow: workflow,
-                            status: workflowProjection?.status ?? .scheduled,
-                            statusDetail: workflowProjection?.statusDetail ?? NSLocalizedString("No run has started yet", comment: ""),
-                            nextScheduledOccurrence: workflowProjection?.nextScheduledOccurrence,
-                            nextScheduledTaskName: nextScheduledTaskName,
-                            workflowProjection: workflowProjection,
-                            pendingDependencySourceID: pendingDependencySourceID,
-                            taskListPreviewState: taskListPreviewState,
-                            onAddConditionTask: onAddConditionTask,
-                            onInsertMacroTask: onInsertMacroTask,
-                            onSelectTask: onSelectTask,
-                            onSelectDependency: onSelectDependency,
-                            onCancelLink: onCancelLink,
-                            onImportWorkflowPackage: onImportWorkflowPackage,
-                            onExportWorkflowPackage: onExportWorkflowPackage,
-                            onExportWorkflowDraft: onExportWorkflowDraft,
-                            onShareWorkflowPackage: onShareWorkflowPackage,
-                            onDeleteWorkflow: onDeleteWorkflow,
-                            onAction: onAction
+                        AutomationEmptyState(
+                            systemImage: "cursorarrow.rays",
+                            title: NSLocalizedString("No Selection", comment: ""),
+                            subtitle: NSLocalizedString("Select a task or dependency to inspect its properties. Use the Settings tab for workflow configurations.", comment: "")
                         )
+                        .padding(.top, 40)
                     case .task(let taskID):
                         if let task = workflow.task(id: taskID) {
                             AutomationTaskInspectorView(
@@ -74,27 +83,12 @@ struct AutomationInspectorView: View {
                                 onAction: onAction
                             )
                         } else {
-                            AutomationWorkflowInspectorView(
-                                workflow: workflow,
-                                status: workflowProjection?.status ?? .scheduled,
-                                statusDetail: workflowProjection?.statusDetail ?? NSLocalizedString("No run has started yet", comment: ""),
-                                nextScheduledOccurrence: workflowProjection?.nextScheduledOccurrence,
-                                nextScheduledTaskName: nextScheduledTaskName,
-                                workflowProjection: workflowProjection,
-                                pendingDependencySourceID: pendingDependencySourceID,
-                                taskListPreviewState: taskListPreviewState,
-                                onAddConditionTask: onAddConditionTask,
-                                onInsertMacroTask: onInsertMacroTask,
-                                onSelectTask: onSelectTask,
-                                onSelectDependency: onSelectDependency,
-                                onCancelLink: onCancelLink,
-                                onImportWorkflowPackage: onImportWorkflowPackage,
-                                onExportWorkflowPackage: onExportWorkflowPackage,
-                                onExportWorkflowDraft: onExportWorkflowDraft,
-                                onShareWorkflowPackage: onShareWorkflowPackage,
-                                onDeleteWorkflow: onDeleteWorkflow,
-                                onAction: onAction
+                            AutomationEmptyState(
+                                systemImage: "cursorarrow.rays",
+                                title: NSLocalizedString("No Selection", comment: ""),
+                                subtitle: NSLocalizedString("Select a task or dependency to inspect its properties. Use the Settings tab for workflow configurations.", comment: "")
                             )
+                            .padding(.top, 40)
                         }
                     case .dependency(let dependencyID):
                         if let dependency = workflow.dependencies.first(where: { $0.id == dependencyID }) {
@@ -105,27 +99,12 @@ struct AutomationInspectorView: View {
                                 onAction: onAction
                             )
                         } else {
-                            AutomationWorkflowInspectorView(
-                                workflow: workflow,
-                                status: workflowProjection?.status ?? .scheduled,
-                                statusDetail: workflowProjection?.statusDetail ?? NSLocalizedString("No run has started yet", comment: ""),
-                                nextScheduledOccurrence: workflowProjection?.nextScheduledOccurrence,
-                                nextScheduledTaskName: nextScheduledTaskName,
-                                workflowProjection: workflowProjection,
-                                pendingDependencySourceID: pendingDependencySourceID,
-                                taskListPreviewState: taskListPreviewState,
-                                onAddConditionTask: onAddConditionTask,
-                                onInsertMacroTask: onInsertMacroTask,
-                                onSelectTask: onSelectTask,
-                                onSelectDependency: onSelectDependency,
-                                onCancelLink: onCancelLink,
-                                onImportWorkflowPackage: onImportWorkflowPackage,
-                                onExportWorkflowPackage: onExportWorkflowPackage,
-                                onExportWorkflowDraft: onExportWorkflowDraft,
-                                onShareWorkflowPackage: onShareWorkflowPackage,
-                                onDeleteWorkflow: onDeleteWorkflow,
-                                onAction: onAction
+                            AutomationEmptyState(
+                                systemImage: "cursorarrow.rays",
+                                title: NSLocalizedString("No Selection", comment: ""),
+                                subtitle: NSLocalizedString("Select a task or dependency to inspect its properties. Use the Settings tab for workflow configurations.", comment: "")
                             )
+                            .padding(.top, 40)
                         }
                     }
                 }

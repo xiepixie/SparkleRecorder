@@ -590,6 +590,7 @@ actor RecordingBundleStore {
         let preservedMetadata = Set(plan.metadataFilesToPreserve)
         var candidates: [String] = []
         var deleted: [String] = []
+        var deletedRefs: [RecordingArtifactRef] = []
         var missing: [String] = []
         var preserved: [String] = []
 
@@ -613,7 +614,15 @@ actor RecordingBundleStore {
             if !dryRun {
                 try FileManager.default.removeItem(at: url)
                 deleted.append(ref.path)
+                deletedRefs.append(ref)
             }
+        }
+        if !dryRun, !deletedRefs.isEmpty {
+            try appendUserDeletedSuppressions(
+                for: deletedRefs,
+                plan: plan,
+                in: directory
+            )
         }
 
         return RecordingBundleRetentionApplicationResult(
@@ -624,6 +633,41 @@ actor RecordingBundleStore {
             deletedRelativePaths: deleted,
             missingRelativePaths: missing,
             preservedRelativePaths: preserved
+        )
+    }
+
+    private func appendUserDeletedSuppressions(
+        for refs: [RecordingArtifactRef],
+        plan: SemanticRecordingRetentionPlan,
+        in directory: URL
+    ) throws {
+        let existingSuppressions = (
+            try? loadBundleTolerant(from: directory).bundle.suppressions
+        ) ?? []
+        let existingDeletionRefs = Set(
+            existingSuppressions.compactMap { suppression -> String? in
+                guard suppression.reason == .userDeleted else {
+                    return nil
+                }
+                return suppression.redactedArtifactRef?.path
+            }
+        )
+        let newSuppressions = refs
+            .filter { !existingDeletionRefs.contains($0.path) }
+            .map { ref in
+                RecordingSuppressionRecord(
+                    reason: .userDeleted,
+                    redactedArtifactRef: ref,
+                    detail: "Artifact was deleted by semantic recording retention cleanup.",
+                    createdAt: plan.evaluatedAt
+                )
+            }
+        guard !newSuppressions.isEmpty else {
+            return
+        }
+        try writeJSONLines(
+            existingSuppressions + newSuppressions,
+            to: directory.appendingPathComponent(SemanticRecordingSchema.suppressionsFileName)
         )
     }
 

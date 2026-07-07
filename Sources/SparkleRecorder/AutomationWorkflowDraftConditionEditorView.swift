@@ -142,6 +142,7 @@ struct AutomationWorkflowDraftConditionEditorView: View {
             regionStatusImage: "viewfinder.rectangular",
             regionStatusTint: Brand.libraryBlue,
             referenceSize: nil,
+            regionPreview: nil,
             supportsBoundsPicker: false,
             showsTypePicker: false,
             regionReferenceOptions: visualRegionReferenceOptions,
@@ -166,7 +167,8 @@ struct AutomationWorkflowDraftConditionEditorView: View {
             threshold: $visualThreshold,
             requiresVisible: $visualRequiresVisible,
             onDrawRegion: {},
-            onClearRegion: {}
+            onClearRegion: {},
+            onPickPixel: nil
         )
     }
 

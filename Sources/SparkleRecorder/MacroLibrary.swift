@@ -114,9 +114,11 @@ final class MacroLibrary: ObservableObject {
     // MARK: - Mutations
 
     /// Insert a fully-built macro (used by importers to preserve metadata).
-    func insert(_ macro: SavedMacro) {
+    func insert(_ macro: SavedMacro, select: Bool = true) {
         macros.insert(macro, at: 0)
-        currentMacroID = macro.id
+        if select {
+            currentMacroID = macro.id
+        }
         Task { try? await client.saveEvents(macro.events, macro.id) }
         Task { try? await client.saveMetadata(macro) }
         save()

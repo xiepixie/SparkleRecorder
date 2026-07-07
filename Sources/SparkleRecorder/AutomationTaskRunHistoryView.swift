@@ -105,8 +105,7 @@ struct AutomationTaskRunHistoryView: View {
                 }
             }
         }
-        .padding(10)
-        .sectionSurface(cornerRadius: 10)
+        .padding(.vertical, 8)
         .onChange(of: initialSelectedRunID) {
             selectedRunID = initialSelectedRunID
         }

@@ -10,6 +10,7 @@ struct AutomationOCRRegionEditorView: View {
     let hasRegion: Bool
     let isNormalizedSpace: Bool
     let referenceSize: CGSize?
+    let preview: AutomationRegionCapturePreview?
     @Binding var regionX: Double
     @Binding var regionY: Double
     @Binding var regionWidth: Double
@@ -43,7 +44,9 @@ struct AutomationOCRRegionEditorView: View {
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
 
-            regionPreview
+            AutomationRegionCapturePreviewView(preview: preview, tint: Brand.sigAmber) {
+                regionPreview
+            }
 
             if hasRegion {
                 regionFields

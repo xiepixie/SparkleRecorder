@@ -11,6 +11,8 @@ struct AutomationTaskDependencyAuthoringView: View {
     @State private var targetTaskID: UUID?
     @State private var triggerDraft: AutomationDependencyTriggerDraft = .onSuccess
     @State private var delaySeconds = 0.0
+    @State private var usesRecognizedTimeDelay = false
+    @State private var maximumRecognizedDelaySeconds = 86_400.0
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -43,10 +45,12 @@ struct AutomationTaskDependencyAuthoringView: View {
                     .foregroundStyle(.secondary)
             }
         }
-        .padding(10)
-        .sectionSurface(cornerRadius: 10)
+        .padding(.vertical, 8)
         .onAppear(perform: repairTargetSelection)
         .onChange(of: task.id) {
+            repairTargetSelection()
+        }
+        .onChange(of: task.kind) {
             repairTargetSelection()
         }
         .onChange(of: workflow.tasks.map(\.id)) {
@@ -71,16 +75,37 @@ struct AutomationTaskDependencyAuthoringView: View {
                 .pickerStyle(.menu)
 
                 HStack(spacing: 8) {
-                    Picker(NSLocalizedString("Trigger", comment: ""), selection: $triggerDraft) {
-                        ForEach(AutomationDependencyTriggerDraft.allCases) { option in
+                    Picker(NSLocalizedString("Run when", comment: ""), selection: $triggerDraft) {
+                        ForEach(triggerOptions) { option in
                             Text(option.title).tag(option)
                         }
                     }
                     .pickerStyle(.menu)
 
-                    TextField(NSLocalizedString("Delay", comment: ""), value: $delaySeconds, format: .number)
+                    TextField(delayFieldTitle, value: $delaySeconds, format: .number)
                         .textFieldStyle(.roundedBorder)
                         .frame(width: 68)
+                }
+
+                if sourceCanProvideDynamicDelay {
+                    Toggle(NSLocalizedString("Use recognized time", comment: ""), isOn: $usesRecognizedTimeDelay)
+                        .toggleStyle(.checkbox)
+                        .help(NSLocalizedString(
+                            "Read a duration from the source condition evidence and use the delay field as fallback.",
+                            comment: ""
+                        ))
+
+                    if usesRecognizedTimeDelay {
+                        LabeledContent(NSLocalizedString("Maximum wait (s)", comment: "")) {
+                            TextField(
+                                NSLocalizedString("Seconds", comment: ""),
+                                value: $maximumRecognizedDelaySeconds,
+                                format: .number
+                            )
+                            .textFieldStyle(.roundedBorder)
+                            .frame(width: 86)
+                        }
+                    }
                 }
 
                 Button(action: createDependency) {
@@ -183,6 +208,28 @@ struct AutomationTaskDependencyAuthoringView: View {
         outgoingDependencies + incomingDependencies
     }
 
+    private var triggerOptions: [AutomationDependencyTriggerDraft] {
+        AutomationDependencyTriggerDraft.options(for: task)
+    }
+
+    private var delayFieldTitle: String {
+        usesRecognizedTimeDelay
+            ? NSLocalizedString("Fallback", comment: "")
+            : NSLocalizedString("Delay", comment: "")
+    }
+
+    private var sourceCanProvideDynamicDelay: Bool {
+        guard case .condition(let condition) = task.kind else {
+            return false
+        }
+        switch condition.kind {
+        case .ocrText, .visual:
+            return true
+        case .manualApproval, .externalSignal, .previousOutcome:
+            return false
+        }
+    }
+
     private func createDependency() {
         guard let targetTaskID = targetBinding.wrappedValue else {
             return
@@ -192,7 +239,8 @@ struct AutomationTaskDependencyAuthoringView: View {
             fromTaskID: task.id,
             toTaskID: targetTaskID,
             trigger: triggerDraft.trigger,
-            delay: max(0, delaySeconds)
+            delay: max(0, delaySeconds),
+            dynamicDelay: createdDynamicDelay
         )
         onAction(.upsertDependency(workflowID: workflow.id, dependency: dependency, at: Date()))
         onSelectDependency(dependency.id)
@@ -202,9 +250,33 @@ struct AutomationTaskDependencyAuthoringView: View {
     private func repairTargetSelection() {
         if let targetTaskID,
            connectTargets.contains(where: { $0.id == targetTaskID }) {
+            repairTriggerSelection()
             return
         }
         targetTaskID = connectTargets.first?.id
+        repairTriggerSelection()
+    }
+
+    private func repairTriggerSelection() {
+        if !sourceCanProvideDynamicDelay {
+            usesRecognizedTimeDelay = false
+            maximumRecognizedDelaySeconds = 86_400
+        }
+        guard !triggerOptions.contains(triggerDraft) else {
+            return
+        }
+        triggerDraft = triggerOptions.first ?? .onSuccess
+    }
+
+    private var createdDynamicDelay: AutomationDependencyDynamicDelay? {
+        guard sourceCanProvideDynamicDelay, usesRecognizedTimeDelay else {
+            return nil
+        }
+        return AutomationDependencyDynamicDelay(
+            source: .conditionEvidenceDuration,
+            fallbackDelay: max(0, delaySeconds),
+            maximumDelay: max(1, maximumRecognizedDelaySeconds)
+        )
     }
 
     private func rowTitle(for dependency: AutomationDependency, direction: DependencyDirection) -> String {
@@ -219,6 +291,13 @@ struct AutomationTaskDependencyAuthoringView: View {
 
     private func rowDetail(for dependency: AutomationDependency) -> String {
         let trigger = AutomationDependencyTriggerDraft.draft(for: dependency.trigger).title
+        if let dynamicDelayDetail = dynamicDelayDetail(for: dependency) {
+            return String(
+                format: NSLocalizedString("%@ · %@", comment: ""),
+                trigger,
+                dynamicDelayDetail
+            )
+        }
         if dependency.delay <= 0 {
             return trigger
         }
@@ -227,6 +306,46 @@ struct AutomationTaskDependencyAuthoringView: View {
             trigger,
             dependency.delay
         )
+    }
+
+    private func dynamicDelayDetail(for dependency: AutomationDependency) -> String? {
+        guard let dynamicDelay = dependency.dynamicDelay,
+              dynamicDelay.source == .conditionEvidenceDuration else {
+            return nil
+        }
+        let fallbackDelay = dynamicDelay.fallbackDelay ?? dependency.delay
+        guard fallbackDelay > 0 else {
+            return NSLocalizedString("Observed time", comment: "")
+        }
+        return String(
+            format: NSLocalizedString("Observed time · fallback %@", comment: ""),
+            compactDelayLabel(for: fallbackDelay)
+        )
+    }
+
+    private func compactDelayLabel(for delay: TimeInterval) -> String {
+        let totalSeconds = Int(max(0, delay).rounded())
+        guard totalSeconds > 0 else {
+            return NSLocalizedString("no delay", comment: "")
+        }
+        let days = totalSeconds / 86_400
+        let hours = (totalSeconds % 86_400) / 3_600
+        let minutes = (totalSeconds % 3_600) / 60
+        let seconds = totalSeconds % 60
+        var parts: [String] = []
+        if days > 0 {
+            parts.append("\(days)d")
+        }
+        if hours > 0 {
+            parts.append("\(hours)h")
+        }
+        if minutes > 0, parts.count < 2 {
+            parts.append("\(minutes)m")
+        }
+        if seconds > 0, parts.isEmpty {
+            parts.append("\(seconds)s")
+        }
+        return parts.prefix(2).joined(separator: " ")
     }
 
     private func taskName(_ taskID: UUID) -> String {

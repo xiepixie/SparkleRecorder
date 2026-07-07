@@ -48,8 +48,7 @@ struct AutomationTaskPositionControlView: View {
                 Spacer(minLength: 0)
             }
         }
-        .padding(10)
-        .sectionSurface(cornerRadius: 10)
+        .padding(.vertical, 8)
     }
 
     private var positionSummary: String {

@@ -103,9 +103,7 @@ final class Recorder: ObservableObject, @unchecked Sendable {
     public func loadEvents(_ new: [RecordedEvent], duration: Double? = nil) {
         events = new
         liveWaveformEvents = Self.cappedWaveformEvents(new, maxCount: maxLiveWaveformEvents)
-        if let d = duration {
-            liveDuration = d
-        }
+        liveDuration = duration ?? (new.last?.time ?? 0)
         recalculateStats()
     }
 
@@ -233,6 +231,7 @@ final class Recorder: ObservableObject, @unchecked Sendable {
     public func clearAll() {
         events.removeAll()
         liveWaveformEvents.removeAll()
+        liveDuration = 0
 
         recalculateStats()
     }

@@ -1,6 +1,11 @@
 import SwiftUI
 import SparkleRecorderCore
 
+enum AutomationCentralTab: String, CaseIterable {
+    case editor
+    case settings
+}
+
 struct AutomationMainContentView: View {
     let state: AutomationRunState
     let projection: AutomationOverviewProjection
@@ -18,6 +23,10 @@ struct AutomationMainContentView: View {
     @State private var pendingDependencyTrigger: AutomationDependencyTriggerDraft = .onSuccess
     @State private var draftPreviewState: AutomationWorkflowDraftPreviewState?
     @State private var importNoticeState: AutomationWorkflowImportNoticeState?
+
+    @State private var centralTab: AutomationCentralTab = .editor
+    @State private var isLeftSidebarVisible: Bool = true
+    @State private var isRightSidebarVisible: Bool = true
 
     init(
         state: AutomationRunState,
@@ -57,6 +66,11 @@ struct AutomationMainContentView: View {
     private var selectedRawWorkflow: AutomationWorkflow? {
         let selectedID = selectedWorkflowID ?? projection.workflows.first?.id ?? state.workflows.first?.id
         return state.workflows.first { $0.id == selectedID }
+    }
+
+    private var pendingDependencyTriggerOptions: [AutomationDependencyTriggerDraft] {
+        let sourceTask = pendingDependencySourceID.flatMap { selectedRawWorkflow?.task(id: $0) }
+        return AutomationDependencyTriggerDraft.options(for: sourceTask)
     }
 
     private var selectedTimelineItems: [AutomationResourceTimelineItem] {
@@ -121,81 +135,164 @@ struct AutomationMainContentView: View {
                 }
 
                 HStack(spacing: 0) {
-                    AutomationWorkflowListView(
-                        projection: projection,
-                        macros: macros,
-                        selectedWorkflowID: $selectedWorkflowID,
-                        selectedWorkflow: selectedRawWorkflow,
-                        onSelectWorkflow: selectWorkflow,
-                        onCreateWorkflow: createWorkflow,
-                        onImportWorkflowPackage: importWorkflowPackage,
-                        onExportWorkflowPackage: exportWorkflowPackage,
-                        onShareWorkflowPackage: shareWorkflowPackage,
-                        onAddMacroTask: addMacroTask
-                    )
-                    .frame(width: 250)
+                    if isLeftSidebarVisible {
+                        AutomationWorkflowListView(
+                            projection: projection,
+                            macros: macros,
+                            selectedWorkflowID: $selectedWorkflowID,
+                            selectedWorkflow: selectedRawWorkflow,
+                            onSelectWorkflow: selectWorkflow,
+                            onCreateWorkflow: createWorkflow,
+                            onImportWorkflowPackage: importWorkflowPackage,
+                            onExportWorkflowPackage: exportWorkflowPackage,
+                            onShareWorkflowPackage: shareWorkflowPackage,
+                            onAddMacroTask: addMacroTask,
+                            onAddConditionTask: addConditionTask
+                        )
+                        .frame(width: 250)
+                        .transition(.move(edge: .leading))
 
-                    Divider().opacity(0.5)
+                        Divider().opacity(0.5)
+                    }
 
                     if let workflow {
                         VStack(spacing: 0) {
-                            AutomationFlowGraphView(
-                                workflow: workflow,
-                                selectedTaskID: selectedTaskID,
-                                selectedDependencyID: selectedDependencyID,
-                                pendingDependencySourceID: pendingDependencySourceID,
-                                pendingDependencyTrigger: pendingDependencyTrigger,
-                                linkPreview: initialFlowGraphLinkPreview,
-                                onSelectTask: selectTask,
-                                onSelectDependency: selectDependency,
-                                onDeleteDependency: deleteDependencyFromGraph,
-                                onStartDependency: startDependency,
-                                onCompleteDependency: completeDependency,
-                                onSetPendingDependencyTrigger: setPendingDependencyTrigger,
-                                onCancelDependency: cancelDependency,
-                                onMacroDropped: addMacroTask,
-                                onAction: onAction
-                            )
-                                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                            HStack {
+                                Button(NSLocalizedString("Toggle Left Sidebar", comment: ""), systemImage: "sidebar.left", action: { withAnimation { isLeftSidebarVisible.toggle() } })
+                                .labelStyle(.iconOnly)
+                                .buttonStyle(.plain)
+                                .padding(.horizontal, 8)
+                                .opacity(isLeftSidebarVisible ? 1.0 : 0.6)
+
+                                Spacer()
+
+                                Picker("", selection: $centralTab) {
+                                    Text(NSLocalizedString("Editor", comment: "")).tag(AutomationCentralTab.editor)
+                                    Text(NSLocalizedString("Settings", comment: "")).tag(AutomationCentralTab.settings)
+                                }
+                                .pickerStyle(.segmented)
+                                .frame(width: 250)
+
+                                Spacer()
+
+                                Button(NSLocalizedString("Toggle Right Sidebar", comment: ""), systemImage: "sidebar.right", action: { withAnimation { isRightSidebarVisible.toggle() } })
+                                .labelStyle(.iconOnly)
+                                .buttonStyle(.plain)
+                                .padding(.horizontal, 8)
+                                .opacity(isRightSidebarVisible ? 1.0 : 0.6)
+
+                                Button(NSLocalizedString("Auto Arrange", comment: ""), systemImage: "wand.and.stars") {
+                                    autoArrangeTasks()
+                                }
+                                .labelStyle(.iconOnly)
+                                .buttonStyle(.plain)
+                                .padding(.horizontal, 8)
+                            }
+                            .padding(8)
+                            .background(Material.bar)
 
                             Divider().opacity(0.5)
 
-                            AutomationResourceTimelineView(
-                                items: timelineItems,
-                                nextScheduledOccurrence: workflow.nextScheduledOccurrence,
-                                nextScheduledTaskName: selectedNextScheduledTaskName
-                            )
-                                .frame(maxWidth: .infinity, minHeight: 156, maxHeight: 216)
+                            switch centralTab {
+                            case .editor:
+                                VSplitView {
+                                    AutomationFlowGraphView(
+                                        workflow: workflow,
+                                        selectedTaskID: selectedTaskID,
+                                        selectedDependencyID: selectedDependencyID,
+                                        pendingDependencySourceID: pendingDependencySourceID,
+                                        pendingDependencyTrigger: pendingDependencyTrigger,
+                                        pendingDependencyTriggerOptions: pendingDependencyTriggerOptions,
+                                        linkPreview: initialFlowGraphLinkPreview,
+                                        onSelectTask: selectTask,
+                                        onSelectDependency: selectDependency,
+                                        onDeleteDependency: deleteDependencyFromGraph,
+                                        onStartDependency: startDependency,
+                                        onCompleteDependency: completeDependency,
+                                        onSetPendingDependencyTrigger: setPendingDependencyTrigger,
+                                        onCancelDependency: cancelDependency,
+                                        onMacroDropped: addMacroTask,
+                                        onAction: onAction
+                                    )
+                                    .frame(minHeight: 300)
+                                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+
+                                    AutomationResourceTimelineView(
+                                        items: timelineItems,
+                                        nextScheduledOccurrence: workflow.nextScheduledOccurrence,
+                                        nextScheduledTaskName: selectedNextScheduledTaskName,
+                                        onUpdateNextSchedule: updateNextSchedule
+                                    )
+                                    .frame(minHeight: 176, idealHeight: 222, maxHeight: 260)
+                                    .frame(maxWidth: .infinity)
+                                }
+                            case .settings:
+                                if let rawWorkflow = selectedRawWorkflow {
+                                    ScrollView {
+                                        AutomationWorkflowSettingsView(
+                                            workflow: rawWorkflow,
+                                            status: workflow.status,
+                                            statusDetail: workflow.statusDetail,
+                                            nextScheduledOccurrence: workflow.nextScheduledOccurrence,
+                                            nextScheduledTaskName: selectedNextScheduledTaskName,
+                                            workflowProjection: workflow,
+                                            taskListPreviewState: initialTaskListPreviewState,
+                                            onInsertMacroTask: insertMacroTask,
+                                            onSelectTask: selectTask,
+                                            onSelectDependency: selectDependency,
+                                            onImportWorkflowPackage: importWorkflowPackage,
+                                            onExportWorkflowPackage: exportWorkflowPackage,
+                                            onExportWorkflowDraft: exportWorkflowDraft,
+                                            onShareWorkflowPackage: shareWorkflowPackage,
+                                            onDeleteWorkflow: deleteWorkflow,
+                                            onAction: onAction
+                                        )
+                                        .frame(maxWidth: 800)
+                                        .padding()
+                                    }
+                                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                                } else {
+                                    AutomationEmptyState(
+                                        systemImage: "gearshape",
+                                        title: NSLocalizedString("No workflow selected", comment: ""),
+                                        subtitle: NSLocalizedString("Create a workflow to view settings.", comment: "")
+                                    )
+                                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                                }
+                            }
                         }
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
 
-                        Divider().opacity(0.5)
+                        if isRightSidebarVisible {
+                            Divider().opacity(0.5)
 
-                        AutomationInspectorView(
-                            workflow: selectedRawWorkflow,
-                            workflowProjection: workflow,
-                            selection: selection,
-                            selectedTaskPosition: selectedTaskGraphPosition,
-                            selectedTaskProjection: selectedTaskProjection,
-                            pendingDependencySourceID: pendingDependencySourceID,
-                            macros: macros,
-                            runs: state.runs,
-                            initialSelectedRunID: initialSelectedRunID,
-                            taskListPreviewState: initialTaskListPreviewState,
-                            onSelectTask: selectTask,
-                            onSelectDependency: selectDependency,
-                            onAddConditionTask: addConditionTask,
-                            onInsertMacroTask: insertMacroTask,
-                            onImportWorkflowPackage: importWorkflowPackage,
-                            onExportWorkflowPackage: exportWorkflowPackage,
-                            onExportWorkflowDraft: exportWorkflowDraft,
-                            onShareWorkflowPackage: shareWorkflowPackage,
-                            onDeleteWorkflow: deleteWorkflow,
-                            onImportWorkflowFromDraftPreview: importWorkflowFromDraftPreview,
-                            onAction: onAction,
-                            onCancelLink: cancelDependency
-                        )
-                        .frame(width: 356)
+                            AutomationInspectorView(
+                                workflow: selectedRawWorkflow,
+                                workflowProjection: workflow,
+                                selection: selection,
+                                selectedTaskPosition: selectedTaskGraphPosition,
+                                selectedTaskProjection: selectedTaskProjection,
+                                pendingDependencySourceID: pendingDependencySourceID,
+                                macros: macros,
+                                runs: state.runs,
+                                initialSelectedRunID: initialSelectedRunID,
+                                taskListPreviewState: initialTaskListPreviewState,
+                                onSelectTask: selectTask,
+                                onSelectDependency: selectDependency,
+                                onAddConditionTask: addConditionTask,
+                                onInsertMacroTask: insertMacroTask,
+                                onImportWorkflowPackage: importWorkflowPackage,
+                                onExportWorkflowPackage: exportWorkflowPackage,
+                                onExportWorkflowDraft: exportWorkflowDraft,
+                                onShareWorkflowPackage: shareWorkflowPackage,
+                                onDeleteWorkflow: deleteWorkflow,
+                                onImportWorkflowFromDraftPreview: importWorkflowFromDraftPreview,
+                                onAction: onAction,
+                                onCancelLink: cancelDependency
+                            )
+                            .frame(width: 356)
+                            .transition(.move(edge: .trailing))
+                        }
                     } else {
                         AutomationEmptyState(
                             systemImage: "point.topleft.down.curvedto.point.bottomright.up",
@@ -397,6 +494,27 @@ struct AutomationMainContentView: View {
         }
     }
 
+    private func updateNextSchedule(to newDate: Date) {
+        guard let workflow = selectedRawWorkflow,
+              let taskID = selectedWorkflow?.nextScheduledTaskID,
+              var task = workflow.tasks.first(where: { $0.id == taskID }),
+              let currentSchedule = task.schedule else {
+            return
+        }
+
+        switch currentSchedule {
+        case .once:
+            task.schedule = .once(newDate)
+        case .repeating(var rule):
+            rule.anchor = newDate
+            task.schedule = .repeating(rule)
+        case .manual:
+            break
+        }
+
+        onAction(.upsertTask(workflowID: workflow.id, task: task, at: Date()))
+    }
+
     private func undoWorkflowDraftImport() {
         guard let notice = importNoticeState else {
             return
@@ -459,12 +577,17 @@ struct AutomationMainContentView: View {
         insertionIndex: Int?
     ) {
         let date = Date()
+        var finalPosition = position
+        if finalPosition == nil && insertionIndex == nil {
+            finalPosition = defaultGraphPosition()
+        }
+
         let task = AutomationTask(
             name: macro.name,
             kind: .macro(macroID: macro.id),
             schedule: .manual,
             resourceRequirement: .foregroundInput,
-            graphPosition: position
+            graphPosition: finalPosition
         )
 
         if let workflow = selectedRawWorkflow {
@@ -544,7 +667,8 @@ struct AutomationMainContentView: View {
             name: name,
             kind: .condition(AutomationConditionSpec(name: name, kind: kind)),
             schedule: .manual,
-            resourceRequirement: conditionTaskResourceRequirement(for: kind)
+            resourceRequirement: conditionTaskResourceRequirement(for: kind),
+            graphPosition: defaultGraphPosition()
         )
         selection = .task(task.id)
         onAction(.upsertTask(workflowID: workflow.id, task: task, at: Date()))
@@ -574,12 +698,15 @@ struct AutomationMainContentView: View {
 
     private func startDependency(from taskID: UUID) {
         pendingDependencySourceID = taskID
-        pendingDependencyTrigger = .onSuccess
+        let sourceTask = selectedRawWorkflow?.task(id: taskID)
+        pendingDependencyTrigger = AutomationDependencyTriggerDraft.options(for: sourceTask).first ?? .onSuccess
         selection = .task(taskID)
     }
 
     private func setPendingDependencyTrigger(_ trigger: AutomationDependencyTriggerDraft) {
-        pendingDependencyTrigger = trigger
+        pendingDependencyTrigger = pendingDependencyTriggerOptions.contains(trigger)
+            ? trigger
+            : pendingDependencyTriggerOptions.first ?? .onSuccess
     }
 
     private func completeDependency(to taskID: UUID) {
@@ -598,10 +725,14 @@ struct AutomationMainContentView: View {
             return
         }
 
+        let trigger = pendingDependencyTriggerOptions.contains(pendingDependencyTrigger)
+            ? pendingDependencyTrigger
+            : pendingDependencyTriggerOptions.first ?? .onSuccess
+
         let dependency = AutomationDependency(
             fromTaskID: sourceID,
             toTaskID: taskID,
-            trigger: pendingDependencyTrigger.trigger
+            trigger: trigger.trigger
         )
         pendingDependencySourceID = nil
         pendingDependencyTrigger = .onSuccess
@@ -649,6 +780,71 @@ struct AutomationMainContentView: View {
                 selection = .workflow
             }
         }
+    }
+
+    private func autoArrangeTasks() {
+        guard var workflow = selectedRawWorkflow else { return }
+        let positions = AutomationGraphAutoLayout.computeLayout(
+            for: workflow,
+            nodeSize: selectedWorkflow?.nodeSize ?? AutomationGraphSize(width: 250, height: 120)
+        )
+        for i in workflow.tasks.indices {
+            if let pos = positions[workflow.tasks[i].id] {
+                workflow.tasks[i].graphPosition = pos
+            }
+        }
+        onAction(.upsertWorkflow(workflow, at: Date()))
+    }
+
+    private func defaultGraphPosition() -> AutomationGraphPoint? {
+        guard let workflow = selectedWorkflow else {
+            return nil
+        }
+
+        var targetPosition: AutomationGraphPoint?
+        let gap = workflow.nodeSize.height + 48
+
+        if let selectedTaskID = selectedTaskID,
+           let selectedNode = workflow.nodes.first(where: { $0.taskID == selectedTaskID }) {
+            targetPosition = AutomationGraphPoint(
+                x: selectedNode.position.x,
+                y: selectedNode.position.y + gap
+            )
+        }
+
+        if targetPosition == nil {
+            let maxY = workflow.nodes.map(\.position.y).max()
+            if let maxY {
+                targetPosition = AutomationGraphPoint(
+                    x: 32,
+                    y: maxY + gap
+                )
+            } else {
+                targetPosition = AutomationGraphPoint(x: 32, y: 32)
+            }
+        }
+
+        guard var pos = targetPosition else { return AutomationGraphPoint(x: 32, y: 32) }
+
+        // Box-based collision avoidance
+        var collision = true
+        while collision {
+            collision = false
+            for node in workflow.nodes {
+                let overlapX = abs(node.position.x - pos.x) < (workflow.nodeSize.width + 16)
+                let overlapY = abs(node.position.y - pos.y) < (workflow.nodeSize.height + 16)
+                if overlapX && overlapY {
+                    pos = AutomationGraphPoint(
+                        x: pos.x + workflow.nodeSize.width + 24,
+                        y: pos.y
+                    )
+                    collision = true
+                    break
+                }
+            }
+        }
+
+        return pos
     }
 
     private func repairImportNotice() {

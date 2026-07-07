@@ -12,6 +12,7 @@ final class RecordingHUDController {
     private let onDiscard: @MainActor @Sendable () -> Void
     private let onStop: @MainActor @Sendable () -> Void
     private weak var state: AppState?
+    private var currentMode: RecordingHUDMode = .compact
 
     init(recorder: Recorder,
          state: AppState?,
@@ -23,8 +24,17 @@ final class RecordingHUDController {
         self.onStop = onStop
     }
 
-    func show() {
-        if window == nil { create() }
+    func show(mode: RecordingHUDMode) {
+        guard mode.showsFloatingPanel else {
+            hide()
+            return
+        }
+        if currentMode != mode {
+            window?.orderOut(nil)
+            window = nil
+        }
+        currentMode = mode
+        if window == nil { create(mode: mode) }
         position()
         window?.alphaValue = 0
         window?.orderFrontRegardless()
@@ -46,12 +56,25 @@ final class RecordingHUDController {
         })
     }
 
-    private func create() {
+    private func expandFromCompact() {
+        guard currentMode == .compact else { return }
+        show(mode: .expanded)
+    }
+
+    private func collapseToCompact() {
+        guard currentMode == .expanded else { return }
+        show(mode: .compact)
+    }
+
+    private func create(mode: RecordingHUDMode) {
         let view = RecordingHUDView(
+            mode: mode,
             recorder: recorder,
             state: state,
             onDiscard: onDiscard,
-            onStop: onStop
+            onStop: onStop,
+            onExpand: { [weak self] in self?.expandFromCompact() },
+            onCollapse: { [weak self] in self?.collapseToCompact() }
         )
         let host = NSHostingView(rootView: view)
         let fitting = host.fittingSize
@@ -66,19 +89,20 @@ final class RecordingHUDController {
         )
         panel.level = .floating
         panel.collectionBehavior = [.canJoinAllSpaces, .stationary, .ignoresCycle]
-        panel.isMovableByWindowBackground = true
+        panel.isMovableByWindowBackground = mode == .expanded
         panel.hidesOnDeactivate = false
         panel.isOpaque = false
         panel.backgroundColor = .clear
-        panel.hasShadow = true
+        panel.hasShadow = mode == .expanded
 
         // The HUD floats over the live desktop — the one place real Liquid Glass
         // refraction shines. Host the SwiftUI body INSIDE an NSGlassEffectView so
         // the glass samples real content behind it (macOS 26+); fall back to the
         // HUD vibrancy material on earlier systems.
+        let cornerRadius: CGFloat = mode == .compact ? 22 : 16
         if #available(macOS 26.0, *) {
             let glass = NSGlassEffectView()
-            glass.cornerRadius = 16
+            glass.cornerRadius = cornerRadius
             glass.contentView = host
             panel.contentView = glass
         } else {
@@ -87,7 +111,7 @@ final class RecordingHUDController {
             fx.blendingMode = .behindWindow
             fx.state = .active
             fx.wantsLayer = true
-            fx.layer?.cornerRadius = 16
+            fx.layer?.cornerRadius = cornerRadius
             fx.layer?.masksToBounds = true
             host.frame = fx.bounds
             host.autoresizingMask = [.width, .height]
@@ -106,9 +130,12 @@ final class RecordingHUDController {
         guard let screen else { return }
         let visible = screen.visibleFrame
         let size = win.frame.size
-        // Top-right with menu-bar gap.
-        let x = visible.maxX - size.width - 24
-        let y = visible.maxY - size.height - 12
+        // Top-right with menu-bar gap. Compact mode stays close to the menu bar;
+        // expanded mode keeps a little more breathing room for its shadow.
+        let margin: CGFloat = currentMode == .compact ? 12 : 24
+        let topGap: CGFloat = currentMode == .compact ? 8 : 12
+        let x = visible.maxX - size.width - margin
+        let y = visible.maxY - size.height - topGap
         win.setFrame(NSRect(origin: NSPoint(x: x, y: y), size: size), display: true)
     }
 }
@@ -116,12 +143,13 @@ final class RecordingHUDController {
 // MARK: - View
 
 struct RecordingHUDView: View {
+    let mode: RecordingHUDMode
     @ObservedObject var recorder: Recorder
     weak var state: AppState?
     let onDiscard: @MainActor @Sendable () -> Void
     let onStop: @MainActor @Sendable () -> Void
-
-    @State private var pulse = false
+    let onExpand: @MainActor @Sendable () -> Void
+    let onCollapse: @MainActor @Sendable () -> Void
 
     /// The actual configured "stop recording" hotkey — pressing record again toggles off.
     private var stopHotkeyName: String {
@@ -146,9 +174,99 @@ struct RecordingHUDView: View {
         String(format: "%.1fs", recorder.liveDuration)
     }
 
+    private var eventCount: Int {
+        stats.clicks + stats.keys + stats.scrolls + stats.drags
+    }
+
+    @ViewBuilder
     var body: some View {
+        switch mode {
+        case .compact:
+            compactBody
+        case .expanded:
+            expandedBody
+        case .menuBar:
+            EmptyView()
+        }
+    }
+
+    private var compactBody: some View {
+        HStack(spacing: 10) {
+            Button(action: onExpand) {
+                HStack(spacing: 10) {
+                    RecDot(size: 9)
+
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text(NSLocalizedString("Recording", comment: "").uppercased())
+                            .font(.system(size: 9.5, weight: .semibold))
+                            .foregroundStyle(Color.white.opacity(0.54))
+                            .lineLimit(1)
+                        Text("\(minutes):\(seconds)")
+                            .font(.system(size: 18, weight: .semibold, design: .monospaced))
+                            .monospacedDigit()
+                            .foregroundStyle(.white)
+                            .contentTransition(.numericText())
+                            .frame(width: 58, alignment: .leading)
+                            .lineLimit(1)
+                    }
+
+                    Spacer(minLength: 0)
+
+                    CompactEventCount(value: eventCount)
+
+                    Image(systemName: "chevron.down")
+                        .font(.system(size: 9, weight: .bold))
+                        .foregroundStyle(Color.white.opacity(0.42))
+                }
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .help(NSLocalizedString("Expand", comment: ""))
+
+            HStack(spacing: 4) {
+                HUDIconButton(
+                    icon: "trash",
+                    shortcut: emergencyHotkeyName,
+                    tint: nil,
+                    accessibilityTitle: NSLocalizedString("Discard", comment: ""),
+                    action: onDiscard
+                )
+                HUDIconButton(
+                    icon: "stop.fill",
+                    shortcut: stopHotkeyName,
+                    tint: Brand.red500,
+                    accessibilityTitle: NSLocalizedString("Stop", comment: ""),
+                    action: onStop
+                )
+            }
+        }
+        .padding(.leading, 13)
+        .padding(.trailing, 7)
+        .frame(width: 288, height: 52)
+        .background(
+            Capsule(style: .continuous)
+                .fill(LinearGradient(
+                    colors: [
+                        Color(red: 0.10, green: 0.11, blue: 0.14).opacity(0.70),
+                        Color(red: 0.045, green: 0.050, blue: 0.070).opacity(0.70)
+                    ],
+                    startPoint: .top,
+                    endPoint: .bottom
+                ))
+        )
+        .overlay(
+            Capsule(style: .continuous)
+                .strokeBorder(Color.white.opacity(0.14), lineWidth: 0.5)
+        )
+        .shadow(color: Color.black.opacity(0.22), radius: 8, y: 3)
+        .environment(\.colorScheme, .dark)
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel(compactAccessibilityLabel)
+    }
+
+    private var expandedBody: some View {
         let s = stats
-        ZStack {
+        return ZStack {
             // Inky translucent layer over the host glass: guarantees legible white
             // content over any desktop, while the NSGlassEffectView behind still
             // refracts. (This is the design's exact approach.)
@@ -164,21 +282,29 @@ struct RecordingHUDView: View {
                     RecDot(size: 10)
                     Text(NSLocalizedString("Recording", comment: "").uppercased())
                         .font(.system(size: 11, weight: .semibold))
-                        .tracking(0.6)
                         .foregroundStyle(Color.white.opacity(0.60))
                     Spacer()
                     HStack(alignment: .firstTextBaseline, spacing: 0) {
                         Text("\(minutes):\(seconds)")
                             .font(.system(size: 22, weight: .semibold, design: .monospaced))
-                            .tracking(-0.5)
+                            .monospacedDigit()
                         Text(".\(hundredths)")
                             .font(.system(size: 16, weight: .semibold, design: .monospaced))
+                            .monospacedDigit()
                             .opacity(0.55)
                     }
                     .foregroundStyle(LinearGradient(
                         colors: [.white, Color(red: 0.77, green: 0.78, blue: 0.82)],
                         startPoint: .top, endPoint: .bottom))
                     .contentTransition(.numericText())
+                    .frame(width: 96, alignment: .trailing)
+                    HUDIconButton(
+                        icon: "chevron.up",
+                        shortcut: "",
+                        tint: nil,
+                        accessibilityTitle: NSLocalizedString("Collapse", comment: ""),
+                        action: onCollapse
+                    )
                 }
 
                 // Event-track panel
@@ -228,8 +354,10 @@ struct RecordingHUDView: View {
                 .strokeBorder(Color.white.opacity(0.14), lineWidth: 0.5)
         )
         .environment(\.colorScheme, .dark)
-        .onAppear { pulse = recorder.isRecording }
-        .onChange(of: recorder.isRecording) { _, recording in pulse = recording }
+    }
+
+    private var compactAccessibilityLabel: Text {
+        Text("\(NSLocalizedString("Recording", comment: "")), \(minutes):\(seconds), \(eventCount) \(NSLocalizedString("events", comment: ""))")
     }
 }
 
@@ -239,7 +367,7 @@ private struct LiveWaveform: View, Equatable {
     let events: [RecordedEvent]
 
     var body: some View {
-        GeometryReader { geo in
+        GeometryReader { _ in
             let bars = WaveformProjection.indexedBars(from: events)
 
             Canvas { context, size in
@@ -282,12 +410,10 @@ private struct HUDStat: View {
             Text("\(value)")
                 .font(.system(size: 14, weight: .semibold, design: .monospaced))
                 .foregroundStyle(.white)
-                .tracking(-0.2)
                 .contentTransition(.numericText())
                 .animation(.spring(response: 0.4), value: value)
             Text(label.uppercased())
                 .font(.system(size: 9, weight: .medium))
-                .tracking(0.3)
                 .foregroundStyle(Color.white.opacity(0.40))
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -301,6 +427,73 @@ private struct HUDStat: View {
         )
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("\(value) \(label)")
+    }
+}
+
+private struct CompactEventCount: View {
+    let value: Int
+
+    var body: some View {
+        HStack(spacing: 5) {
+            Image(systemName: "waveform.path.ecg")
+                .font(.system(size: 10, weight: .semibold))
+                .foregroundStyle(Brand.sigTeal)
+            Text("\(value)")
+                .font(.system(size: 13, weight: .semibold, design: .monospaced))
+                .monospacedDigit()
+                .foregroundStyle(.white.opacity(0.88))
+                .contentTransition(.numericText())
+        }
+        .frame(width: 60, height: 30)
+        .padding(.horizontal, 8)
+        .background(
+            Capsule(style: .continuous)
+                .fill(Color.white.opacity(0.07))
+                .overlay(Capsule(style: .continuous).strokeBorder(Color.white.opacity(0.10), lineWidth: 0.5))
+        )
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("\(value) \(NSLocalizedString("events", comment: ""))")
+    }
+}
+
+private struct HUDIconButton: View {
+    let icon: String
+    let shortcut: String
+    let tint: Color?
+    let accessibilityTitle: String
+    let action: () -> Void
+
+    @State private var hovered = false
+
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: icon)
+                .font(.system(size: 11, weight: .bold))
+                .foregroundStyle(.white)
+                .frame(width: 32, height: 32)
+                .background(
+                    Circle()
+                        .fill(
+                            tint != nil
+                                ? AnyShapeStyle(Brand.redGradient)
+                                : AnyShapeStyle(Color.white.opacity(hovered ? 0.14 : 0.08))
+                        )
+                        .overlay(
+                            Circle()
+                                .strokeBorder(Color.white.opacity(tint != nil ? 0.24 : 0.12), lineWidth: 0.5)
+                        )
+                        .shadow(
+                            color: (tint ?? .black).opacity(hovered ? 0.32 : (tint != nil ? 0.24 : 0.12)),
+                            radius: hovered ? 6 : 3,
+                            y: 2
+                        )
+                )
+        }
+        .buttonStyle(HoverPressButtonStyle(hoverScale: 1.04))
+        .onHover { hovered = $0 }
+        .help(shortcut.isEmpty ? accessibilityTitle : "\(accessibilityTitle) \(shortcut)")
+        .accessibilityLabel(accessibilityTitle)
+        .accessibilityHint(shortcut)
     }
 }
 
@@ -320,7 +513,6 @@ private struct HUDButton: View {
                     .font(.system(size: 10, weight: .bold))
                 Text(title)
                     .font(.system(size: 12, weight: .semibold))
-                    .tracking(-0.1)
                 Spacer(minLength: 0)
                 KeyCapView(text: shortcut, size: .sm, variant: .glass)
             }

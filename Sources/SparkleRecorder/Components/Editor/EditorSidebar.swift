@@ -28,6 +28,7 @@ struct EditorSidebar: View {
     let onAddClickPoint: () -> Void
     let onPickText: () -> Void
     let onRefreshRows: () -> [ActionRow]
+    let onCreateRepeatUntilDraft: () -> Void
 
     @State private var insertWaitMs: Double = 1000
     @State private var confirmClearAll = false
@@ -76,7 +77,7 @@ struct EditorSidebar: View {
 		                        inspectorGrid {
 			                            labeledField(grp.kind.isPassiveWait ? NSLocalizedString("Wait Duration (s)", comment: "") : NSLocalizedString("Time (s)", comment: ""), text: $inspTime)
 		                        
-		                            if grp.kind == .waitForText {
+		                            if grp.kind == .waitForText || grp.kind == .waitForTextGone {
 		                                labeledDoubleField(NSLocalizedString("Timeout (s)", comment: ""), value: $inspTimeout)
 		                            }
 		                        
@@ -365,7 +366,12 @@ struct EditorSidebar: View {
                         .help(actionSelectionDeletionReadinessHelp(deletionReadiness))
 
                         Button(action: duplicateSelected) {
-                            Label(NSLocalizedString("Duplicate", comment: ""), systemImage: "plus.square.on.square")
+                            Label(
+                                selectionSnapshot.containsBehavior
+                                    ? NSLocalizedString("Duplicate Behavior", comment: "")
+                                    : NSLocalizedString("Duplicate", comment: ""),
+                                systemImage: "plus.square.on.square"
+                            )
                                 .frame(maxWidth: .infinity)
                         }
                         .keyboardShortcut("d", modifiers: .command)
@@ -661,6 +667,11 @@ struct EditorSidebar: View {
         section(NSLocalizedString("Behavior", comment: ""), icon: "square.stack.3d.down.right") {
             VStack(alignment: .leading, spacing: 8) {
                 let bindReadiness = selectionSnapshot.behaviorBindReadiness
+                let repeatUntilReadiness = MacroEditorRepeatUntilDraftBuilder.readiness(
+                    events: recorder.events,
+                    groups: rows.map(\.group),
+                    selectedGroupIDs: selection
+                )
                 let selectedBehavior = selectedBehaviorGroup()
                 if let selectedBehavior {
                     let renameReadiness = behaviorRenameReadiness(
@@ -679,6 +690,16 @@ struct EditorSidebar: View {
                         .font(.system(.callout, design: .monospaced))
                         .controlSize(.small)
                         .onSubmit { submitBehaviorName() }
+                    Button {
+                        duplicateSelected()
+                    } label: {
+                        Label(NSLocalizedString("Duplicate Behavior", comment: ""), systemImage: "plus.square.on.square")
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                    .help(NSLocalizedString("Copy this behavior as a new reusable behavior block.", comment: ""))
+
                     HStack(spacing: 6) {
                         Button {
                             renameSelectedBehavior()
@@ -746,6 +767,31 @@ struct EditorSidebar: View {
                             .foregroundStyle(.secondary)
                             .fixedSize(horizontal: false, vertical: true)
                     }
+                }
+
+                Divider().padding(.vertical, 2)
+
+                Button {
+                    onCreateRepeatUntilDraft()
+                } label: {
+                    Label(NSLocalizedString("Preview Repeat Until", comment: ""), systemImage: "arrow.triangle.2.circlepath")
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+                .disabled(!repeatUntilReadiness.canCreate)
+                .help(repeatUntilReadinessHelp(repeatUntilReadiness))
+
+                Text(NSLocalizedString("Save the selected body as a behavior macro, then open a draft-only Repeat-Until preview.", comment: ""))
+                    .font(.system(size: 10))
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                if !repeatUntilReadiness.canCreate {
+                    Text(repeatUntilReadinessHelp(repeatUntilReadiness))
+                        .font(.system(size: 10))
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
             }
         }
@@ -1011,21 +1057,44 @@ struct EditorSidebar: View {
     
     @ViewBuilder
     func insertionTargetView() -> some View {
-        HStack(spacing: 7) {
-            Image(systemName: "arrow.down.to.line.compact")
-                .font(.system(size: 10, weight: .semibold))
-                .foregroundStyle(Brand.sigGreen)
-            Text(insertionTargetLabel())
-                .font(.system(size: 10, weight: .medium))
-                .foregroundStyle(.secondary)
-                .lineLimit(1)
-                .minimumScaleFactor(0.8)
-            Spacer(minLength: 0)
+        Menu {
+            Button {
+                selection.removeAll()
+            } label: {
+                Text(NSLocalizedString("Append at end", comment: ""))
+            }
+
+            if !rows.isEmpty {
+                Divider()
+                ForEach(Array(rows.enumerated()), id: \.element.id) { index, row in
+                    Button {
+                        selection = [row.id]
+                    } label: {
+                        Text(String(format: NSLocalizedString("Insert after #%d: %@", comment: ""), index + 1, humanActionKindName(row.group.kind)))
+                    }
+                }
+            }
+        } label: {
+            HStack(spacing: 7) {
+                Image(systemName: "arrow.down.to.line.compact")
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(Brand.sigGreen)
+                Text(insertionTargetLabel())
+                    .font(.system(size: 10, weight: .medium))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+                Spacer(minLength: 0)
+                Image(systemName: "chevron.up.chevron.down")
+                    .font(.system(size: 9, weight: .semibold))
+                    .foregroundStyle(.tertiary)
+            }
+            .padding(.horizontal, 8)
+            .padding(.vertical, 6)
+            .background(Color.primary.opacity(0.04))
+            .clipShape(.rect(cornerRadius: 7))
         }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 6)
-        .background(Color.primary.opacity(0.04))
-        .clipShape(.rect(cornerRadius: 7))
+        .buttonStyle(.plain)
     }
     
     func insertionTargetLabel() -> String {
@@ -1072,6 +1141,34 @@ struct EditorSidebar: View {
             let groups = self.onRefreshRows().map(\.group)
             if let inserted = ActionGroupProjection.firstGroup(containingEventIn: range, groups: groups) {
                 self.selection = [inserted.id]
+                DispatchQueue.main.async {
+                    self.onLoadInspector()
+                    self.onUpdatePreview()
+                }
+            }
+        }
+    }
+
+    func selectCopiedEvents(
+        in range: Range<Int>,
+        excludingBehaviorIDs sourceBehaviorIDs: Set<BehaviorGroupID>
+    ) {
+        DispatchQueue.main.async {
+            let groups = self.onRefreshRows().map(\.group)
+            let copiedEventIndices = Set(range)
+            let copiedBehaviors = ActionGroupProjection.behaviorGroups(
+                containingEventIndices: copiedEventIndices,
+                excluding: sourceBehaviorIDs,
+                groups: groups
+            )
+            let targets = copiedBehaviors.isEmpty
+                ? groups.filter { group in
+                    group.eventIndices.contains { copiedEventIndices.contains($0) }
+                }
+                : copiedBehaviors
+
+            if !targets.isEmpty {
+                self.selection = Set(targets.map(\.id))
                 DispatchQueue.main.async {
                     self.onLoadInspector()
                     self.onUpdatePreview()
@@ -1222,6 +1319,23 @@ struct EditorSidebar: View {
         guard let group = groups.first, group.behaviorGroupID != nil else { return nil }
         return group
     }
+
+    func repeatUntilReadinessHelp(_ readiness: MacroEditorRepeatUntilDraftReadiness) -> String {
+        switch readiness {
+        case .ready:
+            return NSLocalizedString("Create a reusable behavior macro and preview the Repeat-Until workflow draft.", comment: "")
+        case .noSelection:
+            return NSLocalizedString("Select a behavior body and one text wait condition.", comment: "")
+        case .missingBody:
+            return NSLocalizedString("Select at least one recorded action as the Repeat-Until body.", comment: "")
+        case .multipleUntilConditions:
+            return NSLocalizedString("Select only one Wait Text, Wait Text Gone, or Verify Text condition.", comment: "")
+        case .missingUntilCondition:
+            return NSLocalizedString("Select one Wait Text, Wait Text Gone, or Verify Text condition as the Until check.", comment: "")
+        case .missingUntilText:
+            return NSLocalizedString("Pick or type target text before creating Repeat Until.", comment: "")
+        }
+    }
     
     func nextBehaviorName() -> String {
         let existing = recorder.events.compactMap(\.behaviorGroupID).reduce(into: Set<BehaviorGroupID>()) { partial, id in
@@ -1323,6 +1437,7 @@ struct EditorSidebar: View {
         let selectedGroups = selection.compactMap { groupID -> ActionGroup? in
             rows.first(where: { $0.id == groupID })?.group
         }
+        let sourceBehaviorIDs = Set(selectedGroups.compactMap(\.behaviorGroupID))
         guard actionSelectionDuplicationReadiness(
             for: selectedGroups,
             events: recorder.events,
@@ -1362,7 +1477,7 @@ struct EditorSidebar: View {
         }
 
         if let copiesRange {
-            selectInsertedEvents(in: copiesRange)
+            selectCopiedEvents(in: copiesRange, excludingBehaviorIDs: sourceBehaviorIDs)
         } else {
             selectWaits(matching: waitTargets)
         }

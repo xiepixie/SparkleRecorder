@@ -93,6 +93,14 @@ final class MenuBarController: NSObject, NSPopoverDelegate {
                 self?.updateDockBadge()
             }
             .store(in: &cancellables)
+        recorder.$liveDuration
+            .throttle(for: .seconds(1), scheduler: RunLoop.main, latest: true)
+            .sink { [weak self] _ in
+                guard let self, self.recorder.isRecording else { return }
+                guard self.state.recordingHUDMode == .menuBar else { return }
+                self.refreshIcon()
+            }
+            .store(in: &cancellables)
         player.$isPlaying
             .receive(on: RunLoop.main)
             .sink { [weak self] playing in
@@ -101,14 +109,23 @@ final class MenuBarController: NSObject, NSPopoverDelegate {
                 self?.updateDockBadge()
             }
             .store(in: &cancellables)
+        state.$recordingHUDMode
+            .removeDuplicates()
+            .receive(on: RunLoop.main)
+            .sink { [weak self] _ in
+                guard let self else { return }
+                self.refreshIcon()
+                self.showRecordingHUDIfNeeded()
+            }
+            .store(in: &cancellables)
     }
 
     private func refreshIcon() {
         guard let button = statusItem.button else { return }
         if recorder.isRecording {
             button.image = SparkleIcons.recording
-            button.title = " REC"
-            button.setAccessibilityLabel("SparkleRecorder — recording")
+            button.title = state.recordingHUDMode == .menuBar ? recordingMenuBarTitle : " REC"
+            button.setAccessibilityLabel(recordingMenuBarAccessibilityLabel)
         } else if player.isPlaying {
             button.image = SparkleIcons.playing
             button.title = ""
@@ -118,6 +135,24 @@ final class MenuBarController: NSObject, NSPopoverDelegate {
             button.title = ""
             button.setAccessibilityLabel("SparkleRecorder")
         }
+    }
+
+    private var recordingMenuBarTitle: String {
+        " " + Self.recordingDurationText(recorder.liveDuration)
+    }
+
+    private var recordingMenuBarAccessibilityLabel: String {
+        let seconds = Int(recorder.liveDuration)
+        let eventCount = recorder.liveStats.clicks
+            + recorder.liveStats.keys
+            + recorder.liveStats.scrolls
+            + recorder.liveStats.drags
+        return "SparkleRecorder — recording, \(seconds) seconds, \(eventCount) events"
+    }
+
+    private static func recordingDurationText(_ duration: TimeInterval) -> String {
+        let totalSeconds = max(0, Int(duration))
+        return String(format: "%02d:%02d", totalSeconds / 60, totalSeconds % 60)
     }
 
     private func updateDockBadge() {
@@ -177,8 +212,14 @@ final class MenuBarController: NSObject, NSPopoverDelegate {
 
     private func showPopover() {
         guard let button = statusItem.button else { return }
+        popover.animates = !recorder.isRecording
+        popover.contentSize = recorder.isRecording
+            ? NSSize(width: 320, height: 236)
+            : NSSize(width: 400, height: 540)
         popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
-        popover.contentViewController?.view.window?.becomeKey()
+        if !recorder.isRecording {
+            popover.contentViewController?.view.window?.becomeKey()
+        }
         installGlobalClickMonitor()
     }
 
@@ -294,6 +335,19 @@ final class MenuBarController: NSObject, NSPopoverDelegate {
             onDiscard: { [weak self] in self?.cancelRecording() },
             onStop:    { [weak self] in self?.toggleRecording() }
         )
+    }
+
+    private func showRecordingHUDIfNeeded() {
+        guard recorder.isRecording else {
+            hud?.hide()
+            return
+        }
+        let mode = state.recordingHUDMode
+        if mode.showsFloatingPanel {
+            hud?.show(mode: mode)
+        } else {
+            hud?.hide()
+        }
     }
 
     /// Stop recording and throw away the captured events without saving.
@@ -694,7 +748,7 @@ final class MenuBarController: NSObject, NSPopoverDelegate {
             semanticCaptureTarget: semanticCaptureTarget
         )
         if ok {
-            if state.showRecordingHUD { hud?.show() }
+            showRecordingHUDIfNeeded()
             state.statusMessage = pendingRecordingStartMessage ?? "Recording…"
             pendingRecordingStartMessage = nil
             SoundController.shared.play(.recordStart)
@@ -1412,7 +1466,7 @@ final class MenuBarController: NSObject, NSPopoverDelegate {
     // MARK: - Settings window
 
     func showSettingsWindow() {
-        if popover.isShown { popover.performClose(nil) }
+        if popover.isShown { popover.close() }
         if settingsWC == nil {
             settingsWC = SettingsWindowController(controller: self)
         }

@@ -78,8 +78,7 @@ struct AutomationTaskRuntimeDetailView: View {
                     .foregroundStyle(.secondary)
             }
         }
-        .padding(10)
-        .sectionSurface(cornerRadius: 10)
+        .padding(.vertical, 8)
         .accessibilityElement(children: .combine)
     }
 

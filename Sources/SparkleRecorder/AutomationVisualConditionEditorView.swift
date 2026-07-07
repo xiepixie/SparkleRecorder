@@ -7,6 +7,7 @@ struct AutomationVisualConditionEditorView: View {
     let regionStatusImage: String
     let regionStatusTint: Color
     let referenceSize: CGSize?
+    let regionPreview: AutomationRegionCapturePreview?
     let supportsBoundsPicker: Bool
     let showsTypePicker: Bool
     let regionReferenceOptions: [AutomationVisualReferenceOption]
@@ -32,6 +33,7 @@ struct AutomationVisualConditionEditorView: View {
     @Binding var requiresVisible: Bool
     let onDrawRegion: () -> Void
     let onClearRegion: () -> Void
+    let onPickPixel: ((AutomationRegionCapturePixelSample) -> Void)?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -62,14 +64,18 @@ struct AutomationVisualConditionEditorView: View {
                 tint: hasRegion ? Brand.libraryGreen : Brand.sigAmber
             )
 
-            AutomationVisualReferenceFieldView(
-                title: NSLocalizedString("Region reference", comment: ""),
-                textFieldTitle: NSLocalizedString("Region reference", comment: ""),
-                systemImage: "viewfinder.rectangular",
-                emptyDetail: nil,
-                options: regionReferenceOptions,
-                reference: $regionRef
-            )
+            visualSetupSummary
+
+            if !regionReferenceOptions.isEmpty || !trimmedRegionRef.isEmpty {
+                AutomationVisualReferenceFieldView(
+                    title: NSLocalizedString("Saved watched area", comment: ""),
+                    textFieldTitle: NSLocalizedString("Saved watched area", comment: ""),
+                    systemImage: "viewfinder.rectangular",
+                    emptyDetail: NSLocalizedString("No saved watched areas in this workflow.", comment: ""),
+                    options: regionReferenceOptions,
+                    reference: $regionRef
+                )
+            }
 
             if supportsBoundsPicker {
                 Picker(NSLocalizedString("Region space", comment: ""), selection: $searchRegionSpace) {
@@ -88,6 +94,9 @@ struct AutomationVisualConditionEditorView: View {
                     hasRegion: hasRegion,
                     isNormalizedSpace: searchRegionSpace.isNormalizedSpaceForVisualCondition,
                     referenceSize: referenceSize,
+                    preview: regionPreview,
+                    selectedPixel: selectedPreviewPixel,
+                    onPickPixel: type == .pixelMatched ? onPickPixel : nil,
                     regionX: $regionX,
                     regionY: $regionY,
                     regionWidth: $regionWidth,
@@ -115,25 +124,37 @@ struct AutomationVisualConditionEditorView: View {
         }
     }
 
+    private var selectedPreviewPixel: CGPoint? {
+        guard type == .pixelMatched,
+              hasPixel,
+              pixelX >= 0,
+              pixelX <= 1,
+              pixelY >= 0,
+              pixelY <= 1 else {
+            return nil
+        }
+        return CGPoint(x: pixelX, y: pixelY)
+    }
+
     @ViewBuilder
     private var typeSpecificFields: some View {
         switch type {
         case .regionChanged:
             AutomationVisualReferenceFieldView(
-                title: NSLocalizedString("Baseline reference", comment: ""),
-                textFieldTitle: NSLocalizedString("Baseline reference", comment: ""),
+                title: NSLocalizedString("Baseline image", comment: ""),
+                textFieldTitle: NSLocalizedString("Baseline image", comment: ""),
                 systemImage: "rectangle.dashed",
-                emptyDetail: nil,
+                emptyDetail: NSLocalizedString("No baseline images in this workflow yet.", comment: ""),
                 options: baselineReferenceOptions,
                 reference: $baselineRef
             )
             thresholdFields
         case .imageAppeared, .imageDisappeared:
             AutomationVisualReferenceFieldView(
-                title: NSLocalizedString("Image reference", comment: ""),
-                textFieldTitle: NSLocalizedString("Image reference", comment: ""),
+                title: NSLocalizedString("Reference image", comment: ""),
+                textFieldTitle: NSLocalizedString("Reference image", comment: ""),
                 systemImage: "photo",
-                emptyDetail: nil,
+                emptyDetail: NSLocalizedString("No reference images in this workflow yet.", comment: ""),
                 options: imageReferenceOptions,
                 reference: $imageRef
             )
@@ -176,6 +197,108 @@ struct AutomationVisualConditionEditorView: View {
         }
     }
 
+    private var visualSetupSummary: some View {
+        VStack(alignment: .leading, spacing: 7) {
+            Label(setupTitle, systemImage: setupIsReady ? "checkmark.seal" : "exclamationmark.triangle")
+                .font(.caption)
+                .bold()
+                .foregroundStyle(setupIsReady ? Brand.libraryGreen : Brand.sigAmber)
+
+            ForEach(setupRows) { row in
+                Label(row.title, systemImage: row.systemImage)
+                    .font(.caption2)
+                    .foregroundStyle(row.tint)
+                    .lineLimit(2)
+            }
+        }
+        .padding(8)
+        .automationSubsurface(cornerRadius: 8, tint: setupIsReady ? Brand.libraryGreen : Brand.sigAmber)
+    }
+
+    private var setupTitle: String {
+        setupIsReady
+            ? NSLocalizedString("Visual check ready", comment: "")
+            : NSLocalizedString("Visual check needs setup", comment: "")
+    }
+
+    private var setupIsReady: Bool {
+        setupRows.allSatisfy(\.isReady)
+    }
+
+    private var setupRows: [VisualSetupRow] {
+        var rows: [VisualSetupRow] = [
+            VisualSetupRow(
+                id: "watchedArea",
+                title: hasRegion
+                    ? NSLocalizedString("Watched area selected", comment: "")
+                    : NSLocalizedString("Watching full display", comment: ""),
+                systemImage: hasRegion ? "rectangle.dashed" : "display",
+                tint: hasRegion ? Brand.libraryGreen : Brand.sigAmber,
+                isReady: true
+            )
+        ]
+
+        switch type {
+        case .regionChanged:
+            rows.append(VisualSetupRow(
+                id: "baselineImage",
+                title: trimmedBaselineRef.isEmpty
+                    ? NSLocalizedString("Needs baseline image", comment: "")
+                    : NSLocalizedString("Baseline image selected", comment: ""),
+                systemImage: trimmedBaselineRef.isEmpty ? "exclamationmark.triangle" : "rectangle.dashed",
+                tint: trimmedBaselineRef.isEmpty ? Brand.sigAmber : Brand.libraryGreen,
+                isReady: !trimmedBaselineRef.isEmpty
+            ))
+        case .imageAppeared, .imageDisappeared:
+            rows.append(VisualSetupRow(
+                id: "referenceImage",
+                title: trimmedImageRef.isEmpty
+                    ? NSLocalizedString("Needs reference image", comment: "")
+                    : NSLocalizedString("Reference image selected", comment: ""),
+                systemImage: trimmedImageRef.isEmpty ? "exclamationmark.triangle" : "photo",
+                tint: trimmedImageRef.isEmpty ? Brand.sigAmber : Brand.libraryGreen,
+                isReady: !trimmedImageRef.isEmpty
+            ))
+        case .pixelMatched:
+            rows.append(VisualSetupRow(
+                id: "targetColor",
+                title: trimmedColorHex.isEmpty
+                    ? NSLocalizedString("Needs target color", comment: "")
+                    : NSLocalizedString("Target color selected", comment: ""),
+                systemImage: trimmedColorHex.isEmpty ? "exclamationmark.triangle" : "paintpalette",
+                tint: trimmedColorHex.isEmpty ? Brand.sigAmber : Brand.libraryGreen,
+                isReady: !trimmedColorHex.isEmpty
+            ))
+            rows.append(VisualSetupRow(
+                id: "samplePoint",
+                title: hasPixel || hasRegion
+                    ? NSLocalizedString("Sample point ready", comment: "")
+                    : NSLocalizedString("Needs pixel or watched area", comment: ""),
+                systemImage: hasPixel || hasRegion ? "scope" : "exclamationmark.triangle",
+                tint: hasPixel || hasRegion ? Brand.libraryGreen : Brand.sigAmber,
+                isReady: hasPixel || hasRegion
+            ))
+        }
+
+        return rows
+    }
+
+    private var trimmedRegionRef: String {
+        regionRef.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private var trimmedImageRef: String {
+        imageRef.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private var trimmedBaselineRef: String {
+        baselineRef.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private var trimmedColorHex: String {
+        colorHex.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
     private func numericField(_ label: String, value: Binding<Double>, width: CGFloat) -> some View {
         LabeledContent(label) {
             TextField(label, value: value, format: .number.precision(.fractionLength(2)))
@@ -184,6 +307,14 @@ struct AutomationVisualConditionEditorView: View {
         }
         .font(.caption)
     }
+}
+
+private struct VisualSetupRow: Identifiable {
+    var id: String
+    var title: String
+    var systemImage: String
+    var tint: Color
+    var isReady: Bool
 }
 
 private struct AutomationVisualRegionBoundsEditorView: View {
@@ -195,6 +326,9 @@ private struct AutomationVisualRegionBoundsEditorView: View {
     let hasRegion: Bool
     let isNormalizedSpace: Bool
     let referenceSize: CGSize?
+    let preview: AutomationRegionCapturePreview?
+    let selectedPixel: CGPoint?
+    let onPickPixel: ((AutomationRegionCapturePixelSample) -> Void)?
     @Binding var regionX: Double
     @Binding var regionY: Double
     @Binding var regionWidth: Double
@@ -213,7 +347,14 @@ private struct AutomationVisualRegionBoundsEditorView: View {
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
 
-            regionPreview
+            AutomationRegionCapturePreviewView(
+                preview: preview,
+                tint: Brand.libraryBlue,
+                selectedPixel: selectedPixel,
+                onPickPixel: onPickPixel
+            ) {
+                regionPreview
+            }
 
             if hasRegion {
                 regionFields

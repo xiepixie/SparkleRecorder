@@ -4,6 +4,29 @@ import Combine
 import ApplicationServices
 import SparkleRecorderCore
 
+enum RecordingHUDMode: String, CaseIterable, Identifiable {
+    case compact
+    case expanded
+    case menuBar
+
+    var id: String { rawValue }
+
+    var showsFloatingPanel: Bool {
+        self != .menuBar
+    }
+
+    var title: String {
+        switch self {
+        case .compact:
+            return NSLocalizedString("Compact", comment: "")
+        case .expanded:
+            return NSLocalizedString("Expanded", comment: "")
+        case .menuBar:
+            return NSLocalizedString("Menu bar", comment: "")
+        }
+    }
+}
+
 /// User-configurable settings persisted in UserDefaults.
 @MainActor
 final class AppState: ObservableObject {
@@ -43,9 +66,12 @@ final class AppState: ObservableObject {
             SoundController.shared.enabled = soundEnabled
         }
     }
-    /// Show floating recording HUD when recording.
-    @Published var showRecordingHUD: Bool {
-        didSet { UserDefaults.standard.set(showRecordingHUD, forKey: "showRecordingHUD") }
+    /// How much recording status UI should float over the user's work area.
+    @Published var recordingHUDMode: RecordingHUDMode {
+        didSet {
+            UserDefaults.standard.set(recordingHUDMode.rawValue, forKey: Self.recordingHUDModeKey)
+            UserDefaults.standard.set(recordingHUDMode.showsFloatingPanel, forKey: "showRecordingHUD")
+        }
     }
     /// Whether to log unclicked mouse moves (can result in very large files).
     @Published var recordMouseMoves: Bool {
@@ -123,7 +149,13 @@ final class AppState: ObservableObject {
 
         self.countdownSeconds = d.object(forKey: "countdownSeconds") as? Int ?? 3
         self.soundEnabled = d.object(forKey: "soundEnabled") as? Bool ?? false
-        self.showRecordingHUD = d.object(forKey: "showRecordingHUD") as? Bool ?? true
+        if let rawHUDMode = d.string(forKey: Self.recordingHUDModeKey),
+           let hudMode = RecordingHUDMode(rawValue: rawHUDMode) {
+            self.recordingHUDMode = hudMode
+        } else {
+            let legacyShowsHUD = d.object(forKey: "showRecordingHUD") as? Bool ?? true
+            self.recordingHUDMode = legacyShowsHUD ? .compact : .menuBar
+        }
         self.recordMouseMoves = d.object(forKey: "recordMouseMoves") as? Bool ?? false
         self.semanticRecordingEnabled = d.object(forKey: "semanticRecordingEnabled") as? Bool ?? false
         self.semanticRecordingRetentionMaximumArtifactAgeDays = max(
@@ -277,4 +309,5 @@ final class AppState: ObservableObject {
     private static let semanticRecordingExcludedDomainsKey = "semanticRecordingExcludedDomains"
     private static let semanticRecordingMaximumArtifactByteCountKey = "semanticRecordingMaximumArtifactByteCount"
     private static let semanticRecordingLastScheduledRetentionCleanupAtKey = "semanticRecordingLastScheduledRetentionCleanupAt"
+    private static let recordingHUDModeKey = "recordingHUDMode"
 }

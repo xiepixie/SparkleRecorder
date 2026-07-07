@@ -513,8 +513,66 @@ func batchTextTargetReadinessHelp(_ readiness: BatchTextTargetReadiness) -> Stri
 
 func finiteInspectorDouble(_ text: String) -> Double? {
     let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
-    guard let value = Double(trimmed), value.isFinite else { return nil }
-    return value
+    if let value = Double(trimmed), value.isFinite {
+        return value
+    }
+    
+    // Fallback: parse HH:MM:SS.s or MM:SS.s
+    let parts = trimmed.split(separator: ":")
+    if parts.count == 2 || parts.count == 3 {
+        var totalSeconds: Double = 0
+        let reversedParts = parts.reversed().map { String($0) }
+        
+        // seconds
+        if let sec = Double(reversedParts[0]), sec.isFinite, sec >= 0, sec < 60 {
+            totalSeconds += sec
+        } else {
+            return nil
+        }
+        
+        // minutes
+        if let min = Double(reversedParts[1]), min.isFinite, min >= 0 {
+            totalSeconds += min * 60
+        } else {
+            return nil
+        }
+        
+        // hours
+        if reversedParts.count == 3 {
+            if let hr = Double(reversedParts[2]), hr.isFinite, hr >= 0 {
+                totalSeconds += hr * 3600
+            } else {
+                return nil
+            }
+        }
+        
+        return totalSeconds
+    }
+    
+    return nil
+}
+
+func formatInspectorTime(_ time: Double) -> String {
+    let isNegative = time < 0
+    let absTime = abs(time)
+    let totalSeconds = Int(absTime)
+    let fractional = absTime.truncatingRemainder(dividingBy: 1)
+    
+    let hours = totalSeconds / 3600
+    let minutes = (totalSeconds % 3600) / 60
+    let seconds = totalSeconds % 60
+    
+    let prefix = isNegative ? "-" : ""
+    
+    let fracStr = fractional > 0 ? String(String(format: "%.4f", fractional).dropFirst(1)) : ""
+    
+    if hours > 0 {
+        return String(format: "%@%02d:%02d:%02d%@", prefix, hours, minutes, seconds, fracStr)
+    } else if minutes > 0 {
+        return String(format: "%@%02d:%02d%@", prefix, minutes, seconds, fracStr)
+    } else {
+        return String(format: "%@%.4f", prefix, absTime)
+    }
 }
 
 func nonNegativeInspectorDouble(_ value: Double) -> Double? {

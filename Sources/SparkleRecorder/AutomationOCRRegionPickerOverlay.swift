@@ -146,8 +146,9 @@ final class AutomationOCRRegionPickerOverlay {
 
     private var captureWindow: OCRRegionCaptureWindow?
     private var instructionPanel: NSPanel?
+    private var preparationTask: Task<Void, Never>?
 
-    var onPicked: ((AutomationOCRSearchRegionSelection) -> Void)?
+    var onPicked: ((AutomationScreenRegionPickerSelection) -> Void)?
     var onCancelled: (() -> Void)?
 
     func start(
@@ -159,6 +160,38 @@ final class AutomationOCRRegionPickerOverlay {
             onCancelled?()
             return
         }
+
+        let displayID = Self.displayID(for: screen)
+        preparationTask = Task { [weak self, weak screen] in
+            let sourceImage: CGImage?
+            if #available(macOS 14.0, *) {
+                sourceImage = try? await ScreenCaptureService.shared.captureDisplay(displayID: displayID)
+            } else {
+                sourceImage = nil
+            }
+
+            await MainActor.run {
+                guard let self,
+                      let screen,
+                      !Task.isCancelled else {
+                    return
+                }
+                self.preparationTask = nil
+                self.showCaptureWindow(
+                    on: screen,
+                    instructionTitle: instructionTitle,
+                    sourceImage: sourceImage
+                )
+            }
+        }
+    }
+
+    private func showCaptureWindow(
+        on screen: NSScreen,
+        instructionTitle: String,
+        sourceImage: CGImage?
+    ) {
+        stopActiveWindows()
 
         let win = OCRRegionCaptureWindow(
             contentRect: screen.frame,
@@ -179,7 +212,11 @@ final class AutomationOCRRegionPickerOverlay {
         captureView.onPicked = { [weak self, weak screen] selectedRect in
             guard let self,
                   let screen,
-                  let selection = Self.selection(from: selectedRect, on: screen) else {
+                  let selection = Self.selection(
+                    from: selectedRect,
+                    on: screen,
+                    sourceImage: sourceImage
+                  ) else {
                 self?.stop()
                 self?.onCancelled?()
                 return
@@ -201,6 +238,12 @@ final class AutomationOCRRegionPickerOverlay {
     }
 
     func stop() {
+        preparationTask?.cancel()
+        preparationTask = nil
+        stopActiveWindows()
+    }
+
+    private func stopActiveWindows() {
         captureWindow?.orderOut(nil)
         captureWindow = nil
         instructionPanel?.orderOut(nil)
@@ -241,8 +284,9 @@ final class AutomationOCRRegionPickerOverlay {
 
     private static func selection(
         from globalTopLeftRect: CGRect,
-        on screen: NSScreen
-    ) -> AutomationOCRSearchRegionSelection? {
+        on screen: NSScreen,
+        sourceImage: CGImage?
+    ) -> AutomationScreenRegionPickerSelection? {
         let screenFrame = topLeftFrame(for: screen)
         let selectedPointRect = globalTopLeftRect.intersection(screenFrame)
         guard !selectedPointRect.isNull,
@@ -266,25 +310,40 @@ final class AutomationOCRRegionPickerOverlay {
         )
 
         let center = CGPoint(x: globalTopLeftRect.midX, y: globalTopLeftRect.midY)
-        let frames = windowFrames(containing: center, on: screen)
+        let windowContext = windowContext(containing: center, on: screen)
 
-        return AutomationOCRSearchRegionSelection(
+        let regionSelection = AutomationOCRSearchRegionSelection(
             displayBounds: displayBounds,
             selectedDisplayRegion: selectedDisplayRegion,
-            windowFrame: frames.windowFrame,
-            contentFrame: frames.contentFrame
+            windowFrame: windowContext.windowFrame,
+            contentFrame: windowContext.contentFrame
+        )
+
+        return AutomationScreenRegionPickerSelection(
+            regionSelection: regionSelection,
+            windowSummary: windowContext.windowSummary,
+            preview: capturePreview(
+                from: sourceImage,
+                displayBounds: displayBounds,
+                selectedDisplayRegion: selectedDisplayRegion,
+                windowSummary: windowContext.windowSummary
+            )
         )
     }
 
-    private static func windowFrames(
+    private static func windowContext(
         containing point: CGPoint,
         on screen: NSScreen
-    ) -> (windowFrame: RectValue?, contentFrame: RectValue?) {
+    ) -> (
+        windowFrame: RectValue?,
+        contentFrame: RectValue?,
+        windowSummary: AutomationRegionCaptureWindowSummary?
+    ) {
         guard let windowInfoList = CGWindowListCopyWindowInfo(
             [.optionOnScreenOnly, .excludeDesktopElements],
             kCGNullWindowID
         ) as? [[String: Any]] else {
-            return (nil, nil)
+            return (nil, nil, nil)
         }
 
         let currentPID = getpid()
@@ -312,13 +371,15 @@ final class AutomationOCRRegionPickerOverlay {
                 )
             ).frame
 
+            let windowSummary = windowSummary(from: windowInfo, pid: pid)
             return (
                 displayRect(from: frame, on: screen),
-                displayRect(from: content, on: screen)
+                displayRect(from: content, on: screen),
+                windowSummary
             )
         }
 
-        return (nil, nil)
+        return (nil, nil, nil)
     }
 
     private static func windowFrame(from windowInfo: [String: Any]) -> CGRect? {
@@ -333,6 +394,64 @@ final class AutomationOCRRegionPickerOverlay {
         }
 
         return CGRect(x: x, y: y, width: width, height: height)
+    }
+
+    private static func windowSummary(
+        from windowInfo: [String: Any],
+        pid: pid_t
+    ) -> AutomationRegionCaptureWindowSummary {
+        let app = windowInfo[kCGWindowOwnerName as String] as? String
+        let title = windowInfo[kCGWindowName as String] as? String
+        let windowID = (windowInfo[kCGWindowNumber as String] as? NSNumber)?.uint32Value
+        let bundleIdentifier = NSWorkspace.shared
+            .runningApplications
+            .first { $0.processIdentifier == pid }?
+            .bundleIdentifier
+
+        return AutomationRegionCaptureWindowSummary(
+            appName: app,
+            bundleIdentifier: bundleIdentifier,
+            windowTitle: title,
+            windowID: windowID
+        )
+    }
+
+    private static func capturePreview(
+        from sourceImage: CGImage?,
+        displayBounds: RectValue,
+        selectedDisplayRegion: RectValue,
+        windowSummary: AutomationRegionCaptureWindowSummary?
+    ) -> AutomationRegionCapturePreview? {
+        guard let sourceImage else {
+            return nil
+        }
+
+        let scaleX = CGFloat(sourceImage.width) / max(CGFloat(displayBounds.width), 1)
+        let scaleY = CGFloat(sourceImage.height) / max(CGFloat(displayBounds.height), 1)
+        let requested = CGRect(
+            x: CGFloat(selectedDisplayRegion.x) * scaleX,
+            y: CGFloat(selectedDisplayRegion.y) * scaleY,
+            width: CGFloat(selectedDisplayRegion.width) * scaleX,
+            height: CGFloat(selectedDisplayRegion.height) * scaleY
+        ).integral
+        let imageBounds = CGRect(x: 0, y: 0, width: sourceImage.width, height: sourceImage.height)
+        let cropRect = requested.intersection(imageBounds)
+        guard !cropRect.isNull,
+              cropRect.width >= 2,
+              cropRect.height >= 2,
+              let cropped = sourceImage.cropping(to: cropRect) else {
+            return nil
+        }
+
+        return AutomationRegionCapturePreview(
+            image: NSImage(
+                cgImage: cropped,
+                size: NSSize(width: cropped.width, height: cropped.height)
+            ),
+            pixelWidth: cropped.width,
+            pixelHeight: cropped.height,
+            windowSummary: windowSummary
+        )
     }
 
     private static func displayRect(from rect: CGRect, on screen: NSScreen) -> RectValue? {
@@ -374,5 +493,10 @@ final class AutomationOCRRegionPickerOverlay {
             return CGFloat(truncating: value)
         }
         return nil
+    }
+
+    private static func displayID(for screen: NSScreen) -> CGDirectDisplayID {
+        (screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber)?.uint32Value
+            ?? CGMainDisplayID()
     }
 }

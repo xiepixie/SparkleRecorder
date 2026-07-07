@@ -8,6 +8,7 @@ struct AutomationFlowGraphView: View {
     let selectedDependencyID: UUID?
     let pendingDependencySourceID: UUID?
     let pendingDependencyTrigger: AutomationDependencyTriggerDraft
+    let pendingDependencyTriggerOptions: [AutomationDependencyTriggerDraft]
     let linkPreview: AutomationFlowGraphLinkPreviewState?
     let onSelectTask: (UUID) -> Void
     let onSelectDependency: (UUID) -> Void
@@ -27,35 +28,7 @@ struct AutomationFlowGraphView: View {
     private let graphInset = 32.0
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack {
-                VStack(alignment: .leading, spacing: 2) {
-                    HStack(spacing: 8) {
-                        AutomationSectionHeader(
-                            title: NSLocalizedString("FLOWGRAPH", comment: ""),
-                            count: workflow.edges.count
-                        )
-
-                        if pendingDependencySourceID != nil {
-                            AutomationFlowGraphLinkingToolbar(
-                                trigger: pendingDependencyTrigger,
-                                onSetTrigger: onSetPendingDependencyTrigger,
-                                onCancel: onCancelDependency
-                            )
-                        }
-                    }
-                    Text(workflow.name)
-                        .font(.headline)
-                    Text(String(format: NSLocalizedString("%d tasks", comment: ""), workflow.nodes.count))
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-
-                Spacer()
-            }
-            .padding(.horizontal, 14)
-            .padding(.top, 12)
-
+        ZStack(alignment: .topLeading) {
             ScrollView([.horizontal, .vertical]) {
                 ZStack(alignment: .topLeading) {
                     AutomationFlowGraphEdgeCanvas(edges: dynamicEdges)
@@ -100,9 +73,48 @@ struct AutomationFlowGraphView: View {
                     perform: handleGraphDrop(providers:location:)
                 )
                 .coordinateSpace(name: "AutomationFlowGraphCanvas")
-                .padding(12)
             }
             .scrollIndicators(.hidden)
+
+            // Header Overlay
+            HStack(alignment: .top) {
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack(spacing: 8) {
+                        Text(workflow.name)
+                            .font(.headline)
+
+                        Text(String(format: NSLocalizedString("%d tasks", comment: ""), workflow.nodes.count))
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+
+                    if pendingDependencySourceID != nil {
+                        AutomationFlowGraphLinkingToolbar(
+                            trigger: pendingDependencyTrigger,
+                            triggerOptions: pendingDependencyTriggerOptions,
+                            onSetTrigger: onSetPendingDependencyTrigger,
+                            onCancel: onCancelDependency
+                        )
+                    }
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .background(Material.regular)
+                .clipShape(RoundedRectangle(cornerRadius: 8))
+                .shadow(color: .black.opacity(0.1), radius: 2)
+
+                Spacer()
+            }
+            .padding(16)
+        }
+        .onChange(of: workflow.nodes) {
+            if let dragged = draggedNode, dragged.isCommitted {
+                if let updatedNode = workflow.nodes.first(where: { $0.taskID == dragged.taskID }),
+                   abs(updatedNode.position.x - dragged.displayPosition.x) < 1.0,
+                   abs(updatedNode.position.y - dragged.displayPosition.y) < 1.0 {
+                    draggedNode = nil
+                }
+            }
         }
     }
 
@@ -216,12 +228,15 @@ struct AutomationFlowGraphView: View {
                     y: Double(value.translation.height)
                 )
                 let distance = hypot(translation.x, translation.y)
-                defer { draggedNode = nil }
 
                 guard distance >= dragThreshold else {
+                    draggedNode = nil
                     onSelectTask(node.taskID)
                     return
                 }
+
+                draggedNode?.translation = translation
+                draggedNode?.isCommitted = true
 
                 let finalPosition = node.position.offsetBy(translation).clampedToPositive()
                 onSelectTask(node.taskID)
@@ -317,6 +332,7 @@ struct AutomationFlowGraphView: View {
         var taskID: UUID
         var startPosition: AutomationGraphPoint
         var translation: AutomationGraphPoint
+        var isCommitted: Bool = false
 
         var displayPosition: AutomationGraphPoint {
             startPosition.offsetBy(translation).clampedToPositive()
@@ -330,7 +346,7 @@ struct AutomationFlowGraphView: View {
         }
 
         func hasExceededThreshold(_ threshold: Double) -> Bool {
-            hypot(translation.x, translation.y) >= threshold
+            isCommitted || hypot(translation.x, translation.y) >= threshold
         }
     }
 

@@ -37,6 +37,7 @@ struct AutomationWorkflowDraftPreviewSheet: View {
                 VStack(alignment: .leading, spacing: 14) {
                     summarySection
                     loopExpansionSection
+                    visualAssetSection
                     draftEditSection
                     taskSection
                     dependencySection
@@ -138,6 +139,11 @@ struct AutomationWorkflowDraftPreviewSheet: View {
                     systemImage: "arrow.triangle.2.circlepath"
                 )
                 summaryPill(
+                    title: NSLocalizedString("Visual", comment: ""),
+                    value: "\(previewState.projection.visualAssetRows.count)",
+                    systemImage: "viewfinder"
+                )
+                summaryPill(
                     title: NSLocalizedString("Macros", comment: ""),
                     value: "\(previewState.projection.macroCatalogCount)",
                     systemImage: "record.circle"
@@ -174,6 +180,24 @@ struct AutomationWorkflowDraftPreviewSheet: View {
 
                 ForEach(previewState.projection.loopExpansionRows) { row in
                     loopExpansionRow(row)
+                }
+            }
+            .padding(10)
+            .sectionSurface(cornerRadius: 10)
+        }
+    }
+
+    @ViewBuilder
+    private var visualAssetSection: some View {
+        if !previewState.projection.visualAssetRows.isEmpty {
+            VStack(alignment: .leading, spacing: 8) {
+                AutomationSectionHeader(
+                    title: NSLocalizedString("VISUAL EVIDENCE", comment: ""),
+                    count: previewState.projection.visualAssetRows.count
+                )
+
+                ForEach(previewState.projection.visualAssetRows) { row in
+                    visualAssetRow(row)
                 }
             }
             .padding(10)
@@ -573,6 +597,72 @@ struct AutomationWorkflowDraftPreviewSheet: View {
         .accessibilityElement(children: .combine)
     }
 
+    private func visualAssetRow(_ row: AutomationWorkflowDraftPreviewProjection.VisualAssetRow) -> some View {
+        HStack(alignment: .top, spacing: 9) {
+            Image(systemName: visualAssetImage(for: row.assetKind))
+                .foregroundStyle(Brand.libraryGreen)
+                .frame(width: 20)
+                .accessibilityHidden(true)
+
+            VStack(alignment: .leading, spacing: 5) {
+                HStack(spacing: 6) {
+                    Text(row.assetKindLabel)
+                        .font(.caption)
+                        .bold()
+                    Text(row.taskKey)
+                        .font(.caption2.monospaced())
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                    Text(row.roleLabel)
+                        .font(.caption2)
+                        .foregroundStyle(.tertiary)
+                }
+
+                Text(row.conditionLabel)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                HStack(spacing: 6) {
+                    visualEvidencePill(row.assetKey ?? NSLocalizedString("No asset ref", comment: ""))
+                    if let regionKey = row.regionKey {
+                        visualEvidencePill(regionKey)
+                    }
+                    visualEvidencePill(row.thresholdLabel)
+                }
+
+                if let sourceLine = visualAssetSourceLine(for: row) {
+                    Text(sourceLine)
+                        .font(.caption2.monospaced())
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                }
+
+                if let boundsLine = visualAssetBoundsLine(for: row) {
+                    Text(boundsLine)
+                        .font(.caption2)
+                        .foregroundStyle(.tertiary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+
+                if let path = row.assetPath ?? row.sourceArtifactPath {
+                    Text(path)
+                        .font(.caption2.monospaced())
+                        .foregroundStyle(.tertiary)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                        .textSelection(.enabled)
+                }
+            }
+
+            Spacer(minLength: 0)
+        }
+        .padding(8)
+        .background(rowBackground(tint: Brand.libraryGreen))
+        .accessibilityElement(children: .combine)
+    }
+
     private func issueRow(_ row: AutomationWorkflowDraftPreviewProjection.IssueRow) -> some View {
         HStack(alignment: .top, spacing: 8) {
             Image(systemName: row.severity == .error ? "xmark.octagon" : "exclamationmark.triangle")
@@ -736,6 +826,19 @@ struct AutomationWorkflowDraftPreviewSheet: View {
             RoundedRectangle(cornerRadius: 6, style: .continuous)
                 .fill(Color.primary.opacity(0.045))
         )
+    }
+
+    private func visualEvidencePill(_ value: String) -> some View {
+        Text(value)
+            .font(.caption2.monospaced())
+            .lineLimit(1)
+            .truncationMode(.middle)
+            .padding(.horizontal, 7)
+            .padding(.vertical, 4)
+            .background(
+                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                    .fill(Color.primary.opacity(0.045))
+            )
     }
 
     private var selectedTaskForRemoval: AutomationWorkflowDraftTask? {
@@ -1053,6 +1156,44 @@ struct AutomationWorkflowDraftPreviewSheet: View {
         default:
             return "square"
         }
+    }
+
+    private func visualAssetImage(for kind: AutomationWorkflowDraftPreviewProjection.VisualAssetRow.AssetKind) -> String {
+        switch kind {
+        case .imageTemplate:
+            return "photo.on.rectangle"
+        case .baseline:
+            return "rectangle.dashed"
+        case .pixelSample:
+            return "eyedropper"
+        }
+    }
+
+    private func visualAssetSourceLine(for row: AutomationWorkflowDraftPreviewProjection.VisualAssetRow) -> String? {
+        var parts: [String] = []
+        if let sourceFrameShortID = row.sourceFrameShortID {
+            parts.append(String(format: NSLocalizedString("frame %@", comment: ""), sourceFrameShortID))
+        }
+        if let sourceSurfaceID = row.sourceSurfaceID {
+            parts.append(String(format: NSLocalizedString("surface %@", comment: ""), sourceSurfaceID))
+        }
+        if let sha256 = row.sha256 {
+            parts.append(String(format: NSLocalizedString("sha %@", comment: ""), String(sha256.prefix(10))))
+        }
+        return parts.isEmpty ? nil : parts.joined(separator: " | ")
+    }
+
+    private func visualAssetBoundsLine(for row: AutomationWorkflowDraftPreviewProjection.VisualAssetRow) -> String? {
+        var parts: [String] = []
+        if let sourceBoundsLabel = row.sourceBoundsLabel {
+            let space = row.sourceBoundsSpaceLabel ?? NSLocalizedString("Unknown space", comment: "")
+            parts.append(String(format: NSLocalizedString("crop %@ (%@)", comment: ""), sourceBoundsLabel, space))
+        }
+        if let regionBoundsLabel = row.regionBoundsLabel {
+            let space = row.regionSpaceLabel ?? NSLocalizedString("Unknown space", comment: "")
+            parts.append(String(format: NSLocalizedString("search %@ (%@)", comment: ""), regionBoundsLabel, space))
+        }
+        return parts.isEmpty ? nil : parts.joined(separator: " | ")
     }
 
     private func macroTint(for resolution: AutomationWorkflowDraftPreviewProjection.MacroResolution) -> Color {

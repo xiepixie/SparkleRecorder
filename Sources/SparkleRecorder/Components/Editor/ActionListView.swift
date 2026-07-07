@@ -526,7 +526,12 @@ struct ActionListView: View {
         Button {
             duplicateRows(anchor: row)
         } label: {
-            Label(NSLocalizedString("Duplicate Action", comment: ""), systemImage: "plus.square.on.square")
+            Label(
+                snapshot.containsBehavior
+                    ? NSLocalizedString("Duplicate Behavior", comment: "")
+                    : NSLocalizedString("Duplicate Action", comment: ""),
+                systemImage: "plus.square.on.square"
+            )
         }
         .disabled(snapshot.eventIndices.isEmpty && passiveWaitDuplicationPlan(anchor: row).isEmpty)
 
@@ -622,7 +627,9 @@ struct ActionListView: View {
     func duplicateRows(anchor row: ActionRow) {
         let snapshot = contextSnapshot(anchor: row)
         let indices = snapshot.eventIndices
-        let waitGroups = contextRows(anchor: row).map(\.group)
+        let contextGroups = contextRows(anchor: row).map(\.group)
+        let sourceBehaviorIDs = Set(contextGroups.compactMap(\.behaviorGroupID))
+        let waitGroups = contextGroups
         let waitPlan = passiveWaitDuplicationPlan(anchor: row)
         let waitTargets = duplicatedWaitTargets(for: waitGroups)
         guard !indices.isEmpty || !waitPlan.isEmpty else { return }
@@ -648,11 +655,24 @@ struct ActionListView: View {
         
         DispatchQueue.main.async {
             if let copiesRange {
-                let copied = self.onRefreshRows().filter { item in
-                    item.group.eventIndices.contains(where: { copiesRange.contains($0) })
-                }
+                let rows = self.onRefreshRows()
+                let copiedEventIndices = Set(copiesRange)
+                let copiedBehaviors = ActionGroupProjection.behaviorGroups(
+                    containingEventIndices: copiedEventIndices,
+                    excluding: sourceBehaviorIDs,
+                    groups: rows.map(\.group)
+                )
+                let copied = copiedBehaviors.isEmpty
+                    ? rows.filter { item in
+                        item.group.eventIndices.contains { copiedEventIndices.contains($0) }
+                    }
+                    : rows.filter { item in
+                        copiedBehaviors.contains(where: { $0.id == item.group.id })
+                    }
+
                 if !copied.isEmpty {
                     self.selection = Set(copied.map(\.id))
+                    self.lastAnchor = copied.first?.id
                 }
             } else {
                 self.selectWaits(matching: waitTargets)

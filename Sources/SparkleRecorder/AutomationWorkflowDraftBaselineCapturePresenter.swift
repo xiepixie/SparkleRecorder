@@ -23,14 +23,14 @@ enum AutomationWorkflowDraftBaselineCapturePresenter {
         let label = preferredLabel.trimmingCharacters(in: .whitespacesAndNewlines)
         let displayID = displayID(for: screen)
 
-        AutomationOCRRegionPickerOverlay.shared.onPicked = { selection in
-            AutomationOCRRegionPickerOverlay.shared.onPicked = nil
-            AutomationOCRRegionPickerOverlay.shared.onCancelled = nil
-
+        AutomationScreenRegionPicker.pickRegion(
+            instructionTitle: NSLocalizedString("Drag to capture baseline", comment: ""),
+            onPicked: { selection in
             guard let region = selection.searchRegion(in: .displayAbsolute) else {
                 onError(NSLocalizedString("Could not resolve the selected baseline region.", comment: ""))
                 return
             }
+            let previewImage = selection.preview?.cgImage
 
             Task {
                 do {
@@ -38,6 +38,7 @@ enum AutomationWorkflowDraftBaselineCapturePresenter {
                         packageDirectory: packageDirectory,
                         displayID: displayID,
                         region: region,
+                        previewImage: previewImage,
                         key: baselineKey,
                         label: label.isEmpty ? nil : label
                     )
@@ -53,14 +54,10 @@ enum AutomationWorkflowDraftBaselineCapturePresenter {
                     }
                 }
             }
-        }
-        AutomationOCRRegionPickerOverlay.shared.onCancelled = {
-            AutomationOCRRegionPickerOverlay.shared.onPicked = nil
-            AutomationOCRRegionPickerOverlay.shared.onCancelled = nil
-            onError(NSLocalizedString("Baseline capture cancelled.", comment: ""))
-        }
-        AutomationOCRRegionPickerOverlay.shared.start(
-            instructionTitle: NSLocalizedString("Drag to capture baseline", comment: "")
+        },
+            onCancelled: {
+                onError(NSLocalizedString("Baseline capture cancelled.", comment: ""))
+            }
         )
     }
 
@@ -68,12 +65,19 @@ enum AutomationWorkflowDraftBaselineCapturePresenter {
         packageDirectory: URL,
         displayID: CGDirectDisplayID,
         region: RectValue,
+        previewImage: CGImage?,
         key: String,
         label: String?
     ) async throws -> AutomationWorkflowDraftBaselineCaptureResult {
-        let image = try await ScreenCaptureService.shared.captureDisplay(displayID: displayID)
-        guard let cropped = crop(image: image, region: region) else {
-            throw AutomationWorkflowDraftBaselineCaptureError.emptyRegion
+        let cropped: CGImage
+        if let previewImage {
+            cropped = previewImage
+        } else {
+            let image = try await ScreenCaptureService.shared.captureDisplay(displayID: displayID)
+            guard let fallbackCrop = crop(image: image, region: region) else {
+                throw AutomationWorkflowDraftBaselineCaptureError.emptyRegion
+            }
+            cropped = fallbackCrop
         }
 
         let pngData = try pngData(for: cropped)
