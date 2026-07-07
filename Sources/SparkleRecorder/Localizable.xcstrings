@@ -358,6 +358,516 @@
         }
       }
     },
+    "Open the semantic recording captured with %@. It includes %d timeline events; this run does not carry a separate semantic bundle yet.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open the semantic recording captured with %@. It includes %d timeline events; this run does not carry a separate semantic bundle yet."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "打开随 %@ 捕获的语义录制。它包含 %d 个时间线事件；本次运行还没有单独绑定语义 bundle。"
+          }
+        }
+      }
+    },
+    "Open a semantic recording bundle for frame timeline, visual evidence, region selection, and review-only draft patch generation.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open a semantic recording bundle for frame timeline, visual evidence, region selection, and review-only draft patch generation."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "打开一个语义录制 bundle，用于查看帧时间线、视觉证据、区域选择，以及生成仅供审阅的草稿补丁。"
+          }
+        }
+      }
+    },
+    "Open linked review": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open linked review"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "打开已关联审阅"
+          }
+        }
+      }
+    },
+    "Choose bundle": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Choose bundle"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "选择 bundle"
+          }
+        }
+      }
+    },
+    "Evidence binding": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Evidence binding"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "证据绑定"
+          }
+        }
+      }
+    },
+    "Macro-level": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Macro-level"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "宏级别"
+          }
+        }
+      }
+    },
+    "Manual selection": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Manual selection"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "手动选择"
+          }
+        }
+      }
+    },
+    "Mutation boundary": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mutation boundary"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "变更边界"
+          }
+        }
+      }
+    },
+    "Review only": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Review only"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "仅审阅"
+          }
+        }
+      }
+    },
+    "Uses the semantic recording attached to the saved macro and preselects the closest event or condition evidence when the run outcome provides a target.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Uses the semantic recording attached to the saved macro and preselects the closest event or condition evidence when the run outcome provides a target."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "使用已保存宏附带的语义录制；当运行结果提供目标时，会预选最接近的事件或条件证据。"
+          }
+        }
+      }
+    },
+    "This run does not yet carry a per-run semantic bundle, so review evidence is useful for repair but not accepted as live run proof.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This run does not yet carry a per-run semantic bundle, so review evidence is useful for repair but not accepted as live run proof."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "本次运行还没有单独的语义 bundle，因此这些审阅证据可用于修复，但不能作为 live 运行证明验收。"
+          }
+        }
+      }
+    },
+    "Opening Macro Review never mutates the workflow; reviewed changes still need Draft Preview and confirmed import.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Opening Macro Review never mutates the workflow; reviewed changes still need Draft Preview and confirmed import."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "打开宏审阅不会直接修改 workflow；已审阅的变更仍需经过 Draft Preview 和确认导入。"
+          }
+        }
+      }
+    },
+    "No semantic recording link was found for this macro or run; choose a bundle before reviewing frames, OCR, or visual evidence.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No semantic recording link was found for this macro or run; choose a bundle before reviewing frames, OCR, or visual evidence."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "这个宏或运行没有找到语义录制关联；请先选择 bundle，再审阅帧、OCR 或视觉证据。"
+          }
+        }
+      }
+    },
+    "The selected bundle is not proven to belong to this run, so use it for local review until S2 provides a saved-macro-linked live bundle.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The selected bundle is not proven to belong to this run, so use it for local review until S2 provides a saved-macro-linked live bundle."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "所选 bundle 尚未证明属于本次运行；在 S2 提供已关联保存宏的 live bundle 前，只将它用于本地审阅。"
+          }
+        }
+      }
+    },
+    "Source": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Source"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "来源"
+          }
+        }
+      }
+    },
+    "Scope": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Scope"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "范围"
+          }
+        }
+      }
+    },
+    "Run": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Run"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "运行"
+          }
+        }
+      }
+    },
+    "Saved Macro": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Saved Macro"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已保存宏"
+          }
+        }
+      }
+    },
+    "User-picked": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "User-picked"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "用户选择"
+          }
+        }
+      }
+    },
+    "Not bound": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Not bound"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "未绑定"
+          }
+        }
+      }
+    },
+    "Bundle Picker": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bundle Picker"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bundle 选择器"
+          }
+        }
+      }
+    },
+    "Target": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Target"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "目标"
+          }
+        }
+      }
+    },
+    "Failure report": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Failure report"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "失败报告"
+          }
+        }
+      }
+    },
+    "Failed run": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Failed run"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "失败运行"
+          }
+        }
+      }
+    },
+    "Run outcome": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Run outcome"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "运行结果"
+          }
+        }
+      }
+    },
+    "Condition": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Condition"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "条件"
+          }
+        }
+      }
+    },
+    "Else branch": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Else branch"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Else 分支"
+          }
+        }
+      }
+    },
+    "Open Review": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open Review"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "打开审阅"
+          }
+        }
+      }
+    },
+    "Open Linked Review": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open Linked Review"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "打开已关联审阅"
+          }
+        }
+      }
+    },
+    "Opening": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Opening"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在打开"
+          }
+        }
+      }
+    },
     "Open the blocked permission rows below, then check again before recording.": {
       "extractionState": "manual",
       "localizations": {
@@ -8501,6 +9011,57 @@
         }
       }
     },
+    "Remove everything before the selected action and start it at 0.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Remove everything before the selected action and start it at 0."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "移除选中动作之前的所有内容，并从 0 开始。"
+          }
+        }
+      }
+    },
+    "Select exactly one action to trim the macro.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Select exactly one action to trim the macro."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "请选择一个动作来裁剪宏。"
+          }
+        }
+      }
+    },
+    "The selected action is already at the beginning.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The selected action is already at the beginning."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "选中的动作已经在开头。"
+          }
+        }
+      }
+    },
     "Trim after": {
       "extractionState": "manual",
       "localizations": {
@@ -8514,6 +9075,40 @@
           "stringUnit": {
             "state": "translated",
             "value": "裁剪之后"
+          }
+        }
+      }
+    },
+    "Remove everything after the selected action.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Remove everything after the selected action."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "移除选中动作之后的所有内容。"
+          }
+        }
+      }
+    },
+    "The selected action is already at the end.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The selected action is already at the end."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "选中的动作已经在结尾。"
           }
         }
       }
@@ -10915,6 +11510,23 @@
         }
       }
     },
+    "Create a named behavior from the selected actions.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Create a named behavior from the selected actions."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "用选中的动作创建一个命名行为。"
+          }
+        }
+      }
+    },
     "Show behavior events as separate actions again": {
       "extractionState": "manual",
       "localizations": {
@@ -10928,6 +11540,278 @@
           "stringUnit": {
             "state": "translated",
             "value": "将行为块重新拆分为独立动作"
+          }
+        }
+      }
+    },
+    "Selected Behavior": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Selected Behavior"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已选行为"
+          }
+        }
+      }
+    },
+    "Rename or split this behavior without changing the actions inside it.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rename or split this behavior without changing the actions inside it."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "可重命名或拆分这个行为，不会改变其中的动作。"
+          }
+        }
+      }
+    },
+    "New Behavior": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "New Behavior"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "新建行为"
+          }
+        }
+      }
+    },
+    "Select a continuous set of recorded actions, name it, then create one behavior block.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Select a continuous set of recorded actions, name it, then create one behavior block."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "选择一段连续的录制动作，命名后创建为一个行为块。"
+          }
+        }
+      }
+    },
+    "Select two or more recorded actions to create a behavior.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Select two or more recorded actions to create a behavior."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "选择两个或更多录制动作来创建行为。"
+          }
+        }
+      }
+    },
+    "Select at least two recorded actions; wait gaps alone cannot create a behavior.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Select at least two recorded actions; wait gaps alone cannot create a behavior."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "至少选择两个录制动作；单独的等待间隔不能创建行为。"
+          }
+        }
+      }
+    },
+    "Select one continuous block of recorded actions. Wait gaps can stay between them.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Select one continuous block of recorded actions. Wait gaps can stay between them."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "请选择一段连续的录制动作；中间的等待间隔可以自动保留。"
+          }
+        }
+      }
+    },
+    "This selection already contains a behavior. Rename or unbind it before creating another.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This selection already contains a behavior. Rename or unbind it before creating another."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "当前选择已包含行为。请先重命名或拆分，再创建新的行为。"
+          }
+        }
+      }
+    },
+    "Group actions that should move, duplicate, and read as one reusable behavior.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Group actions that should move, duplicate, and read as one reusable behavior."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "把需要一起移动、复制和阅读的动作组成一个可复用行为。"
+          }
+        }
+      }
+    },
+    "Behavior name": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Behavior name"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "行为名称"
+          }
+        }
+      }
+    },
+    "Rename Behavior": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rename Behavior"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "重命名行为"
+          }
+        }
+      }
+    },
+    "Rename the selected behavior.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rename the selected behavior."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "重命名选中的行为。"
+          }
+        }
+      }
+    },
+    "Select one behavior to rename.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Select one behavior to rename."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "请选择一个行为进行重命名。"
+          }
+        }
+      }
+    },
+    "Enter a behavior name before renaming.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Enter a behavior name before renaming."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "请先输入行为名称，再重命名。"
+          }
+        }
+      }
+    },
+    "Change the behavior name before applying Rename.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Change the behavior name before applying Rename."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "请先修改行为名称，再应用重命名。"
+          }
+        }
+      }
+    },
+    "Copy of %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Copy of %@"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ 的副本"
           }
         }
       }
@@ -10979,6 +11863,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "插入到 #%d 之后"
+          }
+        }
+      }
+    },
+    "Create Behavior": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Create Behavior"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "创建行为"
           }
         }
       }
@@ -11166,6 +12067,91 @@
           "stringUnit": {
             "state": "translated",
             "value": "复用这个等待目标作为后续文本点击。"
+          }
+        }
+      }
+    },
+    "Only Wait Text actions can be converted to Click Text.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Only Wait Text actions can be converted to Click Text."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "只有等待文本动作可以转换为点击文本。"
+          }
+        }
+      }
+    },
+    "Only Wait Text actions can add a follow-up Click Text.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Only Wait Text actions can add a follow-up Click Text."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "只有等待文本动作可以添加后续点击文本。"
+          }
+        }
+      }
+    },
+    "This wait row has no recorded wait event to reuse. Insert Click Text manually instead.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This wait row has no recorded wait event to reuse. Insert Click Text manually instead."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "这个等待行没有可复用的已录制等待事件。请改为手动插入点击文本。"
+          }
+        }
+      }
+    },
+    "This wait row has no recorded wait event to replace. Add Click Text instead.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This wait row has no recorded wait event to replace. Add Click Text instead."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "这个等待行没有可替换的已录制等待事件。请改用添加点击文本。"
+          }
+        }
+      }
+    },
+    "This row no longer matches its recorded wait event. Refresh the action list, then try again.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This row no longer matches its recorded wait event. Refresh the action list, then try again."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "这一行已不再匹配原录制等待事件。刷新动作列表后重试。"
           }
         }
       }
@@ -12513,6 +13499,142 @@
         }
       }
     },
+    "Move selected recorded actions earlier.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Move selected recorded actions earlier."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "将选中的录制动作提前。"
+          }
+        }
+      }
+    },
+    "Move selected recorded actions later.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Move selected recorded actions later."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "将选中的录制动作延后。"
+          }
+        }
+      }
+    },
+    "Select recorded actions to shift their timing.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Select recorded actions to shift their timing."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "请选择要调整时间的录制动作。"
+          }
+        }
+      }
+    },
+    "Wait gaps are edited with Wait Duration instead of Shift Selected.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Wait gaps are edited with Wait Duration instead of Shift Selected."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "等待间隔请用“等待时长”编辑，而不是“移动所选”。"
+          }
+        }
+      }
+    },
+    "Apply this stretch factor to the full macro timeline.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apply this stretch factor to the full macro timeline."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "将这个拉伸倍率应用到整个宏时间线。"
+          }
+        }
+      }
+    },
+    "Record or insert actions before stretching time.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Record or insert actions before stretching time."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "请先录制或插入动作，再拉伸时间。"
+          }
+        }
+      }
+    },
+    "Choose a stretch factor greater than 0.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Choose a stretch factor greater than 0."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "请选择大于 0 的拉伸倍率。"
+          }
+        }
+      }
+    },
+    "Choose a stretch factor other than 1.00x.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Choose a stretch factor other than 1.00x."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "请选择不等于 1.00x 的拉伸倍率。"
+          }
+        }
+      }
+    },
     "Edit Action": {
       "extractionState": "manual",
       "localizations": {
@@ -12594,6 +13716,91 @@
           "stringUnit": {
             "state": "translated",
             "value": "下移选中动作"
+          }
+        }
+      }
+    },
+    "Select recorded actions to reorder them.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Select recorded actions to reorder them."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "请选择要重新排序的录制动作。"
+          }
+        }
+      }
+    },
+    "Wait gaps are edited with Wait Duration instead of row reordering.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Wait gaps are edited with Wait Duration instead of row reordering."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "等待间隔请用“等待时长”编辑，而不是拖动排序。"
+          }
+        }
+      }
+    },
+    "Selected actions are already at the top.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Selected actions are already at the top."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "选中的动作已经在顶部。"
+          }
+        }
+      }
+    },
+    "Selected actions are already at the bottom.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Selected actions are already at the bottom."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "选中的动作已经在底部。"
+          }
+        }
+      }
+    },
+    "Selected actions cannot move farther.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Selected actions cannot move farther."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "选中的动作已经无法继续移动。"
           }
         }
       }
@@ -12900,6 +14107,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "%1$@（%2$d 个动作）"
+          }
+        }
+      }
+    },
+    "%d actions": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%d actions"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%d 个动作"
           }
         }
       }
@@ -13227,6 +14451,23 @@
         }
       }
     },
+    "Align selected coordinate actions to the first selected action.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Align selected coordinate actions to the first selected action."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "将选中的坐标动作对齐到第一个选中动作。"
+          }
+        }
+      }
+    },
     "Align X to First": {
       "extractionState": "manual",
       "localizations": {
@@ -13261,6 +14502,74 @@
         }
       }
     },
+    "Select another coordinate action to align.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Select another coordinate action to align."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "再选择一个可对齐的坐标动作。"
+          }
+        }
+      }
+    },
+    "Select at least two actions to align coordinates.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Select at least two actions to align coordinates."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "请选择至少两个动作来对齐坐标。"
+          }
+        }
+      }
+    },
+    "Selected coordinate actions are already aligned.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Selected coordinate actions are already aligned."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "选中的坐标动作已经对齐。"
+          }
+        }
+      }
+    },
+    "The first selected action has no coordinate to align to.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The first selected action has no coordinate to align to."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "第一个选中动作没有可用于对齐的坐标。"
+          }
+        }
+      }
+    },
     "Standardize Timeout": {
       "extractionState": "manual",
       "localizations": {
@@ -13274,6 +14583,57 @@
           "stringUnit": {
             "state": "translated",
             "value": "统一超时时间"
+          }
+        }
+      }
+    },
+    "Apply this timeout to selected text-target actions.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apply this timeout to selected text-target actions."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "将此超时时间应用到选中的文本目标动作。"
+          }
+        }
+      }
+    },
+    "Select Wait Text, Verify Text, or Click Text actions with a target to set a timeout.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Select Wait Text, Verify Text, or Click Text actions with a target to set a timeout."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "请选择带目标的等待文本、验证文本或点击文本动作来设置超时时间。"
+          }
+        }
+      }
+    },
+    "Enter a timeout of 0 or greater before applying to selected actions.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Enter a timeout of 0 or greater before applying to selected actions."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "请输入大于或等于 0 的超时时间，再应用到选中动作。"
           }
         }
       }
@@ -13478,6 +14838,57 @@
           "stringUnit": {
             "state": "translated",
             "value": "移除最后一个"
+          }
+        }
+      }
+    },
+    "Remove the last point from this Multi Click.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Remove the last point from this Multi Click."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "移除这个多点点击的最后一个点。"
+          }
+        }
+      }
+    },
+    "Only Multi Click actions can remove click points.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Only Multi Click actions can remove click points."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "只有多点点击动作可以移除点击点。"
+          }
+        }
+      }
+    },
+    "Multi Click keeps at least two points.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Multi Click keeps at least two points."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "多点点击至少保留两个点。"
           }
         }
       }
@@ -13801,6 +15212,261 @@
           "stringUnit": {
             "state": "translated",
             "value": "共享文本目标"
+          }
+        }
+      }
+    },
+    "Apply this target text to selected text-target actions.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apply this target text to selected text-target actions."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "将此目标文本应用到选中的文本目标动作。"
+          }
+        }
+      }
+    },
+    "Select text-capable actions before applying a shared target.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Select text-capable actions before applying a shared target."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "请选择可设置文本目标的动作，再应用共享目标。"
+          }
+        }
+      }
+    },
+    "Enter or pick target text before applying to selected actions.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Enter or pick target text before applying to selected actions."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "请先输入或拾取目标文本，再应用到选中动作。"
+          }
+        }
+      }
+    },
+    "Delete selected actions from the macro.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Delete selected actions from the macro."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "从宏中删除选中的动作。"
+          }
+        }
+      }
+    },
+    "Select actions to delete.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Select actions to delete."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "请选择要删除的动作。"
+          }
+        }
+      }
+    },
+    "Select recorded actions or wait gaps with duration to delete.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Select recorded actions or wait gaps with duration to delete."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "请选择录制动作，或有时长的等待间隔来删除。"
+          }
+        }
+      }
+    },
+    "Duplicate selected actions or wait gaps.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Duplicate selected actions or wait gaps."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "复制选中的动作或等待间隔。"
+          }
+        }
+      }
+    },
+    "Select actions to duplicate.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Select actions to duplicate."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "请选择要复制的动作。"
+          }
+        }
+      }
+    },
+    "Select recorded actions or wait gaps with duration to duplicate.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Select recorded actions or wait gaps with duration to duplicate."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "请选择录制动作，或有时长的等待间隔来复制。"
+          }
+        }
+      }
+    },
+    "Inspector inputs are ready to apply.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Inspector inputs are ready to apply."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "检查器输入可以应用。"
+          }
+        }
+      }
+    },
+    "Enter a valid time or duration of 0 or greater.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Enter a valid time or duration of 0 or greater."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "请输入大于或等于 0 的有效时间或时长。"
+          }
+        }
+      }
+    },
+    "Enter a timeout of 0 or greater.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Enter a timeout of 0 or greater."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "请输入大于或等于 0 的超时时长。"
+          }
+        }
+      }
+    },
+    "Enter valid X and Y coordinates for the action start.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Enter valid X and Y coordinates for the action start."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "请输入动作起点的有效 X 和 Y 坐标。"
+          }
+        }
+      }
+    },
+    "Enter valid X and Y coordinates for the action end.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Enter valid X and Y coordinates for the action end."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "请输入动作终点的有效 X 和 Y 坐标。"
+          }
+        }
+      }
+    },
+    "Enter a valid key code.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Enter a valid key code."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "请输入有效的按键码。"
           }
         }
       }
