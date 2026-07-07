@@ -506,6 +506,17 @@ private struct DraftImportCompiler {
             ))
             return nil
         }
+        if let pixelSampleRadius = condition.pixelSampleRadius,
+           !(0...AutomationVisualCondition.maximumPixelSampleRadius).contains(pixelSampleRadius) {
+            issues.append(issue(
+                .error,
+                .invalidPixelSampleRadius,
+                "Condition pixelSampleRadius must be between 0 and \(AutomationVisualCondition.maximumPixelSampleRadius).",
+                "\(path).condition.pixelSampleRadius",
+                taskKey: taskKey
+            ))
+            return nil
+        }
 
         return .visual(AutomationVisualCondition(
             type: type,
@@ -516,6 +527,7 @@ private struct DraftImportCompiler {
             baselineRef: condition.baselineRef,
             pixel: condition.pixel,
             targetColorHex: condition.colorHex,
+            pixelSampleRadius: condition.pixelSampleRadius,
             threshold: condition.threshold,
             requireVisible: condition.requireVisible ?? true
         ))

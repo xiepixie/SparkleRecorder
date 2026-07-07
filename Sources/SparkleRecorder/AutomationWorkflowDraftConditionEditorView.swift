@@ -25,6 +25,7 @@ struct AutomationWorkflowDraftConditionEditorView: View {
     @State private var visualPixelX = 0.0
     @State private var visualPixelY = 0.0
     @State private var visualColorHex = ""
+    @State private var visualPixelSampleRadius = AutomationVisualCondition.defaultPixelSampleRadius
     @State private var hasVisualThreshold = false
     @State private var visualThreshold = 0.9
     @State private var visualRequiresVisible = true
@@ -160,6 +161,7 @@ struct AutomationWorkflowDraftConditionEditorView: View {
             pixelX: $visualPixelX,
             pixelY: $visualPixelY,
             colorHex: $visualColorHex,
+            pixelSampleRadius: $visualPixelSampleRadius,
             hasThreshold: $hasVisualThreshold,
             threshold: $visualThreshold,
             requiresVisible: $visualRequiresVisible,
@@ -275,6 +277,8 @@ struct AutomationWorkflowDraftConditionEditorView: View {
             visualPixelY = 0
         }
         visualColorHex = condition?.colorHex ?? ""
+        visualPixelSampleRadius = condition?.pixelSampleRadius
+            ?? AutomationVisualCondition.defaultPixelSampleRadius
         hasVisualThreshold = condition?.threshold != nil
         visualThreshold = condition?.threshold ?? 0.9
         visualRequiresVisible = condition?.requireVisible ?? true
@@ -347,6 +351,9 @@ struct AutomationWorkflowDraftConditionEditorView: View {
                     : nil,
                 colorHex: conditionKind == .pixelMatched
                     ? visualColorHex.trimmedForDraftConditionEdit.nilIfEmptyForDraftConditionEdit
+                    : nil,
+                pixelSampleRadius: conditionKind == .pixelMatched
+                    ? visualPixelSampleRadius
                     : nil,
                 threshold: hasVisualThreshold ? min(max(visualThreshold, 0), 1) : nil
             )

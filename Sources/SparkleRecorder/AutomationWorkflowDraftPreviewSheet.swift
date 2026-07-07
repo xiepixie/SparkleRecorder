@@ -429,6 +429,15 @@ struct AutomationWorkflowDraftPreviewSheet: View {
                         .font(.caption)
                         .bold()
                         .lineLimit(1)
+                    Text(row.modeLabel)
+                        .font(.caption2)
+                        .foregroundStyle(Brand.sigAmber)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 3)
+                        .background(
+                            RoundedRectangle(cornerRadius: 6, style: .continuous)
+                                .fill(Brand.sigAmber.opacity(0.10))
+                        )
                     Text(row.key)
                         .font(.caption2.monospaced())
                         .foregroundStyle(.tertiary)
@@ -483,10 +492,24 @@ struct AutomationWorkflowDraftPreviewSheet: View {
                     .foregroundStyle(.primary)
                     .fixedSize(horizontal: false, vertical: true)
 
+                if let untilLabel = row.untilLabel {
+                    Text(untilLabel)
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+
+                if let guardrailLabel = row.guardrailLabel {
+                    Text(guardrailLabel)
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+
                 HStack(spacing: 6) {
                     loopMetricPill(
                         value: "\(row.repeatCount)",
-                        title: NSLocalizedString("repeats", comment: "")
+                        title: row.repeatMetricTitle
                     )
                     loopMetricPill(
                         value: "\(row.bodyStepCount)",
@@ -494,7 +517,7 @@ struct AutomationWorkflowDraftPreviewSheet: View {
                     )
                     loopMetricPill(
                         value: "\(row.expandedTaskCount)",
-                        title: NSLocalizedString("imported steps", comment: "")
+                        title: row.expandedMetricTitle
                     )
                 }
 

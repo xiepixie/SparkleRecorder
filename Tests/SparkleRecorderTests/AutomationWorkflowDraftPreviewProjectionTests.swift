@@ -200,6 +200,7 @@ struct AutomationWorkflowDraftPreviewProjectionTests {
         #expect(projection.isReadyForImport)
         #expect(loopRow.key == "repeat_checkout")
         #expect(loopRow.typeLabel == "Loop")
+        #expect(loopRow.modeLabel == "Fixed count")
         #expect(loopRow.detail == "Repeats 2 times, 2 steps")
         #expect(loopExpansionRow.key == "repeat_checkout")
         #expect(loopExpansionRow.repeatCount == 2)
@@ -224,5 +225,99 @@ struct AutomationWorkflowDraftPreviewProjectionTests {
             "repeat_checkout__1__wait_text->repeat_checkout__2__tap:conditionMatched",
             "repeat_checkout__2__tap->repeat_checkout__2__wait_text:success"
         ])
+    }
+
+    @Test("Preview projection exposes repeat-until as draft-only loop intent")
+    func previewProjectionExposesRepeatUntilAsDraftOnlyLoopIntent() throws {
+        let document = AutomationWorkflowDraftDocument(
+            workflow: AutomationWorkflowDraft(
+                name: "Repeat Until Preview",
+                tasks: [
+                    AutomationWorkflowDraftTask(
+                        key: "repeat_until_spinner",
+                        type: "loop",
+                        loop: AutomationWorkflowDraftLoop(
+                            count: 1,
+                            tasks: [
+                                AutomationWorkflowDraftTask(
+                                    key: "tap_refresh",
+                                    type: "delay",
+                                    delaySeconds: 0.25
+                                ),
+                                AutomationWorkflowDraftTask(
+                                    key: "cooldown",
+                                    type: "delay",
+                                    delaySeconds: 0.5
+                                )
+                            ],
+                            kind: AutomationWorkflowDraftLoopKind.repeatUntil,
+                            until: AutomationWorkflowDraftCondition(
+                                type: "imageDisappeared",
+                                regionRef: "spinner_area",
+                                imageRef: "spinner_template",
+                                threshold: 0.82
+                            ),
+                            maxAttempts: 5,
+                            timeoutSeconds: 30,
+                            pollingSeconds: 0.5,
+                            onFailure: AutomationWorkflowDraftLoopFailurePolicy.requireManualApproval
+                        )
+                    )
+                ]
+            ),
+            visualAssets: AutomationWorkflowDraftVisualAssets(
+                regions: [
+                    AutomationWorkflowDraftVisualRegion(
+                        key: "spinner_area",
+                        bounds: RectValue(x: 10, y: 20, width: 80, height: 60)
+                    )
+                ],
+                images: [
+                    AutomationWorkflowDraftVisualImageAsset(
+                        key: "spinner_template",
+                        path: "assets/spinner.png"
+                    )
+                ]
+            )
+        )
+        let validation = AutomationWorkflowDraftValidator.validate(document)
+        let simulation = AutomationWorkflowDraftSimulator.simulate(document)
+        let importResult = AutomationWorkflowDraftImporter.dryRun(document)
+
+        let projection = AutomationWorkflowDraftPreviewProjection(
+            document: document,
+            validationEnvelope: .workflowDraftValidation(command: "workflow draft validate", result: validation),
+            macroCatalogEnvelope: .workflowMacroCatalog(command: "workflow macros", macros: []),
+            simulationEnvelope: .workflowDraftSimulation(command: "workflow draft simulate", result: simulation),
+            importEnvelope: .workflowDraftImport(command: "workflow import --dry-run", result: importResult)
+        )
+
+        let taskRow = try #require(projection.taskRows.first)
+        let loopRow = try #require(projection.loopExpansionRows.first)
+        let importPreview = try #require(projection.importPreview)
+
+        #expect(!projection.isValid)
+        #expect(!projection.isReadyForImport)
+        #expect(projection.statusLabel == "Import blocked")
+        #expect(taskRow.detail == "Repeat until image disappears, 2 steps")
+        #expect(loopRow.key == "repeat_until_spinner")
+        #expect(loopRow.modeLabel == "Repeat until")
+        #expect(loopRow.repeatCount == 5)
+        #expect(loopRow.bodyStepCount == 2)
+        #expect(loopRow.expandedTaskCount == 0)
+        #expect(loopRow.repeatMetricTitle == "max attempts")
+        #expect(loopRow.expandedMetricTitle == "runtime steps")
+        #expect(loopRow.untilLabel == "image disappears")
+        #expect(loopRow.guardrailLabel == "max 5 attempts, 30.0s timeout, 0.5s polling, on failure: requireManualApproval")
+        #expect(loopRow.summary == "Repeats body until image disappears")
+        #expect(loopRow.importBoundaryLabel == "Draft-only repeat-until; import waits for structured runtime loop support")
+        #expect(loopRow.capabilityLabel == "Review can preserve the loop intent; runtime attempt evidence is not active yet")
+        #expect(projection.simulationRows.isEmpty)
+        #expect(importPreview.isImportable == false)
+        #expect(importPreview.issueRows.contains {
+            $0.severity == .error &&
+                $0.code == AutomationWorkflowDraftIssueCode.invalidLoop.rawValue &&
+                $0.message.contains("draft-only")
+        })
     }
 }

@@ -255,6 +255,120 @@ struct AutomationWorkflowDraftTests {
         #expect(importResult.dependencyKeyToID.keys.contains("repeat_battle__3__wait->done:conditionMatched"))
     }
 
+    @Test("Repeat-until loop stays draft-only and does not expand")
+    func repeatUntilLoopStaysDraftOnlyAndDoesNotExpand() throws {
+        let document = AutomationWorkflowDraftDocument(
+            workflow: AutomationWorkflowDraft(
+                name: "Wait for spinner",
+                tasks: [
+                    AutomationWorkflowDraftTask(
+                        key: "repeat_until_spinner_gone",
+                        type: "loop",
+                        loop: AutomationWorkflowDraftLoop(
+                            count: 1,
+                            tasks: [
+                                AutomationWorkflowDraftTask(
+                                    key: "tap_refresh",
+                                    type: "delay",
+                                    delaySeconds: 0.25
+                                )
+                            ],
+                            kind: AutomationWorkflowDraftLoopKind.repeatUntil,
+                            until: AutomationWorkflowDraftCondition(
+                                type: "imageDisappeared",
+                                regionRef: "spinner_area",
+                                imageRef: "spinner_template",
+                                threshold: 0.82
+                            ),
+                            maxAttempts: 4,
+                            timeoutSeconds: 20,
+                            pollingSeconds: 0.5,
+                            onFailure: AutomationWorkflowDraftLoopFailurePolicy.failRun
+                        )
+                    )
+                ]
+            ),
+            visualAssets: AutomationWorkflowDraftVisualAssets(
+                regions: [
+                    AutomationWorkflowDraftVisualRegion(
+                        key: "spinner_area",
+                        bounds: RectValue(x: 10, y: 20, width: 80, height: 60)
+                    )
+                ],
+                images: [
+                    AutomationWorkflowDraftVisualImageAsset(
+                        key: "spinner_template",
+                        path: "assets/spinner.png"
+                    )
+                ]
+            )
+        )
+
+        let validation = AutomationWorkflowDraftValidator.validate(document)
+        let importResult = AutomationWorkflowDraftImporter.dryRun(document)
+        let expanded = AutomationWorkflowDraftLoopExpander.expandedDocument(document)
+        let normalized = AutomationWorkflowDraftEditor.normalize(document).document
+        let normalizedLoop = try #require(normalized.workflow.tasks.first?.loop)
+
+        #expect(!validation.isValid)
+        #expect(validation.issues.contains {
+            $0.code == .invalidLoop &&
+                $0.path == "$.workflow.tasks[0].loop.kind" &&
+                $0.message.contains("draft-only")
+        })
+        #expect(!importResult.isImportable)
+        #expect(expanded.workflow.tasks.map(\.key) == ["repeat_until_spinner_gone"])
+        #expect(expanded.workflow.dependencies.isEmpty)
+        #expect(expanded.workflow.tasks.first?.loop?.isRepeatUntil == true)
+        #expect(normalizedLoop.kind == AutomationWorkflowDraftLoopKind.repeatUntil)
+        #expect(normalizedLoop.until?.type == "imageDisappeared")
+        #expect(normalizedLoop.until?.regionRef == "spinner_area")
+        #expect(normalizedLoop.maxAttempts == 4)
+        #expect(normalizedLoop.timeoutSeconds == 20)
+        #expect(normalizedLoop.pollingSeconds == 0.5)
+        #expect(normalizedLoop.onFailure == AutomationWorkflowDraftLoopFailurePolicy.failRun)
+    }
+
+    @Test("Repeat-until loop decodes without fixed count")
+    func repeatUntilLoopDecodesWithoutFixedCount() throws {
+        let data = Data("""
+        {
+          "schema": "sparkle.workflow.draft.v1",
+          "workflow": {
+            "name": "Decoded repeat until",
+            "tasks": [
+              {
+                "key": "repeat_wait",
+                "type": "loop",
+                "loop": {
+                  "kind": "repeatUntil",
+                  "tasks": [
+                    { "key": "tap", "type": "delay", "delaySeconds": 1.0 }
+                  ],
+                  "until": {
+                    "type": "ocrText",
+                    "text": "Done"
+                  },
+                  "maxAttempts": 3
+                }
+              }
+            ],
+            "dependencies": []
+          }
+        }
+        """.utf8)
+
+        let decoded = try JSONDecoder().decode(AutomationWorkflowDraftDocument.self, from: data)
+        let loop = try #require(decoded.workflow.tasks.first?.loop)
+
+        #expect(loop.count == 1)
+        #expect(loop.isRepeatUntil)
+        #expect(loop.tasks.map(\.key) == ["tap"])
+        #expect(loop.until?.type == "ocrText")
+        #expect(loop.until?.text == "Done")
+        #expect(loop.maxAttempts == 3)
+    }
+
     @Test("Draft editor can author fixed loop body")
     func draftEditorCanAuthorFixedLoopBody() throws {
         var document = try AutomationWorkflowDraftEditor
@@ -300,6 +414,74 @@ struct AutomationWorkflowDraftTests {
         ])
         #expect(importResult.isImportable)
         #expect(importResult.workflow?.validationIssues().isEmpty == true)
+    }
+
+    @Test("Draft editor loop authoring clears incompatible task fields")
+    func draftEditorLoopAuthoringClearsIncompatibleTaskFields() throws {
+        let graphPosition = AutomationGraphPoint(x: 20, y: 40)
+        let scheduledAt = Date(timeIntervalSince1970: 6_700)
+        let document = AutomationWorkflowDraftDocument(
+            workflow: AutomationWorkflowDraft(
+                name: "Loop cleanup",
+                tasks: [
+                    AutomationWorkflowDraftTask(
+                        key: "repeat_checkout",
+                        type: "macro",
+                        loop: AutomationWorkflowDraftLoop(
+                            count: 3,
+                            tasks: [
+                                AutomationWorkflowDraftTask(key: "old", type: "delay", delaySeconds: 1)
+                            ]
+                        ),
+                        macroRef: AutomationWorkflowDraftMacroRef(name: "Old macro"),
+                        condition: AutomationWorkflowDraftCondition(type: "ocrText", text: "Old"),
+                        delaySeconds: 2,
+                        notification: AutomationWorkflowDraftNotification(title: "Old notification"),
+                        schedule: AutomationWorkflowDraftSchedule(type: "once", startAt: scheduledAt),
+                        resource: .foregroundInput,
+                        maxResourceWaitSeconds: 5,
+                        timeoutSeconds: 10,
+                        pollingSeconds: 0.5,
+                        retry: AutomationWorkflowDraftRetry(maxAttempts: 2),
+                        joinPolicy: "all",
+                        enabled: true,
+                        graphPosition: graphPosition
+                    )
+                ]
+            )
+        )
+
+        let result = try AutomationWorkflowDraftEditor.setLoop(
+            taskKey: "repeat_checkout",
+            count: 2,
+            tasks: [
+                AutomationWorkflowDraftTask(
+                    key: "wait_done",
+                    type: "condition",
+                    condition: AutomationWorkflowDraftCondition(type: "ocrText", text: "Done")
+                )
+            ],
+            in: document
+        )
+        let task = try #require(result.document.workflow.tasks.first)
+
+        #expect(result.isValid)
+        #expect(task.type == "loop")
+        #expect(task.loop?.count == 2)
+        #expect(task.loop?.tasks.map(\.key) == ["wait_done"])
+        #expect(task.macroRef == nil)
+        #expect(task.condition == nil)
+        #expect(task.delaySeconds == nil)
+        #expect(task.notification == nil)
+        #expect(task.resource == nil)
+        #expect(task.maxResourceWaitSeconds == nil)
+        #expect(task.timeoutSeconds == nil)
+        #expect(task.pollingSeconds == nil)
+        #expect(task.retry == nil)
+        #expect(task.joinPolicy == nil)
+        #expect(task.schedule?.type == "once")
+        #expect(task.enabled == true)
+        #expect(task.graphPosition == graphPosition)
     }
 
     @Test("Loop draft validates fixed count and rejects nested loops")
@@ -436,6 +618,13 @@ struct AutomationWorkflowDraftTests {
             notes: "Tap the leave button"
         )
         macro.tags = ["battle", "exit"]
+        let recordingID = UUID(uuidString: "22222222-2222-2222-2222-222222222222")!
+        macro.semanticRecording = MacroSemanticRecordingReference(
+            recordingID: recordingID,
+            bundleRelativePath: "SemanticRecordings/\(recordingID.uuidString)",
+            manifestRelativePath: "SemanticRecordings/\(recordingID.uuidString)/manifest.json",
+            eventCount: macro.eventCount
+        )
 
         let entry = AutomationWorkflowDraftMacroCatalogEntry(macro: macro)
         let envelope = AutomationCLIResultEnvelope<AutomationWorkflowMacroCatalogPayload>
@@ -454,6 +643,8 @@ struct AutomationWorkflowDraftTests {
         #expect(entry.notes == "Tap the leave button")
         #expect(entry.resourceRequirement == .foregroundInput)
         #expect(entry.surfaces?.first?.bundleIdentifier == "com.example.battle")
+        #expect(entry.semanticRecording?.recordingID == recordingID)
+        #expect(decoded.data?.macros.first?.semanticRecording?.recordingID == recordingID)
         #expect(entry.matches(searchTerm: "leave"))
         #expect(entry.matches(searchTerm: "result"))
         #expect(!entry.matches(searchTerm: "upload"))
@@ -744,6 +935,60 @@ struct AutomationWorkflowDraftTests {
         #expect(exportedCondition.threshold == 0.91)
         #expect(exportedCondition.requireVisible == false)
         #expect(exportResult.document.visualAssets?.images == [imageAsset])
+    }
+
+    @Test("Draft import and export preserve pixel sample radius")
+    func draftImportAndExportPreservePixelSampleRadius() throws {
+        let region = AutomationWorkflowDraftVisualRegion(
+            key: "status_light",
+            label: "Status light",
+            bounds: RectValue(x: 10, y: 20, width: 30, height: 30),
+            space: .displayAbsolute
+        )
+        let document = AutomationWorkflowDraftDocument(
+            workflow: AutomationWorkflowDraft(
+                name: "Pixel radius flow",
+                tasks: [
+                    AutomationWorkflowDraftTask(
+                        key: "wait_status",
+                        type: "condition",
+                        condition: AutomationWorkflowDraftCondition(
+                            type: "pixelMatched",
+                            regionRef: "status_light",
+                            pixel: AutomationGraphPoint(x: 0.5, y: 0.5),
+                            colorHex: "#00FF00",
+                            pixelSampleRadius: 2,
+                            threshold: 0.93
+                        )
+                    )
+                ]
+            ),
+            visualAssets: AutomationWorkflowDraftVisualAssets(regions: [region])
+        )
+
+        let importResult = AutomationWorkflowDraftImporter.dryRun(document)
+        let workflow = try #require(importResult.workflow)
+        let task = try #require(workflow.tasks.first)
+
+        #expect(importResult.isImportable)
+        if case .condition(let spec) = task.kind,
+           case .visual(let condition) = spec.kind {
+            #expect(condition.type == .pixelMatched)
+            #expect(condition.regionRef == "status_light")
+            #expect(condition.pixelSampleRadius == 2)
+            #expect(condition.threshold == 0.93)
+        } else {
+            Issue.record("Expected imported task to preserve pixel condition")
+        }
+
+        let exportResult = AutomationWorkflowDraftExporter.export(workflow)
+        let exportedCondition = try #require(exportResult.document.workflow.tasks.first?.condition)
+
+        #expect(exportResult.isExportable)
+        #expect(exportedCondition.type == "pixelMatched")
+        #expect(exportedCondition.regionRef == "status_light")
+        #expect(exportedCondition.pixelSampleRadius == 2)
+        #expect(exportedCondition.threshold == 0.93)
     }
 
     @Test("Draft editor and patch update join policy")
@@ -1062,6 +1307,7 @@ struct AutomationWorkflowDraftTests {
                     condition: AutomationWorkflowDraftCondition(
                         type: "pixelMatched",
                         colorHex: "orange",
+                        pixelSampleRadius: 99,
                         threshold: 1.5
                     )
                 )
@@ -1083,6 +1329,11 @@ struct AutomationWorkflowDraftTests {
         #expect(issues.contains {
             $0.severity == .error &&
             $0.code == .invalidThreshold &&
+            $0.taskKey == "bad_pixel"
+        })
+        #expect(issues.contains {
+            $0.severity == .error &&
+            $0.code == .invalidPixelSampleRadius &&
             $0.taskKey == "bad_pixel"
         })
         #expect(issues.contains {
@@ -1424,6 +1675,7 @@ struct AutomationWorkflowDraftTests {
                 type: "pixelMatched",
                 regionRef: "battle_result_area",
                 colorHex: "#FFCC00",
+                pixelSampleRadius: 2,
                 threshold: 0.15
             )
         ])
@@ -1436,6 +1688,7 @@ struct AutomationWorkflowDraftTests {
         #expect(condition.type == "pixelMatched")
         #expect(condition.regionRef == "battle_result_area")
         #expect(condition.colorHex == "#FFCC00")
+        #expect(condition.pixelSampleRadius == 2)
         #expect(condition.threshold == 0.15)
         #expect(task.timeoutSeconds == 45)
         #expect(task.pollingSeconds == 0.25)

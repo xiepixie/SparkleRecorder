@@ -197,6 +197,7 @@ public struct AutomationWorkflowDraftPreviewProjection: Codable, Equatable, Send
         public var key: String
         public var title: String
         public var typeLabel: String
+        public var modeLabel: String
         public var detail: String
         public var macroResolution: MacroResolution
 
@@ -204,6 +205,7 @@ public struct AutomationWorkflowDraftPreviewProjection: Codable, Equatable, Send
             key = task.key
             title = task.name?.nilIfBlankForDraftPreview ?? task.key
             typeLabel = Self.typeLabel(for: task)
+            modeLabel = Self.modeLabel(for: task)
             detail = Self.detail(for: task)
             self.macroResolution = macroResolution
         }
@@ -227,6 +229,15 @@ public struct AutomationWorkflowDraftPreviewProjection: Codable, Equatable, Send
             }
         }
 
+        private static func modeLabel(for task: AutomationWorkflowDraftTask) -> String {
+            guard task.type == "loop" else {
+                return typeLabel(for: task)
+            }
+            return task.loop?.isRepeatUntil == true
+                ? NSLocalizedString("Repeat until", comment: "")
+                : NSLocalizedString("Fixed count", comment: "")
+        }
+
         private static func detail(for task: AutomationWorkflowDraftTask) -> String {
             switch task.type {
             case "macro":
@@ -247,6 +258,16 @@ public struct AutomationWorkflowDraftPreviewProjection: Codable, Equatable, Send
             case "manualApproval":
                 return NSLocalizedString("Manual approval required", comment: "")
             case "loop":
+                if task.loop?.isRepeatUntil == true {
+                    let bodyCount = task.loop?.tasks.count ?? 0
+                    let until = conditionSummary(task.loop?.until)
+                        ?? NSLocalizedString("condition missing", comment: "")
+                    return String(
+                        format: NSLocalizedString("Repeat until %@, %d steps", comment: ""),
+                        until,
+                        bodyCount
+                    )
+                }
                 let count = task.loop?.count ?? 0
                 let bodyCount = task.loop?.tasks.count ?? 0
                 return String(
@@ -258,15 +279,24 @@ public struct AutomationWorkflowDraftPreviewProjection: Codable, Equatable, Send
                 return task.type
             }
         }
+
+        private static func conditionSummary(_ condition: AutomationWorkflowDraftCondition?) -> String? {
+            LoopExpansionRow.conditionSummary(condition)
+        }
     }
 
     public struct LoopExpansionRow: Codable, Equatable, Identifiable, Sendable {
         public var id: String { key }
         public var key: String
         public var title: String
+        public var modeLabel: String
         public var repeatCount: Int
         public var bodyStepCount: Int
         public var expandedTaskCount: Int
+        public var repeatMetricTitle: String
+        public var expandedMetricTitle: String
+        public var untilLabel: String?
+        public var guardrailLabel: String?
         public var summary: String
         public var importBoundaryLabel: String
         public var capabilityLabel: String
@@ -277,19 +307,98 @@ public struct AutomationWorkflowDraftPreviewProjection: Codable, Equatable, Send
             }
             key = task.key
             title = task.name?.nilIfBlankForDraftPreview ?? task.key
-            repeatCount = task.loop?.count ?? 0
             bodyStepCount = task.loop?.tasks.count ?? 0
-            expandedTaskCount = max(0, repeatCount) * bodyStepCount
-            if repeatCount > 0, bodyStepCount > 0 {
-                summary = String(
-                    format: NSLocalizedString("Expands to %d imported steps", comment: ""),
-                    expandedTaskCount
+
+            if task.loop?.isRepeatUntil == true {
+                let loop = task.loop
+                modeLabel = NSLocalizedString("Repeat until", comment: "")
+                repeatCount = loop?.maxAttempts ?? 0
+                expandedTaskCount = 0
+                repeatMetricTitle = NSLocalizedString("max attempts", comment: "")
+                expandedMetricTitle = NSLocalizedString("runtime steps", comment: "")
+                untilLabel = Self.conditionSummary(loop?.until)
+                guardrailLabel = Self.guardrailSummary(for: loop)
+                if let untilLabel {
+                    summary = String(
+                        format: NSLocalizedString("Repeats body until %@", comment: ""),
+                        untilLabel
+                    )
+                } else {
+                    summary = NSLocalizedString("Repeat-until needs an until condition before runtime wiring", comment: "")
+                }
+                importBoundaryLabel = NSLocalizedString(
+                    "Draft-only repeat-until; import waits for structured runtime loop support",
+                    comment: ""
+                )
+                capabilityLabel = NSLocalizedString(
+                    "Review can preserve the loop intent; runtime attempt evidence is not active yet",
+                    comment: ""
                 )
             } else {
-                summary = NSLocalizedString("Loop needs a repeat count and body tasks before import", comment: "")
+                modeLabel = NSLocalizedString("Fixed count", comment: "")
+                repeatCount = task.loop?.count ?? 0
+                expandedTaskCount = max(0, repeatCount) * bodyStepCount
+                repeatMetricTitle = NSLocalizedString("repeats", comment: "")
+                expandedMetricTitle = NSLocalizedString("imported steps", comment: "")
+                untilLabel = nil
+                guardrailLabel = nil
+                if repeatCount > 0, bodyStepCount > 0 {
+                    summary = String(
+                        format: NSLocalizedString("Expands to %d imported steps", comment: ""),
+                        expandedTaskCount
+                    )
+                } else {
+                    summary = NSLocalizedString("Loop needs a repeat count and body tasks before import", comment: "")
+                }
+                importBoundaryLabel = NSLocalizedString("Draft-only loop; imported workflow stays acyclic", comment: "")
+                capabilityLabel = NSLocalizedString("Repeat-until, foreach, and runtime loop evidence are not active yet", comment: "")
             }
-            importBoundaryLabel = NSLocalizedString("Draft-only loop; imported workflow stays acyclic", comment: "")
-            capabilityLabel = NSLocalizedString("Repeat-until, foreach, and runtime loop evidence are not active yet", comment: "")
+        }
+
+        fileprivate static func conditionSummary(_ condition: AutomationWorkflowDraftCondition?) -> String? {
+            guard let condition else {
+                return nil
+            }
+            switch condition.type {
+            case "ocrText":
+                if let text = condition.text?.nilIfBlankForDraftPreview {
+                    return String(format: NSLocalizedString("text \"%@\"", comment: ""), text)
+                }
+                return NSLocalizedString("OCR text appears", comment: "")
+            case "imageAppeared":
+                return NSLocalizedString("image appears", comment: "")
+            case "imageDisappeared":
+                return NSLocalizedString("image disappears", comment: "")
+            case "regionChanged":
+                return NSLocalizedString("region changes", comment: "")
+            case "pixelMatched":
+                if let colorHex = condition.colorHex?.nilIfBlankForDraftPreview {
+                    return String(format: NSLocalizedString("pixel matches %@", comment: ""), colorHex)
+                }
+                return NSLocalizedString("pixel matches", comment: "")
+            default:
+                return condition.type.nilIfBlankForDraftPreview
+            }
+        }
+
+        private static func guardrailSummary(for loop: AutomationWorkflowDraftLoop?) -> String? {
+            guard let loop else {
+                return nil
+            }
+            var parts: [String] = []
+            if let maxAttempts = loop.maxAttempts {
+                parts.append(String(format: NSLocalizedString("max %d attempts", comment: ""), maxAttempts))
+            }
+            if let timeout = loop.timeoutSeconds {
+                parts.append(String(format: NSLocalizedString("%.1fs timeout", comment: ""), timeout))
+            }
+            if let polling = loop.pollingSeconds {
+                parts.append(String(format: NSLocalizedString("%.1fs polling", comment: ""), polling))
+            }
+            if let onFailure = loop.onFailure?.nilIfBlankForDraftPreview {
+                parts.append(String(format: NSLocalizedString("on failure: %@", comment: ""), onFailure))
+            }
+            return parts.isEmpty ? nil : parts.joined(separator: ", ")
         }
     }
 

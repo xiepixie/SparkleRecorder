@@ -59,6 +59,7 @@ public struct AutomationWorkflowDraftPatchOperation: Codable, Equatable, Sendabl
     public var baselineRef: String?
     public var pixel: AutomationGraphPoint?
     public var colorHex: String?
+    public var pixelSampleRadius: Int?
     public var threshold: Double?
     public var visualRegion: AutomationWorkflowDraftVisualRegion?
     public var visualImage: AutomationWorkflowDraftVisualImageAsset?
@@ -106,6 +107,7 @@ public struct AutomationWorkflowDraftPatchOperation: Codable, Equatable, Sendabl
         baselineRef: String? = nil,
         pixel: AutomationGraphPoint? = nil,
         colorHex: String? = nil,
+        pixelSampleRadius: Int? = nil,
         threshold: Double? = nil,
         visualRegion: AutomationWorkflowDraftVisualRegion? = nil,
         visualImage: AutomationWorkflowDraftVisualImageAsset? = nil,
@@ -152,6 +154,7 @@ public struct AutomationWorkflowDraftPatchOperation: Codable, Equatable, Sendabl
         self.baselineRef = baselineRef
         self.pixel = pixel
         self.colorHex = colorHex
+        self.pixelSampleRadius = pixelSampleRadius
         self.threshold = threshold
         self.visualRegion = visualRegion
         self.visualImage = visualImage
@@ -532,6 +535,7 @@ public enum AutomationWorkflowDraftPatchApplier {
             baselineRef: operation.baselineRef,
             pixel: operation.pixel,
             colorHex: operation.colorHex,
+            pixelSampleRadius: operation.pixelSampleRadius,
             threshold: operation.threshold
         )
     }

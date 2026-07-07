@@ -355,6 +355,7 @@ private struct WorkflowDraftExportBuilder {
                     baselineRef: condition.baselineRef,
                     pixel: condition.pixel,
                     colorHex: condition.targetColorHex,
+                    pixelSampleRadius: condition.pixelSampleRadius,
                     threshold: condition.threshold
                 )
             )

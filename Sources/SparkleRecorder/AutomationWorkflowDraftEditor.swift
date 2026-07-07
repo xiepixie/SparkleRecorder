@@ -306,6 +306,7 @@ public enum AutomationWorkflowDraftEditor {
             baselineRef: condition.baselineRef?.trimmedForDraftEditing.nilIfEmptyForDraftEditing,
             pixel: condition.pixel,
             colorHex: condition.colorHex?.trimmedForDraftEditing.nilIfEmptyForDraftEditing,
+            pixelSampleRadius: condition.pixelSampleRadius,
             threshold: condition.threshold
         )
         if let timeoutSeconds {
@@ -486,7 +487,13 @@ public enum AutomationWorkflowDraftEditor {
         task.loop = task.loop.map { loop in
             AutomationWorkflowDraftLoop(
                 count: loop.count,
-                tasks: loop.tasks.map(normalizedTask)
+                tasks: loop.tasks.map(normalizedTask),
+                kind: loop.kind?.trimmedForDraftEditing.nilIfEmptyForDraftEditing,
+                until: loop.until.map(normalizedCondition),
+                maxAttempts: loop.maxAttempts,
+                timeoutSeconds: loop.timeoutSeconds,
+                pollingSeconds: loop.pollingSeconds,
+                onFailure: loop.onFailure?.trimmedForDraftEditing.nilIfEmptyForDraftEditing
             )
         }
         task.macroRef = task.macroRef.map { macroRef in
@@ -495,21 +502,7 @@ public enum AutomationWorkflowDraftEditor {
                 name: macroRef.name?.trimmedForDraftEditing.nilIfEmptyForDraftEditing
             )
         }
-        task.condition = task.condition.map { condition in
-            AutomationWorkflowDraftCondition(
-                type: condition.type.trimmedForDraftEditing,
-                text: condition.text?.trimmedForDraftEditing.nilIfEmptyForDraftEditing,
-                matchMode: condition.matchMode,
-                regionRef: condition.regionRef?.trimmedForDraftEditing.nilIfEmptyForDraftEditing,
-                requireVisible: condition.requireVisible,
-                outcome: condition.outcome?.trimmedForDraftEditing.nilIfEmptyForDraftEditing,
-                imageRef: condition.imageRef?.trimmedForDraftEditing.nilIfEmptyForDraftEditing,
-                baselineRef: condition.baselineRef?.trimmedForDraftEditing.nilIfEmptyForDraftEditing,
-                pixel: condition.pixel,
-                colorHex: condition.colorHex?.trimmedForDraftEditing.nilIfEmptyForDraftEditing,
-                threshold: condition.threshold
-            )
-        }
+        task.condition = task.condition.map(normalizedCondition)
         task.notification = task.notification.map { notification in
             AutomationWorkflowDraftNotification(
                 title: notification.title.trimmedForDraftEditing,
@@ -519,6 +512,25 @@ public enum AutomationWorkflowDraftEditor {
         }
         task.schedule = task.schedule.map(normalizedSchedule)
         return task
+    }
+
+    private static func normalizedCondition(
+        _ condition: AutomationWorkflowDraftCondition
+    ) -> AutomationWorkflowDraftCondition {
+        AutomationWorkflowDraftCondition(
+            type: condition.type.trimmedForDraftEditing,
+            text: condition.text?.trimmedForDraftEditing.nilIfEmptyForDraftEditing,
+            matchMode: condition.matchMode,
+            regionRef: condition.regionRef?.trimmedForDraftEditing.nilIfEmptyForDraftEditing,
+            requireVisible: condition.requireVisible,
+            outcome: condition.outcome?.trimmedForDraftEditing.nilIfEmptyForDraftEditing,
+            imageRef: condition.imageRef?.trimmedForDraftEditing.nilIfEmptyForDraftEditing,
+            baselineRef: condition.baselineRef?.trimmedForDraftEditing.nilIfEmptyForDraftEditing,
+            pixel: condition.pixel,
+            colorHex: condition.colorHex?.trimmedForDraftEditing.nilIfEmptyForDraftEditing,
+            pixelSampleRadius: condition.pixelSampleRadius,
+            threshold: condition.threshold
+        )
     }
 
     private static func normalizedSchedule(_ schedule: AutomationWorkflowDraftSchedule) -> AutomationWorkflowDraftSchedule {

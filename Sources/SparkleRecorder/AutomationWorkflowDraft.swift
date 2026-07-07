@@ -97,16 +97,92 @@ public struct AutomationWorkflowDraftTask: Codable, Equatable, Sendable {
 public struct AutomationWorkflowDraftLoop: Codable, Equatable, Sendable {
     public static let maxFixedCount = 50
 
+    public var kind: String?
     public var count: Int
     public var tasks: [AutomationWorkflowDraftTask]
+    public var until: AutomationWorkflowDraftCondition?
+    public var maxAttempts: Int?
+    public var timeoutSeconds: TimeInterval?
+    public var pollingSeconds: TimeInterval?
+    public var onFailure: String?
 
     public init(
         count: Int,
-        tasks: [AutomationWorkflowDraftTask]
+        tasks: [AutomationWorkflowDraftTask],
+        kind: String? = nil,
+        until: AutomationWorkflowDraftCondition? = nil,
+        maxAttempts: Int? = nil,
+        timeoutSeconds: TimeInterval? = nil,
+        pollingSeconds: TimeInterval? = nil,
+        onFailure: String? = nil
     ) {
+        self.kind = kind
         self.count = count
         self.tasks = tasks
+        self.until = until
+        self.maxAttempts = maxAttempts
+        self.timeoutSeconds = timeoutSeconds
+        self.pollingSeconds = pollingSeconds
+        self.onFailure = onFailure
     }
+
+    private enum CodingKeys: String, CodingKey {
+        case kind
+        case count
+        case tasks
+        case until
+        case maxAttempts
+        case timeoutSeconds
+        case pollingSeconds
+        case onFailure
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        kind = try container.decodeIfPresent(String.self, forKey: .kind)
+        count = try container.decodeIfPresent(Int.self, forKey: .count) ?? 1
+        tasks = try container.decodeIfPresent([AutomationWorkflowDraftTask].self, forKey: .tasks) ?? []
+        until = try container.decodeIfPresent(AutomationWorkflowDraftCondition.self, forKey: .until)
+        maxAttempts = try container.decodeIfPresent(Int.self, forKey: .maxAttempts)
+        timeoutSeconds = try container.decodeIfPresent(TimeInterval.self, forKey: .timeoutSeconds)
+        pollingSeconds = try container.decodeIfPresent(TimeInterval.self, forKey: .pollingSeconds)
+        onFailure = try container.decodeIfPresent(String.self, forKey: .onFailure)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encodeIfPresent(kind, forKey: .kind)
+        try container.encode(count, forKey: .count)
+        try container.encode(tasks, forKey: .tasks)
+        try container.encodeIfPresent(until, forKey: .until)
+        try container.encodeIfPresent(maxAttempts, forKey: .maxAttempts)
+        try container.encodeIfPresent(timeoutSeconds, forKey: .timeoutSeconds)
+        try container.encodeIfPresent(pollingSeconds, forKey: .pollingSeconds)
+        try container.encodeIfPresent(onFailure, forKey: .onFailure)
+    }
+
+    public var normalizedKind: String {
+        kind?.trimmedForDraftValidation.nilIfEmpty ?? AutomationWorkflowDraftLoopKind.fixedCount
+    }
+
+    public var isFixedCount: Bool {
+        normalizedKind == AutomationWorkflowDraftLoopKind.fixedCount
+    }
+
+    public var isRepeatUntil: Bool {
+        normalizedKind == AutomationWorkflowDraftLoopKind.repeatUntil
+    }
+}
+
+public enum AutomationWorkflowDraftLoopKind {
+    public static let fixedCount = "fixedCount"
+    public static let repeatUntil = "repeatUntil"
+}
+
+public enum AutomationWorkflowDraftLoopFailurePolicy {
+    public static let failRun = "failRun"
+    public static let `continue` = "continue"
+    public static let requireManualApproval = "requireManualApproval"
 }
 
 public struct AutomationWorkflowDraftMacroRef: Codable, Equatable, Sendable {
@@ -134,6 +210,7 @@ public struct AutomationWorkflowDraftCondition: Codable, Equatable, Sendable {
     public var baselineRef: String?
     public var pixel: AutomationGraphPoint?
     public var colorHex: String?
+    public var pixelSampleRadius: Int?
     public var threshold: Double?
 
     public init(
@@ -147,6 +224,7 @@ public struct AutomationWorkflowDraftCondition: Codable, Equatable, Sendable {
         baselineRef: String? = nil,
         pixel: AutomationGraphPoint? = nil,
         colorHex: String? = nil,
+        pixelSampleRadius: Int? = nil,
         threshold: Double? = nil
     ) {
         self.type = type
@@ -159,6 +237,7 @@ public struct AutomationWorkflowDraftCondition: Codable, Equatable, Sendable {
         self.baselineRef = baselineRef
         self.pixel = pixel
         self.colorHex = colorHex
+        self.pixelSampleRadius = pixelSampleRadius
         self.threshold = threshold
     }
 }
@@ -372,6 +451,7 @@ public enum AutomationWorkflowDraftLoopExpander {
         for task in document.workflow.tasks {
             guard task.type.trimmedForDraftLoopExpansion == "loop",
                   let loop = task.loop,
+                  loop.isFixedCount,
                   loop.count > 0,
                   !loop.tasks.isEmpty
             else {
@@ -464,6 +544,7 @@ public enum AutomationWorkflowDraftLoopExpander {
         for task in tasks {
             guard task.type.trimmedForDraftLoopExpansion == "loop",
                   let loop = task.loop,
+                  loop.isFixedCount,
                   loop.count > 0,
                   !loop.tasks.isEmpty
             else {
@@ -541,6 +622,7 @@ public struct AutomationWorkflowDraftMacroCatalogEntry: Codable, Equatable, Send
     public var scrollCount: Int
     public var resourceRequirement: AutomationWorkflowDraftResource
     public var surfaces: [AutomationWorkflowDraftSurfaceSummary]?
+    public var semanticRecording: MacroSemanticRecordingReference?
 
     public init(
         id: UUID,
@@ -553,7 +635,8 @@ public struct AutomationWorkflowDraftMacroCatalogEntry: Codable, Equatable, Send
         keyCount: Int = 0,
         scrollCount: Int = 0,
         resourceRequirement: AutomationWorkflowDraftResource = .foregroundInput,
-        surfaces: [AutomationWorkflowDraftSurfaceSummary]? = nil
+        surfaces: [AutomationWorkflowDraftSurfaceSummary]? = nil,
+        semanticRecording: MacroSemanticRecordingReference? = nil
     ) {
         self.id = id
         self.name = name
@@ -566,6 +649,7 @@ public struct AutomationWorkflowDraftMacroCatalogEntry: Codable, Equatable, Send
         self.scrollCount = max(0, scrollCount)
         self.resourceRequirement = resourceRequirement
         self.surfaces = surfaces?.isEmpty == true ? nil : surfaces
+        self.semanticRecording = semanticRecording
     }
 
     public init(macro: SavedMacro) {
@@ -582,7 +666,8 @@ public struct AutomationWorkflowDraftMacroCatalogEntry: Codable, Equatable, Send
             resourceRequirement: .foregroundInput,
             surfaces: macro.surfaces
                 .sorted { $0.key < $1.key }
-                .map { AutomationWorkflowDraftSurfaceSummary(key: $0.key, surface: $0.value) }
+                .map { AutomationWorkflowDraftSurfaceSummary(key: $0.key, surface: $0.value) },
+            semanticRecording: macro.semanticRecording
         )
     }
 
@@ -730,6 +815,7 @@ public enum AutomationWorkflowDraftIssueCode: String, Codable, Equatable, Sendab
     case missingVisualReference
     case missingPixel
     case invalidThreshold
+    case invalidPixelSampleRadius
     case invalidColor
     case unresolvedRegionRef
     case duplicateVisualAssetKey
@@ -782,6 +868,15 @@ private struct Validator {
         AutomationJoinPolicy.all.rawValue,
         AutomationJoinPolicy.any.rawValue,
         AutomationJoinPolicy.firstMatched.rawValue
+    ]
+    private static let supportedLoopKinds: Set<String> = [
+        AutomationWorkflowDraftLoopKind.fixedCount,
+        AutomationWorkflowDraftLoopKind.repeatUntil
+    ]
+    private static let supportedLoopFailurePolicies: Set<String> = [
+        AutomationWorkflowDraftLoopFailurePolicy.failRun,
+        AutomationWorkflowDraftLoopFailurePolicy.continue,
+        AutomationWorkflowDraftLoopFailurePolicy.requireManualApproval
     ]
     private static let visualConditionTypes: Set<String> = [
         "regionChanged",
@@ -1027,23 +1122,37 @@ private struct Validator {
             return
         }
 
+        validateConditionPayload(condition, conditionPath: "\(path).condition", taskKey: key)
+    }
+
+    private mutating func validateConditionPayload(
+        _ condition: AutomationWorkflowDraftCondition,
+        conditionPath: String,
+        taskKey: String
+    ) {
         let type = condition.type.trimmedForDraftValidation
         guard Self.supportedConditionTypes.contains(type) else {
-            add(.error, .unsupportedConditionType, "Condition type '\(condition.type)' is not supported.", "\(path).condition.type", taskKey: key)
+            add(
+                .error,
+                .unsupportedConditionType,
+                "Condition type '\(condition.type)' is not supported.",
+                "\(conditionPath).type",
+                taskKey: taskKey
+            )
             return
         }
 
         if type == "ocrText", condition.text?.trimmedForDraftValidation.isEmpty ?? true {
-            add(.error, .missingConditionText, "OCR text condition needs text.", "\(path).condition.text", taskKey: key)
+            add(.error, .missingConditionText, "OCR text condition needs text.", "\(conditionPath).text", taskKey: taskKey)
         }
 
-        validateVisualCondition(condition, type: type, path: path, taskKey: key)
+        validateVisualCondition(condition, type: type, conditionPath: conditionPath, taskKey: taskKey)
     }
 
     private mutating func validateVisualCondition(
         _ condition: AutomationWorkflowDraftCondition,
         type: String,
-        path: String,
+        conditionPath: String,
         taskKey: String
     ) {
         guard Self.visualConditionTypes.contains(type) else {
@@ -1055,7 +1164,7 @@ private struct Validator {
                 .warning,
                 .missingCondition,
                 "Visual condition '\(type)' should name a regionRef so users can inspect what is being watched.",
-                "\(path).condition.regionRef",
+                "\(conditionPath).regionRef",
                 taskKey: taskKey
             )
         } else if let visualAssets = document.visualAssets,
@@ -1064,7 +1173,7 @@ private struct Validator {
                 .warning,
                 .missingVisualAsset,
                 "Visual condition '\(type)' references regionRef '\(condition.regionRef ?? "")', but visualAssets.regions does not define it.",
-                "\(path).condition.regionRef",
+                "\(conditionPath).regionRef",
                 taskKey: taskKey
             )
         }
@@ -1076,7 +1185,7 @@ private struct Validator {
                     .error,
                     .missingVisualReference,
                     "Visual condition '\(type)' needs imageRef.",
-                    "\(path).condition.imageRef",
+                    "\(conditionPath).imageRef",
                     taskKey: taskKey
                 )
             } else if let visualAssets = document.visualAssets,
@@ -1085,7 +1194,7 @@ private struct Validator {
                     .warning,
                     .missingVisualAsset,
                     "Visual condition '\(type)' references imageRef '\(condition.imageRef ?? "")', but visualAssets.images does not define it.",
-                    "\(path).condition.imageRef",
+                    "\(conditionPath).imageRef",
                     taskKey: taskKey
                 )
             }
@@ -1096,7 +1205,7 @@ private struct Validator {
                     .error,
                     .invalidColor,
                     "pixelMatched condition needs colorHex such as #FFCC00.",
-                    "\(path).condition.colorHex",
+                    "\(conditionPath).colorHex",
                     taskKey: taskKey
                 )
             } else if let colorHex = condition.colorHex?.trimmedForDraftValidation,
@@ -1105,7 +1214,7 @@ private struct Validator {
                     .error,
                     .invalidColor,
                     "Color '\(colorHex)' must be #RGB, #RRGGBB, or #RRGGBBAA.",
-                    "\(path).condition.colorHex",
+                    "\(conditionPath).colorHex",
                     taskKey: taskKey
                 )
             }
@@ -1114,7 +1223,17 @@ private struct Validator {
                     .error,
                     .missingPixel,
                     "pixelMatched condition needs either pixel coordinates or regionRef.",
-                    "\(path).condition.pixel",
+                    "\(conditionPath).pixel",
+                    taskKey: taskKey
+                )
+            }
+            if let pixelSampleRadius = condition.pixelSampleRadius,
+               !(0...AutomationVisualCondition.maximumPixelSampleRadius).contains(pixelSampleRadius) {
+                add(
+                    .error,
+                    .invalidPixelSampleRadius,
+                    "pixelMatched condition pixelSampleRadius must be between 0 and \(AutomationVisualCondition.maximumPixelSampleRadius).",
+                    "\(conditionPath).pixelSampleRadius",
                     taskKey: taskKey
                 )
             }
@@ -1131,7 +1250,7 @@ private struct Validator {
                 .warning,
                 .missingVisualAsset,
                 "Visual condition '\(type)' references baselineRef '\(baselineRef)', but visualAssets.baselines does not define it.",
-                "\(path).condition.baselineRef",
+                "\(conditionPath).baselineRef",
                 taskKey: taskKey
             )
         }
@@ -1174,6 +1293,34 @@ private struct Validator {
             add(.error, .invalidLoop, "Loop task '\(key)' needs a loop body.", "\(path).loop", taskKey: key)
             return
         }
+
+        let kind = loop.normalizedKind
+        guard Self.supportedLoopKinds.contains(kind) else {
+            add(
+                .error,
+                .invalidLoop,
+                "Loop task '\(key)' kind '\(kind)' is not supported.",
+                "\(path).loop.kind",
+                taskKey: key
+            )
+            return
+        }
+
+        switch kind {
+        case AutomationWorkflowDraftLoopKind.fixedCount:
+            validateFixedCountLoop(loop, path: path, key: key)
+        case AutomationWorkflowDraftLoopKind.repeatUntil:
+            validateRepeatUntilLoop(loop, path: path, key: key)
+        default:
+            break
+        }
+    }
+
+    private mutating func validateFixedCountLoop(
+        _ loop: AutomationWorkflowDraftLoop,
+        path: String,
+        key: String
+    ) {
         guard loop.count >= 1, loop.count <= AutomationWorkflowDraftLoop.maxFixedCount else {
             add(
                 .error,
@@ -1184,6 +1331,81 @@ private struct Validator {
             )
             return
         }
+        validateLoopBody(loop, path: path, key: key)
+    }
+
+    private mutating func validateRepeatUntilLoop(
+        _ loop: AutomationWorkflowDraftLoop,
+        path: String,
+        key: String
+    ) {
+        add(
+            .error,
+            .invalidLoop,
+            "Repeat-until loop '\(key)' is draft-only until structured runtime loop support lands.",
+            "\(path).loop.kind",
+            taskKey: key
+        )
+
+        validateLoopBody(loop, path: path, key: key)
+
+        if let until = loop.until {
+            validateConditionPayload(until, conditionPath: "\(path).loop.until", taskKey: key)
+        } else {
+            add(
+                .error,
+                .missingCondition,
+                "Repeat-until loop '\(key)' needs an until condition.",
+                "\(path).loop.until",
+                taskKey: key
+            )
+        }
+
+        if let maxAttempts = loop.maxAttempts, maxAttempts < 1 {
+            add(
+                .error,
+                .invalidLoop,
+                "Repeat-until loop '\(key)' maxAttempts must be at least 1.",
+                "\(path).loop.maxAttempts",
+                taskKey: key
+            )
+        }
+        if let timeout = loop.timeoutSeconds, timeout < 0 {
+            add(
+                .error,
+                .invalidDuration,
+                "Repeat-until loop '\(key)' timeout cannot be negative.",
+                "\(path).loop.timeoutSeconds",
+                taskKey: key
+            )
+        }
+        if let polling = loop.pollingSeconds, polling < 0 {
+            add(
+                .error,
+                .invalidDuration,
+                "Repeat-until loop '\(key)' polling interval cannot be negative.",
+                "\(path).loop.pollingSeconds",
+                taskKey: key
+            )
+        }
+        if let onFailure = loop.onFailure?.trimmedForDraftValidation,
+           !onFailure.isEmpty,
+           !Self.supportedLoopFailurePolicies.contains(onFailure) {
+            add(
+                .error,
+                .invalidLoop,
+                "Repeat-until loop '\(key)' onFailure must be failRun, continue, or requireManualApproval.",
+                "\(path).loop.onFailure",
+                taskKey: key
+            )
+        }
+    }
+
+    private mutating func validateLoopBody(
+        _ loop: AutomationWorkflowDraftLoop,
+        path: String,
+        key: String
+    ) {
         guard !loop.tasks.isEmpty else {
             add(.error, .invalidLoop, "Loop task '\(key)' needs at least one body task.", "\(path).loop.tasks", taskKey: key)
             return
