@@ -84,7 +84,7 @@ recording/
 
 ## Core Contract v0
 
-S1 first pass exists in `Sources/SparkleRecorder/SemanticRecordingBundle.swift`.
+S1 first pass exists in `Sources/SparkleRecorderCore/SemanticRecordingBundle.swift`.
 
 Current mapping:
 

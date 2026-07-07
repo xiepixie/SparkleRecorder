@@ -6,7 +6,7 @@
 - CLI output files: `/tmp/s4-maintenance-explain.json`, `/tmp/s4-maintenance-ocr.json`, `/tmp/s4-maintenance-visual.json`, `/tmp/s4-maintenance-suggest.json`, `/tmp/s4-maintenance-draft-from-recording.json`, `/tmp/s4-maintenance-validate.json`, `/tmp/s4-maintenance-simulate.json`, `/tmp/s4-maintenance-import-dry-run.json`
 - Checklist item: S4 low-token CLI query flow over local visual index, plus fixture/review-only draft validation/simulation/import dry-run gates
 - Worktree note: captured in the current dirty multi-owner worktree while S0/S2/S3 workstreams were still parallel; the scenario input is deterministic fixture data.
-- Known gaps: this transcript is fixture CLI evidence, not live installed-app recording evidence. Product-ready default/live catalog, live/stored suggestion synthesis, image-byte visual similarity, live missing/deleted artifact status, and product-ready stored/live `workflow draft from-recording` remain open.
+- Known gaps: this transcript is fixture CLI evidence, not live installed-app recording evidence. Stored-bundle deterministic suggestion synthesis and retention-pruned deleted-artifact status now have separate unit-test proof, but product-ready default/live catalog, cleanup suggestions, image-byte visual similarity, live artifact status, and product-ready stored/live `workflow draft from-recording` remain open.
 
 ## Commands
 

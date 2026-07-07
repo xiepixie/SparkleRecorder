@@ -6,19 +6,19 @@ Owner B owns the boundary between pure AutomationEngine state and the real macOS
 
 | Area | Files |
 | --- | --- |
-| Engine runtime shell | `Sources/SparkleRecorder/AutomationEngineRuntime.swift` |
-| Runtime lifecycle session | `Sources/SparkleRecorder/AutomationRuntimeSession.swift` |
-| Effect runner | `Sources/SparkleRecorder/AutomationEffectRunner.swift` |
-| Resource arbitration | `Sources/SparkleRecorder/AutomationResourceArbiter.swift` |
-| Player adapter | `Sources/SparkleRecorder/AutomationPlayerClient.swift` |
+| Engine runtime shell | `Sources/SparkleRecorderCore/AutomationEngineRuntime.swift` |
+| Runtime lifecycle session | `Sources/SparkleRecorderCore/AutomationRuntimeSession.swift` |
+| Effect runner | `Sources/SparkleRecorderCore/AutomationEffectRunner.swift` |
+| Resource arbitration | `Sources/SparkleRecorderCore/AutomationResourceArbiter.swift` |
+| Player adapter | `Sources/SparkleRecorderCore/AutomationPlayerClient.swift` |
 | Live Player bridge | `Sources/SparkleRecorder/LiveAutomationPlayerClient.swift` |
 | Live condition evaluator | `Sources/SparkleRecorder/LiveAutomationConditionEvaluatorClient.swift` |
 | Live runtime host | `Sources/SparkleRecorder/LiveAutomationRuntimeHost.swift` |
-| Scheduler adapter | `Sources/SparkleRecorder/AutomationSchedulerClient.swift` |
-| Repository client | `Sources/SparkleRecorder/AutomationRepositoryClient.swift` |
-| Repository snapshot/refresh | `AutomationRepositorySnapshotClient` in `Sources/SparkleRecorder/AutomationRepositoryClient.swift` |
-| Runtime handoff mailbox | `Sources/SparkleRecorder/AutomationRuntimeHandoff.swift`, `LiveAutomationRuntimeHost` polling |
-| Persistence format | `AutomationPersistenceDocument` and `AutomationWorkflowPackageDocument` in `Sources/SparkleRecorder/AutomationRepositoryClient.swift` |
+| Scheduler adapter | `Sources/SparkleRecorderCore/AutomationSchedulerClient.swift` |
+| Repository client | `Sources/SparkleRecorderCore/AutomationRepositoryClient.swift` |
+| Repository snapshot/refresh | `AutomationRepositorySnapshotClient` in `Sources/SparkleRecorderCore/AutomationRepositoryClient.swift` |
+| Runtime handoff mailbox | `Sources/SparkleRecorderCore/AutomationRuntimeHandoff.swift`, `LiveAutomationRuntimeHost` polling |
+| Persistence format | `AutomationPersistenceDocument` and `AutomationWorkflowPackageDocument` in `Sources/SparkleRecorderCore/AutomationRepositoryClient.swift` |
 | Adapter tests | `Tests/SparkleRecorderTests/AutomationOwnerBClientTests.swift`, `Tests/SparkleRecorderTests/AutomationRuntimeSessionTests.swift` |
 
 ## Hard Boundaries

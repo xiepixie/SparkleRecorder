@@ -32,8 +32,8 @@ S1 does not own:
 
 Implementation:
 
-- Core file: `Sources/SparkleRecorder/SemanticRecordingBundle.swift`
-- Shared fixture: `Sources/SparkleRecorder/SemanticRecordingFixture.swift`
+- Core file: `Sources/SparkleRecorderCore/SemanticRecordingBundle.swift`
+- Shared fixture: `Sources/SparkleRecorderCore/SemanticRecordingFixture.swift`
 - Tests: `Tests/SparkleRecorderTests/SemanticRecordingBundleTests.swift`
 - SwiftPM inclusion: `Package.swift`
 

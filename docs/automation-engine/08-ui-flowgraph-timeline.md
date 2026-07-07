@@ -56,9 +56,9 @@ AutomationMainView
 - 通过 FlowGraph 节点按钮拉线建立依赖，通过 dependency inspector 删除依赖。
 - 通过 FlowGraph 节点和 task inspector 取消 active run。
 - 通过 inspector 编辑 workflow/task/dependency 基础字段。
-- 通过 task inspector 编辑 schedule、condition source、timeout、polling 和 retry attempts。
+- 通过 task inspector 编辑 schedule、condition type、timeout、polling 和 retry attempts；选中 condition task 时先编辑具体检查项，再看分支/依赖触发。
 - 通过 OCR condition 的 Pick Text Region 从真实屏幕/窗口选中文字并写入 `searchRegion` bounds。
-- 通过 OCR condition 的 Draw Region 在屏幕上拖拽任意矩形并写入当前 display/window/content 坐标空间的 `searchRegion` bounds。
+- 通过 shared `AutomationScreenRegionPicker` 在屏幕上拖拽任意矩形，并让 OCR Draw Region、visual Draw Bounds、pixelMatched region authoring 和 AI Draft baseline capture 共用同一套 display capture / top-window summary / original-pixel crop 逻辑；`automatic` 框选会优先落成 content/window normalized bounds，无法识别窗口时才退回 display absolute。
 - 通过 OCR region editor 预览/微调 bounds，并提示多显示器、window/content 坐标空间是否有可用上下文。
 - 通过 `.sparkrec_workflow` 导入/导出/分享 workflow，支持当前 workflow 和全部 workflows package；冲突时让用户选择 Add Copies 或 Replace Existing，引用本地不存在的 macro 时先提示再导入。
 - external signal 由 app 内 signal store/toggle 提供，manual approval 由 AppKit approval presenter 提供；SwiftUI 不直接调用 condition evaluator。
@@ -71,11 +71,11 @@ AutomationMainView
 - `AutomationFlowGraphEdgeCanvas` 使用单个 Canvas 绘制依赖边，端点和边状态由 projection 预先计算。
 - FlowGraph 节点拖拽只在 gesture transient state 中移动，松手后 grid snap 并发送 `AutomationAction.moveTask`；reducer 持久化 `AutomationTask.graphPosition`。
 - FlowGraph 节点可选择、手动运行、取消 active run、启动/完成 dependency link；task inspector 也可对当前 active run 发出 cancel；dependency 选择和删除走 inspector/reducer action。
-- `AutomationTaskInspectorView` 可编辑 manual/once/repeating schedule，以及 manual approval、external signal、OCR text、previous outcome condition 参数。
+- `AutomationTaskInspectorView` 可编辑 manual/once/repeating schedule；选中 task 时先显示该块的核心定义：macro task 可替换引用的 saved macro，delay task 可编辑 duration，notification task 可编辑 title/body/severity，condition task 可编辑 concrete condition type（manual approval、external signal、OCR text、image appeared/disappeared、region changed、pixel matched、previous outcome）及对应 OCR/视觉/像素字段，再显示 If/Then/Else 和 dependency trigger。`AutomationDependencyInspectorView` 只编辑 link trigger/delay，并在源 task 是 condition 时提供返回源条件的入口；dependency trigger 选项按源 task 类型收窄，避免普通 macro/delay/notification 暴露 condition matched/not matched。
 - `AutomationTaskRunHistoryView` 在 task inspector 内展示该 task 最近运行的 outcome reason、Created/Scheduled/Ready/Started/Completed 时间、attempt、execution chain、upstream count、evidence availability 和 duration metadata；SwiftUI 不读取 Player internals 或 evidence payload。
 - `AutomationOCRRegionPicker` 复用现有 `TextPickerOverlay`，从上游 macro surface 优先选取目标窗口，写入 OCR text 和 `searchRegion` bounds；有 target surface 时使用 content-normalized region，否则退回 display-absolute region。
-- `AutomationOCRRegionPickerOverlay` 支持不依赖 OCR 文本识别的任意矩形拖拽框选，并通过 `AutomationOCRSearchRegionSelection` 转换成当前选择的 display/window/content region space。
-- `AutomationOCRRegionEditorView` 提供 region preview、X/Y/W/H 微调、Clear Region、多显示器提示，以及 window/content context 不可用时的明确反馈。
+- `AutomationScreenRegionPicker` 包装 `AutomationOCRRegionPickerOverlay`，支持不依赖 OCR 文本识别的任意矩形拖拽框选，并通过 `AutomationOCRSearchRegionSelection` 转换成当前选择的 display/window/content region space。TextPickerOverlay 保持独立，因为它返回 OCR text anchor；Review frame dragging 保持独立，因为它是在已保存帧里选区，不是 live screen selection。
+- `AutomationOCRRegionEditorView` / visual bounds editor 提供 region preview、X/Y/W/H 微调、Clear Region、多显示器提示，以及 window/content context 不可用时的明确反馈。Draw Region authoring 现在会在遮罩出现前尝试捕获显示器原始像素，框选后在 Inspector 展示真实裁剪图、原始像素尺寸和顶层窗口摘要；pixelMatched 可在该真实裁剪图上点选 normalized X/Y 和目标颜色；捕获失败时才退回比例示意图。
 - `AutomationWorkflowPackagePresenter` 提供 `.sparkrec_workflow` import/export/share，支持 selected/all workflow package、duplicate workflow conflict prompt，以及 missing local macro reference prompt；导入结果仍通过 reducer `upsertWorkflow` 进入持久化。
 - `AutomationExternalSignalSourceView` 和 `AutomationManualApprovalPresenter` 提供真实产品来源，并通过 `LiveAutomationRuntimeHost` provider injection 进入 Owner B。
 - `AutomationResourceTimelineView` 只显示用户可理解的资源标签，不暴露 internal channel 编号。

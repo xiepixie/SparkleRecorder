@@ -1,7 +1,7 @@
 # Visual Repeat-Until Design
 
 更新时间：2026-07-07
-状态：设计对齐；runtime/product open，routed-crop detector 与 Review linked-macro body first slices 已有
+状态：设计对齐；runtime/product open，routed-crop detector、Review linked-macro body 与 Macro Editor OCR-text body preview first slices 已有
 Owner：S2 App-edge capture / Owner 2 Workflow UX / S3 Review / S4 CLI
 
 本文对齐一组用户最容易感知的能力：录制时保存视频和关键帧，录完后从帧里提取文字、图标、区域变化和像素条件，并把“重复做某个行为，直到某个文字或图案出现/消失”做成可解释、可审阅、可运行的 Workflow 能力。
@@ -59,14 +59,15 @@ SDK 校准点：
 - OCR 条件已经按 `searchRegion` crop 后再识别；无区域时才扫描整个显示器。
 - fixed-count draft loop 已有 first pass，并在 import 前展开成 acyclic workflow。2026-07-07 新增 draft-only Repeat-Until loop intent：`AutomationWorkflowDraftLoop.kind = repeatUntil` 可以保存 `until` condition、`maxAttempts`、`timeoutSeconds`、`pollingSeconds` 和 `onFailure`；Draft Preview 能显示 mode / until / guardrails，validator/import 会明确以 draft-only gate 阻止导入，loop expander 不会把它伪装成 fixed-count 或 dependency cycle。foreach、runtime loop evidence 仍未实现。
 - `SemanticRecordingReviewDraftPatchBuilder` 现在可以把 Review condition candidate + 用户框选 frame crop + 明确提供的 body draft tasks 生成 draft-only `repeatUntil` loop patch：继续 upsert visual region/image/baseline assets，把候选条件写入 `loop.until`，并保留 max attempts / timeout / polling / failure policy。测试覆盖 image disappeared candidate、manual frame crop asset extraction、Draft Preview loop row 和 import-blocking gate。
-- `SemanticRecordingReviewRepeatUntilBodyResolver` / `SemanticRecordingReviewFixtureView` 已有 Review UI first slice：当当前 bundle 能通过 `SavedMacro.semanticRecording.recordingID` 解析到唯一 linked macro，或调用方显式提供 preferred macro id 时，Review 会把该 macro 生成 `Do` body task，并在 condition candidate 上提供 `Repeat Until` action；多 linked macros 或无 linked macro 时不会猜测循环体。测试覆盖唯一 linked macro、ambiguous guard、preferred macro 消歧，以及 resolved macro body -> draft-only repeat-until patch。
+- `SemanticRecordingReviewRepeatUntilBodyResolver` / `SemanticRecordingReviewFixtureView` 已有 Review UI body first slice：当前 bundle 能通过 `SavedMacro.semanticRecording.recordingID` 解析 linked macros；唯一 linked macro 会自动作为 `Do` body，多 linked macros 会暴露 `Body` 菜单让用户选择，调用方也可以显式提供 preferred macro id；无 linked macro 时仍不会猜测循环体。测试覆盖唯一 linked macro、body options 排序、ambiguous guard、preferred macro 消歧，以及 resolved macro body -> draft-only repeat-until patch。
+- Macro Editor 已有 OCR 文本类 Repeat-Until first slice：用户选中一段可执行行为和一个 `Wait Text` / `Wait Text Gone` / `Verify Text` 条件后，sidebar 可以把选中行为保存成新的 behavior macro，并打开 draft-only Repeat-Until Preview。builder 会把 body event 时间归一化、清除原 behavior metadata，把 until 条件写成 `ocrText`，优先保留 content-normalized search region，并继续让 Draft Preview validator/import 以 draft-only gate 阻止运行时导入。当前 slice 不处理图标/图案、区域变化、像素条件，也不提供 graph loop runtime。
 - `AutomationVisualRepeatUntil.swift` 已提供纯 core first slice：frame sample metadata、selected/window/full scope、scope inference、detector request/result、frame route ROI resolution、implicit full-display fallback audit flag、native detector score threshold、Repeat-Until policy、attempt evidence 和 loop state transition；`AutomationVisualRepeatUntilTests` 覆盖 detector mapping、feature-print distance threshold、region-diff threshold、scope/safe refs、selected-region routing、target-window default routing、implicit full-display fallback、unavailable ROI rejection、max attempts、timeout 和 manual-approval exhaustion。
 
 当前缺口也很明确：
 
 - 还没有 `SCStreamOutput -> live CMSampleBuffer image frame -> production OCR/Vision/Accelerate detector` 的完整产品 evaluator；core scope/ROI route contract、app-edge raw frame stream、latest-frame store、`CGImage` ROI crop、fake/prototype polling dispatch、可注入 OCR routed-crop detector、可注入 feature-print routed-crop detector、live visual condition template locator evidence、pixel routed-crop sampler 和 region-diff routed-crop sampler first slice 已有。
 - 还没有 recorded crop feature-print precompute/cache、production 多尺度/full-window locator、Accelerate/Metal-backed region diff、region diff runtime/storage persistence、Lab/display-profile color matching 和 live product proof；deterministic verifier 与 fixture-safe routed-ROI template locator 已有 first slice，但还不是 product-ready image locator。
-- 没有从 recorded frame crop 到 repeat-until visual condition 的完整产品 UX。当前已完成 builder/API first slice、linked saved macro body resolver、Review `Repeat Until` action 和 Workflow draft/preview/import-gate 表达；尚未完成多宏选择器、Macro Editor 选中行为作为 `Do`、graph loop node 预览/编辑和 live product evidence 的完整产品路径。
+- 没有从 recorded frame crop 到 repeat-until visual condition 的完整产品 UX。当前已完成 builder/API first slice、linked saved macro body resolver、Review linked-macro `Body` 菜单、Review `Repeat Until` action、Macro Editor selected body + OCR text until draft preview first slice，以及 Workflow draft/preview/import-gate 表达；尚未完成 Macro Editor 图标/图案/region/pixel 条件入口、跨宏/任务组合 body picker、graph loop node 预览/编辑和 live product evidence 的完整产品路径。
 - 还没有把 Repeat-Until state 接入 Automation runtime/reducer/import 语义；import 当前会阻止 `kind = repeatUntil`，直到 Owner 1 提供结构化 runtime loop state。
 - 没有 product-ready live evidence 证明 ordinary Recorder 产生真实 `.mov` / keyframe bundle 并被 Review / CLI / Workflow 消费。
 
@@ -95,9 +96,12 @@ Repeat Until
 Macro Editor 的首版入口应该更轻：
 
 - 用户选中一段连续行为。
-- 右键或工具栏选择 `Repeat Until...`。
-- 弹出或跳转到 Workflow Draft Preview，系统把选中行为作为 `Do`，把用户框选文字/图案/区域作为 `Until`。
+- 用户同时选中一个文本类 visual wait：`Wait Text`、`Wait Text Gone` 或 `Verify Text`。
+- sidebar 选择 `Preview Repeat Until`。
+- 系统把选中行为另存为一个 behavior macro，再打开 Workflow Draft Preview：`Do` 指向新 body macro，`Until` 指向 OCR 文本条件和已记录的 search region。
 - Macro Editor 不承担复杂嵌套循环编辑；它继续做录后清理、绑定行为、修正点击/等待。
+
+2026-07-07 已落地的入口只覆盖上面的 OCR 文本类路径。下一步要把用户从录制帧里框选图标/图案、baseline region 或 pixel sample 的 Review/Macro Editor affordance 接进同一个 Draft Preview 合同；graph container、运行时 state machine 和 attempt evidence 仍属于后续 Workflow/runtime work。
 
 ## User Journey
 
