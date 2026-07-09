@@ -951,13 +951,13 @@ public enum AutomationBranchDecisionStatus: String, Codable, Equatable, Hashable
     public var label: String {
         switch self {
         case .waiting:
-            return NSLocalizedString("Waiting", comment: "")
+            return String(localized: "Waiting", table: "EditorUX")
         case .triggered:
-            return NSLocalizedString("Triggered", comment: "")
+            return String(localized: "Triggered", table: "Common")
         case .skipped:
-            return NSLocalizedString("Skipped", comment: "")
+            return String(localized: "Skipped", table: "Common")
         case .disabled:
-            return NSLocalizedString("Disabled", comment: "")
+            return String(localized: "Disabled", table: "Common")
         }
     }
 }

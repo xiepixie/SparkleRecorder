@@ -109,10 +109,7 @@ struct AutomationDependencyInspectorView: View {
             if sourceCanProvideDynamicDelay {
                 Toggle(String(localized: "Use recognized time", table: "Common"), isOn: $usesRecognizedTimeDelay)
                     .toggleStyle(.checkbox)
-                    .help(NSLocalizedString(
-                        "Read a duration from the source condition evidence and use the delay field as fallback.",
-                        comment: ""
-                    ))
+                    .help(String(localized: "Read a duration from the source condition evidence and use the delay field as fallback.", table: "Automation"))
 
                 if usesRecognizedTimeDelay {
                     LabeledContent(String(localized: "Maximum wait (s)", table: "EditorUX")) {

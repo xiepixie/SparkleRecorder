@@ -392,7 +392,7 @@ struct SettingsPanel: View {
                 HStack(spacing: 7) {
                     Image(systemName: semanticRecordingPreflightIcon(presentation.status))
                         .foregroundStyle(semanticRecordingPreflightColor(presentation.status))
-                    Text(NSLocalizedString(presentation.title, comment: ""))
+                    Text(LocalizedStringKey(presentation.title), tableName: "Common")
                         .font(.system(size: 11.5, weight: .semibold))
                         .fixedSize(horizontal: false, vertical: true)
                     Spacer(minLength: 8)
@@ -405,7 +405,7 @@ struct SettingsPanel: View {
                     .help(String(localized: "Check semantic recording permissions again", table: "Common"))
                 }
 
-                Text(NSLocalizedString(presentation.summary, comment: ""))
+                Text(LocalizedStringKey(presentation.summary), tableName: "Common")
                     .font(.system(size: 10.5))
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -573,10 +573,7 @@ struct SettingsPanel: View {
         }
         if preview.deleteBundleCount > 0 {
             return String(
-                format: NSLocalizedString(
-                    "This will delete evidence from %d recording(s), including %d full bundle(s) and %d artifact reference(s). %d metadata file(s) stay listed for pruned recordings.",
-                    comment: ""
-                ),
+                format: String(localized: "This will delete evidence from %d recording(s), including %d full bundle(s) and %d artifact reference(s). %d metadata file(s) stay listed for pruned recordings.", table: "Common"),
                 preview.items.count,
                 preview.deleteBundleCount,
                 preview.artifactRefCount,
@@ -584,10 +581,7 @@ struct SettingsPanel: View {
             )
         }
         return String(
-            format: NSLocalizedString(
-                "This will delete %d visual evidence artifact reference(s) from %d recording(s). %d metadata file(s) stay listed for history and explainability.",
-                comment: ""
-            ),
+            format: String(localized: "This will delete %d visual evidence artifact reference(s) from %d recording(s). %d metadata file(s) stay listed for history and explainability.", table: "Common"),
             preview.artifactRefCount,
             preview.items.count,
             preview.preservedMetadataFileCount
@@ -658,9 +652,9 @@ struct SettingsPanel: View {
                 .frame(width: 15, height: 16, alignment: .center)
 
             VStack(alignment: .leading, spacing: 2) {
-                Text(NSLocalizedString(row.title, comment: ""))
+                Text(LocalizedStringKey(row.title), tableName: "Common")
                     .font(.system(size: 10.5, weight: .semibold))
-                Text(NSLocalizedString(row.detail, comment: ""))
+                Text(LocalizedStringKey(row.detail), tableName: "Common")
                     .font(.system(size: 10))
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -707,9 +701,9 @@ struct SettingsPanel: View {
                 .frame(width: 16, height: 18, alignment: .center)
 
             VStack(alignment: .leading, spacing: 3) {
-                Text(NSLocalizedString(issue.title, comment: ""))
+                Text(LocalizedStringKey(issue.title), tableName: "Common")
                     .font(.system(size: 10.5, weight: .semibold))
-                Text(NSLocalizedString(issue.detail, comment: ""))
+                Text(LocalizedStringKey(issue.detail), tableName: "Common")
                     .font(.system(size: 10))
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -729,8 +723,8 @@ struct SettingsPanel: View {
                 Label(String(localized: "Open", table: "Common"), systemImage: "arrow.up.forward.app")
             }
             .buttonStyle(PillButtonStyle(tint: issue.severity == .blocking ? .red : .orange))
-            .help(NSLocalizedString(issue.action.label, comment: ""))
-            .accessibilityLabel(NSLocalizedString(issue.action.label, comment: ""))
+            .help(String(localized: String.LocalizationValue(issue.action.label), table: "Common"))
+            .accessibilityLabel(String(localized: String.LocalizationValue(issue.action.label), table: "Common"))
         }
         .padding(.top, 2)
     }

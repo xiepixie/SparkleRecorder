@@ -1201,11 +1201,11 @@ struct SemanticRecordingReviewFixtureView: View {
     ) -> some View {
         if let row = presentation.rows.first(where: { $0.kind == .mutationEffect }) {
             HStack(alignment: .firstTextBaseline, spacing: 6) {
-                Text(NSLocalizedString(row.label, comment: ""))
+                Text(LocalizedStringKey(row.label), tableName: "Common")
                     .font(.system(size: 9, weight: .semibold))
                     .foregroundStyle(tint.opacity(0.64))
                     .frame(width: 44, alignment: .leading)
-                Text(NSLocalizedString(row.value, comment: ""))
+                Text(LocalizedStringKey(row.value), tableName: "Common")
                     .font(.system(size: 9, weight: .medium))
                     .foregroundStyle(Color.white.opacity(0.52))
                     .lineLimit(1)
@@ -1470,15 +1470,9 @@ struct SemanticRecordingReviewFixtureView: View {
 
     private func bundleHealthDetail(_ state: SemanticRecordingReviewState) -> String {
         if state.validationIssues.isEmpty {
-            return NSLocalizedString(
-                "Manifest references validate. Review edits still require Draft Preview before import.",
-                comment: ""
-            )
+            return String(localized: "Manifest references validate. Review edits still require Draft Preview before import.", table: "Common")
         }
-        return NSLocalizedString(
-            "Review can still inspect available evidence, but fix bundle references before treating suggestions as product-ready.",
-            comment: ""
-        )
+        return String(localized: "Review can still inspect available evidence, but fix bundle references before treating suggestions as product-ready.", table: "Common")
     }
 
     private func validationIssueLabel(_ issue: SemanticRecordingBundleIssue) -> String {
@@ -1947,7 +1941,7 @@ struct SemanticRecordingReviewFixtureView: View {
         )
         guard bodyResolution.isResolved else {
             draftPatchResult = nil
-            draftPatchErrorMessage = NSLocalizedString(bodyResolution.message, comment: "")
+            draftPatchErrorMessage = String(localized: String.LocalizationValue(bodyResolution.message), table: "Common")
             return
         }
 

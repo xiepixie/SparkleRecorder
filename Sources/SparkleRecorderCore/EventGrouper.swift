@@ -158,7 +158,7 @@ public struct EventGrouper: Sendable {
                             eventIndices: [],
                             startTime: prevEv.time,
                             endTime: ev.time,
-                            summary: String(format: NSLocalizedString("Wait %.2fs", comment: ""), gap)
+                            summary: String(format: String(localized: "Wait %.2fs", table: "EditorUX"), gap)
                         ))
                     }
                 }
@@ -187,7 +187,7 @@ public struct EventGrouper: Sendable {
                 let name: String
                 if ev.kind.isKey {
                     let nameStr = ev.unicodeString ?? keyName(ev.keyCode) ?? "Key \(ev.keyCode)"
-                    let keyLabel = ev.kind == .keyDown ? NSLocalizedString("Key Down", comment: "") : (ev.kind == .keyUp ? NSLocalizedString("Key Up", comment: "") : NSLocalizedString("Modifier", comment: ""))
+                    let keyLabel = ev.kind == .keyDown ? String(localized: "Key Down", table: "Common") : (ev.kind == .keyUp ? String(localized: "Key Up", table: "Common") : String(localized: "Modifier", table: "Common"))
                     name = "\(keyLabel) (\(nameStr))"
                 } else {
                     name = localizedEventKindName(ev.kind)
@@ -222,7 +222,7 @@ public struct EventGrouper: Sendable {
                         eventIndices: [],
                         startTime: lastEv.time,
                         endTime: live,
-                        summary: String(format: NSLocalizedString("Wait %.2fs", comment: ""), gap)
+                        summary: String(format: String(localized: "Wait %.2fs", table: "EditorUX"), gap)
                     ))
                 }
             }
@@ -244,7 +244,7 @@ public struct EventGrouper: Sendable {
                         eventIndices: [],
                         startTime: prevGroup.endTime,
                         endTime: events[i].time,
-                        summary: String(format: NSLocalizedString("Wait %.2fs", comment: ""), gap)
+                        summary: String(format: String(localized: "Wait %.2fs", table: "EditorUX"), gap)
                     ))
                 }
             }
@@ -313,24 +313,24 @@ public struct EventGrouper: Sendable {
                 
                 if sawDraggedEvent && distance > options.clickMoveTolerance {
                     kind = .drag
-                    summary = String(format: NSLocalizedString("Drag from (%d, %d) to (%d, %d)", comment: ""), Int(startEv.x), Int(startEv.y), Int(endEv.x), Int(endEv.y))
+                    summary = String(format: String(localized: "Drag from (%d, %d) to (%d, %d)", table: "EditorUX"), Int(startEv.x), Int(startEv.y), Int(endEv.x), Int(endEv.y))
                 } else if distance > options.dragDistanceThreshold {
                     kind = .drag
-                    summary = String(format: NSLocalizedString("Drag from (%d, %d) to (%d, %d)", comment: ""), Int(startEv.x), Int(startEv.y), Int(endEv.x), Int(endEv.y))
+                    summary = String(format: String(localized: "Drag from (%d, %d) to (%d, %d)", table: "EditorUX"), Int(startEv.x), Int(startEv.y), Int(endEv.x), Int(endEv.y))
                 } else if duration >= options.longPressThreshold {
                     kind = .longPress
                     let btnName = mouseButtonName(kind: ev.kind, button: ev.mouseButton)
-                    summary = String(format: NSLocalizedString("Long Press (%@) at (%d, %d)", comment: ""), btnName, Int(startEv.x), Int(startEv.y))
+                    summary = String(format: String(localized: "Long Press (%@) at (%d, %d)", table: "Common"), btnName, Int(startEv.x), Int(startEv.y))
                 } else {
                     kind = .click
                     let btnName = mouseButtonName(kind: ev.kind, button: ev.mouseButton)
                     if startEv.coordinateStrategy == .locatorOnly || startEv.textAnchor != nil {
                         let text = startEv.textAnchor?.text.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
                         summary = text.isEmpty
-                            ? NSLocalizedString("Click text (needs text)", comment: "")
-                            : String(format: NSLocalizedString("Click text: %@", comment: ""), text)
+                            ? String(localized: "Click text (needs text)", table: "EditorUX")
+                            : String(format: String(localized: "Click text: %@", table: "EditorUX"), text)
                     } else {
-                        summary = String(format: NSLocalizedString("%@ Click at (%d, %d)", comment: ""), btnName, Int(startEv.x), Int(startEv.y))
+                        summary = String(format: String(localized: "%@ Click at (%d, %d)", table: "EditorUX"), btnName, Int(startEv.x), Int(startEv.y))
                     }
                 }
                 
@@ -396,7 +396,7 @@ public struct EventGrouper: Sendable {
                     scrollDeltaX: totalDX,
                     scrollDeltaY: totalDY,
                     scrollPayload: aggregateScrollPayload(Array(events[startIdx...lastIdx])),
-                    summary: String(format: NSLocalizedString("Scroll (dy: %d, dx: %d)", comment: ""), totalDY, totalDX)
+                    summary: String(format: String(localized: "Scroll (dy: %d, dx: %d)", table: "Common"), totalDY, totalDX)
                 ))
                 
                 i = j
@@ -449,13 +449,13 @@ public struct EventGrouper: Sendable {
                 let summary: String
                 if repeatCount > 0 {
                     kind = .keyRepeat
-                    summary = String(format: NSLocalizedString("Repeat key: %@ (%d repeats)", comment: ""), name, repeatCount)
+                    summary = String(format: String(localized: "Repeat key: %@ (%d repeats)", table: "Common"), name, repeatCount)
                 } else if duration >= options.keyHoldThreshold {
                     kind = .keyHold
-                    summary = String(format: NSLocalizedString("Hold key: %@ (%.2fs)", comment: ""), name, duration)
+                    summary = String(format: String(localized: "Hold key: %@ (%.2fs)", table: "Common"), name, duration)
                 } else {
                     kind = .keyPress
-                    summary = String(format: NSLocalizedString("Press key: %@", comment: ""), name)
+                    summary = String(format: String(localized: "Press key: %@", table: "Common"), name)
                 }
                 
                 groups.append(ActionGroup(
@@ -504,7 +504,7 @@ public struct EventGrouper: Sendable {
                     startPoint: CGPoint(x: startEv.x, y: startEv.y),
                     endPoint: CGPoint(x: endEv.x, y: endEv.y),
                     path: movePoints,
-                    summary: String(format: NSLocalizedString("Move to (%d, %d)", comment: ""), Int(endEv.x), Int(endEv.y))
+                    summary: String(format: String(localized: "Move to (%d, %d)", table: "Common"), Int(endEv.x), Int(endEv.y))
                 ))
                 
                 i = j
@@ -515,33 +515,33 @@ public struct EventGrouper: Sendable {
             let name: String
             let kind: ActionGroupKind
             if ev.kind == .flagsChanged {
-                name = String(format: NSLocalizedString("Modifiers changed: 0x%02X", comment: ""), ev.flags)
+                name = String(format: String(localized: "Modifiers changed: 0x%02X", table: "Common"), ev.flags)
                 kind = .keyPress
             } else if ev.kind == .keyUp {
                 let nameStr = ev.unicodeString ?? keyName(ev.keyCode) ?? "Code \(ev.keyCode)"
-                name = String(format: NSLocalizedString("Key Release: %@", comment: ""), nameStr)
+                name = String(format: String(localized: "Key Release: %@", table: "Common"), nameStr)
                 kind = .keyPress
             } else if ev.kind == .mouseMoved {
-                name = String(format: NSLocalizedString("Move to (%d, %d)", comment: ""), Int(ev.x), Int(ev.y))
+                name = String(format: String(localized: "Move to (%d, %d)", table: "Common"), Int(ev.x), Int(ev.y))
                 kind = .mouseMove
             } else if ev.kind == .waitForText {
                 let mustExist = ev.verifyMustExist ?? true
                 if let text = ev.textAnchor?.text.trimmingCharacters(in: .whitespacesAndNewlines), !text.isEmpty {
                     name = mustExist
-                        ? String(format: NSLocalizedString("Wait Text: %@", comment: ""), text)
-                        : String(format: NSLocalizedString("Wait Text Gone: %@", comment: ""), text)
+                        ? String(format: String(localized: "Wait Text: %@", table: "EditorUX"), text)
+                        : String(format: String(localized: "Wait Text Gone: %@", table: "EditorUX"), text)
                 } else {
                     name = mustExist
-                        ? NSLocalizedString("Wait Text (needs text)", comment: "")
-                        : NSLocalizedString("Wait Text Gone (needs text)", comment: "")
+                        ? String(localized: "Wait Text (needs text)", table: "EditorUX")
+                        : String(localized: "Wait Text Gone (needs text)", table: "EditorUX")
                 }
                 kind = mustExist ? .waitForText : .waitForTextGone
             } else if ev.kind == .verifyText {
                 let mustExist = ev.verifyMustExist ?? true
                 if let text = ev.textAnchor?.text.trimmingCharacters(in: .whitespacesAndNewlines), !text.isEmpty {
-                    name = String(format: NSLocalizedString("Verify Text: %@ (%@)", comment: ""), text, mustExist ? NSLocalizedString("Exists", comment: "") : NSLocalizedString("Not Exists", comment: ""))
+                    name = String(format: String(localized: "Verify Text: %@ (%@)", table: "EditorUX"), text, mustExist ? String(localized: "Exists", table: "Common") : String(localized: "Not Exists", table: "Common"))
                 } else {
-                    name = NSLocalizedString("Verify Text (needs text)", comment: "")
+                    name = String(localized: "Verify Text (needs text)", table: "EditorUX")
                 }
                 kind = .verifyText
             } else {
@@ -582,7 +582,7 @@ public struct EventGrouper: Sendable {
                     eventIndices: [],
                     startTime: lastGroup.endTime,
                     endTime: live,
-                    summary: String(format: NSLocalizedString("Wait %.2fs", comment: ""), gap)
+                    summary: String(format: String(localized: "Wait %.2fs", table: "EditorUX"), gap)
                 ))
             }
         }
@@ -688,7 +688,7 @@ public struct EventGrouper: Sendable {
             scrollDeltaX: totalDX,
             scrollDeltaY: totalDY,
             scrollPayload: aggregateScrollPayload(payloadEvents),
-            summary: String(format: NSLocalizedString("Scroll Segment (dy: %d, dx: %d)", comment: ""), totalDY, totalDX)
+            summary: String(format: String(localized: "Scroll Segment (dy: %d, dx: %d)", table: "Common"), totalDY, totalDX)
         )
     }
 
@@ -750,7 +750,7 @@ public struct EventGrouper: Sendable {
             let eventIndices = mergedGroups.flatMap(\.eventIndices)
             let first = mergedGroups.first!
             let last = mergedGroups.last!
-            let name = behaviorGroupName(for: group, events: events) ?? NSLocalizedString("Behavior", comment: "")
+            let name = behaviorGroupName(for: group, events: events) ?? String(localized: "Behavior", table: "Common")
             
             result.append(ActionGroup(
                 id: behaviorID.rawValue,
@@ -768,7 +768,7 @@ public struct EventGrouper: Sendable {
                 scrollDeltaX: nil,
                 scrollDeltaY: nil,
                 scrollPayload: nil,
-                summary: String(format: NSLocalizedString("%@ (%d actions)", comment: ""), name, nonWaitCount),
+                summary: String(format: String(localized: "%@ (%d actions)", table: "EditorUX"), name, nonWaitCount),
                 clickCount: 1,
                 textAnchor: nil,
                 textTimeout: nil,
@@ -844,9 +844,9 @@ public struct EventGrouper: Sendable {
                     merged.clickCount = count
                     let clickName: String
                     switch count {
-                    case 2: clickName = NSLocalizedString("Double Click", comment: "")
-                    case 3: clickName = NSLocalizedString("Triple Click", comment: "")
-                    default: clickName = String(format: NSLocalizedString("Repeated Click (%d)", comment: ""), count)
+                    case 2: clickName = String(localized: "Double Click", table: "EditorUX")
+                    case 3: clickName = String(localized: "Triple Click", table: "EditorUX")
+                    default: clickName = String(format: String(localized: "Repeated Click (%d)", table: "EditorUX"), count)
                     }
                     if let sp = merged.startPoint {
                         merged.summary = String(format: "%@ (%d, %d)", clickName, Int(sp.x), Int(sp.y))
@@ -900,7 +900,7 @@ public struct EventGrouper: Sendable {
             if j > i + 1 {
                 merged.kind = .textInput
                 merged.unicodeString = typed
-                merged.summary = String(format: NSLocalizedString("Type %@", comment: ""), typed)
+                merged.summary = String(format: String(localized: "Type %@", table: "Common"), typed)
                 merged.id = deterministicUUID(from: "textinput-\(merged.startTime)-\(merged.endTime)-\(typed)")
             }
             result.append(merged)
@@ -954,7 +954,7 @@ public struct EventGrouper: Sendable {
                 endPoint: points.last,
                 path: points,
                 mouseButton: firstGroup.mouseButton,
-                summary: String(format: NSLocalizedString("Multi Click (%d points)", comment: ""), points.count),
+                summary: String(format: String(localized: "Multi Click (%d points)", table: "EditorUX"), points.count),
                 clickCount: points.count
             ))
             i = j
@@ -1014,7 +1014,7 @@ public struct EventGrouper: Sendable {
                         endTime: next.time,
                         keyCode: start.keyCode,
                         keyFlags: start.flags,
-                        summary: String(format: NSLocalizedString("Hold modifier: %@", comment: ""), modifierName(start.flags))
+                        summary: String(format: String(localized: "Hold modifier: %@", table: "Common"), modifierName(start.flags))
                     ),
                     j + 1
                 )
@@ -1064,7 +1064,7 @@ public struct EventGrouper: Sendable {
                 keyCode: keyDown.keyCode,
                 keyFlags: keyDown.flags,
                 unicodeString: keyDown.unicodeString,
-                summary: String(format: NSLocalizedString("Shortcut %@", comment: ""), label)
+                summary: String(format: String(localized: "Shortcut %@", table: "Common"), label)
             ),
             max(j, lastIdx + 1)
         )
@@ -1096,14 +1096,14 @@ public struct EventGrouper: Sendable {
     private func mouseButtonName(kind: RecordedEvent.Kind, button: Int64) -> String {
         switch kind {
         case .leftMouseDown, .leftMouseUp, .leftMouseDragged:
-            return NSLocalizedString("Left", comment: "")
+            return String(localized: "Left", table: "Common")
         case .rightMouseDown, .rightMouseUp, .rightMouseDragged:
-            return NSLocalizedString("Right", comment: "")
+            return String(localized: "Right", table: "Common")
         case .otherMouseDown, .otherMouseUp, .otherMouseDragged:
-            if button == 2 { return NSLocalizedString("Middle", comment: "") }
-            return String(format: NSLocalizedString("Mouse Button %d", comment: ""), Int(button))
+            if button == 2 { return String(localized: "Middle", table: "Common") }
+            return String(format: String(localized: "Mouse Button %d", table: "Common"), Int(button))
         default:
-            return NSLocalizedString("Mouse", comment: "")
+            return String(localized: "Mouse", table: "Common")
         }
     }
     
@@ -1155,22 +1155,22 @@ public struct EventGrouper: Sendable {
     
     private func localizedEventKindName(_ k: RecordedEvent.Kind) -> String {
         switch k {
-        case .leftMouseDown:     return NSLocalizedString("Left Click ↓", comment: "")
-        case .leftMouseUp:       return NSLocalizedString("Left Click ↑", comment: "")
-        case .rightMouseDown:    return NSLocalizedString("Right Click ↓", comment: "")
-        case .rightMouseUp:      return NSLocalizedString("Right Click ↑", comment: "")
-        case .mouseMoved:        return NSLocalizedString("Mouse Move", comment: "")
-        case .leftMouseDragged:  return NSLocalizedString("Left Drag", comment: "")
-        case .rightMouseDragged: return NSLocalizedString("Right Drag", comment: "")
-        case .otherMouseDown:    return NSLocalizedString("Other Click ↓", comment: "")
-        case .otherMouseUp:      return NSLocalizedString("Other Click ↑", comment: "")
-        case .otherMouseDragged: return NSLocalizedString("Other Drag", comment: "")
-        case .keyDown:           return NSLocalizedString("Key Down", comment: "")
-        case .keyUp:             return NSLocalizedString("Key Up", comment: "")
-        case .flagsChanged:      return NSLocalizedString("Modifier", comment: "")
-        case .scrollWheel:       return NSLocalizedString("Scroll", comment: "")
-        case .waitForText:       return NSLocalizedString("Wait Text", comment: "")
-        case .verifyText:        return NSLocalizedString("Verify Text", comment: "")
+        case .leftMouseDown:     return String(localized: "Left Click ↓", table: "EditorUX")
+        case .leftMouseUp:       return String(localized: "Left Click ↑", table: "EditorUX")
+        case .rightMouseDown:    return String(localized: "Right Click ↓", table: "EditorUX")
+        case .rightMouseUp:      return String(localized: "Right Click ↑", table: "EditorUX")
+        case .mouseMoved:        return String(localized: "Mouse Move", table: "Common")
+        case .leftMouseDragged:  return String(localized: "Left Drag", table: "EditorUX")
+        case .rightMouseDragged: return String(localized: "Right Drag", table: "EditorUX")
+        case .otherMouseDown:    return String(localized: "Other Click ↓", table: "EditorUX")
+        case .otherMouseUp:      return String(localized: "Other Click ↑", table: "EditorUX")
+        case .otherMouseDragged: return String(localized: "Other Drag", table: "EditorUX")
+        case .keyDown:           return String(localized: "Key Down", table: "Common")
+        case .keyUp:             return String(localized: "Key Up", table: "Common")
+        case .flagsChanged:      return String(localized: "Modifier", table: "Common")
+        case .scrollWheel:       return String(localized: "Scroll", table: "Common")
+        case .waitForText:       return String(localized: "Wait Text", table: "EditorUX")
+        case .verifyText:        return String(localized: "Verify Text", table: "EditorUX")
         }
     }
 }

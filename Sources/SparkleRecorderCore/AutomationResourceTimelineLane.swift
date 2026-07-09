@@ -9,13 +9,13 @@ public enum AutomationResourceTimelineLane: String, CaseIterable, Codable, Equat
     public var displayName: String {
         switch self {
         case .foregroundInput:
-            NSLocalizedString("Needs mouse and keyboard", comment: "")
+            String(localized: "Needs mouse and keyboard", table: "Common")
         case .screenCapture:
-            NSLocalizedString("Screen capture", comment: "")
+            String(localized: "Screen capture", table: "Recording")
         case .waiting:
-            NSLocalizedString("Waiting", comment: "")
+            String(localized: "Waiting", table: "EditorUX")
         case .completed:
-            NSLocalizedString("Completed", comment: "")
+            String(localized: "Completed", table: "Common")
         }
     }
 }

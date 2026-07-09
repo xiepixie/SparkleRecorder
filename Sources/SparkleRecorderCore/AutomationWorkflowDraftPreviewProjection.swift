@@ -56,10 +56,10 @@ public struct AutomationWorkflowDraftPreviewProjection: Codable, Equatable, Send
         }
         if !issueRows.contains(where: { $0.severity == .error }) {
             return issueRows.isEmpty
-                ? NSLocalizedString("Ready to review", comment: "")
-                : NSLocalizedString("Needs review", comment: "")
+                ? String(localized: "Ready to review", table: "Common")
+                : String(localized: "Needs review", table: "Common")
         }
-        return NSLocalizedString("Blocked by validation", comment: "")
+        return String(localized: "Blocked by validation", table: "Common")
     }
 
     public struct ImportPreview: Codable, Equatable, Sendable {
@@ -82,8 +82,8 @@ public struct AutomationWorkflowDraftPreviewProjection: Codable, Equatable, Send
 
             isImportable = result.isImportable
             statusLabel = result.isImportable
-                ? NSLocalizedString("Dry-run passed", comment: "")
-                : NSLocalizedString("Import blocked", comment: "")
+                ? String(localized: "Dry-run passed", table: "Automation")
+                : String(localized: "Import blocked", table: "Common")
             workflowName = result.workflow?.name
             workflowID = result.workflow?.id
             taskCount = result.workflow?.tasks.count ?? result.taskKeyToID.count
@@ -112,7 +112,7 @@ public struct AutomationWorkflowDraftPreviewProjection: Codable, Equatable, Send
         public init(resolution: AutomationWorkflowDraftMacroResolution) {
             taskKey = resolution.taskKey
             macroName = resolution.macroName?.nilIfBlankForDraftPreview
-                ?? NSLocalizedString("Unnamed macro", comment: "")
+                ?? String(localized: "Unnamed macro", table: "EditorUX")
             macroID = resolution.macroID
             sourceLabel = Self.sourceLabel(for: resolution.source)
             isResolved = resolution.macroID != nil && resolution.source != .unresolved
@@ -121,11 +121,11 @@ public struct AutomationWorkflowDraftPreviewProjection: Codable, Equatable, Send
         private static func sourceLabel(for source: AutomationWorkflowDraftMacroResolutionSource) -> String {
             switch source {
             case .id:
-                return NSLocalizedString("Matched by ID", comment: "")
+                return String(localized: "Matched by ID", table: "Common")
             case .catalogName:
-                return NSLocalizedString("Matched by catalog name", comment: "")
+                return String(localized: "Matched by catalog name", table: "Common")
             case .unresolved:
-                return NSLocalizedString("Unresolved", comment: "")
+                return String(localized: "Unresolved", table: "Common")
             }
         }
     }
@@ -152,44 +152,44 @@ public struct AutomationWorkflowDraftPreviewProjection: Codable, Equatable, Send
             switch issue {
             case .duplicateTaskID(let id):
                 code = "duplicateTaskID"
-                message = String(format: NSLocalizedString("Duplicate task ID %@", comment: ""), id.uuidString)
+                message = String(format: String(localized: "Duplicate task ID %@", table: "Automation"), id.uuidString)
             case .duplicateDependencyID(let id):
                 code = "duplicateDependencyID"
-                message = String(format: NSLocalizedString("Duplicate dependency ID %@", comment: ""), id.uuidString)
+                message = String(format: String(localized: "Duplicate dependency ID %@", table: "Automation"), id.uuidString)
             case .missingDependencySource(let dependencyID, let taskID):
                 code = "missingDependencySource"
                 message = String(
-                    format: NSLocalizedString("Dependency %@ references missing source task %@", comment: ""),
+                    format: String(localized: "Dependency %@ references missing source task %@", table: "Automation"),
                     dependencyID.uuidString,
                     taskID.uuidString
                 )
             case .missingDependencyTarget(let dependencyID, let taskID):
                 code = "missingDependencyTarget"
                 message = String(
-                    format: NSLocalizedString("Dependency %@ references missing target task %@", comment: ""),
+                    format: String(localized: "Dependency %@ references missing target task %@", table: "Automation"),
                     dependencyID.uuidString,
                     taskID.uuidString
                 )
             case .selfDependency(let dependencyID, let taskID):
                 code = "selfDependency"
                 message = String(
-                    format: NSLocalizedString("Dependency %@ loops back to task %@", comment: ""),
+                    format: String(localized: "Dependency %@ loops back to task %@", table: "Automation"),
                     dependencyID.uuidString,
                     taskID.uuidString
                 )
             case .cycleDetected(let taskID):
                 code = "cycleDetected"
-                message = String(format: NSLocalizedString("Cycle detected at task %@", comment: ""), taskID.uuidString)
+                message = String(format: String(localized: "Cycle detected at task %@", table: "Automation"), taskID.uuidString)
             }
         }
     }
 
     public var simulationLabel: String {
         if simulationRows.isEmpty {
-            return NSLocalizedString("No simulated steps", comment: "")
+            return String(localized: "No simulated steps", table: "Common")
         }
         return String(
-            format: NSLocalizedString("%d simulated steps", comment: ""),
+            format: String(localized: "%d simulated steps", table: "Common"),
             simulationRows.count
         )
     }
@@ -215,17 +215,17 @@ public struct AutomationWorkflowDraftPreviewProjection: Codable, Equatable, Send
         private static func typeLabel(for task: AutomationWorkflowDraftTask) -> String {
             switch task.type {
             case "macro":
-                return NSLocalizedString("Macro", comment: "")
+                return String(localized: "Macro", table: "EditorUX")
             case "condition":
-                return NSLocalizedString("Condition", comment: "")
+                return String(localized: "Condition", table: "Automation")
             case "delay":
-                return NSLocalizedString("Delay", comment: "")
+                return String(localized: "Delay", table: "EditorUX")
             case "notification":
-                return NSLocalizedString("Notification", comment: "")
+                return String(localized: "Notification", table: "Common")
             case "manualApproval":
-                return NSLocalizedString("Manual approval", comment: "")
+                return String(localized: "Manual approval", table: "Common")
             case "loop":
-                return NSLocalizedString("Loop", comment: "")
+                return String(localized: "Loop", table: "Common")
             default:
                 return task.type
             }
@@ -236,8 +236,8 @@ public struct AutomationWorkflowDraftPreviewProjection: Codable, Equatable, Send
                 return typeLabel(for: task)
             }
             return task.loop?.isRepeatUntil == true
-                ? NSLocalizedString("Repeat until", comment: "")
-                : NSLocalizedString("Fixed count", comment: "")
+                ? String(localized: "Repeat until", table: "Common")
+                : String(localized: "Fixed count", table: "Common")
         }
 
         private static func detail(for task: AutomationWorkflowDraftTask) -> String {
@@ -245,27 +245,27 @@ public struct AutomationWorkflowDraftPreviewProjection: Codable, Equatable, Send
             case "macro":
                 return task.macroRef?.name?.nilIfBlankForDraftPreview
                     ?? task.macroRef?.id?.uuidString
-                    ?? NSLocalizedString("No macro selected", comment: "")
+                    ?? String(localized: "No macro selected", table: "EditorUX")
             case "condition":
                 return task.condition?.text?.nilIfBlankForDraftPreview
                     ?? task.condition?.type
-                    ?? NSLocalizedString("Condition details missing", comment: "")
+                    ?? String(localized: "Condition details missing", table: "Automation")
             case "delay":
                 return task.delaySeconds.map {
-                    String(format: NSLocalizedString("%.1fs delay", comment: ""), $0)
-                } ?? NSLocalizedString("Delay missing", comment: "")
+                    String(format: String(localized: "%.1fs delay", table: "EditorUX"), $0)
+                } ?? String(localized: "Delay missing", table: "EditorUX")
             case "notification":
                 return task.notification?.title.nilIfBlankForDraftPreview
-                    ?? NSLocalizedString("Notification title missing", comment: "")
+                    ?? String(localized: "Notification title missing", table: "Common")
             case "manualApproval":
-                return NSLocalizedString("Manual approval required", comment: "")
+                return String(localized: "Manual approval required", table: "Common")
             case "loop":
                 if task.loop?.isRepeatUntil == true {
                     let bodyCount = task.loop?.tasks.count ?? 0
                     let until = conditionSummary(task.loop?.until)
-                        ?? NSLocalizedString("condition missing", comment: "")
+                        ?? String(localized: "condition missing", table: "Common")
                     return String(
-                        format: NSLocalizedString("Repeat until %@, %d steps", comment: ""),
+                        format: String(localized: "Repeat until %@, %d steps", table: "Common"),
                         until,
                         bodyCount
                     )
@@ -273,7 +273,7 @@ public struct AutomationWorkflowDraftPreviewProjection: Codable, Equatable, Send
                 let count = task.loop?.count ?? 0
                 let bodyCount = task.loop?.tasks.count ?? 0
                 return String(
-                    format: NSLocalizedString("Repeats %d times, %d steps", comment: ""),
+                    format: String(localized: "Repeats %d times, %d steps", table: "Common"),
                     count,
                     bodyCount
                 )
@@ -316,50 +316,44 @@ public struct AutomationWorkflowDraftPreviewProjection: Codable, Equatable, Send
                 let attempts = loop?.maxAttempts ?? 0
                 let approvalStepCount = loop?.onFailure?.nilIfBlankForDraftPreview ==
                     AutomationWorkflowDraftLoopFailurePolicy.requireManualApproval ? 1 : 0
-                modeLabel = NSLocalizedString("Repeat until", comment: "")
+                modeLabel = String(localized: "Repeat until", table: "Common")
                 repeatCount = attempts
                 expandedTaskCount = attempts > 0 ? attempts * (bodyStepCount + 1) + 1 + approvalStepCount : 0
-                repeatMetricTitle = NSLocalizedString("max attempts", comment: "")
-                expandedMetricTitle = NSLocalizedString("imported steps", comment: "")
+                repeatMetricTitle = String(localized: "max attempts", table: "Common")
+                expandedMetricTitle = String(localized: "imported steps", table: "Common")
                 untilLabel = Self.conditionSummary(loop?.until)
                 guardrailLabel = Self.guardrailSummary(for: loop)
                 if attempts <= 0 {
-                    summary = NSLocalizedString("Repeat-until needs max attempts before import", comment: "")
+                    summary = String(localized: "Repeat-until needs max attempts before import", table: "EditorUX")
                 } else if let untilLabel {
                     summary = String(
-                        format: NSLocalizedString("Expands to up to %d imported steps; exits when %@ matches", comment: ""),
+                        format: String(localized: "Expands to up to %d imported steps; exits when %@ matches", table: "EditorUX"),
                         expandedTaskCount,
                         untilLabel
                     )
                 } else {
-                    summary = NSLocalizedString("Repeat-until needs an until condition before import", comment: "")
+                    summary = String(localized: "Repeat-until needs an until condition before import", table: "Automation")
                 }
-                importBoundaryLabel = NSLocalizedString(
-                    "Bounded repeat-until expands to an acyclic workflow at import",
-                    comment: ""
-                )
-                capabilityLabel = NSLocalizedString(
-                    "Runtime receives ordinary tasks; structured attempt evidence remains future work",
-                    comment: ""
-                )
+                importBoundaryLabel = String(localized: "Bounded repeat-until expands to an acyclic workflow at import", table: "Common")
+                capabilityLabel = String(localized: "Runtime receives ordinary tasks; structured attempt evidence remains future work", table: "Common")
             } else {
-                modeLabel = NSLocalizedString("Fixed count", comment: "")
+                modeLabel = String(localized: "Fixed count", table: "Common")
                 repeatCount = task.loop?.count ?? 0
                 expandedTaskCount = max(0, repeatCount) * bodyStepCount
-                repeatMetricTitle = NSLocalizedString("repeats", comment: "")
-                expandedMetricTitle = NSLocalizedString("imported steps", comment: "")
+                repeatMetricTitle = String(localized: "repeats", table: "Common")
+                expandedMetricTitle = String(localized: "imported steps", table: "Common")
                 untilLabel = nil
                 guardrailLabel = nil
                 if repeatCount > 0, bodyStepCount > 0 {
                     summary = String(
-                        format: NSLocalizedString("Expands to %d imported steps", comment: ""),
+                        format: String(localized: "Expands to %d imported steps", table: "Common"),
                         expandedTaskCount
                     )
                 } else {
-                    summary = NSLocalizedString("Loop needs a repeat count and body tasks before import", comment: "")
+                    summary = String(localized: "Loop needs a repeat count and body tasks before import", table: "Automation")
                 }
-                importBoundaryLabel = NSLocalizedString("Draft-only loop; imported workflow stays acyclic", comment: "")
-                capabilityLabel = NSLocalizedString("Repeat-until, foreach, and runtime loop evidence are not active yet", comment: "")
+                importBoundaryLabel = String(localized: "Draft-only loop; imported workflow stays acyclic", table: "Automation")
+                capabilityLabel = String(localized: "Repeat-until, foreach, and runtime loop evidence are not active yet", table: "Automation")
             }
         }
 
@@ -370,20 +364,20 @@ public struct AutomationWorkflowDraftPreviewProjection: Codable, Equatable, Send
             switch condition.type {
             case "ocrText":
                 if let text = condition.text?.nilIfBlankForDraftPreview {
-                    return String(format: NSLocalizedString("text \"%@\"", comment: ""), text)
+                    return String(format: String(localized: "text \"%@\"", table: "Common"), text)
                 }
-                return NSLocalizedString("OCR text appears", comment: "")
+                return String(localized: "OCR text appears", table: "Common")
             case "imageAppeared":
-                return NSLocalizedString("image appears", comment: "")
+                return String(localized: "image appears", table: "Common")
             case "imageDisappeared":
-                return NSLocalizedString("image disappears", comment: "")
+                return String(localized: "image disappears", table: "Common")
             case "regionChanged":
-                return NSLocalizedString("region changes", comment: "")
+                return String(localized: "region changes", table: "Common")
             case "pixelMatched":
                 if let colorHex = condition.colorHex?.nilIfBlankForDraftPreview {
-                    return String(format: NSLocalizedString("pixel matches %@", comment: ""), colorHex)
+                    return String(format: String(localized: "pixel matches %@", table: "Common"), colorHex)
                 }
-                return NSLocalizedString("pixel matches", comment: "")
+                return String(localized: "pixel matches", table: "Common")
             default:
                 return condition.type.nilIfBlankForDraftPreview
             }
@@ -395,16 +389,16 @@ public struct AutomationWorkflowDraftPreviewProjection: Codable, Equatable, Send
             }
             var parts: [String] = []
             if let maxAttempts = loop.maxAttempts {
-                parts.append(String(format: NSLocalizedString("max %d attempts", comment: ""), maxAttempts))
+                parts.append(String(format: String(localized: "max %d attempts", table: "Common"), maxAttempts))
             }
             if let timeout = loop.timeoutSeconds {
-                parts.append(String(format: NSLocalizedString("%.1fs timeout", comment: ""), timeout))
+                parts.append(String(format: String(localized: "%.1fs timeout", table: "Common"), timeout))
             }
             if let polling = loop.pollingSeconds {
-                parts.append(String(format: NSLocalizedString("%.1fs polling", comment: ""), polling))
+                parts.append(String(format: String(localized: "%.1fs polling", table: "Common"), polling))
             }
             if let onFailure = loop.onFailure?.nilIfBlankForDraftPreview {
-                parts.append(String(format: NSLocalizedString("on failure: %@", comment: ""), onFailure))
+                parts.append(String(format: String(localized: "on failure: %@", table: "Common"), onFailure))
             }
             return parts.isEmpty ? nil : parts.joined(separator: ", ")
         }
@@ -422,7 +416,7 @@ public struct AutomationWorkflowDraftPreviewProjection: Codable, Equatable, Send
             to = dependency.to
             triggerLabel = Self.triggerLabel(for: dependency.trigger)
             delayLabel = dependency.delaySeconds.map {
-                String(format: NSLocalizedString("%.1fs delay", comment: ""), $0)
+                String(format: String(localized: "%.1fs delay", table: "EditorUX"), $0)
             }
             id = dependency.key ?? "\(dependency.from)->\(dependency.to):\(dependency.trigger)"
         }
@@ -430,19 +424,19 @@ public struct AutomationWorkflowDraftPreviewProjection: Codable, Equatable, Send
         private static func triggerLabel(for trigger: String) -> String {
             switch trigger {
             case "success":
-                return NSLocalizedString("Success", comment: "")
+                return String(localized: "Success", table: "Common")
             case "failure":
-                return NSLocalizedString("Failure", comment: "")
+                return String(localized: "Failure", table: "Common")
             case "timeout":
-                return NSLocalizedString("Timeout", comment: "")
+                return String(localized: "Timeout", table: "Common")
             case "cancelled":
-                return NSLocalizedString("Cancelled", comment: "")
+                return String(localized: "Cancelled", table: "Common")
             case "conditionMatched":
-                return NSLocalizedString("Condition matched", comment: "")
+                return String(localized: "Condition matched", table: "Automation")
             case "conditionNotMatched":
-                return NSLocalizedString("Condition not matched", comment: "")
+                return String(localized: "Condition not matched", table: "Automation")
             case "always":
-                return NSLocalizedString("Always", comment: "")
+                return String(localized: "Always", table: "Common")
             default:
                 return trigger
             }
@@ -551,24 +545,24 @@ public struct AutomationWorkflowDraftPreviewProjection: Codable, Equatable, Send
             }
             threshold = condition.threshold
             thresholdLabel = condition.threshold.map {
-                String(format: NSLocalizedString("%.2f threshold", comment: ""), $0)
-            } ?? NSLocalizedString("Default threshold", comment: "")
+                String(format: String(localized: "%.2f threshold", table: "Common"), $0)
+            } ?? String(localized: "Default threshold", table: "Common")
         }
 
         private static func assetKindLabel(for kind: AssetKind) -> String {
             switch kind {
             case .imageTemplate:
-                return NSLocalizedString("Image template", comment: "")
+                return String(localized: "Image template", table: "Common")
             case .baseline:
-                return NSLocalizedString("Baseline", comment: "")
+                return String(localized: "Baseline", table: "Common")
             case .pixelSample:
-                return NSLocalizedString("Pixel sample", comment: "")
+                return String(localized: "Pixel sample", table: "Common")
             }
         }
 
         private static func boundsLabel(for bounds: RectValue) -> String {
             String(
-                format: NSLocalizedString("x %.1f, y %.1f, w %.1f, h %.1f", comment: ""),
+                format: String(localized: "x %.1f, y %.1f, w %.1f, h %.1f", table: "Common"),
                 bounds.x,
                 bounds.y,
                 bounds.width,
@@ -579,19 +573,19 @@ public struct AutomationWorkflowDraftPreviewProjection: Codable, Equatable, Send
         private static func spaceLabel(for space: AutomationOCRSearchRegionSpace) -> String {
             switch space {
             case .automatic:
-                return NSLocalizedString("Automatic", comment: "")
+                return String(localized: "Automatic", table: "Common")
             case .displayAbsolute:
-                return NSLocalizedString("Display absolute", comment: "")
+                return String(localized: "Display absolute", table: "Common")
             case .displayNormalized:
-                return NSLocalizedString("Display normalized", comment: "")
+                return String(localized: "Display normalized", table: "Common")
             case .windowLocal:
-                return NSLocalizedString("Window local", comment: "")
+                return String(localized: "Window local", table: "Common")
             case .windowNormalized:
-                return NSLocalizedString("Window normalized", comment: "")
+                return String(localized: "Window normalized", table: "Common")
             case .contentLocal:
-                return NSLocalizedString("Content local", comment: "")
+                return String(localized: "Content local", table: "Common")
             case .contentNormalized:
-                return NSLocalizedString("Content normalized", comment: "")
+                return String(localized: "Content normalized", table: "Common")
             }
         }
     }
@@ -710,13 +704,13 @@ public struct AutomationWorkflowDraftPreviewProjection: Codable, Equatable, Send
         public var label: String {
             switch self {
             case .notRequired:
-                return NSLocalizedString("No macro needed", comment: "")
+                return String(localized: "No macro needed", table: "EditorUX")
             case .resolved:
-                return NSLocalizedString("Macro resolved", comment: "")
+                return String(localized: "Macro resolved", table: "EditorUX")
             case .missing:
-                return NSLocalizedString("Missing macro", comment: "")
+                return String(localized: "Missing macro", table: "EditorUX")
             case .ambiguous:
-                return NSLocalizedString("Choose macro", comment: "")
+                return String(localized: "Choose macro", table: "EditorUX")
             }
         }
     }
@@ -729,7 +723,7 @@ public struct AutomationWorkflowDraftPreviewProjection: Codable, Equatable, Send
             return .notRequired
         }
         guard let macroRef = task.macroRef, !macroRef.isEmpty else {
-            return .missing(reference: NSLocalizedString("No macro selected", comment: ""))
+            return .missing(reference: String(localized: "No macro selected", table: "EditorUX"))
         }
 
         if let id = macroRef.id {
@@ -740,7 +734,7 @@ public struct AutomationWorkflowDraftPreviewProjection: Codable, Equatable, Send
         }
 
         guard let name = macroRef.name?.nilIfBlankForDraftPreview else {
-            return .missing(reference: NSLocalizedString("No macro selected", comment: ""))
+            return .missing(reference: String(localized: "No macro selected", table: "EditorUX"))
         }
 
         let matches = catalog.filter { $0.name.caseInsensitiveCompare(name) == .orderedSame }
@@ -777,7 +771,7 @@ public struct AutomationWorkflowDraftPreviewProjection: Codable, Equatable, Send
             if let condition = task.condition {
                 references.append(VisualConditionReference(
                     taskKey: taskKey,
-                    roleLabel: NSLocalizedString("Task condition", comment: ""),
+                    roleLabel: String(localized: "Task condition", table: "Common"),
                     condition: condition
                 ))
             }
@@ -785,7 +779,7 @@ public struct AutomationWorkflowDraftPreviewProjection: Codable, Equatable, Send
             if let until = task.loop?.until {
                 references.append(VisualConditionReference(
                     taskKey: taskKey,
-                    roleLabel: NSLocalizedString("Loop until", comment: ""),
+                    roleLabel: String(localized: "Loop until", table: "Common"),
                     condition: until
                 ))
             }
@@ -803,32 +797,32 @@ private extension AutomationWorkflowDraftPreviewProjection.SimulationRow {
     static func outcomeLabel(for outcome: AutomationWorkflowDraftSimulationOutcome) -> String {
         switch outcome {
         case .success:
-            return NSLocalizedString("Success", comment: "")
+            return String(localized: "Success", table: "Common")
         case .failure:
-            return NSLocalizedString("Failure", comment: "")
+            return String(localized: "Failure", table: "Common")
         case .timeout:
-            return NSLocalizedString("Timeout", comment: "")
+            return String(localized: "Timeout", table: "Common")
         case .cancelled:
-            return NSLocalizedString("Cancelled", comment: "")
+            return String(localized: "Cancelled", table: "Common")
         case .conditionMatched:
-            return NSLocalizedString("Condition matched", comment: "")
+            return String(localized: "Condition matched", table: "Automation")
         case .conditionNotMatched:
-            return NSLocalizedString("Condition not matched", comment: "")
+            return String(localized: "Condition not matched", table: "Automation")
         }
     }
 
     static func resourceLabel(for resource: AutomationWorkflowDraftResource) -> String {
         switch resource {
         case .foregroundInput:
-            return NSLocalizedString("Needs mouse and keyboard", comment: "")
+            return String(localized: "Needs mouse and keyboard", table: "Common")
         case .screenCapture:
-            return NSLocalizedString("Screen capture", comment: "")
+            return String(localized: "Screen capture", table: "Recording")
         case .accessibility:
-            return NSLocalizedString("Accessibility", comment: "")
+            return String(localized: "Accessibility", table: "Settings")
         case .network:
-            return NSLocalizedString("Network", comment: "")
+            return String(localized: "Network", table: "Common")
         case .none:
-            return NSLocalizedString("None", comment: "")
+            return String(localized: "None", table: "Common")
         }
     }
 }

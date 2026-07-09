@@ -10,15 +10,15 @@ public enum AutomationDependencyDisplayStatus: String, Codable, Equatable, Hasha
     public var label: String {
         switch self {
         case .pending:
-            NSLocalizedString("Pending", comment: "")
+            String(localized: "Pending", table: "Common")
         case .waiting:
-            NSLocalizedString("Waiting", comment: "")
+            String(localized: "Waiting", table: "EditorUX")
         case .satisfied:
-            NSLocalizedString("Satisfied", comment: "")
+            String(localized: "Satisfied", table: "Common")
         case .blocked:
-            NSLocalizedString("Blocked", comment: "")
+            String(localized: "Blocked", table: "Common")
         case .disabled:
-            NSLocalizedString("Disabled", comment: "")
+            String(localized: "Disabled", table: "Common")
         }
     }
 }

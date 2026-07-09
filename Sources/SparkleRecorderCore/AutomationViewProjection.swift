@@ -385,7 +385,7 @@ public enum AutomationViewProjection {
         maxAttempts: Int
     ) -> String {
         String(
-            format: NSLocalizedString("Attempt %d of %d", comment: ""),
+            format: String(localized: "Attempt %d of %d", table: "Common"),
             currentAttempt,
             maxAttempts
         )
@@ -508,7 +508,7 @@ public enum AutomationViewProjection {
         case .ocrText(let condition):
             return AutomationConditionProgressProjection(
                 kind: .ocrText,
-                kindLabel: NSLocalizedString("Screen text", comment: ""),
+                kindLabel: String(localized: "Screen text", table: "Recording"),
                 targetLabel: condition.text,
                 detail: ocrConditionDetail(for: condition),
                 pollingInterval: spec.pollingInterval,
@@ -528,9 +528,9 @@ public enum AutomationViewProjection {
             let label = predicateLabel(for: predicate)
             return AutomationConditionProgressProjection(
                 kind: .previousOutcome,
-                kindLabel: NSLocalizedString("Previous outcome", comment: ""),
+                kindLabel: String(localized: "Previous outcome", table: "Common"),
                 targetLabel: label,
-                detail: String(format: NSLocalizedString("Checks previous runs for %@", comment: ""), label),
+                detail: String(format: String(localized: "Checks previous runs for %@", table: "Common"), label),
                 pollingInterval: spec.pollingInterval,
                 isActivelyPolling: isActivelyPolling,
                 timeoutCountdown: countdown
@@ -539,9 +539,9 @@ public enum AutomationViewProjection {
         case .externalSignal(let signalName):
             return AutomationConditionProgressProjection(
                 kind: .externalSignal,
-                kindLabel: NSLocalizedString("External signal", comment: ""),
+                kindLabel: String(localized: "External signal", table: "Common"),
                 targetLabel: signalName,
-                detail: String(format: NSLocalizedString("Waits for signal %@", comment: ""), signalName),
+                detail: String(format: String(localized: "Waits for signal %@", table: "Common"), signalName),
                 pollingInterval: spec.pollingInterval,
                 isActivelyPolling: isActivelyPolling,
                 timeoutCountdown: countdown
@@ -550,9 +550,9 @@ public enum AutomationViewProjection {
         case .manualApproval:
             return AutomationConditionProgressProjection(
                 kind: .manualApproval,
-                kindLabel: NSLocalizedString("Manual approval", comment: ""),
+                kindLabel: String(localized: "Manual approval", table: "Common"),
                 targetLabel: spec.name,
-                detail: NSLocalizedString("Waits for user approval", comment: ""),
+                detail: String(localized: "Waits for user approval", table: "Common"),
                 pollingInterval: spec.pollingInterval,
                 isActivelyPolling: isActivelyPolling,
                 timeoutCountdown: countdown
@@ -632,13 +632,13 @@ public enum AutomationViewProjection {
     ) -> String {
         switch type {
         case .regionChanged:
-            return NSLocalizedString("Region changed", comment: "")
+            return String(localized: "Region changed", table: "EditorUX")
         case .imageAppeared:
-            return NSLocalizedString("Image appeared", comment: "")
+            return String(localized: "Image appeared", table: "Common")
         case .imageDisappeared:
-            return NSLocalizedString("Image disappeared", comment: "")
+            return String(localized: "Image disappeared", table: "Common")
         case .pixelMatched:
-            return NSLocalizedString("Pixel matched", comment: "")
+            return String(localized: "Pixel matched", table: "Common")
         }
     }
 
@@ -647,11 +647,11 @@ public enum AutomationViewProjection {
     ) -> String {
         switch condition.type {
         case .regionChanged:
-            return condition.regionRef ?? NSLocalizedString("Watched region", comment: "")
+            return condition.regionRef ?? String(localized: "Watched region", table: "Common")
         case .imageAppeared, .imageDisappeared:
-            return condition.imageRef ?? NSLocalizedString("Image reference", comment: "")
+            return condition.imageRef ?? String(localized: "Image reference", table: "Common")
         case .pixelMatched:
-            return condition.targetColorHex ?? condition.regionRef ?? NSLocalizedString("Target color", comment: "")
+            return condition.targetColorHex ?? condition.regionRef ?? String(localized: "Target color", table: "Common")
         }
     }
 
@@ -660,26 +660,26 @@ public enum AutomationViewProjection {
     ) -> String {
         var parts: [String] = []
         if let regionRef = condition.regionRef {
-            parts.append(String(format: NSLocalizedString("Region %@", comment: ""), regionRef))
+            parts.append(String(format: String(localized: "Region %@", table: "Common"), regionRef))
         }
         if let imageRef = condition.imageRef {
-            parts.append(String(format: NSLocalizedString("Image %@", comment: ""), imageRef))
+            parts.append(String(format: String(localized: "Image %@", table: "Common"), imageRef))
         }
         if let baselineRef = condition.baselineRef {
-            parts.append(String(format: NSLocalizedString("Baseline %@", comment: ""), baselineRef))
+            parts.append(String(format: String(localized: "Baseline %@", table: "Common"), baselineRef))
         }
         if let colorHex = condition.targetColorHex {
-            parts.append(String(format: NSLocalizedString("Color %@", comment: ""), colorHex))
+            parts.append(String(format: String(localized: "Color %@", table: "Common"), colorHex))
         }
         if let pixelSampleRadius = condition.pixelSampleRadius {
-            parts.append(String(format: NSLocalizedString("Sample radius %d", comment: ""), pixelSampleRadius))
+            parts.append(String(format: String(localized: "Sample radius %d", table: "Common"), pixelSampleRadius))
         }
         if let threshold = condition.threshold {
-            parts.append(String(format: NSLocalizedString("Threshold %.2f", comment: ""), threshold))
+            parts.append(String(format: String(localized: "Threshold %.2f", table: "Common"), threshold))
         }
         if let pixel = condition.pixel {
             parts.append(String(
-                format: NSLocalizedString("Pixel %.0f, %.0f", comment: ""),
+                format: String(localized: "Pixel %.0f, %.0f", table: "Common"),
                 pixel.x,
                 pixel.y
             ))
@@ -689,13 +689,13 @@ public enum AutomationViewProjection {
 
     private static func ocrConditionDetail(for condition: AutomationOCRCondition) -> String {
         let matchLabel = condition.matchMode == .exact
-            ? NSLocalizedString("Exact match", comment: "")
-            : NSLocalizedString("Contains text", comment: "")
+            ? String(localized: "Exact match", table: "Common")
+            : String(localized: "Contains text", table: "Common")
         guard condition.searchRegion != nil else {
             return matchLabel
         }
         return String(
-            format: NSLocalizedString("%@ in %@", comment: ""),
+            format: String(localized: "%@ in %@", table: "Common"),
             matchLabel,
             searchRegionSpaceLabel(for: condition.searchRegionSpace)
         )
@@ -704,30 +704,30 @@ public enum AutomationViewProjection {
     private static func searchRegionSpaceLabel(for space: AutomationOCRSearchRegionSpace) -> String {
         switch space {
         case .automatic:
-            return NSLocalizedString("Automatic", comment: "")
+            return String(localized: "Automatic", table: "Common")
         case .displayAbsolute:
-            return NSLocalizedString("Display absolute", comment: "")
+            return String(localized: "Display absolute", table: "Common")
         case .displayNormalized:
-            return NSLocalizedString("Display normalized", comment: "")
+            return String(localized: "Display normalized", table: "Common")
         case .windowLocal:
-            return NSLocalizedString("Window local", comment: "")
+            return String(localized: "Window local", table: "Common")
         case .windowNormalized:
-            return NSLocalizedString("Window normalized", comment: "")
+            return String(localized: "Window normalized", table: "Common")
         case .contentLocal:
-            return NSLocalizedString("Content local", comment: "")
+            return String(localized: "Content local", table: "Common")
         case .contentNormalized:
-            return NSLocalizedString("Content normalized", comment: "")
+            return String(localized: "Content normalized", table: "Common")
         }
     }
 
     private static func joinPolicyLabel(for policy: AutomationJoinPolicy) -> String {
         switch policy {
         case .all:
-            return NSLocalizedString("All incoming branches", comment: "")
+            return String(localized: "All incoming branches", table: "Common")
         case .any:
-            return NSLocalizedString("Any incoming branch", comment: "")
+            return String(localized: "Any incoming branch", table: "Common")
         case .firstMatched:
-            return NSLocalizedString("First matching branch", comment: "")
+            return String(localized: "First matching branch", table: "Common")
         }
     }
 
@@ -803,7 +803,7 @@ public enum AutomationViewProjection {
 
     private static func workflowStatusDetail(for nodes: [AutomationTaskNodeProjection]) -> String {
         guard !nodes.isEmpty else {
-            return NSLocalizedString("No tasks in workflow", comment: "")
+            return String(localized: "No tasks in workflow", table: "Automation")
         }
 
         let runningCount = nodes.count { $0.status == .running }
@@ -815,27 +815,27 @@ public enum AutomationViewProjection {
 
         if runningCount > 0 {
             return String(
-                format: NSLocalizedString("%d running, %d waiting", comment: ""),
+                format: String(localized: "%d running, %d waiting", table: "Automation"),
                 runningCount,
                 waitingCount + queuedCount
             )
         }
         if queuedCount > 0 {
-            return String(format: NSLocalizedString("%d queued to run", comment: ""), queuedCount)
+            return String(format: String(localized: "%d queued to run", table: "Automation"), queuedCount)
         }
         if waitingCount > 0 {
-            return String(format: NSLocalizedString("%d waiting for upstream tasks or resources", comment: ""), waitingCount)
+            return String(format: String(localized: "%d waiting for upstream tasks or resources", table: "Automation"), waitingCount)
         }
         if attentionCount > 0 {
-            return String(format: NSLocalizedString("%d tasks need attention", comment: ""), attentionCount)
+            return String(format: String(localized: "%d tasks need attention", table: "Automation"), attentionCount)
         }
         if completedCount == nodes.count {
-            return NSLocalizedString("All tasks completed", comment: "")
+            return String(localized: "All tasks completed", table: "Automation")
         }
         if cancelledCount > 0 {
-            return String(format: NSLocalizedString("%d tasks cancelled", comment: ""), cancelledCount)
+            return String(format: String(localized: "%d tasks cancelled", table: "Automation"), cancelledCount)
         }
-        return String(format: NSLocalizedString("%d tasks waiting for first run", comment: ""), nodes.count)
+        return String(format: String(localized: "%d tasks waiting for first run", table: "Automation"), nodes.count)
     }
 
     private static func statusDetail(
@@ -843,7 +843,7 @@ public enum AutomationViewProjection {
         run: AutomationTaskRun?
     ) -> String {
         guard let run else {
-            return NSLocalizedString("No run has started yet", comment: "")
+            return String(localized: "No run has started yet", table: "Automation")
         }
 
         if let outcome = run.outcome {
@@ -852,42 +852,42 @@ public enum AutomationViewProjection {
 
         switch run.status {
         case .planned:
-            return NSLocalizedString("Waiting for its scheduled start", comment: "")
+            return String(localized: "Waiting for its scheduled start", table: "EditorUX")
         case .waitingForDependencies:
-            return NSLocalizedString("Waiting for an upstream task", comment: "")
+            return String(localized: "Waiting for an upstream task", table: "Automation")
         case .waitingForResource:
             return resourceWaitingDetail(for: task.resourceRequirement)
         case .queued:
-            return NSLocalizedString("Queued to run", comment: "")
+            return String(localized: "Queued to run", table: "Automation")
         case .running:
-            return NSLocalizedString("Running now", comment: "")
+            return String(localized: "Running now", table: "Automation")
         case .completed:
-            return NSLocalizedString("Completed", comment: "")
+            return String(localized: "Completed", table: "Common")
         }
     }
 
     private static func outcomeDetail(for outcome: AutomationOutcome) -> String {
         switch outcome {
         case .succeeded:
-            return NSLocalizedString("Completed successfully", comment: "")
+            return String(localized: "Completed successfully", table: "Common")
         case .failed(let report):
-            return report?.errorMessage ?? NSLocalizedString("Run failed", comment: "")
+            return report?.errorMessage ?? String(localized: "Run failed", table: "Automation")
         case .cancelled(let reason):
-            return reason ?? NSLocalizedString("Cancelled", comment: "")
+            return reason ?? String(localized: "Cancelled", table: "Common")
         case .timedOut:
-            return NSLocalizedString("Timed out before completion", comment: "")
+            return String(localized: "Timed out before completion", table: "Common")
         case .resourceConflict(let resource):
             return resource.map {
-                String(format: NSLocalizedString("Resource conflict: %@", comment: ""), resourceLabel(for: $0))
-            } ?? NSLocalizedString("Resource conflict", comment: "")
+                String(format: String(localized: "Resource conflict: %@", table: "Common"), resourceLabel(for: $0))
+            } ?? String(localized: "Resource conflict", table: "Common")
         case .permissionDenied(let permission, let message):
-            return String(format: NSLocalizedString("%@: %@", comment: ""), permissionLabel(for: permission), message)
+            return String(format: String(localized: "%@: %@", table: "Common"), permissionLabel(for: permission), message)
         case .conditionMatched:
-            return NSLocalizedString("Condition matched", comment: "")
+            return String(localized: "Condition matched", table: "Automation")
         case .conditionNotMatched:
-            return NSLocalizedString("Condition did not match", comment: "")
+            return String(localized: "Condition did not match", table: "Automation")
         case .missingMacro:
-            return NSLocalizedString("Macro is missing", comment: "")
+            return String(localized: "Macro is missing", table: "EditorUX")
         case .rejected(let reason):
             return reason
         }
@@ -937,8 +937,8 @@ public enum AutomationViewProjection {
                 executionID: sourceRun.executionID,
                 decidedAt: sourceRun.completedAt,
                 status: .disabled,
-                outcomeLabel: NSLocalizedString("Disabled", comment: ""),
-                detail: NSLocalizedString("Branch disabled", comment: "")
+                outcomeLabel: String(localized: "Disabled", table: "Common"),
+                detail: String(localized: "Branch disabled", table: "Common")
             )
         }
 
@@ -948,8 +948,8 @@ public enum AutomationViewProjection {
                 targetRunID: targetRun?.id,
                 executionID: sourceRun.executionID,
                 status: .waiting,
-                outcomeLabel: NSLocalizedString("Waiting for outcome", comment: ""),
-                detail: NSLocalizedString("Waiting for upstream outcome", comment: "")
+                outcomeLabel: String(localized: "Waiting for outcome", table: "Common"),
+                detail: String(localized: "Waiting for upstream outcome", table: "Common")
             )
         }
 
@@ -963,7 +963,7 @@ public enum AutomationViewProjection {
                 decidedAt: decidedAt,
                 status: .triggered,
                 outcomeLabel: label,
-                detail: String(format: NSLocalizedString("Triggered after %@", comment: ""), label)
+                detail: String(format: String(localized: "Triggered after %@", table: "Common"), label)
             )
         }
 
@@ -974,32 +974,32 @@ public enum AutomationViewProjection {
             decidedAt: decidedAt,
             status: .skipped,
             outcomeLabel: label,
-            detail: String(format: NSLocalizedString("Skipped after %@", comment: ""), label)
+            detail: String(format: String(localized: "Skipped after %@", table: "Common"), label)
         )
     }
 
     private static func outcomeLabel(for outcome: AutomationOutcome) -> String {
         switch outcome {
         case .succeeded:
-            return NSLocalizedString("Success", comment: "")
+            return String(localized: "Success", table: "Common")
         case .failed:
-            return NSLocalizedString("Failure", comment: "")
+            return String(localized: "Failure", table: "Common")
         case .cancelled:
-            return NSLocalizedString("Cancelled", comment: "")
+            return String(localized: "Cancelled", table: "Common")
         case .timedOut:
-            return NSLocalizedString("Timeout", comment: "")
+            return String(localized: "Timeout", table: "Common")
         case .resourceConflict:
-            return NSLocalizedString("Resource conflict", comment: "")
+            return String(localized: "Resource conflict", table: "Common")
         case .permissionDenied:
-            return NSLocalizedString("Permission denied", comment: "")
+            return String(localized: "Permission denied", table: "Settings")
         case .conditionMatched:
-            return NSLocalizedString("Condition matched", comment: "")
+            return String(localized: "Condition matched", table: "Automation")
         case .conditionNotMatched:
-            return NSLocalizedString("Condition not matched", comment: "")
+            return String(localized: "Condition not matched", table: "Automation")
         case .missingMacro:
-            return NSLocalizedString("Missing macro", comment: "")
+            return String(localized: "Missing macro", table: "EditorUX")
         case .rejected:
-            return NSLocalizedString("Rejected", comment: "")
+            return String(localized: "Rejected", table: "Common")
         }
     }
 
@@ -1107,68 +1107,68 @@ public enum AutomationViewProjection {
     private static func kindLabel(for kind: AutomationTaskKind) -> String {
         switch kind {
         case .macro:
-            NSLocalizedString("Macro", comment: "")
+            String(localized: "Macro", table: "EditorUX")
         case .condition:
-            NSLocalizedString("Condition", comment: "")
+            String(localized: "Condition", table: "Automation")
         case .delay:
-            NSLocalizedString("Delay", comment: "")
+            String(localized: "Delay", table: "EditorUX")
         case .notification:
-            NSLocalizedString("Notification", comment: "")
+            String(localized: "Notification", table: "Common")
         }
     }
 
     private static func scheduleLabel(for schedule: AutomationSchedule?) -> String {
         guard let schedule else {
-            return NSLocalizedString("Manual", comment: "")
+            return String(localized: "Manual", table: "Common")
         }
 
         switch schedule {
         case .manual:
-            return NSLocalizedString("Manual", comment: "")
+            return String(localized: "Manual", table: "Common")
         case .once:
-            return NSLocalizedString("Scheduled once", comment: "")
+            return String(localized: "Scheduled once", table: "Common")
         case .repeating:
-            return NSLocalizedString("Repeating", comment: "")
+            return String(localized: "Repeating", table: "Common")
         }
     }
 
     private static func triggerLabel(for trigger: AutomationDependencyTrigger) -> String {
         switch trigger {
         case .onSuccess:
-            NSLocalizedString("On success", comment: "")
+            String(localized: "On success", table: "Common")
         case .onFailure:
-            NSLocalizedString("On failure", comment: "")
+            String(localized: "On failure", table: "Common")
         case .onTimeout:
-            NSLocalizedString("On timeout", comment: "")
+            String(localized: "On timeout", table: "Common")
         case .onCancelled:
-            NSLocalizedString("On cancel", comment: "")
+            String(localized: "On cancel", table: "Common")
         case .onConditionMatched:
-            NSLocalizedString("Condition matched", comment: "")
+            String(localized: "Condition matched", table: "Automation")
         case .onConditionNotMatched:
-            NSLocalizedString("Condition not matched", comment: "")
+            String(localized: "Condition not matched", table: "Automation")
         case .onOutcome(let predicate):
             predicateLabel(for: predicate)
         case .always:
-            NSLocalizedString("Always", comment: "")
+            String(localized: "Always", table: "Common")
         }
     }
 
     private static func predicateLabel(for predicate: AutomationOutcomePredicate) -> String {
         switch predicate {
         case .success:
-            NSLocalizedString("Success", comment: "")
+            String(localized: "Success", table: "Common")
         case .failure:
-            NSLocalizedString("Failure", comment: "")
+            String(localized: "Failure", table: "Common")
         case .timeout:
-            NSLocalizedString("Timeout", comment: "")
+            String(localized: "Timeout", table: "Common")
         case .cancelled:
-            NSLocalizedString("Cancelled", comment: "")
+            String(localized: "Cancelled", table: "Common")
         case .conditionMatched:
-            NSLocalizedString("Condition matched", comment: "")
+            String(localized: "Condition matched", table: "Automation")
         case .conditionNotMatched:
-            NSLocalizedString("Condition not matched", comment: "")
+            String(localized: "Condition not matched", table: "Automation")
         case .anyTerminal:
-            NSLocalizedString("Any terminal outcome", comment: "")
+            String(localized: "Any terminal outcome", table: "Common")
         }
     }
 
@@ -1177,7 +1177,7 @@ public enum AutomationViewProjection {
             return delayLabel(for: dependency.delay)
         }
         guard let sourceRun else {
-            return NSLocalizedString("Observed time", comment: "")
+            return String(localized: "Observed time", table: "Common")
         }
 
         let resolution = dependency.delayResolution(after: sourceRun)
@@ -1186,12 +1186,12 @@ public enum AutomationViewProjection {
             return delayLabel(for: resolution.delay)
         case .recognizedDuration:
             return String(
-                format: NSLocalizedString("Observed %@", comment: ""),
+                format: String(localized: "Observed %@", table: "Common"),
                 compactDelayLabel(for: resolution.delay)
             )
         case .fallback:
             return String(
-                format: NSLocalizedString("Fallback %@", comment: ""),
+                format: String(localized: "Fallback %@", table: "Common"),
                 compactDelayLabel(for: resolution.delay)
             )
         }
@@ -1199,15 +1199,15 @@ public enum AutomationViewProjection {
 
     private static func delayLabel(for delay: TimeInterval) -> String {
         guard delay > 0 else {
-            return NSLocalizedString("No delay", comment: "")
+            return String(localized: "No delay", table: "EditorUX")
         }
-        return String(format: NSLocalizedString("%ds delay", comment: ""), Int(delay.rounded()))
+        return String(format: String(localized: "%ds delay", table: "EditorUX"), Int(delay.rounded()))
     }
 
     private static func compactDelayLabel(for delay: TimeInterval) -> String {
         let totalSeconds = Int(max(0, delay).rounded())
         guard totalSeconds > 0 else {
-            return NSLocalizedString("no delay", comment: "")
+            return String(localized: "no delay", table: "EditorUX")
         }
         let days = totalSeconds / 86_400
         let hours = (totalSeconds % 86_400) / 3_600
@@ -1231,7 +1231,7 @@ public enum AutomationViewProjection {
 
     private static func resourceLabel(for requirement: AutomationResourceRequirement) -> String {
         guard !requirement.resources.isEmpty else {
-            return NSLocalizedString("Background", comment: "")
+            return String(localized: "Background", table: "Common")
         }
 
         return sortedResources(in: requirement)
@@ -1249,25 +1249,25 @@ public enum AutomationViewProjection {
     ) -> String {
         if let blocker, let taskTitle = blocker.taskTitle {
             return String(
-                format: NSLocalizedString("Waiting for %@ held by %@", comment: ""),
+                format: String(localized: "Waiting for %@ held by %@", table: "Common"),
                 resourceWaitLabel(for: blocker.resource),
                 taskTitle
             )
         }
         if let blocker {
             return String(
-                format: NSLocalizedString("Waiting for %@", comment: ""),
+                format: String(localized: "Waiting for %@", table: "Common"),
                 resourceWaitLabel(for: blocker.resource)
             )
         }
         if requirement.resources.contains(.foregroundInput) {
-            return NSLocalizedString("Waiting for mouse and keyboard", comment: "")
+            return String(localized: "Waiting for mouse and keyboard", table: "Common")
         }
         guard !requirement.resources.isEmpty else {
-            return NSLocalizedString("Waiting for a required resource", comment: "")
+            return String(localized: "Waiting for a required resource", table: "EditorUX")
         }
         return String(
-            format: NSLocalizedString("Waiting for %@", comment: ""),
+            format: String(localized: "Waiting for %@", table: "Common"),
             resourceLabel(for: requirement)
         )
     }
@@ -1294,52 +1294,52 @@ public enum AutomationViewProjection {
     private static func resourceLabel(for resource: AutomationResource) -> String {
         switch resource {
         case .foregroundInput:
-            NSLocalizedString("Needs mouse and keyboard", comment: "")
+            String(localized: "Needs mouse and keyboard", table: "Common")
         case .screenCapture:
-            NSLocalizedString("Screen capture", comment: "")
+            String(localized: "Screen capture", table: "Recording")
         case .accessibility:
-            NSLocalizedString("Accessibility", comment: "")
+            String(localized: "Accessibility", table: "Settings")
         case .network:
-            NSLocalizedString("Network", comment: "")
+            String(localized: "Network", table: "Common")
         }
     }
 
     private static func resourceWaitLabel(for resource: AutomationResource) -> String {
         switch resource {
         case .foregroundInput:
-            NSLocalizedString("mouse and keyboard", comment: "")
+            String(localized: "mouse and keyboard", table: "Common")
         case .screenCapture:
-            NSLocalizedString("screen capture", comment: "")
+            String(localized: "screen capture", table: "Common")
         case .accessibility:
-            NSLocalizedString("Accessibility", comment: "")
+            String(localized: "Accessibility", table: "Settings")
         case .network:
-            NSLocalizedString("network", comment: "")
+            String(localized: "network", table: "Common")
         }
     }
 
     private static func resourcePriorityLabel(for priority: AutomationResourcePriority) -> String {
         switch priority {
         case .low:
-            NSLocalizedString("Low priority", comment: "")
+            String(localized: "Low priority", table: "Common")
         case .normal:
-            NSLocalizedString("Normal priority", comment: "")
+            String(localized: "Normal priority", table: "Common")
         case .high:
-            NSLocalizedString("High priority", comment: "")
+            String(localized: "High priority", table: "Common")
         }
     }
 
     private static func permissionLabel(for permission: AutomationPermission) -> String {
         switch permission {
         case .accessibility:
-            NSLocalizedString("Accessibility", comment: "")
+            String(localized: "Accessibility", table: "Settings")
         case .inputMonitoring:
-            NSLocalizedString("Input Monitoring", comment: "")
+            String(localized: "Input Monitoring", table: "Common")
         case .screenRecording:
-            NSLocalizedString("Screen Recording", comment: "")
+            String(localized: "Screen Recording", table: "Recording")
         case .automation:
-            NSLocalizedString("Automation", comment: "")
+            String(localized: "Automation", table: "Automation")
         case .postEvents:
-            NSLocalizedString("Post Events", comment: "")
+            String(localized: "Post Events", table: "EditorUX")
         }
     }
 }

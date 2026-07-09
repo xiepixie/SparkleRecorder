@@ -420,7 +420,13 @@ struct AutomationMainContentView: View {
                 }
             }
         }
-        .onChange(of: projection.workflows.map(\.id)) {
+        .onChange(of: projection.workflows.map(\.id)) { old, new in
+            if new.count > old.count {
+                let addedIDs = Set(new).subtracting(old)
+                if let newID = addedIDs.first {
+                    selectedWorkflowID = newID
+                }
+            }
             repairSelection()
             repairImportNotice()
         }

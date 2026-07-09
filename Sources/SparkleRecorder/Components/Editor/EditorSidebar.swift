@@ -55,7 +55,7 @@ struct EditorSidebar: View {
         VStack(spacing: 0) {
             Picker("", selection: $currentTab) {
                 ForEach(SidebarTab.allCases) { tab in
-                    Text(NSLocalizedString(tab.rawValue, comment: "")).tag(tab)
+                    Text(LocalizedStringKey(tab.rawValue), tableName: "Common").tag(tab)
                 }
             }
             .pickerStyle(.segmented)

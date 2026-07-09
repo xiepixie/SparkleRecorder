@@ -99,7 +99,7 @@ struct AutomationSequentialBuilderSheet: View {
             
             Picker(String(localized: "Type", table: "Common"), selection: $scheduleType) {
                 ForEach(scheduleTypes, id: \.self) { type in
-                    Text(NSLocalizedString(type.capitalized, comment: "")).tag(type)
+                    Text(LocalizedStringKey(type.capitalized), tableName: "Common").tag(type)
                 }
             }
             .pickerStyle(.segmented)
@@ -116,7 +116,7 @@ struct AutomationSequentialBuilderSheet: View {
                             .frame(width: 50)
                         Picker("", selection: $unit) {
                             ForEach(units, id: \.self) { u in
-                                Text(NSLocalizedString(u, comment: "")).tag(u)
+                                Text(LocalizedStringKey(u), tableName: "Common").tag(u)
                             }
                         }
                         .labelsHidden()

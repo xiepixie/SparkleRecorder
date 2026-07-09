@@ -14,23 +14,23 @@ public enum AutomationDisplayStatus: String, CaseIterable, Codable, Equatable, H
     public var label: String {
         switch self {
         case .scheduled:
-            NSLocalizedString("Scheduled", comment: "")
+            String(localized: "Scheduled", table: "Common")
         case .waiting:
-            NSLocalizedString("Waiting", comment: "")
+            String(localized: "Waiting", table: "EditorUX")
         case .queued:
-            NSLocalizedString("Queued", comment: "")
+            String(localized: "Queued", table: "Common")
         case .running:
-            NSLocalizedString("Running", comment: "")
+            String(localized: "Running", table: "Automation")
         case .completed:
-            NSLocalizedString("Completed", comment: "")
+            String(localized: "Completed", table: "Common")
         case .failed:
-            NSLocalizedString("Failed", comment: "")
+            String(localized: "Failed", table: "Common")
         case .cancelled:
-            NSLocalizedString("Cancelled", comment: "")
+            String(localized: "Cancelled", table: "Common")
         case .timedOut:
-            NSLocalizedString("Timed out", comment: "")
+            String(localized: "Timed out", table: "Common")
         case .blocked:
-            NSLocalizedString("Blocked", comment: "")
+            String(localized: "Blocked", table: "Common")
         }
     }
 }

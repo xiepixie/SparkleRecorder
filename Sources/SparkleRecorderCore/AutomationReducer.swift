@@ -857,17 +857,17 @@ public enum AutomationReducer {
                 let reason: String
                 if !dependency.isEnabled {
                     status = .disabled
-                    reason = NSLocalizedString("Dependency disabled", comment: "")
+                    reason = String(localized: "Dependency disabled", table: "Common")
                 } else if dependency.fires(for: outcome) {
                     status = .triggered
                     reason = String(
-                        format: NSLocalizedString("Triggered after %@", comment: ""),
+                        format: String(localized: "Triggered after %@", table: "Common"),
                         outcomeLabel(for: outcome)
                     )
                 } else {
                     status = .skipped
                     reason = String(
-                        format: NSLocalizedString("Skipped after %@", comment: ""),
+                        format: String(localized: "Skipped after %@", table: "Common"),
                         outcomeLabel(for: outcome)
                     )
                 }
@@ -918,25 +918,25 @@ public enum AutomationReducer {
     private static func outcomeLabel(for outcome: AutomationOutcome) -> String {
         switch outcome {
         case .succeeded:
-            return NSLocalizedString("Success", comment: "")
+            return String(localized: "Success", table: "Common")
         case .failed:
-            return NSLocalizedString("Failure", comment: "")
+            return String(localized: "Failure", table: "Common")
         case .cancelled:
-            return NSLocalizedString("Cancelled", comment: "")
+            return String(localized: "Cancelled", table: "Common")
         case .timedOut:
-            return NSLocalizedString("Timeout", comment: "")
+            return String(localized: "Timeout", table: "Common")
         case .resourceConflict:
-            return NSLocalizedString("Resource conflict", comment: "")
+            return String(localized: "Resource conflict", table: "Common")
         case .permissionDenied:
-            return NSLocalizedString("Permission denied", comment: "")
+            return String(localized: "Permission denied", table: "Settings")
         case .conditionMatched:
-            return NSLocalizedString("Condition matched", comment: "")
+            return String(localized: "Condition matched", table: "Automation")
         case .conditionNotMatched:
-            return NSLocalizedString("Condition not matched", comment: "")
+            return String(localized: "Condition not matched", table: "Automation")
         case .missingMacro:
-            return NSLocalizedString("Missing macro", comment: "")
+            return String(localized: "Missing macro", table: "EditorUX")
         case .rejected:
-            return NSLocalizedString("Rejected", comment: "")
+            return String(localized: "Rejected", table: "Common")
         }
     }
 

@@ -178,10 +178,7 @@ enum AutomationWorkflowPackagePresenter {
         let alert = NSAlert()
         alert.alertStyle = .warning
         alert.messageText = String(localized: "Workflow package has conflicts", table: "Automation")
-        alert.informativeText = NSLocalizedString(
-            "Some imported workflows already exist. Add copies to keep existing workflows, or replace matching workflows.",
-            comment: ""
-        )
+        alert.informativeText = String(localized: "Some imported workflows already exist. Add copies to keep existing workflows, or replace matching workflows.", table: "Automation")
         alert.addButton(withTitle: String(localized: "Add Copies", table: "Common"))
         alert.addButton(withTitle: String(localized: "Replace Existing", table: "Common"))
         alert.addButton(withTitle: String(localized: "Cancel", table: "Common"))
@@ -209,10 +206,7 @@ enum AutomationWorkflowPackagePresenter {
         alert.alertStyle = .warning
         alert.messageText = String(localized: "Workflow package references missing macros", table: "Automation")
         alert.informativeText = String(
-            format: NSLocalizedString(
-                "This package references %d macros that are not in your local library. The workflows can still be imported, but those tasks will show as Missing macro until you import or recreate the macros.",
-                comment: ""
-            ),
+            format: String(localized: "This package references %d macros that are not in your local library. The workflows can still be imported, but those tasks will show as Missing macro until you import or recreate the macros.", table: "Automation"),
             missingMacroIDs.count
         )
         alert.addButton(withTitle: String(localized: "Import Anyway", table: "Common"))
