@@ -21,7 +21,12 @@ let package = Package(
             dependencies: ["SparkleRecorderCore"],
             resources: [
                 .process("Localizable.xcstrings"),
-                .process("InfoPlist.xcstrings")
+                .process("InfoPlist.xcstrings"),
+                .process("Automation.xcstrings"),
+                .process("Recording.xcstrings"),
+                .process("EditorUX.xcstrings"),
+                .process("Settings.xcstrings"),
+                .process("Common.xcstrings")
             ],
             swiftSettings: [
                 .swiftLanguageMode(.v6)
