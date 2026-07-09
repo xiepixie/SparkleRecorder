@@ -15,21 +15,21 @@ struct AutomationMacroTaskLibraryView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             VStack(alignment: .leading, spacing: 8) {
-                AutomationSectionHeader(title: NSLocalizedString("SOURCE", comment: ""))
+                AutomationSectionHeader(title: String(localized: "SOURCE", table: "Common"))
                 recordMacroButton
             }
 
             VStack(alignment: .leading, spacing: 8) {
                 AutomationSectionHeader(
-                    title: NSLocalizedString("MACROS", comment: ""),
+                    title: String(localized: "MACROS", table: "EditorUX"),
                     count: macros.count
                 )
 
                 if macros.isEmpty {
                     AutomationEmptyState(
                         systemImage: "record.circle",
-                        title: NSLocalizedString("No macros yet", comment: ""),
-                        subtitle: NSLocalizedString("Record a macro before adding automation tasks.", comment: "")
+                        title: String(localized: "No macros yet", table: "EditorUX"),
+                        subtitle: String(localized: "Record a macro before adding automation tasks.", table: "Automation")
                     )
                     .frame(maxWidth: .infinity, minHeight: 180)
                 } else {
@@ -46,7 +46,7 @@ struct AutomationMacroTaskLibraryView: View {
             }
 
             VStack(alignment: .leading, spacing: 8) {
-                AutomationSectionHeader(title: NSLocalizedString("CONDITION BLOCKS", comment: ""))
+                AutomationSectionHeader(title: String(localized: "CONDITION BLOCKS", table: "Automation"))
 
                 VStack(alignment: .leading, spacing: 6) {
                     manualApprovalButton
@@ -81,8 +81,8 @@ struct AutomationMacroTaskLibraryView: View {
 
                 VStack(alignment: .leading, spacing: 1) {
                     Text(isRecordingMacro
-                         ? NSLocalizedString("Stop recording", comment: "")
-                         : NSLocalizedString("Record macro", comment: ""))
+                         ? String(localized: "Stop recording", table: "Recording")
+                         : String(localized: "Record macro", table: "Recording"))
                         .font(.caption)
                         .fontWeight(.semibold)
                         .foregroundStyle(.primary)
@@ -115,25 +115,25 @@ struct AutomationMacroTaskLibraryView: View {
         .buttonStyle(AutomationQuietButtonStyle())
         .disabled(onRecordMacro == nil)
         .accessibilityLabel(isRecordingMacro
-                            ? NSLocalizedString("Stop recording", comment: "")
-                            : NSLocalizedString("Record macro", comment: ""))
+                            ? String(localized: "Stop recording", table: "Recording")
+                            : String(localized: "Record macro", table: "Recording"))
     }
 
     private var recordMacroDetail: String {
         if isRecordingMacro {
             return isRecordingIntoWorkflow
-                ? NSLocalizedString("Capturing workflow task", comment: "")
-                : NSLocalizedString("Capturing source", comment: "")
+                ? String(localized: "Capturing workflow task", table: "Automation")
+                : String(localized: "Capturing source", table: "Common")
         }
         return recordsMacroIntoWorkflow
-            ? NSLocalizedString("New source task", comment: "")
-            : NSLocalizedString("New source macro", comment: "")
+            ? String(localized: "New source task", table: "Automation")
+            : String(localized: "New source macro", table: "EditorUX")
     }
 
     private var manualApprovalButton: some View {
         conditionButton(
-            title: NSLocalizedString("Manual approval", comment: ""),
-            detail: NSLocalizedString("Human decision", comment: ""),
+            title: String(localized: "Manual approval", table: "Common"),
+            detail: String(localized: "Human decision", table: "Common"),
             systemImage: "hand.raised.fill",
             tint: Brand.libraryBlue,
             action: { onAddConditionTask(.manualApproval) }
@@ -142,18 +142,18 @@ struct AutomationMacroTaskLibraryView: View {
 
     private var externalSignalButton: some View {
         conditionButton(
-            title: NSLocalizedString("External signal", comment: ""),
-            detail: NSLocalizedString("Named app signal", comment: ""),
+            title: String(localized: "External signal", table: "Common"),
+            detail: String(localized: "Named app signal", table: "Common"),
             systemImage: "antenna.radiowaves.left.and.right",
             tint: Brand.sigTeal,
-            action: { onAddConditionTask(.externalSignal(NSLocalizedString("Ready", comment: ""))) }
+            action: { onAddConditionTask(.externalSignal(String(localized: "Ready", table: "Common"))) }
         )
     }
 
     private var screenTextButton: some View {
         conditionButton(
-            title: NSLocalizedString("Screen text", comment: ""),
-            detail: NSLocalizedString("OCR text target", comment: ""),
+            title: String(localized: "Screen text", table: "Recording"),
+            detail: String(localized: "OCR text target", table: "EditorUX"),
             systemImage: "text.viewfinder",
             tint: Brand.sigAmber,
             action: { onAddConditionTask(.ocrText(AutomationOCRCondition(text: ""))) }
@@ -163,7 +163,7 @@ struct AutomationMacroTaskLibraryView: View {
     private var regionChangedButton: some View {
         conditionButton(
             title: AutomationVisualConditionPresentation.title(for: AutomationVisualConditionType.regionChanged),
-            detail: NSLocalizedString("Watched area + baseline", comment: ""),
+            detail: String(localized: "Watched area + baseline", table: "Common"),
             systemImage: "viewfinder.rectangular",
             tint: Brand.sigViolet,
             action: { onAddConditionTask(.visual(AutomationVisualCondition(type: .regionChanged))) }
@@ -173,7 +173,7 @@ struct AutomationMacroTaskLibraryView: View {
     private var imageAppearedButton: some View {
         conditionButton(
             title: AutomationVisualConditionPresentation.title(for: AutomationVisualConditionType.imageAppeared),
-            detail: NSLocalizedString("Watched area + image", comment: ""),
+            detail: String(localized: "Watched area + image", table: "Common"),
             systemImage: "photo",
             tint: Brand.libraryGreen,
             action: { onAddConditionTask(.visual(AutomationVisualCondition(type: .imageAppeared))) }
@@ -183,7 +183,7 @@ struct AutomationMacroTaskLibraryView: View {
     private var imageDisappearedButton: some View {
         conditionButton(
             title: AutomationVisualConditionPresentation.title(for: AutomationVisualConditionType.imageDisappeared),
-            detail: NSLocalizedString("Watched area + image", comment: ""),
+            detail: String(localized: "Watched area + image", table: "Common"),
             systemImage: "photo.on.rectangle",
             tint: Brand.libraryGreen,
             action: { onAddConditionTask(.visual(AutomationVisualCondition(type: .imageDisappeared))) }
@@ -193,7 +193,7 @@ struct AutomationMacroTaskLibraryView: View {
     private var pixelMatchedButton: some View {
         conditionButton(
             title: AutomationVisualConditionPresentation.title(for: AutomationVisualConditionType.pixelMatched),
-            detail: NSLocalizedString("Pixel + color", comment: ""),
+            detail: String(localized: "Pixel + color", table: "Common"),
             systemImage: "paintpalette",
             tint: Brand.sigPink,
             action: { onAddConditionTask(.visual(AutomationVisualCondition(type: .pixelMatched))) }

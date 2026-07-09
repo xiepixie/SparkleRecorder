@@ -7,24 +7,24 @@ struct AutomationTaskRunEvidenceManifestView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 5) {
             AutomationTaskRunDetailRowView(
-                title: NSLocalizedString("Evidence created", comment: ""),
+                title: String(localized: "Evidence created", table: "Common"),
                 value: timeSummary(manifest.createdAt)
             )
             AutomationTaskRunDetailRowView(
-                title: NSLocalizedString("Manifest run", comment: ""),
+                title: String(localized: "Manifest run", table: "Common"),
                 value: shortID(manifest.runID)
             )
             AutomationTaskRunDetailRowView(
-                title: NSLocalizedString("Macro", comment: ""),
+                title: String(localized: "Macro", table: "EditorUX"),
                 value: shortID(manifest.macroID)
             )
             AutomationTaskRunDetailRowView(
-                title: NSLocalizedString("Report file", comment: ""),
+                title: String(localized: "Report file", table: "Common"),
                 value: manifest.reportFilename
             )
             AutomationTaskRunDetailRowView(
-                title: NSLocalizedString("Screenshot file", comment: ""),
-                value: manifest.screenshotFilename ?? NSLocalizedString("None", comment: "")
+                title: String(localized: "Screenshot file", table: "Common"),
+                value: manifest.screenshotFilename ?? String(localized: "None", table: "Common")
             )
         }
     }

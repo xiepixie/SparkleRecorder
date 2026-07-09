@@ -63,14 +63,14 @@ struct AutomationTaskBranchDecisionSummaryView: View {
     private var runBindingLabel: String {
         if let targetRunID = decision.targetRunID {
             return String(
-                format: NSLocalizedString("Source %@ -> target %@", comment: ""),
+                format: String(localized: "Source %@ -> target %@", table: "Common"),
                 shortID(decision.sourceRunID),
                 shortID(targetRunID)
             )
         }
 
         return String(
-            format: NSLocalizedString("Source %@", comment: ""),
+            format: String(localized: "Source %@", table: "Common"),
             shortID(decision.sourceRunID)
         )
     }

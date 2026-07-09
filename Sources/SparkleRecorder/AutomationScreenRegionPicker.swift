@@ -4,7 +4,7 @@ import SparkleRecorderCore
 @MainActor
 enum AutomationScreenRegionPicker {
     static func pickRegion(
-        instructionTitle: String = NSLocalizedString("Drag to select region", comment: ""),
+        instructionTitle: String = String(localized: "Drag to select region", table: "EditorUX"),
         onPicked: @escaping (AutomationScreenRegionPickerSelection) -> Void,
         onCancelled: (() -> Void)? = nil
     ) {

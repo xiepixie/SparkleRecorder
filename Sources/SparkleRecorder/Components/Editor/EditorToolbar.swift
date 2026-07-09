@@ -19,16 +19,16 @@ struct EditorToolbar: View {
 	                BrandMark(size: 32)
 
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(macro?.name ?? NSLocalizedString("Untitled macro", comment: ""))
+                    Text(macro?.name ?? String(localized: "Untitled macro", table: "EditorUX"))
                         .font(.system(size: 14, weight: .semibold))
                         .foregroundStyle(.primary)
                     HStack(spacing: 6) {
-                        Label(String(format: NSLocalizedString("%d events", comment: ""), rowCount), systemImage: "wave.3.right")
+                        Label(String(format: String(localized: "%d events", table: "EditorUX"), rowCount), systemImage: "wave.3.right")
                         Text("·").foregroundStyle(.tertiary)
                         Label(formatDuration(duration), systemImage: "clock")
                         if let m = macro {
                             Text("·").foregroundStyle(.tertiary)
-                            Text(String(format: NSLocalizedString("edited %@", comment: ""), RelativeTime.string(from: m.modifiedAt)))
+                            Text(String(format: String(localized: "edited %@", table: "Common"), RelativeTime.string(from: m.modifiedAt)))
                         }
                     }
                     .font(.system(size: 10.5))
@@ -43,29 +43,29 @@ struct EditorToolbar: View {
 	                HStack(spacing: 6) {
 	                    EditorToolbarToggle(
 	                        isOn: $showOverlayPreview,
-	                        title: NSLocalizedString("Preview", comment: ""),
-	                        help: NSLocalizedString("Show or hide the on-screen coordinate preview overlay", comment: ""),
+	                        title: String(localized: "Preview", table: "Common"),
+	                        help: String(localized: "Show or hide the on-screen coordinate preview overlay", table: "Recording"),
 	                        icon: "eye",
 	                        tint: Brand.sigTeal
 	                    )
 	                    EditorToolbarToggle(
 	                        isOn: $showAllPaths,
-	                        title: NSLocalizedString("Paths", comment: ""),
-	                        help: NSLocalizedString("Show paths for all actions instead of only the selection", comment: ""),
+	                        title: String(localized: "Paths", table: "Common"),
+	                        help: String(localized: "Show paths for all actions instead of only the selection", table: "EditorUX"),
 	                        icon: "point.topleft.down.to.point.bottomright.curvepath",
 	                        tint: Brand.sigViolet
 	                    )
 	                    EditorToolbarToggle(
 	                        isOn: $hideMouseMoves,
-	                        title: NSLocalizedString("Moves", comment: ""),
-	                        help: NSLocalizedString("Hide raw mouse-move rows in the action list", comment: ""),
+	                        title: String(localized: "Moves", table: "Common"),
+	                        help: String(localized: "Hide raw mouse-move rows in the action list", table: "EditorUX"),
 	                        icon: "eye.slash.fill",
 	                        tint: Brand.sigAmber
 	                    )
 	                    EditorToolbarToggle(
 	                        isOn: $smartMergeGestures,
-	                        title: NSLocalizedString("Merge", comment: ""),
-	                        help: NSLocalizedString("Merge raw events into editable semantic actions", comment: ""),
+	                        title: String(localized: "Merge", table: "Common"),
+	                        help: String(localized: "Merge raw events into editable semantic actions", table: "EditorUX"),
 	                        icon: "arrow.triangle.merge",
 	                        tint: Brand.libraryGreen
 	                    )

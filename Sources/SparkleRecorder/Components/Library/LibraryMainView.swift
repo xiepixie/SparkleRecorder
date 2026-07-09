@@ -17,6 +17,7 @@ struct LibraryMainView: View {
     @Binding var showAssignHotkey: SavedMacro?
     @Binding var showAddTag: SavedMacro?
     @Binding var showNotesFor: SavedMacro?
+    @State private var showSequenceBuilderFor: [SavedMacro]?
     
     @State private var showSearch = false
     @FocusState private var searchFocused: Bool
@@ -84,9 +85,19 @@ struct LibraryMainView: View {
                         for id in visibleSelection { controller.exportMacroToFile(id) }
                     },
                     onAddTag: {
-                        if let m = library.macros.first(where: { $0.id == visibleSelection.first }) {
+                        if let firstID = visibleSelection.first,
+                           let m = library.macros.first(where: { $0.id == firstID }) {
                             showAddTag = m
                         }
+                    },
+                    onCreateSequence: {
+                        var arr = [SavedMacro]()
+                        for id in visibleSelection {
+                            if let m = library.macros.first(where: { $0.id == id }) {
+                                arr.append(m)
+                            }
+                        }
+                        showSequenceBuilderFor = arr
                     }
                 )
                 .padding(.horizontal, 12)
@@ -192,7 +203,8 @@ struct LibraryMainView: View {
                                         controller.setChain(macro.id, to: target)
                                     },
                                     chainCandidates: chainCandidates,
-                                    chainTargetName: macro.chainTo.flatMap { chainNameByID[$0] }
+                                    chainTargetName: macro.chainTo.flatMap { chainNameByID[$0] },
+                                    onCreateSequence: { showSequenceBuilderFor = [macro] }
                                 )
                             }
                         }
@@ -272,7 +284,7 @@ struct LibraryMainView: View {
                     Image(systemName: "magnifyingglass")
                         .font(.system(size: 14, weight: .medium))
                         .foregroundStyle(.secondary)
-                    TextField(NSLocalizedString("Search macros...", comment: ""), text: $search)
+                    TextField(String(localized: "Search macros...", table: "EditorUX"), text: $search)
                         .textFieldStyle(.plain)
                         .font(.system(size: 14))
                         .focused($searchFocused)
@@ -287,7 +299,7 @@ struct LibraryMainView: View {
                                 .foregroundStyle(.tertiary)
                         }
                         .buttonStyle(.plain)
-                        .accessibilityLabel(NSLocalizedString("Clear search", comment: ""))
+                        .accessibilityLabel(String(localized: "Clear search", table: "Common"))
                     }
                 }
                 .padding(.horizontal, 16)
@@ -329,6 +341,32 @@ struct LibraryMainView: View {
                 }
             }
         }
+        .sheet(item: Binding(
+            get: { showSequenceBuilderFor != nil ? SequenceBuilderSheetItem() : nil },
+            set: { if $0 == nil { showSequenceBuilderFor = nil } }
+        )) { _ in
+            if let macros = showSequenceBuilderFor {
+                AutomationSequentialBuilderSheet(initialMacros: macros, onCreate: { doc in
+                    let id = UUID()
+                    var options = AutomationWorkflowDraftImportOptions(mode: .confirm)
+                    options.stableIDNamespace = id.uuidString
+                    
+                    let result = AutomationWorkflowDraftImporter.compile(
+                        doc,
+                        options: options
+                    )
+                    
+                    if var imported = result.workflow {
+                        imported.id = id
+                        controller.appState.automationSession?.createWorkflow(id: id, workflow: imported)
+                        
+                        DispatchQueue.main.async {
+                            NSApp.sendAction(Selector(("showAutomationWorkspace:")), to: nil, from: nil)
+                        }
+                    }
+                })
+            }
+        }
     }
     
     /// Clears the status line a few seconds after the latest message.
@@ -353,16 +391,16 @@ private struct LibraryWorkflowActionStrip: View {
 
     private var statusText: String {
         if isRecording {
-            return NSLocalizedString("Recording active", comment: "")
+            return String(localized: "Recording active", table: "Recording")
         }
-        let format = NSLocalizedString("%d saved", comment: "")
+        let format = String(localized: "%d saved", table: "Common")
         return String(format: format, macroCount)
     }
 
     private var evidenceText: String {
         visualEvidenceEnabled
-            ? NSLocalizedString("Visual evidence on", comment: "")
-            : NSLocalizedString("Visual evidence off", comment: "")
+            ? String(localized: "Visual evidence on", table: "Automation")
+            : String(localized: "Visual evidence off", table: "Automation")
     }
 
     var body: some View {
@@ -384,16 +422,16 @@ private struct LibraryWorkflowActionStrip: View {
             .frame(maxWidth: .infinity, alignment: .leading)
 
             libraryWorkflowButton(
-                title: NSLocalizedString("Review", comment: ""),
-                detail: NSLocalizedString("Current macro", comment: ""),
+                title: String(localized: "Review", table: "Common"),
+                detail: String(localized: "Current macro", table: "EditorUX"),
                 systemImage: "slider.horizontal.below.rectangle",
                 isEnabled: hasCurrentMacro,
                 action: onReview
             )
 
             libraryWorkflowButton(
-                title: NSLocalizedString("Workflow", comment: ""),
-                detail: NSLocalizedString("Schedule / repeat", comment: ""),
+                title: String(localized: "Workflow", table: "Automation"),
+                detail: String(localized: "Schedule / repeat", table: "Common"),
                 systemImage: "point.topleft.down.curvedto.point.bottomright.up",
                 isEnabled: macroCount > 0,
                 action: onWorkflow
@@ -446,6 +484,11 @@ private struct LibraryWorkflowActionStrip: View {
             RoundedRectangle(cornerRadius: 7, style: .continuous)
                 .strokeBorder(Color.primary.opacity(isEnabled ? 0.09 : 0.04), lineWidth: 0.5)
         )
-        .help(isEnabled ? title : NSLocalizedString("Record a macro first", comment: ""))
+        .help(isEnabled ? title : String(localized: "Record a macro first", table: "Recording"))
     }
 }
+
+private struct SequenceBuilderSheetItem: Identifiable, Equatable {
+    let id = UUID()
+}
+

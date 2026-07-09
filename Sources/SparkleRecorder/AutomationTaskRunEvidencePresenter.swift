@@ -58,7 +58,7 @@ enum AutomationTaskRunEvidencePresenter {
         guard FileManager.default.fileExists(atPath: url.path) else {
             return .failed(
                 .revealReport,
-                message: NSLocalizedString("Report file no longer exists.", comment: "")
+                message: String(localized: "Report file no longer exists.", table: "Common")
             )
         }
 
@@ -70,14 +70,14 @@ enum AutomationTaskRunEvidencePresenter {
         guard FileManager.default.fileExists(atPath: url.path) else {
             return .failed(
                 .openScreenshot,
-                message: NSLocalizedString("Screenshot file no longer exists.", comment: "")
+                message: String(localized: "Screenshot file no longer exists.", table: "Common")
             )
         }
 
         guard NSWorkspace.shared.open(url) else {
             return .failed(
                 .openScreenshot,
-                message: NSLocalizedString("macOS could not open the screenshot.", comment: "")
+                message: String(localized: "macOS could not open the screenshot.", table: "Common")
             )
         }
 

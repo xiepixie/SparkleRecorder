@@ -33,24 +33,24 @@ struct EmptyState: View {
     }
 
     private var title: String {
-        if hasSearch { return NSLocalizedString("No matches", comment: "") }
+        if hasSearch { return String(localized: "No matches", table: "Common") }
         switch filter {
-        case .favorites:  return NSLocalizedString("No favorites yet", comment: "")
-        case .recent:     return NSLocalizedString("Nothing recent", comment: "")
-        case .mostPlayed: return NSLocalizedString("No playback history", comment: "")
-        case .withHotkey: return NSLocalizedString("No macros with hotkeys", comment: "")
-        case .tag(let t): return String(format: NSLocalizedString("No macros tagged %@", comment: ""), t)
-        case .accent(let name): return String(format: NSLocalizedString("No %@ macros", comment: ""), accentDisplayName(name))
-        case .all:        return NSLocalizedString("No macros yet", comment: "")
+        case .favorites:  return String(localized: "No favorites yet", table: "Common")
+        case .recent:     return String(localized: "Nothing recent", table: "Common")
+        case .mostPlayed: return String(localized: "No playback history", table: "Common")
+        case .withHotkey: return String(localized: "No macros with hotkeys", table: "EditorUX")
+        case .tag(let t): return String(format: String(localized: "No macros tagged %@", table: "EditorUX"), t)
+        case .accent(let name): return String(format: String(localized: "No %@ macros", table: "EditorUX"), accentDisplayName(name))
+        case .all:        return String(localized: "No macros yet", table: "EditorUX")
         }
     }
 
     private var subtitle: String {
-        if hasSearch { return NSLocalizedString("Try a different search term.", comment: "") }
+        if hasSearch { return String(localized: "Try a different search term.", table: "Automation") }
         switch filter {
-        case .favorites: return NSLocalizedString("Tap the ★ on any card to favorite it.", comment: "")
-        case .all:       return NSLocalizedString("Record a repeatable task, then review or combine it in a workflow.", comment: "")
-        default:         return NSLocalizedString("Try the All filter.", comment: "")
+        case .favorites: return String(localized: "Tap the ★ on any card to favorite it.", table: "Automation")
+        case .all:       return String(localized: "Record a repeatable task, then review or combine it in a workflow.", table: "Automation")
+        default:         return String(localized: "Try the All filter.", table: "Common")
         }
     }
 

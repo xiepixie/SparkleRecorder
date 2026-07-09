@@ -16,7 +16,7 @@ struct AutomationTimelineItemView: View {
                     .lineLimit(1)
 
                 if hasConflict {
-                    Label(NSLocalizedString("Conflict", comment: ""), systemImage: "exclamationmark.triangle.fill")
+                    Label(String(localized: "Conflict", table: "Common"), systemImage: "exclamationmark.triangle.fill")
                         .font(.caption)
                         .fontWeight(.semibold)
                         .foregroundStyle(Brand.red500)
@@ -85,7 +85,7 @@ struct AutomationTimelineItemView: View {
                     }
                 }
                 if item.hasEvidence {
-                    Label(NSLocalizedString("Evidence", comment: ""), systemImage: "doc.richtext")
+                    Label(String(localized: "Evidence", table: "Automation"), systemImage: "doc.richtext")
                 }
             }
             .font(.caption)
@@ -113,7 +113,7 @@ struct AutomationTimelineItemView: View {
 
     private var accessibilitySummary: String {
         var summary = String(
-            format: NSLocalizedString("%@, %@, %@", comment: ""),
+            format: String(localized: "%@, %@, %@", table: "Common"),
             item.title,
             item.kindLabel ?? item.lane.displayName,
             item.status.label
@@ -122,10 +122,10 @@ struct AutomationTimelineItemView: View {
             summary += ", " + statusDetail
         }
         if hasConflict {
-            summary += ", " + NSLocalizedString("Conflict", comment: "")
+            summary += ", " + String(localized: "Conflict", table: "Common")
         }
         if item.hasEvidence {
-            summary += ", " + NSLocalizedString("Evidence available", comment: "")
+            summary += ", " + String(localized: "Evidence available", table: "Automation")
         }
         if let runtimeSummary = AutomationRuntimeDetailFormatter.accessibilitySummary(
             timeoutCountdown: item.timeoutCountdown,

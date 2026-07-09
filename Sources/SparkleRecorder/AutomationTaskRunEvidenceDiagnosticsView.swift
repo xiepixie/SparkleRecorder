@@ -8,11 +8,11 @@ struct AutomationTaskRunEvidenceDiagnosticsView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 5) {
             AutomationTaskRunDetailRowView(
-                title: NSLocalizedString("Focus", comment: ""),
+                title: String(localized: "Focus", table: "Common"),
                 value: focusLabel
             )
             AutomationTaskRunDetailRowView(
-                title: NSLocalizedString("Preview", comment: ""),
+                title: String(localized: "Preview", table: "Common"),
                 value: previewLabel
             )
 
@@ -25,53 +25,53 @@ struct AutomationTaskRunEvidenceDiagnosticsView: View {
 
     private var focusLabel: String {
         if payload.report.isSuccess {
-            return NSLocalizedString("Completed run", comment: "")
+            return String(localized: "Completed run", table: "Common")
         }
 
         if let failedEventIndex = payload.report.failedEventIndex {
-            return String(format: NSLocalizedString("Event #%d", comment: ""), failedEventIndex + 1)
+            return String(format: String(localized: "Event #%d", table: "EditorUX"), failedEventIndex + 1)
         }
 
         if let outcome = run.outcome {
             switch outcome {
             case .timedOut:
-                return NSLocalizedString("Timeout", comment: "")
+                return String(localized: "Timeout", table: "Common")
             case .permissionDenied:
-                return NSLocalizedString("Permission", comment: "")
+                return String(localized: "Permission", table: "Common")
             case .missingMacro:
-                return NSLocalizedString("Missing macro", comment: "")
+                return String(localized: "Missing macro", table: "EditorUX")
             case .conditionNotMatched:
-                return NSLocalizedString("Else branch", comment: "")
+                return String(localized: "Else branch", table: "Automation")
             case .conditionMatched:
-                return NSLocalizedString("Then branch", comment: "")
+                return String(localized: "Then branch", table: "Common")
             case .failed:
-                return NSLocalizedString("Playback error", comment: "")
+                return String(localized: "Playback error", table: "Common")
             case .cancelled:
-                return NSLocalizedString("Cancelled run", comment: "")
+                return String(localized: "Cancelled run", table: "Common")
             case .resourceConflict:
-                return NSLocalizedString("Resource conflict", comment: "")
+                return String(localized: "Resource conflict", table: "Common")
             case .rejected:
-                return NSLocalizedString("Rejected run", comment: "")
+                return String(localized: "Rejected run", table: "Common")
             case .succeeded:
-                return NSLocalizedString("Completed run", comment: "")
+                return String(localized: "Completed run", table: "Common")
             }
         }
 
-        return NSLocalizedString("Report", comment: "")
+        return String(localized: "Report", table: "Common")
     }
 
     private var previewLabel: String {
         if payload.screenshotData != nil {
-            return NSLocalizedString("Inline screenshot", comment: "")
+            return String(localized: "Inline screenshot", table: "Common")
         }
 
         if payload.screenshotURL != nil {
-            return NSLocalizedString("Screenshot file", comment: "")
+            return String(localized: "Screenshot file", table: "Common")
         }
 
         return payload.report.isSuccess
-            ? NSLocalizedString("No failure screenshot needed", comment: "")
-            : NSLocalizedString("No screenshot saved", comment: "")
+            ? String(localized: "No failure screenshot needed", table: "Common")
+            : String(localized: "No screenshot saved", table: "Common")
     }
 
     private var nextCheckImage: String {
@@ -84,26 +84,26 @@ struct AutomationTaskRunEvidenceDiagnosticsView: View {
 
     private var nextCheckLabel: String {
         if payload.report.isSuccess {
-            return NSLocalizedString("Keep this report as a run audit trail.", comment: "")
+            return String(localized: "Keep this report as a run audit trail.", table: "Common")
         }
 
         if payload.source == .latestMacro {
-            return NSLocalizedString("Latest macro evidence is not tied to this run; prefer per-run evidence after the next playback.", comment: "")
+            return String(localized: "Latest macro evidence is not tied to this run; prefer per-run evidence after the next playback.", table: "Common")
         }
 
         if payload.screenshotData != nil {
-            return NSLocalizedString("Compare the failed event with the inline screenshot before editing the macro.", comment: "")
+            return String(localized: "Compare the failed event with the inline screenshot before editing the macro.", table: "Common")
         }
 
         if payload.screenshotURL != nil {
-            return NSLocalizedString("Open the saved screenshot, then compare the target window and failed event.", comment: "")
+            return String(localized: "Open the saved screenshot, then compare the target window and failed event.", table: "Common")
         }
 
         if let errorMessage = payload.report.errorMessage,
            !errorMessage.isEmpty {
-            return NSLocalizedString("Start with the error message, then inspect the macro target and window context.", comment: "")
+            return String(localized: "Start with the error message, then inspect the macro target and window context.", table: "Common")
         }
 
-        return NSLocalizedString("Review the report timing and macro package before retrying.", comment: "")
+        return String(localized: "Review the report timing and macro package before retrying.", table: "Common")
     }
 }

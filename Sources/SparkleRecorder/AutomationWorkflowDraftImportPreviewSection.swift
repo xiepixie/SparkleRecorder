@@ -8,7 +8,7 @@ struct AutomationWorkflowDraftImportPreviewSection: View {
         if let preview {
             VStack(alignment: .leading, spacing: 8) {
                 AutomationSectionHeader(
-                    title: NSLocalizedString("IMPORT DRY-RUN", comment: ""),
+                    title: String(localized: "IMPORT DRY-RUN", table: "Automation"),
                     count: preview.taskCount
                 )
 
@@ -16,28 +16,28 @@ struct AutomationWorkflowDraftImportPreviewSection: View {
                 summaryRow(preview)
 
                 if !preview.macroResolutionRows.isEmpty {
-                    subsectionTitle(NSLocalizedString("MACRO RESOLUTION", comment: ""))
+                    subsectionTitle(String(localized: "MACRO RESOLUTION", table: "EditorUX"))
                     ForEach(preview.macroResolutionRows) { row in
                         macroResolutionRow(row)
                     }
                 }
 
                 if !preview.taskIDRows.isEmpty {
-                    subsectionTitle(NSLocalizedString("TASK ID MAP", comment: ""))
+                    subsectionTitle(String(localized: "TASK ID MAP", table: "Automation"))
                     ForEach(preview.taskIDRows) { row in
                         idMapRow(row)
                     }
                 }
 
                 if !preview.dependencyIDRows.isEmpty {
-                    subsectionTitle(NSLocalizedString("DEPENDENCY ID MAP", comment: ""))
+                    subsectionTitle(String(localized: "DEPENDENCY ID MAP", table: "Automation"))
                     ForEach(preview.dependencyIDRows) { row in
                         idMapRow(row)
                     }
                 }
 
                 if !preview.issueRows.isEmpty || !preview.workflowIssueRows.isEmpty {
-                    subsectionTitle(NSLocalizedString("IMPORT ISSUES", comment: ""))
+                    subsectionTitle(String(localized: "IMPORT ISSUES", table: "Common"))
                     ForEach(preview.issueRows) { row in
                         importIssueRow(row)
                     }
@@ -61,7 +61,7 @@ struct AutomationWorkflowDraftImportPreviewSection: View {
                 Text(preview.statusLabel)
                     .font(.caption)
                     .bold()
-                Text(preview.workflowName ?? NSLocalizedString("No compiled workflow", comment: ""))
+                Text(preview.workflowName ?? String(localized: "No compiled workflow", table: "Automation"))
                     .font(.caption2)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
@@ -84,22 +84,22 @@ struct AutomationWorkflowDraftImportPreviewSection: View {
     private func summaryRow(_ preview: AutomationWorkflowDraftPreviewProjection.ImportPreview) -> some View {
         HStack(spacing: 8) {
             summaryPill(
-                title: NSLocalizedString("Compiled tasks", comment: ""),
+                title: String(localized: "Compiled tasks", table: "Automation"),
                 value: "\(preview.taskCount)",
                 systemImage: "square.stack.3d.up"
             )
             summaryPill(
-                title: NSLocalizedString("Compiled edges", comment: ""),
+                title: String(localized: "Compiled edges", table: "Common"),
                 value: "\(preview.dependencyCount)",
                 systemImage: "arrow.triangle.branch"
             )
             summaryPill(
-                title: NSLocalizedString("Resolved macros", comment: ""),
+                title: String(localized: "Resolved macros", table: "EditorUX"),
                 value: "\(preview.macroResolutionRows.filter(\.isResolved).count)",
                 systemImage: "record.circle"
             )
             summaryPill(
-                title: NSLocalizedString("Import issues", comment: ""),
+                title: String(localized: "Import issues", table: "Common"),
                 value: "\(preview.issueRows.count + preview.workflowIssueRows.count)",
                 systemImage: "exclamationmark.circle"
             )

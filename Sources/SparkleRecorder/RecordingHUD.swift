@@ -197,7 +197,7 @@ struct RecordingHUDView: View {
                     RecDot(size: 9)
 
                     VStack(alignment: .leading, spacing: 1) {
-                        Text(NSLocalizedString("Recording", comment: "").uppercased())
+                        Text(String(localized: "Recording", table: "Recording").uppercased())
                             .font(.system(size: 9.5, weight: .semibold))
                             .foregroundStyle(Color.white.opacity(0.54))
                             .lineLimit(1)
@@ -221,21 +221,21 @@ struct RecordingHUDView: View {
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .help(NSLocalizedString("Expand", comment: ""))
+            .help(String(localized: "Expand", table: "Common"))
 
             HStack(spacing: 4) {
                 HUDIconButton(
                     icon: "trash",
                     shortcut: emergencyHotkeyName,
                     tint: nil,
-                    accessibilityTitle: NSLocalizedString("Discard", comment: ""),
+                    accessibilityTitle: String(localized: "Discard", table: "Common"),
                     action: onDiscard
                 )
                 HUDIconButton(
                     icon: "stop.fill",
                     shortcut: stopHotkeyName,
                     tint: Brand.red500,
-                    accessibilityTitle: NSLocalizedString("Stop", comment: ""),
+                    accessibilityTitle: String(localized: "Stop", table: "Common"),
                     action: onStop
                 )
             }
@@ -280,7 +280,7 @@ struct RecordingHUDView: View {
                 // Top row: status + big gradient timer
                 HStack(spacing: 10) {
                     RecDot(size: 10)
-                    Text(NSLocalizedString("Recording", comment: "").uppercased())
+                    Text(String(localized: "Recording", table: "Recording").uppercased())
                         .font(.system(size: 11, weight: .semibold))
                         .foregroundStyle(Color.white.opacity(0.60))
                     Spacer()
@@ -302,7 +302,7 @@ struct RecordingHUDView: View {
                         icon: "chevron.up",
                         shortcut: "",
                         tint: nil,
-                        accessibilityTitle: NSLocalizedString("Collapse", comment: ""),
+                        accessibilityTitle: String(localized: "Collapse", table: "Common"),
                         action: onCollapse
                     )
                 }
@@ -332,16 +332,16 @@ struct RecordingHUDView: View {
 
                 // 4-stat grid
                 HStack(spacing: 6) {
-                    HUDStat(icon: "cursorarrow.click", value: s.clicks, label: NSLocalizedString("Clicks", comment: ""), tint: Brand.sigGreen)
-                    HUDStat(icon: "keyboard",          value: s.keys,   label: NSLocalizedString("Keys", comment: ""),   tint: Brand.sigBlue)
-                    HUDStat(icon: "arrow.up.and.down", value: s.scrolls, label: NSLocalizedString("Scrolls", comment: ""), tint: Brand.sigTeal)
-                    HUDStat(icon: "hand.draw",         value: s.drags,  label: NSLocalizedString("Drags", comment: ""),   tint: Brand.sigViolet)
+                    HUDStat(icon: "cursorarrow.click", value: s.clicks, label: String(localized: "Clicks", table: "EditorUX"), tint: Brand.sigGreen)
+                    HUDStat(icon: "keyboard",          value: s.keys,   label: String(localized: "Keys", table: "Common"),   tint: Brand.sigBlue)
+                    HUDStat(icon: "arrow.up.and.down", value: s.scrolls, label: String(localized: "Scrolls", table: "Common"), tint: Brand.sigTeal)
+                    HUDStat(icon: "hand.draw",         value: s.drags,  label: String(localized: "Drags", table: "EditorUX"),   tint: Brand.sigViolet)
                 }
 
                 // Action bar
                 HStack(spacing: 6) {
-                    HUDButton(title: NSLocalizedString("Discard", comment: ""), icon: "trash", shortcut: emergencyHotkeyName, tint: nil, action: onDiscard)
-                    HUDButton(title: NSLocalizedString("Stop", comment: ""), icon: "stop.fill", shortcut: stopHotkeyName, tint: Brand.red500, action: onStop)
+                    HUDButton(title: String(localized: "Discard", table: "Common"), icon: "trash", shortcut: emergencyHotkeyName, tint: nil, action: onDiscard)
+                    HUDButton(title: String(localized: "Stop", table: "Common"), icon: "stop.fill", shortcut: stopHotkeyName, tint: Brand.red500, action: onStop)
                 }
             }
             .padding(14)
@@ -357,7 +357,7 @@ struct RecordingHUDView: View {
     }
 
     private var compactAccessibilityLabel: Text {
-        Text("\(NSLocalizedString("Recording", comment: "")), \(minutes):\(seconds), \(eventCount) \(NSLocalizedString("events", comment: ""))")
+        Text("\(String(localized: "Recording", table: "Recording")), \(minutes):\(seconds), \(eventCount) \(String(localized: "events", table: "EditorUX"))")
     }
 }
 
@@ -452,7 +452,7 @@ private struct CompactEventCount: View {
                 .overlay(Capsule(style: .continuous).strokeBorder(Color.white.opacity(0.10), lineWidth: 0.5))
         )
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("\(value) \(NSLocalizedString("events", comment: ""))")
+        .accessibilityLabel("\(value) \(String(localized: "events", table: "EditorUX"))")
     }
 }
 

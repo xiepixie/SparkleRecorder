@@ -20,7 +20,7 @@ struct AutomationWorkflowTaskInsertionDropTarget: View {
                 .frame(height: isActive ? 2 : 1)
 
             if isActive {
-                Text(NSLocalizedString("Insert here", comment: ""))
+                Text("Insert here", tableName: "Common")
                     .font(.caption)
                     .foregroundStyle(Brand.libraryGreen)
                     .lineLimit(1)
@@ -37,8 +37,8 @@ struct AutomationWorkflowTaskInsertionDropTarget: View {
         .onChange(of: isTargeted) {
             updateActiveInsertionIndex()
         }
-        .accessibilityLabel(NSLocalizedString("Drop task or macro here", comment: ""))
-        .accessibilityValue(String(format: NSLocalizedString("Insert at position %d", comment: ""), index + 1))
+        .accessibilityLabel(String(localized: "Drop task or macro here", table: "Common"))
+        .accessibilityValue(String(format: String(localized: "Insert at position %d", table: "Common"), index + 1))
     }
 
     private func updateActiveInsertionIndex() {

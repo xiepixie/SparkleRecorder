@@ -19,16 +19,16 @@ func normalizedAccentName(_ name: String?) -> String? {
 
 func accentDisplayName(_ name: String) -> String {
     switch normalizedAccentName(name) ?? name {
-    case "Red": return NSLocalizedString("Red", comment: "")
-    case "Orange": return NSLocalizedString("Orange", comment: "")
-    case "Yellow": return NSLocalizedString("Yellow", comment: "")
-    case "Green": return NSLocalizedString("Green", comment: "")
-    case "Teal": return NSLocalizedString("Teal", comment: "")
-    case "Blue": return NSLocalizedString("Blue", comment: "")
-    case "Indigo": return NSLocalizedString("Indigo", comment: "")
-    case "Purple": return NSLocalizedString("Purple", comment: "")
-    case "Pink": return NSLocalizedString("Pink", comment: "")
-    case "Gray": return NSLocalizedString("Gray", comment: "")
+    case "Red": return String(localized: "Red", table: "Common")
+    case "Orange": return String(localized: "Orange", table: "Common")
+    case "Yellow": return String(localized: "Yellow", table: "Common")
+    case "Green": return String(localized: "Green", table: "Common")
+    case "Teal": return String(localized: "Teal", table: "Common")
+    case "Blue": return String(localized: "Blue", table: "Common")
+    case "Indigo": return String(localized: "Indigo", table: "Common")
+    case "Purple": return String(localized: "Purple", table: "Common")
+    case "Pink": return String(localized: "Pink", table: "Common")
+    case "Gray": return String(localized: "Gray", table: "Common")
     default: return name
     }
 }
@@ -97,7 +97,7 @@ struct AccentBadge: View {
                         .strokeBorder(cardAccentColor(for: name).opacity(0.22), lineWidth: 0.5)
                 )
         )
-        .accessibilityLabel(Text(String(format: NSLocalizedString("Color: %@", comment: ""), accentDisplayName(name))))
+        .accessibilityLabel(Text(String(format: String(localized: "Color: %@", table: "Common"), accentDisplayName(name))))
     }
 }
 
@@ -113,7 +113,7 @@ struct AccentMenuLabel: View {
             } else {
                 Image(systemName: "circle.dashed")
                     .frame(width: 14)
-                Text(NSLocalizedString("Default", comment: ""))
+                Text("Default", tableName: "Common")
             }
             Spacer()
             if isSelected {

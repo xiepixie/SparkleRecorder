@@ -111,10 +111,10 @@ struct PopoverContentView: View {
                         Image(systemName: "arrow.down.doc.fill")
                             .font(.system(size: 38, weight: .semibold))
                             .foregroundStyle(.tint)
-	                        Text(NSLocalizedString("Drop to import", comment: ""))
+	                        Text("Drop to import", tableName: "Common")
 	                            .font(.system(size: 13, weight: .semibold))
 	                            .foregroundStyle(.primary)
-	                        Text(NSLocalizedString("Drop a .tinyrec, legacy Windows .rec, or .txt macro.", comment: ""))
+	                        Text("Drop a .tinyrec, legacy Windows .rec, or .txt macro.", tableName: "EditorUX")
 	                            .font(.system(size: 10.5))
 	                            .foregroundStyle(.secondary)
                     }
@@ -325,7 +325,7 @@ private struct RecordingMenuBarPopoverView: View {
             HStack(alignment: .center, spacing: 10) {
                 RecDot(size: 10)
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(NSLocalizedString("Recording", comment: "").uppercased())
+                    Text(String(localized: "Recording", table: "Recording").uppercased())
                         .font(.system(size: 10, weight: .semibold))
                         .foregroundStyle(.secondary)
                     Text(model.durationText)
@@ -344,7 +344,7 @@ private struct RecordingMenuBarPopoverView: View {
                             .fill(Color.primary.opacity(0.055))
                             .overlay(Capsule(style: .continuous).strokeBorder(Color.primary.opacity(0.10), lineWidth: 0.5))
                     )
-                    .accessibilityLabel("\(eventCount) \(NSLocalizedString("events", comment: ""))")
+                    .accessibilityLabel("\(eventCount) \(String(localized: "events", table: "EditorUX"))")
             }
 
             HStack(spacing: 7) {
@@ -362,7 +362,7 @@ private struct RecordingMenuBarPopoverView: View {
                 )
                 RecordingPopoverStateBadge(
                     icon: "tray.and.arrow.down.fill",
-                    title: NSLocalizedString("Stop saves to Library", comment: ""),
+                    title: String(localized: "Stop saves to Library", table: "Common"),
                     tint: Brand.libraryBlue
                 )
             }
@@ -371,7 +371,7 @@ private struct RecordingMenuBarPopoverView: View {
                 Button {
                     controller.cancelRecording()
                 } label: {
-                    Label(NSLocalizedString("Discard", comment: ""), systemImage: "trash")
+                    Label(String(localized: "Discard", table: "Common"), systemImage: "trash")
                         .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(RecordingPopoverButtonStyle(tint: nil))
@@ -380,7 +380,7 @@ private struct RecordingMenuBarPopoverView: View {
                 Button {
                     controller.toggleRecording()
                 } label: {
-                    Label(NSLocalizedString("Stop", comment: ""), systemImage: "stop.fill")
+                    Label(String(localized: "Stop", table: "Common"), systemImage: "stop.fill")
                         .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(RecordingPopoverButtonStyle(tint: Brand.red500))
@@ -391,7 +391,7 @@ private struct RecordingMenuBarPopoverView: View {
                 Button {
                     controller.showSettingsWindow()
                 } label: {
-                    Label(NSLocalizedString("Settings", comment: ""), systemImage: "gearshape")
+                    Label(String(localized: "Settings", table: "Settings"), systemImage: "gearshape")
                         .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(RecordingPopoverButtonStyle(tint: Brand.libraryBlue, isQuiet: true))
@@ -399,7 +399,7 @@ private struct RecordingMenuBarPopoverView: View {
                 Button {
                     controller.showMainWindow()
                 } label: {
-                    Label(NSLocalizedString("Library", comment: ""), systemImage: "rectangle.stack")
+                    Label(String(localized: "Library", table: "Common"), systemImage: "rectangle.stack")
                         .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(RecordingPopoverButtonStyle(tint: Brand.libraryBlue, isQuiet: true))
@@ -417,25 +417,25 @@ private struct RecordingMenuBarPopoverView: View {
 
     private var visualEvidenceTitle: String {
         guard state.semanticRecordingEnabled else {
-            return NSLocalizedString("Action recording", comment: "")
+            return String(localized: "Action recording", table: "Recording")
         }
         switch recorder.semanticRecordingStatus {
         case .starting:
-            return NSLocalizedString("Preparing evidence", comment: "")
+            return String(localized: "Preparing evidence", table: "Automation")
         case .active:
-            return NSLocalizedString("Evidence recording", comment: "")
+            return String(localized: "Evidence recording", table: "Automation")
         case .finishing:
-            return NSLocalizedString("Saving evidence", comment: "")
+            return String(localized: "Saving evidence", table: "Automation")
         case .finished:
-            return NSLocalizedString("Evidence saved", comment: "")
+            return String(localized: "Evidence saved", table: "Automation")
         case .blocked, .failed:
-            return NSLocalizedString("Evidence issue", comment: "")
+            return String(localized: "Evidence issue", table: "Automation")
         case .suppressed:
-            return NSLocalizedString("Evidence paused", comment: "")
+            return String(localized: "Evidence paused", table: "Automation")
         case .cancelled:
-            return NSLocalizedString("Evidence cancelled", comment: "")
+            return String(localized: "Evidence cancelled", table: "Automation")
         case .idle:
-            return NSLocalizedString("Evidence ready", comment: "")
+            return String(localized: "Evidence ready", table: "Automation")
         }
     }
 
@@ -578,9 +578,9 @@ enum WorkspaceMode: String, CaseIterable, Identifiable {
     var title: String {
         switch self {
         case .library:
-            NSLocalizedString("Library", comment: "")
+            String(localized: "Library", table: "Common")
         case .automation:
-            NSLocalizedString("Automation", comment: "")
+            String(localized: "Automation", table: "Automation")
         }
     }
 

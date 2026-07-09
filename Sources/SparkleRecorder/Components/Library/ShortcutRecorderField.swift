@@ -18,8 +18,8 @@ struct ShortcutRecorderField: View {
     @Binding var currentBinding: HotkeyBinding?
     let allHotkeys: Set<UInt32>
     var allowsClear = true
-    var recordingPrompt = NSLocalizedString("Type shortcut...", comment: "")
-    var emptyPrompt = NSLocalizedString("Click to record shortcut", comment: "")
+    var recordingPrompt = String(localized: "Type shortcut...", table: "Common")
+    var emptyPrompt = String(localized: "Click to record shortcut", table: "Recording")
     var onRecord: (ShortcutRecording) -> Void = { _ in }
     
     @State private var isRecording = false

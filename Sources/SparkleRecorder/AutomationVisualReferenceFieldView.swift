@@ -13,7 +13,7 @@ struct AutomationVisualReferenceFieldView: View {
         VStack(alignment: .leading, spacing: 8) {
             if !options.isEmpty {
                 Picker(title, selection: pickerSelection) {
-                    Text(NSLocalizedString("Custom", comment: ""))
+                    Text("Custom", tableName: "Common")
                         .tag(Self.customSelection)
 
                     ForEach(options) { option in
@@ -33,7 +33,7 @@ struct AutomationVisualReferenceFieldView: View {
                     }
                     .buttonStyle(.plain)
                     .foregroundStyle(Brand.libraryBlue)
-                    .help(NSLocalizedString("Capture new reference image", comment: ""))
+                    .help(String(localized: "Capture new reference image", table: "Common"))
                 }
 
                 TextField(textFieldTitle, text: normalizedReference)
@@ -44,12 +44,12 @@ struct AutomationVisualReferenceFieldView: View {
                 if hasKnownReference {
                     Image(systemName: "checkmark.seal")
                         .foregroundStyle(Brand.libraryGreen)
-                        .accessibilityLabel(NSLocalizedString("Known visual asset", comment: ""))
+                        .accessibilityLabel(String(localized: "Known visual asset", table: "Common"))
                 } else if !reference.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
                           !options.isEmpty {
                     Image(systemName: "questionmark.diamond")
                         .foregroundStyle(Brand.sigAmber)
-                        .accessibilityLabel(NSLocalizedString("Custom visual asset reference", comment: ""))
+                        .accessibilityLabel(String(localized: "Custom visual asset reference", table: "Common"))
                 }
             }
 

@@ -11,22 +11,22 @@ func formatDuration(_ d: TimeInterval) -> String {
 
 func humanKindName(_ k: RecordedEvent.Kind) -> String {
     switch k {
-    case .leftMouseDown:     return NSLocalizedString("Left Click ↓", comment: "")
-    case .leftMouseUp:       return NSLocalizedString("Left Click ↑", comment: "")
-    case .rightMouseDown:    return NSLocalizedString("Right Click ↓", comment: "")
-    case .rightMouseUp:      return NSLocalizedString("Right Click ↑", comment: "")
-    case .otherMouseDown:    return NSLocalizedString("Other Click ↓", comment: "")
-    case .otherMouseUp:      return NSLocalizedString("Other Click ↑", comment: "")
-    case .mouseMoved:        return NSLocalizedString("Mouse Move", comment: "")
-    case .leftMouseDragged:  return NSLocalizedString("Drag (L)", comment: "")
-    case .rightMouseDragged: return NSLocalizedString("Drag (R)", comment: "")
-    case .otherMouseDragged: return NSLocalizedString("Drag (Other)", comment: "")
-    case .keyDown:           return NSLocalizedString("Key Down", comment: "")
-    case .keyUp:             return NSLocalizedString("Key Up", comment: "")
-    case .flagsChanged:      return NSLocalizedString("Modifier", comment: "")
-    case .scrollWheel:       return NSLocalizedString("Scroll", comment: "")
-    case .waitForText:       return NSLocalizedString("Wait Text", comment: "")
-    case .verifyText:        return NSLocalizedString("Verify Text", comment: "")
+    case .leftMouseDown:     return String(localized: "Left Click ↓", table: "EditorUX")
+    case .leftMouseUp:       return String(localized: "Left Click ↑", table: "EditorUX")
+    case .rightMouseDown:    return String(localized: "Right Click ↓", table: "EditorUX")
+    case .rightMouseUp:      return String(localized: "Right Click ↑", table: "EditorUX")
+    case .otherMouseDown:    return String(localized: "Other Click ↓", table: "EditorUX")
+    case .otherMouseUp:      return String(localized: "Other Click ↑", table: "EditorUX")
+    case .mouseMoved:        return String(localized: "Mouse Move", table: "Common")
+    case .leftMouseDragged:  return String(localized: "Drag (L)", table: "EditorUX")
+    case .rightMouseDragged: return String(localized: "Drag (R)", table: "EditorUX")
+    case .otherMouseDragged: return String(localized: "Drag (Other)", table: "EditorUX")
+    case .keyDown:           return String(localized: "Key Down", table: "Common")
+    case .keyUp:             return String(localized: "Key Up", table: "Common")
+    case .flagsChanged:      return String(localized: "Modifier", table: "Common")
+    case .scrollWheel:       return String(localized: "Scroll", table: "Common")
+    case .waitForText:       return String(localized: "Wait Text", table: "EditorUX")
+    case .verifyText:        return String(localized: "Verify Text", table: "EditorUX")
     }
 }
 
@@ -81,25 +81,25 @@ func actionKindIcon(_ k: ActionGroupKind) -> String {
 
 func humanActionKindName(_ k: ActionGroupKind) -> String {
     switch k {
-    case .click: return NSLocalizedString("Click", comment: "")
-    case .doubleClick: return NSLocalizedString("Double Click", comment: "")
-    case .repeatedClick: return NSLocalizedString("Repeated Click", comment: "")
-    case .multiPointClick: return NSLocalizedString("Multi Click", comment: "")
-    case .longPress: return NSLocalizedString("Long Press", comment: "")
-    case .drag: return NSLocalizedString("Drag", comment: "")
-    case .scroll: return NSLocalizedString("Scroll", comment: "")
-    case .keyPress: return NSLocalizedString("KeyPress", comment: "")
-    case .keyHold: return NSLocalizedString("KeyHold", comment: "")
-    case .keyRepeat: return NSLocalizedString("Key Repeat", comment: "")
-    case .shortcut: return NSLocalizedString("Shortcut", comment: "")
-    case .modifierHold: return NSLocalizedString("Modifier Hold", comment: "")
-    case .textInput: return NSLocalizedString("Text Input", comment: "")
-    case .waitForText: return NSLocalizedString("Wait Text", comment: "")
-    case .waitForTextGone: return NSLocalizedString("Wait Text Gone", comment: "")
-    case .verifyText: return NSLocalizedString("Verify Text", comment: "")
-    case .sequence: return NSLocalizedString("Behavior", comment: "")
-    case .wait: return NSLocalizedString("Wait", comment: "")
-    case .mouseMove: return NSLocalizedString("Mouse Move", comment: "")
+    case .click: return String(localized: "Click", table: "EditorUX")
+    case .doubleClick: return String(localized: "Double Click", table: "EditorUX")
+    case .repeatedClick: return String(localized: "Repeated Click", table: "EditorUX")
+    case .multiPointClick: return String(localized: "Multi Click", table: "EditorUX")
+    case .longPress: return String(localized: "Long Press", table: "Common")
+    case .drag: return String(localized: "Drag", table: "EditorUX")
+    case .scroll: return String(localized: "Scroll", table: "Common")
+    case .keyPress: return String(localized: "KeyPress", table: "Common")
+    case .keyHold: return String(localized: "KeyHold", table: "Common")
+    case .keyRepeat: return String(localized: "Key Repeat", table: "Common")
+    case .shortcut: return String(localized: "Shortcut", table: "Common")
+    case .modifierHold: return String(localized: "Modifier Hold", table: "Common")
+    case .textInput: return String(localized: "Text Input", table: "EditorUX")
+    case .waitForText: return String(localized: "Wait Text", table: "EditorUX")
+    case .waitForTextGone: return String(localized: "Wait Text Gone", table: "EditorUX")
+    case .verifyText: return String(localized: "Verify Text", table: "EditorUX")
+    case .sequence: return String(localized: "Behavior", table: "Common")
+    case .wait: return String(localized: "Wait", table: "EditorUX")
+    case .mouseMove: return String(localized: "Mouse Move", table: "Common")
     }
 }
 
@@ -207,50 +207,50 @@ extension ActionGroupKind {
 func actionWorkflowMessage(for group: ActionGroup, event: RecordedEvent?) -> String {
     if group.kind == .waitForText {
         guard ActionGroupProjection.textAnchorIsReady(event?.textAnchor ?? group.textAnchor) else {
-            return NSLocalizedString("Needs target text before playback can wait.", comment: "")
+            return String(localized: "Needs target text before playback can wait.", table: "EditorUX")
         }
-        return NSLocalizedString("Waits until the target text appears, then continues. It does not click.", comment: "")
+        return String(localized: "Waits until the target text appears, then continues. It does not click.", table: "EditorUX")
     }
     if group.kind == .waitForTextGone {
         guard ActionGroupProjection.textAnchorIsReady(event?.textAnchor ?? group.textAnchor) else {
-            return NSLocalizedString("Needs target text before playback can wait.", comment: "")
+            return String(localized: "Needs target text before playback can wait.", table: "EditorUX")
         }
-        return NSLocalizedString("Waits until the target text disappears, then continues. It does not click.", comment: "")
+        return String(localized: "Waits until the target text disappears, then continues. It does not click.", table: "EditorUX")
     }
     if group.kind == .verifyText {
         guard ActionGroupProjection.textAnchorIsReady(event?.textAnchor ?? group.textAnchor) else {
-            return NSLocalizedString("Needs target text before playback can verify.", comment: "")
+            return String(localized: "Needs target text before playback can verify.", table: "EditorUX")
         }
-        return NSLocalizedString("Checks the text condition once. Playback stops if the condition is not met.", comment: "")
+        return String(localized: "Checks the text condition once. Playback stops if the condition is not met.", table: "Automation")
     }
     if group.kind == .multiPointClick {
-        return NSLocalizedString("Clicks several coordinates in rapid sequence so they behave like one combined action.", comment: "")
+        return String(localized: "Clicks several coordinates in rapid sequence so they behave like one combined action.", table: "EditorUX")
     }
     if group.kind.canUseLocatorStrategy && ((event?.coordinateStrategy == .locatorOnly) || group.textAnchor != nil) {
         guard ActionGroupProjection.textAnchorIsReady(event?.textAnchor ?? group.textAnchor) else {
             if group.kind == .click {
-                return NSLocalizedString("Needs target text before playback can click.", comment: "")
+                return String(localized: "Needs target text before playback can click.", table: "EditorUX")
             }
-            return NSLocalizedString("Needs target text before playback can locate this action.", comment: "")
+            return String(localized: "Needs target text before playback can locate this action.", table: "EditorUX")
         }
         if group.kind == .click {
-            return NSLocalizedString("Waits for the target text up to the timeout, then clicks the matched text box.", comment: "")
+            return String(localized: "Waits for the target text up to the timeout, then clicks the matched text box.", table: "EditorUX")
         }
-        return NSLocalizedString("Waits for the target text up to the timeout, then plays this action at the matched text box.", comment: "")
+        return String(localized: "Waits for the target text up to the timeout, then plays this action at the matched text box.", table: "EditorUX")
     }
     if group.kind.editsPathTarget {
-        return NSLocalizedString("Keeps the drag as one down-drag-up gesture; moving handles preserves the path shape.", comment: "")
+        return String(localized: "Keeps the drag as one down-drag-up gesture; moving handles preserves the path shape.", table: "EditorUX")
     }
     if group.kind.isPassiveWait {
-        return NSLocalizedString("Adds time between actions without sending input.", comment: "")
+        return String(localized: "Adds time between actions without sending input.", table: "EditorUX")
     }
     if group.kind.editsKeyboardInput {
-        return NSLocalizedString("Edits the captured key and modifiers while keeping the action timing in place.", comment: "")
+        return String(localized: "Edits the captured key and modifiers while keeping the action timing in place.", table: "Recording")
     }
     if group.kind == .sequence {
-        return NSLocalizedString("Keeps the selected events together as one behavior block while preserving their internal timing.", comment: "")
+        return String(localized: "Keeps the selected events together as one behavior block while preserving their internal timing.", table: "EditorUX")
     }
-    return NSLocalizedString("Edits this action without changing the surrounding actions.", comment: "")
+    return String(localized: "Edits this action without changing the surrounding actions.", table: "EditorUX")
 }
 
 enum MultiPointClickPointRemovalReadiness: String, Codable, Equatable, Sendable {
@@ -277,46 +277,46 @@ func multiPointClickPointRemovalReadiness(for group: ActionGroup) -> MultiPointC
 func multiPointClickPointRemovalReadinessHelp(_ readiness: MultiPointClickPointRemovalReadiness) -> String {
     switch readiness {
     case .ready:
-        return NSLocalizedString("Remove the last point from this Multi Click.", comment: "")
+        return String(localized: "Remove the last point from this Multi Click.", table: "EditorUX")
     case .unsupportedAction:
-        return NSLocalizedString("Only Multi Click actions can remove click points.", comment: "")
+        return String(localized: "Only Multi Click actions can remove click points.", table: "EditorUX")
     case .needsAtLeastThreePoints:
-        return NSLocalizedString("Multi Click keeps at least two points.", comment: "")
+        return String(localized: "Multi Click keeps at least two points.", table: "EditorUX")
     }
 }
 
 func textClickConversionReadinessHelp(_ readiness: TextClickConversionReadiness) -> String {
     switch readiness {
     case .ready:
-        return NSLocalizedString("Replace this wait with a text click using the same target.", comment: "")
+        return String(localized: "Replace this wait with a text click using the same target.", table: "EditorUX")
     case .unsupportedAction:
-        return NSLocalizedString("Only Wait Text actions can be converted to Click Text.", comment: "")
+        return String(localized: "Only Wait Text actions can be converted to Click Text.", table: "EditorUX")
     case .missingSourceEvent:
-        return NSLocalizedString("This wait row has no recorded wait event to replace. Add Click Text instead.", comment: "")
+        return String(localized: "This wait row has no recorded wait event to replace. Add Click Text instead.", table: "Recording")
     case .sourceEventMismatch:
-        return NSLocalizedString("This row no longer matches its recorded wait event. Refresh the action list, then try again.", comment: "")
+        return String(localized: "This row no longer matches its recorded wait event. Refresh the action list, then try again.", table: "Recording")
     }
 }
 
 func textClickFollowUpInsertionReadinessHelp(_ readiness: TextClickConversionReadiness) -> String {
     switch readiness {
     case .ready:
-        return NSLocalizedString("Reuse this wait target for the next text click.", comment: "")
+        return String(localized: "Reuse this wait target for the next text click.", table: "EditorUX")
     case .unsupportedAction:
-        return NSLocalizedString("Only Wait Text actions can add a follow-up Click Text.", comment: "")
+        return String(localized: "Only Wait Text actions can add a follow-up Click Text.", table: "EditorUX")
     case .missingSourceEvent:
-        return NSLocalizedString("This wait row has no recorded wait event to reuse. Insert Click Text manually instead.", comment: "")
+        return String(localized: "This wait row has no recorded wait event to reuse. Insert Click Text manually instead.", table: "Recording")
     case .sourceEventMismatch:
-        return NSLocalizedString("This row no longer matches its recorded wait event. Refresh the action list, then try again.", comment: "")
+        return String(localized: "This row no longer matches its recorded wait event. Refresh the action list, then try again.", table: "Recording")
     }
 }
 
 func actionRowTextTargetStatusLabel(_ readiness: TextTargetReadiness) -> String? {
     switch readiness {
     case .missingAnchor:
-        return NSLocalizedString("No text target", comment: "")
+        return String(localized: "No text target", table: "EditorUX")
     case .missingText:
-        return NSLocalizedString("No target text", comment: "")
+        return String(localized: "No target text", table: "EditorUX")
     case .notTextTarget, .ready:
         return nil
     }
@@ -325,15 +325,15 @@ func actionRowTextTargetStatusLabel(_ readiness: TextTargetReadiness) -> String?
 func behaviorBindReadinessHelp(_ readiness: BehaviorBindReadiness) -> String {
     switch readiness {
     case .ready:
-        return NSLocalizedString("Create a named behavior from the selected actions.", comment: "")
+        return String(localized: "Create a named behavior from the selected actions.", table: "EditorUX")
     case .noSelection:
-        return NSLocalizedString("Select two or more recorded actions to create a behavior.", comment: "")
+        return String(localized: "Select two or more recorded actions to create a behavior.", table: "Recording")
     case .needsTwoRecordedActions:
-        return NSLocalizedString("Select at least two recorded actions; wait gaps alone cannot create a behavior.", comment: "")
+        return String(localized: "Select at least two recorded actions; wait gaps alone cannot create a behavior.", table: "Recording")
     case .nonContiguousRecordedActions:
-        return NSLocalizedString("Select one continuous block of recorded actions. Wait gaps can stay between them.", comment: "")
+        return String(localized: "Select one continuous block of recorded actions. Wait gaps can stay between them.", table: "Recording")
     case .containsBehavior:
-        return NSLocalizedString("This selection already contains a behavior. Rename or unbind it before creating another.", comment: "")
+        return String(localized: "This selection already contains a behavior. Rename or unbind it before creating another.", table: "Automation")
     }
 }
 
@@ -369,13 +369,13 @@ func behaviorRenameReadiness(
 func behaviorRenameReadinessHelp(_ readiness: BehaviorRenameReadiness) -> String {
     switch readiness {
     case .ready:
-        return NSLocalizedString("Rename the selected behavior.", comment: "")
+        return String(localized: "Rename the selected behavior.", table: "Common")
     case .noSelectedBehavior:
-        return NSLocalizedString("Select one behavior to rename.", comment: "")
+        return String(localized: "Select one behavior to rename.", table: "Automation")
     case .missingName:
-        return NSLocalizedString("Enter a behavior name before renaming.", comment: "")
+        return String(localized: "Enter a behavior name before renaming.", table: "Automation")
     case .unchangedName:
-        return NSLocalizedString("Change the behavior name before applying Rename.", comment: "")
+        return String(localized: "Change the behavior name before applying Rename.", table: "Automation")
     }
 }
 
@@ -417,15 +417,15 @@ func batchCoordinateAlignmentReadiness(
 func batchCoordinateAlignmentReadinessHelp(_ readiness: BatchCoordinateAlignmentReadiness) -> String {
     switch readiness {
     case .ready:
-        return NSLocalizedString("Align selected coordinate actions to the first selected action.", comment: "")
+        return String(localized: "Align selected coordinate actions to the first selected action.", table: "EditorUX")
     case .needsMultipleActions:
-        return NSLocalizedString("Select at least two actions to align coordinates.", comment: "")
+        return String(localized: "Select at least two actions to align coordinates.", table: "EditorUX")
     case .firstActionHasNoCoordinate:
-        return NSLocalizedString("The first selected action has no coordinate to align to.", comment: "")
+        return String(localized: "The first selected action has no coordinate to align to.", table: "EditorUX")
     case .noOtherCoordinateActions:
-        return NSLocalizedString("Select another coordinate action to align.", comment: "")
+        return String(localized: "Select another coordinate action to align.", table: "EditorUX")
     case .alreadyAligned:
-        return NSLocalizedString("Selected coordinate actions are already aligned.", comment: "")
+        return String(localized: "Selected coordinate actions are already aligned.", table: "EditorUX")
     }
 }
 
@@ -471,11 +471,11 @@ func batchTimeoutReadiness(
 func batchTimeoutReadinessHelp(_ readiness: BatchTimeoutReadiness) -> String {
     switch readiness {
     case .ready:
-        return NSLocalizedString("Apply this timeout to selected text-target actions.", comment: "")
+        return String(localized: "Apply this timeout to selected text-target actions.", table: "EditorUX")
     case .noTimeoutActions:
-        return NSLocalizedString("Select Wait Text, Verify Text, or Click Text actions with a target to set a timeout.", comment: "")
+        return String(localized: "Select Wait Text, Verify Text, or Click Text actions with a target to set a timeout.", table: "EditorUX")
     case .invalidTimeout:
-        return NSLocalizedString("Enter a timeout of 0 or greater before applying to selected actions.", comment: "")
+        return String(localized: "Enter a timeout of 0 or greater before applying to selected actions.", table: "EditorUX")
     }
 }
 
@@ -503,11 +503,11 @@ func batchTextTargetReadiness(
 func batchTextTargetReadinessHelp(_ readiness: BatchTextTargetReadiness) -> String {
     switch readiness {
     case .ready:
-        return NSLocalizedString("Apply this target text to selected text-target actions.", comment: "")
+        return String(localized: "Apply this target text to selected text-target actions.", table: "EditorUX")
     case .noTextTargetActions:
-        return NSLocalizedString("Select text-capable actions before applying a shared target.", comment: "")
+        return String(localized: "Select text-capable actions before applying a shared target.", table: "EditorUX")
     case .missingTargetText:
-        return NSLocalizedString("Enter or pick target text before applying to selected actions.", comment: "")
+        return String(localized: "Enter or pick target text before applying to selected actions.", table: "EditorUX")
     }
 }
 
@@ -644,17 +644,17 @@ func actionInspectorInputWarning(
 func actionInspectorInputWarningHelp(_ warning: ActionInspectorInputWarning) -> String {
     switch warning {
     case .none:
-        return NSLocalizedString("Inspector inputs are ready to apply.", comment: "")
+        return String(localized: "Inspector inputs are ready to apply.", table: "Automation")
     case .invalidTime:
-        return NSLocalizedString("Enter a valid time or duration of 0 or greater.", comment: "")
+        return String(localized: "Enter a valid time or duration of 0 or greater.", table: "Automation")
     case .invalidTimeout:
-        return NSLocalizedString("Enter a timeout of 0 or greater.", comment: "")
+        return String(localized: "Enter a timeout of 0 or greater.", table: "Automation")
     case .invalidStartCoordinate:
-        return NSLocalizedString("Enter valid X and Y coordinates for the action start.", comment: "")
+        return String(localized: "Enter valid X and Y coordinates for the action start.", table: "EditorUX")
     case .invalidEndCoordinate:
-        return NSLocalizedString("Enter valid X and Y coordinates for the action end.", comment: "")
+        return String(localized: "Enter valid X and Y coordinates for the action end.", table: "EditorUX")
     case .invalidKeyCode:
-        return NSLocalizedString("Enter a valid key code.", comment: "")
+        return String(localized: "Enter a valid key code.", table: "Automation")
     }
 }
 
@@ -686,11 +686,11 @@ func actionSelectionDeletionReadiness(
 func actionSelectionDeletionReadinessHelp(_ readiness: ActionSelectionDeletionReadiness) -> String {
     switch readiness {
     case .ready:
-        return NSLocalizedString("Delete selected actions from the macro.", comment: "")
+        return String(localized: "Delete selected actions from the macro.", table: "EditorUX")
     case .noSelection:
-        return NSLocalizedString("Select actions to delete.", comment: "")
+        return String(localized: "Select actions to delete.", table: "EditorUX")
     case .noDeletableActions:
-        return NSLocalizedString("Select recorded actions or wait gaps with duration to delete.", comment: "")
+        return String(localized: "Select recorded actions or wait gaps with duration to delete.", table: "Recording")
     }
 }
 
@@ -725,11 +725,11 @@ func actionSelectionDuplicationReadiness(
 func actionSelectionDuplicationReadinessHelp(_ readiness: ActionSelectionDuplicationReadiness) -> String {
     switch readiness {
     case .ready:
-        return NSLocalizedString("Duplicate selected actions or wait gaps.", comment: "")
+        return String(localized: "Duplicate selected actions or wait gaps.", table: "EditorUX")
     case .noSelection:
-        return NSLocalizedString("Select actions to duplicate.", comment: "")
+        return String(localized: "Select actions to duplicate.", table: "EditorUX")
     case .noDuplicatableActions:
-        return NSLocalizedString("Select recorded actions or wait gaps with duration to duplicate.", comment: "")
+        return String(localized: "Select recorded actions or wait gaps with duration to duplicate.", table: "Recording")
     }
 }
 
@@ -787,16 +787,16 @@ func actionTrimReadinessHelp(
     case .ready:
         switch direction {
         case .before:
-            return NSLocalizedString("Remove everything before the selected action and start it at 0.", comment: "")
+            return String(localized: "Remove everything before the selected action and start it at 0.", table: "EditorUX")
         case .after:
-            return NSLocalizedString("Remove everything after the selected action.", comment: "")
+            return String(localized: "Remove everything after the selected action.", table: "EditorUX")
         }
     case .needsSingleAction:
-        return NSLocalizedString("Select exactly one action to trim the macro.", comment: "")
+        return String(localized: "Select exactly one action to trim the macro.", table: "EditorUX")
     case .noContentBefore:
-        return NSLocalizedString("The selected action is already at the beginning.", comment: "")
+        return String(localized: "The selected action is already at the beginning.", table: "EditorUX")
     case .noContentAfter:
-        return NSLocalizedString("The selected action is already at the end.", comment: "")
+        return String(localized: "The selected action is already at the end.", table: "EditorUX")
     }
 }
 
@@ -840,16 +840,16 @@ func actionShiftReadinessHelp(
     case .ready:
         switch direction {
         case .earlier:
-            return NSLocalizedString("Move selected recorded actions earlier.", comment: "")
+            return String(localized: "Move selected recorded actions earlier.", table: "Recording")
         case .later:
-            return NSLocalizedString("Move selected recorded actions later.", comment: "")
+            return String(localized: "Move selected recorded actions later.", table: "Recording")
         }
     case .noSelection:
-        return NSLocalizedString("Select recorded actions to shift their timing.", comment: "")
+        return String(localized: "Select recorded actions to shift their timing.", table: "Recording")
     case .noEventBackedActions:
-        return NSLocalizedString("Wait gaps are edited with Wait Duration instead of Shift Selected.", comment: "")
+        return String(localized: "Wait gaps are edited with Wait Duration instead of Shift Selected.", table: "EditorUX")
     case .alreadyAtStart:
-        return NSLocalizedString("The selected action is already at the beginning.", comment: "")
+        return String(localized: "The selected action is already at the beginning.", table: "EditorUX")
     }
 }
 
@@ -881,13 +881,13 @@ func actionTimeStretchReadiness(
 func actionTimeStretchReadinessHelp(_ readiness: ActionTimeStretchReadiness) -> String {
     switch readiness {
     case .ready:
-        return NSLocalizedString("Apply this stretch factor to the full macro timeline.", comment: "")
+        return String(localized: "Apply this stretch factor to the full macro timeline.", table: "EditorUX")
     case .noActions:
-        return NSLocalizedString("Record or insert actions before stretching time.", comment: "")
+        return String(localized: "Record or insert actions before stretching time.", table: "Recording")
     case .invalidFactor:
-        return NSLocalizedString("Choose a stretch factor greater than 0.", comment: "")
+        return String(localized: "Choose a stretch factor greater than 0.", table: "Automation")
     case .unchangedFactor:
-        return NSLocalizedString("Choose a stretch factor other than 1.00x.", comment: "")
+        return String(localized: "Choose a stretch factor other than 1.00x.", table: "Automation")
     }
 }
 
@@ -936,18 +936,18 @@ func actionRowReorderReadinessHelp(
     case .ready:
         switch direction {
         case .up:
-            return NSLocalizedString("Move selected actions up", comment: "")
+            return String(localized: "Move selected actions up", table: "EditorUX")
         case .down:
-            return NSLocalizedString("Move selected actions down", comment: "")
+            return String(localized: "Move selected actions down", table: "EditorUX")
         }
     case .noSelection:
-        return NSLocalizedString("Select recorded actions to reorder them.", comment: "")
+        return String(localized: "Select recorded actions to reorder them.", table: "Recording")
     case .noRecordedActions:
-        return NSLocalizedString("Wait gaps are edited with Wait Duration instead of row reordering.", comment: "")
+        return String(localized: "Wait gaps are edited with Wait Duration instead of row reordering.", table: "EditorUX")
     case .alreadyAtTop:
-        return NSLocalizedString("Selected actions are already at the top.", comment: "")
+        return String(localized: "Selected actions are already at the top.", table: "EditorUX")
     case .alreadyAtBottom:
-        return NSLocalizedString("Selected actions are already at the bottom.", comment: "")
+        return String(localized: "Selected actions are already at the bottom.", table: "EditorUX")
     }
 }
 
@@ -956,13 +956,13 @@ func actionRowReorderDisabledSummary(
     down: ActionRowReorderReadiness
 ) -> String {
     if up == .noRecordedActions || down == .noRecordedActions {
-        return NSLocalizedString("Wait gaps are edited with Wait Duration instead of row reordering.", comment: "")
+        return String(localized: "Wait gaps are edited with Wait Duration instead of row reordering.", table: "EditorUX")
     }
     if up == .noSelection || down == .noSelection {
-        return NSLocalizedString("Select recorded actions to reorder them.", comment: "")
+        return String(localized: "Select recorded actions to reorder them.", table: "Recording")
     }
     if up == .alreadyAtTop && down == .alreadyAtBottom {
-        return NSLocalizedString("Selected actions cannot move farther.", comment: "")
+        return String(localized: "Selected actions cannot move farther.", table: "EditorUX")
     }
     if !up.canMove {
         return actionRowReorderReadinessHelp(up, direction: .up)
@@ -970,21 +970,21 @@ func actionRowReorderDisabledSummary(
     if !down.canMove {
         return actionRowReorderReadinessHelp(down, direction: .down)
     }
-    return NSLocalizedString("Move selected actions up", comment: "")
+    return String(localized: "Move selected actions up", table: "EditorUX")
 }
 
 func actionRowCountLabel(for group: ActionGroup) -> String? {
     guard group.eventIndices.count > 1 else { return nil }
     if group.kind.previewsPointSequence {
-        return String(format: NSLocalizedString("%d points", comment: ""), max(group.path.count, group.clickCount))
+        return String(format: String(localized: "%d points", table: "Common"), max(group.path.count, group.clickCount))
     }
     if group.kind == .scroll {
-        return String(format: NSLocalizedString("%d wheel ticks", comment: ""), group.eventIndices.count)
+        return String(format: String(localized: "%d wheel ticks", table: "Common"), group.eventIndices.count)
     }
     if group.kind == .sequence {
-        return String(format: NSLocalizedString("%d actions", comment: ""), group.containedActionCount ?? group.eventIndices.count)
+        return String(format: String(localized: "%d actions", table: "EditorUX"), group.containedActionCount ?? group.eventIndices.count)
     }
-    return String(format: NSLocalizedString("Merged (%d)", comment: ""), group.eventIndices.count)
+    return String(format: String(localized: "Merged (%d)", table: "Common"), group.eventIndices.count)
 }
 
 func kindColor(_ k: RecordedEvent.Kind) -> Color {

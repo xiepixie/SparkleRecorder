@@ -14,7 +14,7 @@ struct AutomationTaskRunControlView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 9) {
-            AutomationSectionHeader(title: NSLocalizedString("RUN CONTROL", comment: ""))
+            AutomationSectionHeader(title: String(localized: "RUN CONTROL", table: "Automation"))
 
             HStack(alignment: .center, spacing: 8) {
                 Label(statusTitle, systemImage: statusImage)
@@ -31,31 +31,31 @@ struct AutomationTaskRunControlView: View {
                 Spacer(minLength: 0)
 
                 if activeRunID == nil {
-                    Button(NSLocalizedString("Run Task", comment: ""), systemImage: "play.fill") {
+                    Button(String(localized: "Run Task", table: "Automation"), systemImage: "play.fill") {
                         isConfirmingRun = true
                     }
                     .buttonStyle(AutomationQuietButtonStyle(tint: Brand.libraryGreen))
                     .disabled(!isEnabled)
                     .help(runButtonHelp)
                 } else {
-                    Button(NSLocalizedString("Cancel Run", comment: ""), systemImage: "xmark.circle", role: .destructive) {
+                    Button(String(localized: "Cancel Run", table: "Automation"), systemImage: "xmark.circle", role: .destructive) {
                         isConfirmingCancel = true
                     }
                     .buttonStyle(AutomationQuietButtonStyle(isDestructive: true))
-                    .help(NSLocalizedString("Cancel the current run", comment: ""))
+                    .help(String(localized: "Cancel the current run", table: "Automation"))
                 }
             }
         }
         .padding(.vertical, 8)
         .alert(runConfirmationTitle, isPresented: $isConfirmingRun) {
-            Button(NSLocalizedString("Run Task", comment: ""), action: onRun)
-            Button(NSLocalizedString("Cancel", comment: ""), role: .cancel) {}
+            Button(String(localized: "Run Task", table: "Automation"), action: onRun)
+            Button(String(localized: "Cancel", table: "Common"), role: .cancel) {}
         } message: {
             Text(runConfirmationMessage)
         }
         .alert(cancelConfirmationTitle, isPresented: $isConfirmingCancel) {
-            Button(NSLocalizedString("Cancel Run", comment: ""), role: .destructive, action: onCancel)
-            Button(NSLocalizedString("Keep Running", comment: ""), role: .cancel) {}
+            Button(String(localized: "Cancel Run", table: "Automation"), role: .destructive, action: onCancel)
+            Button(String(localized: "Keep Running", table: "Automation"), role: .cancel) {}
         } message: {
             Text(cancelConfirmationMessage)
         }
@@ -63,12 +63,12 @@ struct AutomationTaskRunControlView: View {
 
     private var statusTitle: String {
         if activeRunID != nil {
-            return NSLocalizedString("Running", comment: "")
+            return String(localized: "Running", table: "Automation")
         }
         if !isEnabled {
-            return NSLocalizedString("Disabled", comment: "")
+            return String(localized: "Disabled", table: "Common")
         }
-        return NSLocalizedString("Ready", comment: "")
+        return String(localized: "Ready", table: "Common")
     }
 
     private var statusImage: String {
@@ -93,20 +93,20 @@ struct AutomationTaskRunControlView: View {
 
     private var statusDetail: String {
         if activeRunID != nil {
-            return NSLocalizedString("Current run is active", comment: "")
+            return String(localized: "Current run is active", table: "Automation")
         }
         if !isEnabled {
-            return NSLocalizedString("Enable the task before running", comment: "")
+            return String(localized: "Enable the task before running", table: "Automation")
         }
         if resourceRequirement.requiresForegroundInput {
-            return NSLocalizedString("May use mouse and keyboard", comment: "")
+            return String(localized: "May use mouse and keyboard", table: "Automation")
         }
         return resourceLabel
     }
 
     private var resourceLabel: String {
         if resourceRequirement.resources.isEmpty {
-            return NSLocalizedString("No exclusive resources", comment: "")
+            return String(localized: "No exclusive resources", table: "Common")
         }
         return resourceRequirement.resources
             .sorted { $0.rawValue < $1.rawValue }
@@ -116,34 +116,34 @@ struct AutomationTaskRunControlView: View {
 
     private var runButtonHelp: String {
         isEnabled
-            ? NSLocalizedString("Start this task now", comment: "")
-            : NSLocalizedString("Enable the task before running", comment: "")
+            ? String(localized: "Start this task now", table: "Automation")
+            : String(localized: "Enable the task before running", table: "Automation")
     }
 
     private var runConfirmationTitle: String {
-        String(format: NSLocalizedString("Run %@?", comment: ""), taskName)
+        String(format: String(localized: "Run %@?", table: "Automation"), taskName)
     }
 
     private var runConfirmationMessage: String {
         if resourceRequirement.requiresForegroundInput {
             return String(
-                format: NSLocalizedString("This starts \"%@\" now and may control the mouse and keyboard while it runs.", comment: ""),
+                format: String(localized: "This starts \"%@\" now and may control the mouse and keyboard while it runs.", table: "Common"),
                 taskName
             )
         }
         return String(
-            format: NSLocalizedString("This starts \"%@\" now using its configured automation resources.", comment: ""),
+            format: String(localized: "This starts \"%@\" now using its configured automation resources.", table: "Common"),
             taskName
         )
     }
 
     private var cancelConfirmationTitle: String {
-        String(format: NSLocalizedString("Cancel %@?", comment: ""), taskName)
+        String(format: String(localized: "Cancel %@?", table: "Common"), taskName)
     }
 
     private var cancelConfirmationMessage: String {
         String(
-            format: NSLocalizedString("This cancels the current run for \"%@\".", comment: ""),
+            format: String(localized: "This cancels the current run for \"%@\".", table: "Common"),
             taskName
         )
     }
@@ -151,13 +151,13 @@ struct AutomationTaskRunControlView: View {
     private func resourceTitle(for resource: AutomationResource) -> String {
         switch resource {
         case .foregroundInput:
-            return NSLocalizedString("Mouse and keyboard", comment: "")
+            return String(localized: "Mouse and keyboard", table: "Common")
         case .screenCapture:
-            return NSLocalizedString("Screen capture", comment: "")
+            return String(localized: "Screen capture", table: "Recording")
         case .accessibility:
-            return NSLocalizedString("Accessibility", comment: "")
+            return String(localized: "Accessibility", table: "Settings")
         case .network:
-            return NSLocalizedString("Network", comment: "")
+            return String(localized: "Network", table: "Common")
         }
     }
 }

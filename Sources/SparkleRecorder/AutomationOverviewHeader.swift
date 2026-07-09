@@ -9,7 +9,7 @@ struct AutomationOverviewHeader: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            Label(NSLocalizedString("Automation", comment: ""), systemImage: "point.topleft.down.curvedto.point.bottomright.up")
+            Label(String(localized: "Automation", table: "Automation"), systemImage: "point.topleft.down.curvedto.point.bottomright.up")
                 .font(.title3)
                 .bold()
                 .foregroundStyle(.primary)
@@ -30,8 +30,8 @@ struct AutomationOverviewHeader: View {
 
             Button("AI Draft", systemImage: "sparkles", action: onOpenAIDraftPreview)
                 .buttonStyle(.borderless)
-                .help(NSLocalizedString("Open AI workflow draft", comment: ""))
-                .accessibilityLabel(NSLocalizedString("Open AI workflow draft", comment: ""))
+                .help(String(localized: "Open AI workflow draft", table: "Automation"))
+                .accessibilityLabel(String(localized: "Open AI workflow draft", table: "Automation"))
 
             Button("Refresh", systemImage: "arrow.clockwise", action: onRefresh)
                 .labelStyle(.iconOnly)
@@ -42,8 +42,8 @@ struct AutomationOverviewHeader: View {
                         .fill(refreshState.isLoading ? Brand.libraryBlue.opacity(0.12) : Color.clear)
                 )
                 .disabled(refreshState.isLoading)
-                .help(NSLocalizedString("Refresh automation projection", comment: ""))
-                .accessibilityLabel(NSLocalizedString("Refresh automation projection", comment: ""))
+                .help(String(localized: "Refresh automation projection", table: "Automation"))
+                .accessibilityLabel(String(localized: "Refresh automation projection", table: "Automation"))
         }
     }
 }

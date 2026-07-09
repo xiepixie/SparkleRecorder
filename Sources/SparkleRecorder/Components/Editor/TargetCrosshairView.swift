@@ -86,13 +86,13 @@ struct TargetCrosshairView: View {
     private func targetBadgeTitle(for action: RelativePreviewAction) -> String? {
         switch action.affordance {
         case .textClickTarget:
-            return NSLocalizedString("Click text", comment: "")
+            return String(localized: "Click text", table: "EditorUX")
         case .waitTextRegion:
-            return NSLocalizedString("Wait text", comment: "")
+            return String(localized: "Wait text", table: "EditorUX")
         case .waitTextGoneRegion:
-            return NSLocalizedString("Wait gone", comment: "")
+            return String(localized: "Wait gone", table: "EditorUX")
         case .verifyTextRegion:
-            return NSLocalizedString("Verify text", comment: "")
+            return String(localized: "Verify text", table: "EditorUX")
         default:
             return nil
         }
@@ -247,8 +247,8 @@ struct TargetCrosshairView: View {
                         path.addLines(displayPath)
                     })
                     .help(action.kind.previewsPointSequence
-                          ? NSLocalizedString("Drag line to move all click points", comment: "")
-                          : NSLocalizedString("Drag path to move the whole drag", comment: ""))
+                          ? String(localized: "Drag line to move all click points", table: "EditorUX")
+                          : String(localized: "Drag path to move the whole drag", table: "EditorUX"))
 	                    .gesture(
 	                        DragGesture(minimumDistance: 0)
 	                            .onChanged { value in
@@ -309,7 +309,7 @@ struct TargetCrosshairView: View {
                                             }
                                         }
                                     )
-                                    .help(NSLocalizedString("Drag to adjust swipe destination (rotate/stretch)", comment: ""))
+                                    .help(String(localized: "Drag to adjust swipe destination (rotate/stretch)", table: "EditorUX"))
                                     .frame(width: 100, height: 100) // Large frame to prevent visual clipping of badge/arrow/shadows
                                     .contentShape(Rectangle())
                                     .offset(x: displayEndPt.x - 50, y: displayEndPt.y - 50)
@@ -365,7 +365,7 @@ struct TargetCrosshairView: View {
                                     .foregroundStyle(.white)
                             }
                             .scaleEffect(isCurrentPointDrag ? 1.18 : 1.0)
-                            .help(NSLocalizedString("Drag to adjust this click point", comment: ""))
+                            .help(String(localized: "Drag to adjust this click point", table: "EditorUX"))
                             .frame(width: 100, height: 100)
                             .contentShape(Rectangle())
                             .offset(x: point.x - 50, y: point.y - 50)
@@ -443,7 +443,7 @@ struct TargetCrosshairView: View {
                             )
                             .offset(x: 14, y: -14)
                     )
-                    .help(NSLocalizedString("Drag to adjust drag start", comment: ""))
+                    .help(String(localized: "Drag to adjust drag start", table: "EditorUX"))
                     .frame(width: 100, height: 100) // Large frame to prevent visual clipping of badge/arrow/shadows
                     .contentShape(Rectangle())
                     .offset(x: displayPt.x - 50, y: displayPt.y - 50)

@@ -17,11 +17,11 @@ enum LibraryFilter: Hashable {
 
     var label: String {
         switch self {
-        case .all:        return NSLocalizedString("All Macros", comment: "")
-        case .favorites:  return NSLocalizedString("Favorites", comment: "")
-        case .recent:     return NSLocalizedString("Recent", comment: "")
-        case .mostPlayed: return NSLocalizedString("Most Played", comment: "")
-        case .withHotkey: return NSLocalizedString("Has Hotkey", comment: "")
+        case .all:        return String(localized: "All Macros", table: "EditorUX")
+        case .favorites:  return String(localized: "Favorites", table: "Common")
+        case .recent:     return String(localized: "Recent", table: "Common")
+        case .mostPlayed: return String(localized: "Most Played", table: "Common")
+        case .withHotkey: return String(localized: "Has Hotkey", table: "Common")
         case .tag(let t): return t
         case .accent(let name): return accentDisplayName(name)
         }
@@ -447,17 +447,17 @@ final class MacroLibrary: ObservableObject {
 enum RelativeTime {
     static func string(from date: Date) -> String {
         let s = -date.timeIntervalSinceNow
-        if s < 60 { return NSLocalizedString("just now", comment: "") }
+        if s < 60 { return String(localized: "just now", table: "Common") }
         if s < 3600 {
-            let format = NSLocalizedString("%dm ago", comment: "")
+            let format = String(localized: "%dm ago", table: "Common")
             return String(format: format, Int(s / 60))
         }
         if s < 86_400 {
-            let format = NSLocalizedString("%dh ago", comment: "")
+            let format = String(localized: "%dh ago", table: "Common")
             return String(format: format, Int(s / 3600))
         }
         if s < 604_800 {
-            let format = NSLocalizedString("%dd ago", comment: "")
+            let format = String(localized: "%dd ago", table: "Common")
             return String(format: format, Int(s / 86_400))
         }
         let f = DateFormatter()

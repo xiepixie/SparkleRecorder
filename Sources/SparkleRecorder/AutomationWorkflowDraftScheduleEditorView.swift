@@ -20,12 +20,12 @@ struct AutomationWorkflowDraftScheduleEditorView: View {
         if !document.workflow.tasks.isEmpty {
             VStack(alignment: .leading, spacing: 8) {
                 AutomationSectionHeader(
-                    title: NSLocalizedString("DRAFT SCHEDULE", comment: ""),
+                    title: String(localized: "DRAFT SCHEDULE", table: "Common"),
                     count: scheduledTaskCount
                 )
 
                 HStack(spacing: 8) {
-                    Picker(NSLocalizedString("Task", comment: ""), selection: $selectedTaskKey) {
+                    Picker(String(localized: "Task", table: "Automation"), selection: $selectedTaskKey) {
                         ForEach(document.workflow.tasks, id: \.key) { task in
                             Text(task.name ?? task.key).tag(task.key)
                         }
@@ -35,7 +35,7 @@ struct AutomationWorkflowDraftScheduleEditorView: View {
                         loadSelectedTask()
                     }
 
-                    Picker(NSLocalizedString("Schedule", comment: ""), selection: $scheduleType) {
+                    Picker(String(localized: "Schedule", table: "Common"), selection: $scheduleType) {
                         ForEach(scheduleTypes, id: \.self) { type in
                             Text(scheduleTitle(for: type)).tag(type)
                         }
@@ -46,7 +46,7 @@ struct AutomationWorkflowDraftScheduleEditorView: View {
 
                 if scheduleType != "manual" {
                     DatePicker(
-                        NSLocalizedString("Start", comment: ""),
+                        String(localized: "Start", table: "Common"),
                         selection: $startAt,
                         displayedComponents: [.date, .hourAndMinute]
                     )
@@ -55,19 +55,19 @@ struct AutomationWorkflowDraftScheduleEditorView: View {
 
                 if scheduleType == "repeating" {
                     HStack(spacing: 8) {
-                        Label(NSLocalizedString("Every", comment: ""), systemImage: "repeat")
+                        Label(String(localized: "Every", table: "Common"), systemImage: "repeat")
                             .font(.caption)
                             .foregroundStyle(.secondary)
-                        TextField(NSLocalizedString("Every", comment: ""), value: $every, format: .number)
+                        TextField(String(localized: "Every", table: "Common"), value: $every, format: .number)
                             .textFieldStyle(.roundedBorder)
                             .frame(width: 72)
-                        Picker(NSLocalizedString("Unit", comment: ""), selection: $unit) {
+                        Picker(String(localized: "Unit", table: "Common"), selection: $unit) {
                             ForEach(units, id: \.self) { unit in
                                 Text(unitTitle(for: unit)).tag(unit)
                             }
                         }
                         .frame(width: 130)
-                        TextField(NSLocalizedString("Time zone", comment: ""), text: $timeZone)
+                        TextField(String(localized: "Time zone", table: "Common"), text: $timeZone)
                             .textFieldStyle(.roundedBorder)
                             .frame(maxWidth: 220)
                     }
@@ -75,7 +75,7 @@ struct AutomationWorkflowDraftScheduleEditorView: View {
 
                 HStack {
                     Spacer(minLength: 0)
-                    Button(NSLocalizedString("Apply Schedule", comment: ""), systemImage: "calendar.badge.checkmark", action: applyEdit)
+                    Button(String(localized: "Apply Schedule", table: "Common"), systemImage: "calendar.badge.checkmark", action: applyEdit)
                         .buttonStyle(.bordered)
                         .disabled(selectedTaskKey.isEmpty)
                 }
@@ -156,24 +156,24 @@ struct AutomationWorkflowDraftScheduleEditorView: View {
     private func scheduleTitle(for type: String) -> String {
         switch type {
         case "once":
-            return NSLocalizedString("Once", comment: "")
+            return String(localized: "Once", table: "Common")
         case "repeating":
-            return NSLocalizedString("Repeating", comment: "")
+            return String(localized: "Repeating", table: "Common")
         default:
-            return NSLocalizedString("Manual", comment: "")
+            return String(localized: "Manual", table: "Common")
         }
     }
 
     private func unitTitle(for unit: String) -> String {
         switch unit {
         case "minutes":
-            return NSLocalizedString("Minutes", comment: "")
+            return String(localized: "Minutes", table: "Common")
         case "hours":
-            return NSLocalizedString("Hours", comment: "")
+            return String(localized: "Hours", table: "Common")
         case "weeks":
-            return NSLocalizedString("Weeks", comment: "")
+            return String(localized: "Weeks", table: "Common")
         default:
-            return NSLocalizedString("Days", comment: "")
+            return String(localized: "Days", table: "Common")
         }
     }
 }

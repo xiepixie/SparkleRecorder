@@ -13,7 +13,7 @@ struct AutomationWorkflowTaskListView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             AutomationSectionHeader(
-                title: NSLocalizedString("TASKS", comment: ""),
+                title: String(localized: "TASKS", table: "Automation"),
                 count: tasks.count
             )
 

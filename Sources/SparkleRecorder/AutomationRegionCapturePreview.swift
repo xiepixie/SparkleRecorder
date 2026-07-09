@@ -23,7 +23,7 @@ struct AutomationRegionCaptureWindowSummary {
         if let bundleIdentifier, !bundleIdentifier.isEmpty {
             return bundleIdentifier
         }
-        return NSLocalizedString("Top window", comment: "")
+        return String(localized: "Top window", table: "Common")
     }
 }
 
@@ -34,12 +34,12 @@ struct AutomationRegionCapturePreview {
     var windowSummary: AutomationRegionCaptureWindowSummary?
 
     var sourceTitle: String {
-        windowSummary?.displayTitle ?? NSLocalizedString("Display crop", comment: "")
+        windowSummary?.displayTitle ?? String(localized: "Display crop", table: "Common")
     }
 
     var pixelDetail: String {
         String(
-            format: NSLocalizedString("%d x %d px · Original pixels", comment: ""),
+            format: String(localized: "%d x %d px · Original pixels", table: "Automation"),
             pixelWidth,
             pixelHeight
         )
@@ -148,7 +148,7 @@ struct AutomationRegionCapturePreviewView<Placeholder: View>: View {
                                     }
                                 }
                         )
-                        .help(NSLocalizedString("Click preview to sample pixel color", comment: ""))
+                        .help(String(localized: "Click preview to sample pixel color", table: "EditorUX"))
                 }
             }
         }

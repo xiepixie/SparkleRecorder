@@ -17,7 +17,7 @@ struct AutomationTaskDependencyAuthoringView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             AutomationSectionHeader(
-                title: NSLocalizedString("DEPENDENCIES", comment: ""),
+                title: String(localized: "DEPENDENCIES", table: "Common"),
                 count: relatedDependencies.count
             )
 
@@ -25,7 +25,7 @@ struct AutomationTaskDependencyAuthoringView: View {
 
             if !outgoingDependencies.isEmpty {
                 dependencyGroup(
-                    title: NSLocalizedString("OUTGOING", comment: ""),
+                    title: String(localized: "OUTGOING", table: "Common"),
                     dependencies: outgoingDependencies,
                     direction: .outgoing
                 )
@@ -33,14 +33,14 @@ struct AutomationTaskDependencyAuthoringView: View {
 
             if !incomingDependencies.isEmpty {
                 dependencyGroup(
-                    title: NSLocalizedString("INCOMING", comment: ""),
+                    title: String(localized: "INCOMING", table: "Common"),
                     dependencies: incomingDependencies,
                     direction: .incoming
                 )
             }
 
             if relatedDependencies.isEmpty && connectTargets.isEmpty {
-                Label(NSLocalizedString("Add another task to create a link", comment: ""), systemImage: "link.badge.plus")
+                Label(String(localized: "Add another task to create a link", table: "Automation"), systemImage: "link.badge.plus")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -67,7 +67,7 @@ struct AutomationTaskDependencyAuthoringView: View {
             EmptyView()
         } else {
             VStack(alignment: .leading, spacing: 8) {
-                Picker(NSLocalizedString("Connect to", comment: ""), selection: targetBinding) {
+                Picker(String(localized: "Connect to", table: "Common"), selection: targetBinding) {
                     ForEach(connectTargets) { target in
                         Text(target.name).tag(Optional(target.id))
                     }
@@ -75,7 +75,7 @@ struct AutomationTaskDependencyAuthoringView: View {
                 .pickerStyle(.menu)
 
                 HStack(spacing: 8) {
-                    Picker(NSLocalizedString("Run when", comment: ""), selection: $triggerDraft) {
+                    Picker(String(localized: "Run when", table: "Automation"), selection: $triggerDraft) {
                         ForEach(triggerOptions) { option in
                             Text(option.title).tag(option)
                         }
@@ -88,7 +88,7 @@ struct AutomationTaskDependencyAuthoringView: View {
                 }
 
                 if sourceCanProvideDynamicDelay {
-                    Toggle(NSLocalizedString("Use recognized time", comment: ""), isOn: $usesRecognizedTimeDelay)
+                    Toggle(String(localized: "Use recognized time", table: "Common"), isOn: $usesRecognizedTimeDelay)
                         .toggleStyle(.checkbox)
                         .help(NSLocalizedString(
                             "Read a duration from the source condition evidence and use the delay field as fallback.",
@@ -96,9 +96,9 @@ struct AutomationTaskDependencyAuthoringView: View {
                         ))
 
                     if usesRecognizedTimeDelay {
-                        LabeledContent(NSLocalizedString("Maximum wait (s)", comment: "")) {
+                        LabeledContent(String(localized: "Maximum wait (s)", table: "EditorUX")) {
                             TextField(
-                                NSLocalizedString("Seconds", comment: ""),
+                                String(localized: "Seconds", table: "Common"),
                                 value: $maximumRecognizedDelaySeconds,
                                 format: .number
                             )
@@ -109,7 +109,7 @@ struct AutomationTaskDependencyAuthoringView: View {
                 }
 
                 Button(action: createDependency) {
-                    Label(NSLocalizedString("Create Link", comment: ""), systemImage: "link.badge.plus")
+                    Label(String(localized: "Create Link", table: "Common"), systemImage: "link.badge.plus")
                         .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(AutomationQuietButtonStyle(tint: Brand.sigAmber))
@@ -159,22 +159,22 @@ struct AutomationTaskDependencyAuthoringView: View {
             }
             .buttonStyle(.plain)
 
-            Button(NSLocalizedString("Select task", comment: ""), systemImage: "arrow.up.right.square") {
+            Button(String(localized: "Select task", table: "Automation"), systemImage: "arrow.up.right.square") {
                 onSelectTask(direction.peerTaskID(for: dependency))
             }
             .labelStyle(.iconOnly)
             .buttonStyle(.plain)
             .frame(width: 24, height: 24)
-            .help(NSLocalizedString("Select task", comment: ""))
+            .help(String(localized: "Select task", table: "Automation"))
 
-            Button(NSLocalizedString("Delete Dependency", comment: ""), systemImage: "trash", role: .destructive) {
+            Button(String(localized: "Delete Dependency", table: "Automation"), systemImage: "trash", role: .destructive) {
                 onAction(.deleteDependency(workflowID: workflow.id, dependencyID: dependency.id, at: Date()))
             }
             .labelStyle(.iconOnly)
             .buttonStyle(.plain)
             .frame(width: 24, height: 24)
             .foregroundStyle(Brand.red500)
-            .help(NSLocalizedString("Delete Dependency", comment: ""))
+            .help(String(localized: "Delete Dependency", table: "Automation"))
         }
         .padding(8)
         .automationSubsurface(cornerRadius: 8)
@@ -214,8 +214,8 @@ struct AutomationTaskDependencyAuthoringView: View {
 
     private var delayFieldTitle: String {
         usesRecognizedTimeDelay
-            ? NSLocalizedString("Fallback", comment: "")
-            : NSLocalizedString("Delay", comment: "")
+            ? String(localized: "Fallback", table: "Common")
+            : String(localized: "Delay", table: "EditorUX")
     }
 
     private var sourceCanProvideDynamicDelay: Bool {
@@ -283,9 +283,9 @@ struct AutomationTaskDependencyAuthoringView: View {
         let peerName = taskName(direction.peerTaskID(for: dependency))
         switch direction {
         case .outgoing:
-            return String(format: NSLocalizedString("To %@", comment: ""), peerName)
+            return String(format: String(localized: "To %@", table: "Common"), peerName)
         case .incoming:
-            return String(format: NSLocalizedString("From %@", comment: ""), peerName)
+            return String(format: String(localized: "From %@", table: "Common"), peerName)
         }
     }
 
@@ -293,7 +293,7 @@ struct AutomationTaskDependencyAuthoringView: View {
         let trigger = AutomationDependencyTriggerDraft.draft(for: dependency.trigger).title
         if let dynamicDelayDetail = dynamicDelayDetail(for: dependency) {
             return String(
-                format: NSLocalizedString("%@ · %@", comment: ""),
+                format: String(localized: "%@ · %@", table: "Common"),
                 trigger,
                 dynamicDelayDetail
             )
@@ -302,7 +302,7 @@ struct AutomationTaskDependencyAuthoringView: View {
             return trigger
         }
         return String(
-            format: NSLocalizedString("%@ · %.1fs delay", comment: ""),
+            format: String(localized: "%@ · %.1fs delay", table: "EditorUX"),
             trigger,
             dependency.delay
         )
@@ -315,10 +315,10 @@ struct AutomationTaskDependencyAuthoringView: View {
         }
         let fallbackDelay = dynamicDelay.fallbackDelay ?? dependency.delay
         guard fallbackDelay > 0 else {
-            return NSLocalizedString("Observed time", comment: "")
+            return String(localized: "Observed time", table: "Common")
         }
         return String(
-            format: NSLocalizedString("Observed time · fallback %@", comment: ""),
+            format: String(localized: "Observed time · fallback %@", table: "Common"),
             compactDelayLabel(for: fallbackDelay)
         )
     }
@@ -326,7 +326,7 @@ struct AutomationTaskDependencyAuthoringView: View {
     private func compactDelayLabel(for delay: TimeInterval) -> String {
         let totalSeconds = Int(max(0, delay).rounded())
         guard totalSeconds > 0 else {
-            return NSLocalizedString("no delay", comment: "")
+            return String(localized: "no delay", table: "EditorUX")
         }
         let days = totalSeconds / 86_400
         let hours = (totalSeconds % 86_400) / 3_600
@@ -349,7 +349,7 @@ struct AutomationTaskDependencyAuthoringView: View {
     }
 
     private func taskName(_ taskID: UUID) -> String {
-        workflow.task(id: taskID)?.name ?? NSLocalizedString("Missing task", comment: "")
+        workflow.task(id: taskID)?.name ?? String(localized: "Missing task", table: "Automation")
     }
 }
 

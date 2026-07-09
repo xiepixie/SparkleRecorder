@@ -31,8 +31,8 @@ struct AutomationResourceTimelineView: View {
             if items.isEmpty {
                 AutomationEmptyState(
                     systemImage: "clock.badge.questionmark",
-                    title: NSLocalizedString("No runs yet", comment: ""),
-                    subtitle: NSLocalizedString("Manual or scheduled starts will appear here as timed checkpoints.", comment: "")
+                    title: String(localized: "No runs yet", table: "Common"),
+                    subtitle: String(localized: "Manual or scheduled starts will appear here as timed checkpoints.", table: "Common")
                 )
                 .frame(maxWidth: .infinity, minHeight: 118)
                 .padding(.horizontal, 12)
@@ -190,7 +190,7 @@ private struct AutomationTimelineColumn: View {
             }
             .buttonStyle(.plain)
             .frame(width: cardWidth)
-            .accessibilityHint(NSLocalizedString("Shows the task and run details in the inspector", comment: ""))
+            .accessibilityHint(String(localized: "Shows the task and run details in the inspector", table: "Automation"))
         }
         .frame(width: cardWidth + 16, alignment: .leading)
     }
@@ -215,7 +215,7 @@ private struct AutomationTimelineColumn: View {
         }
 
         if hasConflict {
-            return NSLocalizedString("Conflict", comment: "")
+            return String(localized: "Conflict", table: "Common")
         }
 
         guard let previousCompletedAt = previousItem.completedAt,

@@ -21,9 +21,9 @@ struct AutomationTaskRunEvidenceScreenshotPreviewView: View {
                         RoundedRectangle(cornerRadius: 7)
                             .strokeBorder(Color.primary.opacity(0.08), lineWidth: 0.6)
                     )
-                    .accessibilityLabel(NSLocalizedString("Failure screenshot preview", comment: ""))
+                    .accessibilityLabel(String(localized: "Failure screenshot preview", table: "Common"))
             } else {
-                Label(NSLocalizedString("Screenshot preview unavailable", comment: ""), systemImage: "photo.badge.exclamationmark")
+                Label(String(localized: "Screenshot preview unavailable", table: "Common"), systemImage: "photo.badge.exclamationmark")
                     .font(.caption)
                     .foregroundStyle(.tertiary)
                     .fixedSize(horizontal: false, vertical: true)

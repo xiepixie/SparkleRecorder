@@ -31,7 +31,7 @@ struct AutomationMacroTaskRow: View {
                         .foregroundStyle(.primary)
                         .lineLimit(1)
 
-                    Text(String(format: NSLocalizedString("%d events", comment: ""), macro.eventCount))
+                    Text(String(format: String(localized: "%d events", table: "EditorUX"), macro.eventCount))
                         .font(.caption)
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
@@ -56,9 +56,9 @@ struct AutomationMacroTaskRow: View {
         .onHover { hover in
             isHovered = hover
         }
-        .help(NSLocalizedString("Add macro as task", comment: ""))
+        .help(String(localized: "Add macro as task", table: "Automation"))
         .accessibilityLabel(accessibilityLabel)
-        .accessibilityHint(NSLocalizedString("Press to add as a workflow task. Drag to place it on the graph or task list.", comment: ""))
+        .accessibilityHint(String(localized: "Press to add as a workflow task. Drag to place it on the graph or task list.", table: "Common"))
     }
 
     private var macroIcon: some View {
@@ -84,7 +84,7 @@ struct AutomationMacroTaskRow: View {
 
     private var accessibilityLabel: String {
         String(
-            format: NSLocalizedString("Add %@ as task", comment: ""),
+            format: String(localized: "Add %@ as task", table: "Automation"),
             macro.name
         )
     }

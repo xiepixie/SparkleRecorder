@@ -7,34 +7,34 @@ struct AutomationTaskRunBranchEvidenceDetailsView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             AutomationTaskRunDetailRowView(
-                title: NSLocalizedString("Dependency", comment: ""),
+                title: String(localized: "Dependency", table: "Automation"),
                 value: shortID(evidence.dependencyID)
             )
             AutomationTaskRunDetailRowView(
-                title: NSLocalizedString("Trigger", comment: ""),
+                title: String(localized: "Trigger", table: "Automation"),
                 value: triggerLabel
             )
             if evidence.delay > 0 {
                 AutomationTaskRunDetailRowView(
-                    title: NSLocalizedString("Delay", comment: ""),
+                    title: String(localized: "Delay", table: "EditorUX"),
                     value: durationLabel(evidence.delay)
                 )
             }
             if let targetJoinPolicy = evidence.targetJoinPolicy {
                 AutomationTaskRunDetailRowView(
-                    title: NSLocalizedString("Target join", comment: ""),
+                    title: String(localized: "Target join", table: "Common"),
                     value: joinPolicyLabel(for: targetJoinPolicy)
                 )
             }
             if let targetRunID = evidence.targetRunID {
                 AutomationTaskRunDetailRowView(
-                    title: NSLocalizedString("Target run", comment: ""),
+                    title: String(localized: "Target run", table: "Common"),
                     value: shortID(targetRunID)
                 )
             } else if evidence.status == .triggered {
                 AutomationTaskRunDetailRowView(
-                    title: NSLocalizedString("Target run", comment: ""),
-                    value: NSLocalizedString("Waiting for join policy", comment: "")
+                    title: String(localized: "Target run", table: "Common"),
+                    value: String(localized: "Waiting for join policy", table: "Common")
                 )
             }
         }
@@ -44,59 +44,59 @@ struct AutomationTaskRunBranchEvidenceDetailsView: View {
     private var triggerLabel: String {
         switch evidence.trigger {
         case .onSuccess:
-            return NSLocalizedString("On success", comment: "")
+            return String(localized: "On success", table: "Common")
         case .onFailure:
-            return NSLocalizedString("On failure", comment: "")
+            return String(localized: "On failure", table: "Common")
         case .onTimeout:
-            return NSLocalizedString("On timeout", comment: "")
+            return String(localized: "On timeout", table: "Common")
         case .onCancelled:
-            return NSLocalizedString("On cancel", comment: "")
+            return String(localized: "On cancel", table: "Common")
         case .onConditionMatched:
-            return NSLocalizedString("Condition matched", comment: "")
+            return String(localized: "Condition matched", table: "Automation")
         case .onConditionNotMatched:
-            return NSLocalizedString("Condition not matched", comment: "")
+            return String(localized: "Condition not matched", table: "Automation")
         case .onOutcome(let predicate):
             return predicateLabel(for: predicate)
         case .always:
-            return NSLocalizedString("Always", comment: "")
+            return String(localized: "Always", table: "Common")
         }
     }
 
     private func predicateLabel(for predicate: AutomationOutcomePredicate) -> String {
         switch predicate {
         case .success:
-            return NSLocalizedString("Success", comment: "")
+            return String(localized: "Success", table: "Common")
         case .failure:
-            return NSLocalizedString("Failure", comment: "")
+            return String(localized: "Failure", table: "Common")
         case .timeout:
-            return NSLocalizedString("Timeout", comment: "")
+            return String(localized: "Timeout", table: "Common")
         case .cancelled:
-            return NSLocalizedString("Cancelled", comment: "")
+            return String(localized: "Cancelled", table: "Common")
         case .conditionMatched:
-            return NSLocalizedString("Condition matched", comment: "")
+            return String(localized: "Condition matched", table: "Automation")
         case .conditionNotMatched:
-            return NSLocalizedString("Condition not matched", comment: "")
+            return String(localized: "Condition not matched", table: "Automation")
         case .anyTerminal:
-            return NSLocalizedString("Any terminal outcome", comment: "")
+            return String(localized: "Any terminal outcome", table: "Common")
         }
     }
 
     private func joinPolicyLabel(for policy: AutomationJoinPolicy) -> String {
         switch policy {
         case .all:
-            return NSLocalizedString("All incoming branches", comment: "")
+            return String(localized: "All incoming branches", table: "Common")
         case .any:
-            return NSLocalizedString("Any incoming branch", comment: "")
+            return String(localized: "Any incoming branch", table: "Common")
         case .firstMatched:
-            return NSLocalizedString("First matching branch", comment: "")
+            return String(localized: "First matching branch", table: "Common")
         }
     }
 
     private func durationLabel(_ duration: TimeInterval) -> String {
         if duration < 10 {
-            return String(format: NSLocalizedString("%.1fs", comment: ""), duration)
+            return String(format: String(localized: "%.1fs", table: "Common"), duration)
         }
-        return String(format: NSLocalizedString("%.0fs", comment: ""), duration.rounded())
+        return String(format: String(localized: "%.0fs", table: "Common"), duration.rounded())
     }
 
     private func shortID(_ id: UUID) -> String {

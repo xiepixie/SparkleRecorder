@@ -928,7 +928,7 @@ extension Array where Element == RecordedEvent {
                 if copiedBehaviorNames[sourceBehaviorID] == nil,
                    let sourceName = sourceBehaviorNames[sourceBehaviorID] {
                     copiedBehaviorNames[sourceBehaviorID] = String(
-                        format: NSLocalizedString("Copy of %@", comment: ""),
+                        format: String(localized: "Copy of %@", table: "Common"),
                         sourceName
                     )
                 }

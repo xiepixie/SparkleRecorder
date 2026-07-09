@@ -56,30 +56,30 @@ struct AutomationTaskRunDetailView: View {
 
             VStack(alignment: .leading, spacing: 5) {
                 AutomationTaskRunDetailRowView(
-                    title: NSLocalizedString("Run", comment: ""),
+                    title: String(localized: "Run", table: "Automation"),
                     value: shortID(run.id)
                 )
                 AutomationTaskRunDetailRowView(
-                    title: NSLocalizedString("Execution", comment: ""),
+                    title: String(localized: "Execution", table: "Common"),
                     value: shortID(run.executionID)
                 )
                 AutomationTaskRunDetailRowView(
-                    title: NSLocalizedString("Attempt", comment: ""),
+                    title: String(localized: "Attempt", table: "Common"),
                     value: attemptSummary
                 )
                 AutomationTaskRunDetailRowView(
-                    title: NSLocalizedString("Upstream", comment: ""),
+                    title: String(localized: "Upstream", table: "Common"),
                     value: upstreamSummary
                 )
                 if let macroID = run.macroID {
                     AutomationTaskRunDetailRowView(
-                        title: NSLocalizedString("Macro", comment: ""),
+                        title: String(localized: "Macro", table: "EditorUX"),
                         value: shortID(macroID)
                     )
                 }
                 if let leaseID = run.leaseID {
                     AutomationTaskRunDetailRowView(
-                        title: NSLocalizedString("Lease", comment: ""),
+                        title: String(localized: "Lease", table: "Common"),
                         value: shortID(leaseID)
                     )
                 }
@@ -89,30 +89,30 @@ struct AutomationTaskRunDetailView: View {
 
             VStack(alignment: .leading, spacing: 5) {
                 AutomationTaskRunDetailRowView(
-                    title: NSLocalizedString("Created", comment: ""),
+                    title: String(localized: "Created", table: "Common"),
                     value: timeSummary(run.createdAt)
                 )
                 if let scheduledStartTime = run.scheduledStartTime {
                     AutomationTaskRunDetailRowView(
-                        title: NSLocalizedString("Scheduled", comment: ""),
+                        title: String(localized: "Scheduled", table: "Common"),
                         value: timeSummary(scheduledStartTime)
                     )
                 }
                 if let earliestStartTime = run.earliestStartTime {
                     AutomationTaskRunDetailRowView(
-                        title: NSLocalizedString("Ready", comment: ""),
+                        title: String(localized: "Ready", table: "Common"),
                         value: timeSummary(earliestStartTime)
                     )
                 }
                 if let actualStartTime = run.actualStartTime {
                     AutomationTaskRunDetailRowView(
-                        title: NSLocalizedString("Started", comment: ""),
+                        title: String(localized: "Started", table: "Common"),
                         value: timeSummary(actualStartTime)
                     )
                 }
                 if let completedAt = run.completedAt {
                     AutomationTaskRunDetailRowView(
-                        title: NSLocalizedString("Completed", comment: ""),
+                        title: String(localized: "Completed", table: "Common"),
                         value: timeSummary(completedAt)
                     )
                 }
@@ -181,7 +181,7 @@ struct AutomationTaskRunDetailView: View {
     private var macroReviewSection: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(alignment: .firstTextBaseline, spacing: 8) {
-                Label(NSLocalizedString("Macro Review", comment: ""), systemImage: "film.stack")
+                Label(String(localized: "Macro Review", table: "Common"), systemImage: "film.stack")
                     .font(.caption)
                     .bold()
                     .lineLimit(1)
@@ -205,8 +205,8 @@ struct AutomationTaskRunDetailView: View {
                     .buttonStyle(.bordered)
                     .controlSize(.small)
                     .disabled(isOpeningSemanticReview)
-                    .help(NSLocalizedString("Reveal linked Macro Review bundle", comment: ""))
-                    .accessibilityLabel(NSLocalizedString("Reveal linked Macro Review bundle", comment: ""))
+                    .help(String(localized: "Reveal linked Macro Review bundle", table: "Common"))
+                    .accessibilityLabel(String(localized: "Reveal linked Macro Review bundle", table: "Common"))
 
                     Button("", systemImage: "folder") {
                         chooseSemanticReviewBundle()
@@ -214,8 +214,8 @@ struct AutomationTaskRunDetailView: View {
                     .buttonStyle(.bordered)
                     .controlSize(.small)
                     .disabled(isOpeningSemanticReview)
-                    .help(NSLocalizedString("Choose a different Macro Review bundle", comment: ""))
-                    .accessibilityLabel(NSLocalizedString("Choose a different Macro Review bundle", comment: ""))
+                    .help(String(localized: "Choose a different Macro Review bundle", table: "Common"))
+                    .accessibilityLabel(String(localized: "Choose a different Macro Review bundle", table: "Common"))
                 }
             }
 
@@ -236,7 +236,7 @@ struct AutomationTaskRunDetailView: View {
                 HStack(spacing: 8) {
                     ProgressView()
                         .controlSize(.small)
-                    Text(NSLocalizedString("Opening review bundle", comment: ""))
+                    Text("Opening review bundle", tableName: "Common")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -353,37 +353,37 @@ struct AutomationTaskRunDetailView: View {
         ViewThatFits(in: .horizontal) {
             HStack(spacing: 5) {
                 macroReviewBadge(
-                    title: NSLocalizedString("Recording", comment: ""),
+                    title: String(localized: "Recording", table: "Recording"),
                     value: shortID(reference.recordingID)
                 )
                 macroReviewBadge(
-                    title: NSLocalizedString("Events", comment: ""),
+                    title: String(localized: "Events", table: "EditorUX"),
                     value: "\(reference.eventCount)"
                 )
                 macroReviewBadge(
-                    title: NSLocalizedString("Captured", comment: ""),
+                    title: String(localized: "Captured", table: "Common"),
                     value: compactDate(reference.capturedAt)
                 )
                 macroReviewBadge(
-                    title: NSLocalizedString("Manifest", comment: ""),
+                    title: String(localized: "Manifest", table: "Common"),
                     value: compactPath(reference.manifestRelativePath)
                 )
             }
             VStack(alignment: .leading, spacing: 5) {
                 macroReviewBadge(
-                    title: NSLocalizedString("Recording", comment: ""),
+                    title: String(localized: "Recording", table: "Recording"),
                     value: shortID(reference.recordingID)
                 )
                 macroReviewBadge(
-                    title: NSLocalizedString("Events", comment: ""),
+                    title: String(localized: "Events", table: "EditorUX"),
                     value: "\(reference.eventCount)"
                 )
                 macroReviewBadge(
-                    title: NSLocalizedString("Captured", comment: ""),
+                    title: String(localized: "Captured", table: "Common"),
                     value: compactDate(reference.capturedAt)
                 )
                 macroReviewBadge(
-                    title: NSLocalizedString("Manifest", comment: ""),
+                    title: String(localized: "Manifest", table: "Common"),
                     value: compactPath(reference.manifestRelativePath)
                 )
             }
@@ -451,25 +451,25 @@ struct AutomationTaskRunDetailView: View {
         switch feedback {
         case .succeeded(.open, let path):
             return (
-                String(format: NSLocalizedString("Opened %@", comment: ""), compactPath(path)),
+                String(format: String(localized: "Opened %@", table: "Common"), compactPath(path)),
                 "checkmark.circle",
                 .secondary
             )
         case .succeeded(.reveal, let path):
             return (
-                String(format: NSLocalizedString("Revealed %@", comment: ""), compactPath(path)),
+                String(format: String(localized: "Revealed %@", table: "Common"), compactPath(path)),
                 "checkmark.circle",
                 .secondary
             )
         case .failed(.open, let message):
             return (
-                String(format: NSLocalizedString("Open failed: %@", comment: ""), message),
+                String(format: String(localized: "Open failed: %@", table: "Common"), message),
                 "exclamationmark.triangle",
                 Brand.sigAmber
             )
         case .failed(.reveal, let message):
             return (
-                String(format: NSLocalizedString("Reveal failed: %@", comment: ""), message),
+                String(format: String(localized: "Reveal failed: %@", table: "Common"), message),
                 "exclamationmark.triangle",
                 Brand.sigAmber
             )
@@ -479,10 +479,10 @@ struct AutomationTaskRunDetailView: View {
     private var attemptSummary: String {
         let maxAttempts = retryPolicy.maxAttempts
         guard maxAttempts > 1 else {
-            return String(format: NSLocalizedString("%d", comment: ""), run.attempt)
+            return String(format: String(localized: "%d", table: "Common"), run.attempt)
         }
         return String(
-            format: NSLocalizedString("%d of %d", comment: ""),
+            format: String(localized: "%d of %d", table: "Common"),
             run.attempt,
             maxAttempts
         )
@@ -490,9 +490,9 @@ struct AutomationTaskRunDetailView: View {
 
     private var upstreamSummary: String {
         guard !run.upstreamRunIDs.isEmpty else {
-            return NSLocalizedString("None", comment: "")
+            return String(localized: "None", table: "Common")
         }
-        return String(format: NSLocalizedString("%d runs", comment: ""), run.upstreamRunIDs.count)
+        return String(format: String(localized: "%d runs", table: "Common"), run.upstreamRunIDs.count)
     }
 
     private var retryExhausted: Bool {
@@ -517,53 +517,53 @@ struct AutomationTaskRunDetailView: View {
 
     private var nextCheckSummary: String {
         if retryExhausted {
-            return NSLocalizedString("No retry attempts remain. Review the failed step or timeout branch before running again.", comment: "")
+            return String(localized: "No retry attempts remain. Review the failed step or timeout branch before running again.", table: "Common")
         }
 
         guard let outcome = run.outcome else {
             switch run.status {
             case .planned:
-                return NSLocalizedString("Waiting for its planned start.", comment: "")
+                return String(localized: "Waiting for its planned start.", table: "Common")
             case .waitingForDependencies:
-                return NSLocalizedString("Waiting for upstream work to finish.", comment: "")
+                return String(localized: "Waiting for upstream work to finish.", table: "Common")
             case .waitingForResource:
-                return NSLocalizedString("Waiting for a required resource to become available.", comment: "")
+                return String(localized: "Waiting for a required resource to become available.", table: "Common")
             case .queued:
-                return NSLocalizedString("Queued and ready for the runner.", comment: "")
+                return String(localized: "Queued and ready for the runner.", table: "Common")
             case .running:
-                return NSLocalizedString("Running now; waiting for the next outcome.", comment: "")
+                return String(localized: "Running now; waiting for the next outcome.", table: "Common")
             case .completed:
-                return NSLocalizedString("Completed without a recorded outcome.", comment: "")
+                return String(localized: "Completed without a recorded outcome.", table: "Common")
             }
         }
 
         switch outcome {
         case .succeeded:
-            return NSLocalizedString("This run completed successfully.", comment: "")
+            return String(localized: "This run completed successfully.", table: "Common")
         case .failed(let report):
             if let failedEventIndex = report?.failedEventIndex {
                 return String(
-                    format: NSLocalizedString("Review event #%d and its target window before retrying.", comment: ""),
+                    format: String(localized: "Review event #%d and its target window before retrying.", table: "Common"),
                     failedEventIndex + 1
                 )
             }
-            return NSLocalizedString("Review the macro target, window context, and latest evidence before retrying.", comment: "")
+            return String(localized: "Review the macro target, window context, and latest evidence before retrying.", table: "Common")
         case .cancelled:
-            return NSLocalizedString("Cancelled before completion; confirm whether this branch should stop or continue.", comment: "")
+            return String(localized: "Cancelled before completion; confirm whether this branch should stop or continue.", table: "Common")
         case .timedOut:
-            return NSLocalizedString("Check the timeout, watched condition, or timeout branch before retrying.", comment: "")
+            return String(localized: "Check the timeout, watched condition, or timeout branch before retrying.", table: "Common")
         case .resourceConflict:
-            return NSLocalizedString("Check foreground input timing and resource priority.", comment: "")
+            return String(localized: "Check foreground input timing and resource priority.", table: "Common")
         case .permissionDenied:
-            return NSLocalizedString("Grant the required permission before retrying.", comment: "")
+            return String(localized: "Grant the required permission before retrying.", table: "Common")
         case .conditionMatched:
-            return NSLocalizedString("Then branch is eligible after this condition.", comment: "")
+            return String(localized: "Then branch is eligible after this condition.", table: "Common")
         case .conditionNotMatched:
-            return NSLocalizedString("Else branch is eligible after this condition.", comment: "")
+            return String(localized: "Else branch is eligible after this condition.", table: "Common")
         case .missingMacro:
-            return NSLocalizedString("Reconnect the saved macro or replace this task.", comment: "")
+            return String(localized: "Reconnect the saved macro or replace this task.", table: "Common")
         case .rejected:
-            return NSLocalizedString("Fix the rejection reason before retrying.", comment: "")
+            return String(localized: "Fix the rejection reason before retrying.", table: "Common")
         }
     }
 
@@ -590,7 +590,7 @@ struct AutomationTaskRunDetailView: View {
     private func loadEvidence() {
         guard run.macroID != nil else {
             evidencePayload = nil
-            evidenceErrorMessage = NSLocalizedString("This run has no macro package evidence.", comment: "")
+            evidenceErrorMessage = String(localized: "This run has no macro package evidence.", table: "Common")
             isLoadingEvidence = false
             return
         }
@@ -620,7 +620,7 @@ struct AutomationTaskRunDetailView: View {
                 }
                 evidencePayload = nil
                 evidenceErrorMessage = String(
-                    format: NSLocalizedString("Could not load evidence: %@", comment: ""),
+                    format: String(localized: "Could not load evidence: %@", table: "Common"),
                     String(describing: error)
                 )
                 isLoadingEvidence = false
@@ -654,7 +654,7 @@ struct AutomationTaskRunDetailView: View {
             case .failure(let error):
                 semanticReviewState = nil
                 semanticReviewErrorMessage = String(
-                    format: NSLocalizedString("Could not open Macro Review: %@", comment: ""),
+                    format: String(localized: "Could not open Macro Review: %@", table: "Common"),
                     String(describing: error)
                 )
             }
@@ -687,7 +687,7 @@ struct AutomationTaskRunDetailView: View {
             do {
                 let state = try await SemanticRecordingReviewPresenter.reviewState(
                     from: reference,
-                    sourceName: presentation.macroName ?? NSLocalizedString("Macro Review", comment: "")
+                    sourceName: presentation.macroName ?? String(localized: "Macro Review", table: "Common")
                 )
                 await MainActor.run {
                     guard semanticReviewRequestRunID == requestedRunID else {
@@ -704,7 +704,7 @@ struct AutomationTaskRunDetailView: View {
                     isOpeningSemanticReview = false
                     semanticReviewState = nil
                     semanticReviewErrorMessage = String(
-                        format: NSLocalizedString("Could not open linked Macro Review: %@", comment: ""),
+                        format: String(localized: "Could not open linked Macro Review: %@", table: "Common"),
                         String(describing: error)
                     )
                 }
@@ -726,9 +726,9 @@ struct AutomationTaskRunDetailView: View {
 
     private var noEvidenceMessage: String {
         if run.evidenceID != nil {
-            return NSLocalizedString("No per-run evidence report found for this run yet.", comment: "")
+            return String(localized: "No per-run evidence report found for this run yet.", table: "Common")
         }
-        return NSLocalizedString("No evidence report found for this macro.", comment: "")
+        return String(localized: "No evidence report found for this macro.", table: "Common")
     }
 
     private func resetEvidence() {

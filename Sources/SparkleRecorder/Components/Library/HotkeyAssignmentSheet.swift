@@ -14,8 +14,8 @@ struct HotkeyAssignmentSheet: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             VStack(alignment: .leading, spacing: 4) {
-                Text(NSLocalizedString("Assign Hotkey", comment: "")).font(.system(size: 14, weight: .semibold))
-                Text(String(format: NSLocalizedString("Press any key combination to play %@ from any app.", comment: ""), macro.name))
+                Text("Assign Hotkey", tableName: "Common").font(.system(size: 14, weight: .semibold))
+                Text(String(format: String(localized: "Press any key combination to play %@ from any app.", table: "Automation"), macro.name))
                     .font(.system(size: 11))
                     .foregroundStyle(.secondary)
             }
@@ -24,13 +24,13 @@ struct HotkeyAssignmentSheet: View {
 
             HStack {
                 if currentHotkey != nil {
-                    Button(NSLocalizedString("Clear", comment: "")) { onSave(nil) }
+                    Button(String(localized: "Clear", table: "Common")) { onSave(nil) }
                         .controlSize(.regular)
                 }
                 Spacer()
-                Button(NSLocalizedString("Cancel", comment: ""), action: onCancel)
+                Button(String(localized: "Cancel", table: "Common"), action: onCancel)
                     .keyboardShortcut(.cancelAction)
-                Button(NSLocalizedString("Assign", comment: "")) {
+                Button(String(localized: "Assign", table: "Common")) {
                     if let s = selected {
                         onSave(s)
                     }

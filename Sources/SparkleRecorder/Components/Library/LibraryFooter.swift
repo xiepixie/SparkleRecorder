@@ -13,13 +13,13 @@ struct LibraryFooter: View {
             if workspace == .library {
                 FooterRow(
                     icon: "plus",
-                    label: NSLocalizedString("New macro", comment: ""),
+                    label: String(localized: "New macro", table: "EditorUX"),
                     rightAccessory: AnyView(KeyCapView(text: "⌘R")),
                     action: { controller.toggleRecording() }
                 )
                 FooterRow(
                     icon: "plus.diamond",
-                    label: NSLocalizedString("New workflow", comment: ""),
+                    label: String(localized: "New workflow", table: "Automation"),
                     rightAccessory: nil,
                     action: {
                         if isWindow {
@@ -32,13 +32,13 @@ struct LibraryFooter: View {
             } else {
                 FooterRow(
                     icon: "rectangle.stack",
-                    label: NSLocalizedString("Macro library", comment: ""),
+                    label: String(localized: "Macro library", table: "EditorUX"),
                     rightAccessory: nil,
                     action: { workspace = .library }
                 )
                 FooterRow(
                     icon: "plus.diamond",
-                    label: NSLocalizedString("New workflow", comment: ""),
+                    label: String(localized: "New workflow", table: "Automation"),
                     rightAccessory: nil,
                     action: { /* Currently placeholder */ }
                 )
@@ -46,13 +46,13 @@ struct LibraryFooter: View {
 
             FooterRow(
                 icon: "slider.horizontal.below.rectangle",
-                label: NSLocalizedString("Open editor", comment: ""),
+                label: String(localized: "Open editor", table: "EditorUX"),
                 rightAccessory: nil,
                 action: { controller.openEditor() }
             )
             FooterRow(
                 icon: "gearshape",
-                label: NSLocalizedString("Settings", comment: ""),
+                label: String(localized: "Settings", table: "Settings"),
                 rightAccessory: AnyView(KeyCapView(text: "⌘,")),
                 action: { controller.showSettingsWindow() }
             )

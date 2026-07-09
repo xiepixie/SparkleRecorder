@@ -16,9 +16,9 @@ enum AutomationWorkflowDraftVisualAssetImportKind: Sendable {
     var pickerTitle: String {
         switch self {
         case .image:
-            return NSLocalizedString("Import Image Template", comment: "")
+            return String(localized: "Import Image Template", table: "Common")
         case .baseline:
-            return NSLocalizedString("Import Baseline Image", comment: "")
+            return String(localized: "Import Baseline Image", table: "Common")
         }
     }
 }

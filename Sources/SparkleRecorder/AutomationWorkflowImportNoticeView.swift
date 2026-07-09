@@ -13,7 +13,7 @@ struct AutomationWorkflowImportNoticeView: View {
                 .accessibilityHidden(true)
 
             VStack(alignment: .leading, spacing: 2) {
-                Text(notice.isReplacement ? NSLocalizedString("Workflow replaced", comment: "") : NSLocalizedString("Workflow imported", comment: ""))
+                Text(notice.isReplacement ? String(localized: "Workflow replaced", table: "Automation") : String(localized: "Workflow imported", table: "Automation"))
                     .font(.caption)
                     .bold()
                 Text(detailLabel)
@@ -30,14 +30,14 @@ struct AutomationWorkflowImportNoticeView: View {
 
             Button("Refresh", systemImage: "arrow.clockwise", action: onRefresh)
                 .buttonStyle(.borderless)
-                .help(NSLocalizedString("Refresh automation projection", comment: ""))
+                .help(String(localized: "Refresh automation projection", table: "Automation"))
 
             Button("Dismiss import notice", systemImage: "xmark", action: onDismiss)
                 .labelStyle(.iconOnly)
                 .buttonStyle(.borderless)
                 .frame(width: 24, height: 24)
-                .help(NSLocalizedString("Dismiss import notice", comment: ""))
-                .accessibilityLabel(NSLocalizedString("Dismiss import notice", comment: ""))
+                .help(String(localized: "Dismiss import notice", table: "Common"))
+                .accessibilityLabel(String(localized: "Dismiss import notice", table: "Common"))
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 9)
@@ -53,7 +53,7 @@ struct AutomationWorkflowImportNoticeView: View {
 
     private var detailLabel: String {
         String(
-            format: NSLocalizedString("%@, %d tasks, %d dependencies", comment: ""),
+            format: String(localized: "%@, %d tasks, %d dependencies", table: "Automation"),
             notice.workflowName,
             notice.taskCount,
             notice.dependencyCount
@@ -62,8 +62,8 @@ struct AutomationWorkflowImportNoticeView: View {
 
     private var undoButtonTitle: String {
         notice.isReplacement
-            ? NSLocalizedString("Restore Previous", comment: "")
-            : NSLocalizedString("Undo Import", comment: "")
+            ? String(localized: "Restore Previous", table: "Common")
+            : String(localized: "Undo Import", table: "Common")
     }
 
     private var undoButtonImage: String {

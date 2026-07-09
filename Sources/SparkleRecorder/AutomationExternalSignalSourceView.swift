@@ -6,7 +6,7 @@ struct AutomationExternalSignalSourceView: View {
     @State private var isActive = false
 
     var body: some View {
-        Toggle(NSLocalizedString("Signal active", comment: ""), isOn: $isActive)
+        Toggle(String(localized: "Signal active", table: "Common"), isOn: $isActive)
             .toggleStyle(.switch)
             .disabled(trimmedSignalName.isEmpty)
             .onChange(of: isActive) {

@@ -15,7 +15,7 @@ enum AutomationWorkflowPackagePresenter {
     static func export(workflow: AutomationWorkflow) {
         export(
             workflows: [workflow],
-            title: NSLocalizedString("Export Workflow", comment: ""),
+            title: String(localized: "Export Workflow", table: "Automation"),
             defaultName: workflow.name
         )
     }
@@ -23,7 +23,7 @@ enum AutomationWorkflowPackagePresenter {
     static func export(workflows: [AutomationWorkflow], defaultName: String) {
         export(
             workflows: workflows,
-            title: NSLocalizedString("Export Workflow Package", comment: ""),
+            title: String(localized: "Export Workflow Package", table: "Automation"),
             defaultName: defaultName
         )
     }
@@ -41,8 +41,8 @@ enum AutomationWorkflowPackagePresenter {
             let url = try temporaryPackageURL(workflows: workflows, defaultName: defaultName)
             guard let view = NSApp.keyWindow?.contentView ?? NSApp.mainWindow?.contentView else {
                 showError(
-                    title: NSLocalizedString("Share failed", comment: ""),
-                    message: NSLocalizedString("Open a SparkleRecorder window before sharing a workflow package.", comment: "")
+                    title: String(localized: "Share failed", table: "Common"),
+                    message: String(localized: "Open a SparkleRecorder window before sharing a workflow package.", table: "Automation")
                 )
                 return
             }
@@ -52,7 +52,7 @@ enum AutomationWorkflowPackagePresenter {
             picker.show(relativeTo: view.bounds, of: view, preferredEdge: .minY)
         } catch {
             showError(
-                title: NSLocalizedString("Share failed", comment: ""),
+                title: String(localized: "Share failed", table: "Common"),
                 message: String(describing: error)
             )
         }
@@ -86,7 +86,7 @@ enum AutomationWorkflowPackagePresenter {
                 try data.write(to: url, options: .atomic)
             } catch {
                 showError(
-                    title: NSLocalizedString("Export failed", comment: ""),
+                    title: String(localized: "Export failed", table: "Common"),
                     message: String(describing: error)
                 )
             }
@@ -114,7 +114,7 @@ enum AutomationWorkflowPackagePresenter {
         onImport: @escaping ([AutomationWorkflow]) -> Void
     ) {
         let panel = NSOpenPanel()
-        panel.title = NSLocalizedString("Import Workflow Package", comment: "")
+        panel.title = String(localized: "Import Workflow Package", table: "Automation")
         panel.allowsMultipleSelection = true
         panel.canChooseDirectories = false
         if let type = UTType(filenameExtension: AutomationWorkflowPackage.fileExtension) {
@@ -149,7 +149,7 @@ enum AutomationWorkflowPackagePresenter {
                 persistVisualAssetPackageRoots(for: prepared)
             } catch {
                 showError(
-                    title: NSLocalizedString("Import failed", comment: ""),
+                    title: String(localized: "Import failed", table: "Common"),
                     message: String(describing: error)
                 )
             }
@@ -177,14 +177,14 @@ enum AutomationWorkflowPackagePresenter {
 
         let alert = NSAlert()
         alert.alertStyle = .warning
-        alert.messageText = NSLocalizedString("Workflow package has conflicts", comment: "")
+        alert.messageText = String(localized: "Workflow package has conflicts", table: "Automation")
         alert.informativeText = NSLocalizedString(
             "Some imported workflows already exist. Add copies to keep existing workflows, or replace matching workflows.",
             comment: ""
         )
-        alert.addButton(withTitle: NSLocalizedString("Add Copies", comment: ""))
-        alert.addButton(withTitle: NSLocalizedString("Replace Existing", comment: ""))
-        alert.addButton(withTitle: NSLocalizedString("Cancel", comment: ""))
+        alert.addButton(withTitle: String(localized: "Add Copies", table: "Common"))
+        alert.addButton(withTitle: String(localized: "Replace Existing", table: "Common"))
+        alert.addButton(withTitle: String(localized: "Cancel", table: "Common"))
 
         switch alert.runModal() {
         case .alertFirstButtonReturn:
@@ -207,7 +207,7 @@ enum AutomationWorkflowPackagePresenter {
 
         let alert = NSAlert()
         alert.alertStyle = .warning
-        alert.messageText = NSLocalizedString("Workflow package references missing macros", comment: "")
+        alert.messageText = String(localized: "Workflow package references missing macros", table: "Automation")
         alert.informativeText = String(
             format: NSLocalizedString(
                 "This package references %d macros that are not in your local library. The workflows can still be imported, but those tasks will show as Missing macro until you import or recreate the macros.",
@@ -215,8 +215,8 @@ enum AutomationWorkflowPackagePresenter {
             ),
             missingMacroIDs.count
         )
-        alert.addButton(withTitle: NSLocalizedString("Import Anyway", comment: ""))
-        alert.addButton(withTitle: NSLocalizedString("Cancel", comment: ""))
+        alert.addButton(withTitle: String(localized: "Import Anyway", table: "Common"))
+        alert.addButton(withTitle: String(localized: "Cancel", table: "Common"))
 
         return alert.runModal() == .alertFirstButtonReturn
     }
@@ -253,7 +253,7 @@ enum AutomationWorkflowPackagePresenter {
             }
 
             workflow.id = UUID()
-            workflow.name = String(format: NSLocalizedString("%@ Copy", comment: ""), workflow.name)
+            workflow.name = String(format: String(localized: "%@ Copy", table: "Common"), workflow.name)
             workflow.createdAt = now
             workflow.modifiedAt = now
             seenIDs.insert(workflow.id)
@@ -308,7 +308,7 @@ enum AutomationWorkflowPackagePresenter {
 
     private static func safeFileName(_ name: String) -> String {
         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
-        let base = trimmed.isEmpty ? NSLocalizedString("Workflow", comment: "") : trimmed
+        let base = trimmed.isEmpty ? String(localized: "Workflow", table: "Automation") : trimmed
         let invalid = CharacterSet(charactersIn: "/:\\?%*|\"<>")
         return base
             .components(separatedBy: invalid)

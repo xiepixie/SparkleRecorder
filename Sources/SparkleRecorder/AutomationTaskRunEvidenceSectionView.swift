@@ -29,7 +29,7 @@ struct AutomationTaskRunEvidenceSectionView: View {
 
             if let evidenceID = run.evidenceID {
                 AutomationTaskRunDetailRowView(
-                    title: NSLocalizedString("Evidence ID", comment: ""),
+                    title: String(localized: "Evidence ID", table: "Common"),
                     value: shortID(evidenceID)
                 )
             }
@@ -40,7 +40,7 @@ struct AutomationTaskRunEvidenceSectionView: View {
                 .fixedSize(horizontal: false, vertical: true)
 
             if run.macroID == nil {
-                Label(NSLocalizedString("No macro package evidence for this task", comment: ""), systemImage: "folder.badge.questionmark")
+                Label(String(localized: "No macro package evidence for this task", table: "Common"), systemImage: "folder.badge.questionmark")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -48,7 +48,7 @@ struct AutomationTaskRunEvidenceSectionView: View {
                 HStack(spacing: 8) {
                     ProgressView()
                         .controlSize(.small)
-                    Text(NSLocalizedString("Loading evidence", comment: ""))
+                    Text("Loading evidence", tableName: "Common")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -60,7 +60,7 @@ struct AutomationTaskRunEvidenceSectionView: View {
                     .foregroundStyle(Brand.sigAmber)
                     .fixedSize(horizontal: false, vertical: true)
             } else {
-                Label(NSLocalizedString("Evidence has not been loaded", comment: ""), systemImage: "doc.text.magnifyingglass")
+                Label(String(localized: "Evidence has not been loaded", table: "Common"), systemImage: "doc.text.magnifyingglass")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -87,37 +87,37 @@ struct AutomationTaskRunEvidenceSectionView: View {
 
     private var loadButtonTitle: String {
         payload == nil
-            ? NSLocalizedString("Load Evidence", comment: "")
-            : NSLocalizedString("Reload Evidence", comment: "")
+            ? String(localized: "Load Evidence", table: "Common")
+            : String(localized: "Reload Evidence", table: "Common")
     }
 
     private var evidenceTitle: String {
         switch payload?.source {
         case .perRun:
-            return NSLocalizedString("Run evidence", comment: "")
+            return String(localized: "Run evidence", table: "Common")
         case .latestMatchingRun:
-            return NSLocalizedString("Latest macro evidence", comment: "")
+            return String(localized: "Latest macro evidence", table: "Common")
         case .latestMacro:
-            return NSLocalizedString("Latest macro evidence", comment: "")
+            return String(localized: "Latest macro evidence", table: "Common")
         case nil:
             return run.evidenceID == nil
-                ? NSLocalizedString("Latest macro evidence", comment: "")
-                : NSLocalizedString("Run evidence", comment: "")
+                ? String(localized: "Latest macro evidence", table: "Common")
+                : String(localized: "Run evidence", table: "Common")
         }
     }
 
     private var evidenceSummary: String {
         switch payload?.source {
         case .perRun:
-            return NSLocalizedString("Stable report loaded from this run evidence ID.", comment: "")
+            return String(localized: "Stable report loaded from this run evidence ID.", table: "Common")
         case .latestMatchingRun:
-            return NSLocalizedString("Legacy latest report matches this run ID.", comment: "")
+            return String(localized: "Legacy latest report matches this run ID.", table: "Common")
         case .latestMacro:
-            return NSLocalizedString("Latest saved report for this macro package.", comment: "")
+            return String(localized: "Latest saved report for this macro package.", table: "Common")
         case nil:
             return run.evidenceID == nil
-                ? NSLocalizedString("Latest saved report for this macro package.", comment: "")
-                : NSLocalizedString("Loads the report bound to this run evidence ID.", comment: "")
+                ? String(localized: "Latest saved report for this macro package.", table: "Common")
+                : String(localized: "Loads the report bound to this run evidence ID.", table: "Common")
         }
     }
 
@@ -125,7 +125,7 @@ struct AutomationTaskRunEvidenceSectionView: View {
     private func evidencePayloadContent(_ payload: AutomationTaskRunEvidencePayload) -> some View {
         VStack(alignment: .leading, spacing: 5) {
             AutomationTaskRunDetailRowView(
-                title: NSLocalizedString("Source", comment: ""),
+                title: String(localized: "Source", table: "Common"),
                 value: sourceLabel(payload.source)
             )
             AutomationTaskRunEvidenceBindingView(run: run, payload: payload)
@@ -144,33 +144,33 @@ struct AutomationTaskRunEvidenceSectionView: View {
                 AutomationTaskRunEvidenceManifestView(manifest: manifest)
             }
             AutomationTaskRunDetailRowView(
-                title: NSLocalizedString("Report run", comment: ""),
+                title: String(localized: "Report run", table: "Common"),
                 value: shortID(payload.report.runID)
             )
             AutomationTaskRunDetailRowView(
-                title: NSLocalizedString("Result", comment: ""),
+                title: String(localized: "Result", table: "Common"),
                 value: payload.report.isSuccess
-                    ? NSLocalizedString("Success", comment: "")
-                    : NSLocalizedString("Failed", comment: "")
+                    ? String(localized: "Success", table: "Common")
+                    : String(localized: "Failed", table: "Common")
             )
             AutomationTaskRunDetailRowView(
-                title: NSLocalizedString("Started", comment: ""),
+                title: String(localized: "Started", table: "Common"),
                 value: timeSummary(payload.report.startTime)
             )
             AutomationTaskRunDetailRowView(
-                title: NSLocalizedString("Duration", comment: ""),
+                title: String(localized: "Duration", table: "Common"),
                 value: durationLabel(payload.report.duration)
             )
             if let failedEventIndex = payload.report.failedEventIndex {
                 AutomationTaskRunDetailRowView(
-                    title: NSLocalizedString("Failed event", comment: ""),
-                    value: String(format: NSLocalizedString("#%d", comment: ""), failedEventIndex + 1)
+                    title: String(localized: "Failed event", table: "Common"),
+                    value: String(format: String(localized: "#%d", table: "Common"), failedEventIndex + 1)
                 )
             }
             if let errorMessage = payload.report.errorMessage,
                !errorMessage.isEmpty {
                 AutomationTaskRunDetailRowView(
-                    title: NSLocalizedString("Error", comment: ""),
+                    title: String(localized: "Error", table: "Common"),
                     value: errorMessage
                 )
             }
@@ -193,14 +193,14 @@ struct AutomationTaskRunEvidenceSectionView: View {
 
     @ViewBuilder
     private func evidenceFileButtons(_ payload: AutomationTaskRunEvidencePayload) -> some View {
-        Button(NSLocalizedString("Reveal Report", comment: ""), systemImage: "doc.text.magnifyingglass") {
+        Button(String(localized: "Reveal Report", table: "Common"), systemImage: "doc.text.magnifyingglass") {
             actionFeedback = AutomationTaskRunEvidencePresenter.revealReport(payload.reportURL)
         }
         .buttonStyle(.bordered)
         .controlSize(.small)
 
         if let screenshotURL = payload.screenshotURL {
-            Button(NSLocalizedString("Open Screenshot", comment: ""), systemImage: "photo") {
+            Button(String(localized: "Open Screenshot", table: "Common"), systemImage: "photo") {
                 actionFeedback = AutomationTaskRunEvidencePresenter.openScreenshot(screenshotURL)
             }
             .buttonStyle(.bordered)
@@ -225,23 +225,23 @@ struct AutomationTaskRunEvidenceSectionView: View {
     private func durationLabel(_ duration: TimeInterval) -> String {
         let seconds = max(0, duration)
         if seconds < 10 {
-            return String(format: NSLocalizedString("%.1fs", comment: ""), seconds)
+            return String(format: String(localized: "%.1fs", table: "Common"), seconds)
         }
-        return String(format: NSLocalizedString("%.0fs", comment: ""), seconds.rounded())
+        return String(format: String(localized: "%.0fs", table: "Common"), seconds.rounded())
     }
 
     private func missingScreenshotLabel(for payload: AutomationTaskRunEvidencePayload) -> String {
         payload.screenshotURL == nil
-            ? NSLocalizedString("No screenshot saved", comment: "")
-            : NSLocalizedString("Screenshot preview unavailable", comment: "")
+            ? String(localized: "No screenshot saved", table: "Common")
+            : String(localized: "Screenshot preview unavailable", table: "Common")
     }
 
     private func actionFeedbackMessage(_ feedback: AutomationTaskRunEvidenceActionFeedback) -> String {
         switch feedback {
         case .succeeded(.revealReport):
-            return NSLocalizedString("Report revealed in Finder.", comment: "")
+            return String(localized: "Report revealed in Finder.", table: "Common")
         case .succeeded(.openScreenshot):
-            return NSLocalizedString("Screenshot opened in the default image viewer.", comment: "")
+            return String(localized: "Screenshot opened in the default image viewer.", table: "Common")
         case .failed(.revealReport, let message), .failed(.openScreenshot, let message):
             return message
         }
@@ -274,11 +274,11 @@ struct AutomationTaskRunEvidenceSectionView: View {
     private func sourceLabel(_ source: AutomationTaskRunEvidenceSource) -> String {
         switch source {
         case .perRun:
-            return NSLocalizedString("Per-run", comment: "")
+            return String(localized: "Per-run", table: "Common")
         case .latestMatchingRun:
-            return NSLocalizedString("Latest match", comment: "")
+            return String(localized: "Latest match", table: "Common")
         case .latestMacro:
-            return NSLocalizedString("Latest macro", comment: "")
+            return String(localized: "Latest macro", table: "Common")
         }
     }
 }

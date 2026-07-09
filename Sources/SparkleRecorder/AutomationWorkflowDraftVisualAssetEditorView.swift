@@ -20,18 +20,18 @@ struct AutomationWorkflowDraftVisualAssetEditorView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 9) {
             AutomationSectionHeader(
-                title: NSLocalizedString("DRAFT VISUAL ASSETS", comment: ""),
+                title: String(localized: "DRAFT VISUAL ASSETS", table: "Common"),
                 count: assetCount
             )
 
             HStack(spacing: 8) {
                 assetSummary(
-                    title: NSLocalizedString("Images", comment: ""),
+                    title: String(localized: "Images", table: "Common"),
                     count: visualAssets.images.count,
                     systemImage: "photo"
                 )
                 assetSummary(
-                    title: NSLocalizedString("Baselines", comment: ""),
+                    title: String(localized: "Baselines", table: "Common"),
                     count: visualAssets.baselines.count,
                     systemImage: "rectangle.dashed"
                 )
@@ -80,10 +80,10 @@ struct AutomationWorkflowDraftVisualAssetEditorView: View {
     }
 
     private var assetKindPicker: some View {
-        Picker(NSLocalizedString("Asset type", comment: ""), selection: $assetKind) {
-            Label(NSLocalizedString("Image template", comment: ""), systemImage: "photo")
+        Picker(String(localized: "Asset type", table: "Common"), selection: $assetKind) {
+            Label(String(localized: "Image template", table: "Common"), systemImage: "photo")
                 .tag(Self.imageKind)
-            Label(NSLocalizedString("Baseline", comment: ""), systemImage: "rectangle.dashed")
+            Label(String(localized: "Baseline", table: "Common"), systemImage: "rectangle.dashed")
                 .tag(Self.baselineKind)
         }
         .pickerStyle(.menu)
@@ -91,21 +91,21 @@ struct AutomationWorkflowDraftVisualAssetEditorView: View {
     }
 
     private var keyField: some View {
-        TextField(NSLocalizedString("Asset key", comment: ""), text: normalizedKey)
+        TextField(String(localized: "Asset key", table: "Common"), text: normalizedKey)
             .textFieldStyle(.roundedBorder)
             .font(.caption)
             .frame(maxWidth: 180)
     }
 
     private var labelField: some View {
-        TextField(NSLocalizedString("Label", comment: ""), text: normalizedLabel)
+        TextField(String(localized: "Label", table: "Common"), text: normalizedLabel)
             .textFieldStyle(.roundedBorder)
             .font(.caption)
             .frame(maxWidth: 220)
     }
 
     private var packagePathField: some View {
-        TextField(NSLocalizedString("Package-relative path", comment: ""), text: normalizedPath)
+        TextField(String(localized: "Package-relative path", table: "Common"), text: normalizedPath)
             .textFieldStyle(.roundedBorder)
             .font(.caption)
     }
@@ -127,7 +127,7 @@ struct AutomationWorkflowDraftVisualAssetEditorView: View {
     private var assetList: some View {
         let rows = visibleAssetRows
         if rows.isEmpty {
-            Label(NSLocalizedString("No package image or baseline assets registered", comment: ""), systemImage: "photo.on.rectangle.angled")
+            Label(String(localized: "No package image or baseline assets registered", table: "Common"), systemImage: "photo.on.rectangle.angled")
                 .font(.caption)
                 .foregroundStyle(.secondary)
         } else {
@@ -226,7 +226,7 @@ struct AutomationWorkflowDraftVisualAssetEditorView: View {
     }
 
     private var packageRootLabel: String {
-        sourceDirectory?.lastPathComponent ?? NSLocalizedString("Open a draft file to choose package assets", comment: "")
+        sourceDirectory?.lastPathComponent ?? String(localized: "Open a draft file to choose package assets", table: "Common")
     }
 
     private var normalizedKey: Binding<String> {
@@ -272,7 +272,7 @@ struct AutomationWorkflowDraftVisualAssetEditorView: View {
                 asset,
                 idPrefix: "image",
                 systemImage: "photo",
-                kind: NSLocalizedString("Image", comment: "")
+                kind: String(localized: "Image", table: "Common")
             )
         }
         let baselineRows = visualAssets.baselines.map { asset in
@@ -280,7 +280,7 @@ struct AutomationWorkflowDraftVisualAssetEditorView: View {
                 asset,
                 idPrefix: "baseline",
                 systemImage: "rectangle.dashed",
-                kind: NSLocalizedString("Baseline", comment: "")
+                kind: String(localized: "Baseline", table: "Common")
             )
         }
         return Array((imageRows + baselineRows).prefix(6))
@@ -296,7 +296,7 @@ struct AutomationWorkflowDraftVisualAssetEditorView: View {
             id: "\(idPrefix)-\(asset.key)",
             systemImage: systemImage,
             title: asset.label ?? asset.key,
-            path: asset.path ?? NSLocalizedString("No path", comment: ""),
+            path: asset.path ?? String(localized: "No path", table: "Common"),
             kind: kind,
             provenance: provenanceLabels(for: asset)
         )
@@ -307,7 +307,7 @@ struct AutomationWorkflowDraftVisualAssetEditorView: View {
         if let sourceFrameID = asset.sourceFrameID {
             labels.append(
                 String(
-                    format: NSLocalizedString("Frame %@", comment: ""),
+                    format: String(localized: "Frame %@", table: "Common"),
                     shortID(sourceFrameID.uuidString)
                 )
             )
@@ -318,7 +318,7 @@ struct AutomationWorkflowDraftVisualAssetEditorView: View {
         if let sourceArtifactPath = asset.sourceArtifactPath {
             labels.append(
                 String(
-                    format: NSLocalizedString("Source %@", comment: ""),
+                    format: String(localized: "Source %@", table: "Common"),
                     compactPath(sourceArtifactPath)
                 )
             )
@@ -326,7 +326,7 @@ struct AutomationWorkflowDraftVisualAssetEditorView: View {
         if let sourceSurfaceID = asset.sourceSurfaceID {
             labels.append(
                 String(
-                    format: NSLocalizedString("Surface %@", comment: ""),
+                    format: String(localized: "Surface %@", table: "Common"),
                     shortID(sourceSurfaceID)
                 )
             )
@@ -334,7 +334,7 @@ struct AutomationWorkflowDraftVisualAssetEditorView: View {
         if let sha256 = asset.sha256 {
             labels.append(
                 String(
-                    format: NSLocalizedString("SHA %@", comment: ""),
+                    format: String(localized: "SHA %@", table: "Common"),
                     shortID(sha256)
                 )
             )
@@ -376,13 +376,13 @@ struct AutomationWorkflowDraftVisualAssetEditorView: View {
 
     private func choosePackageFile() {
         guard let sourceDirectory else {
-            message = NSLocalizedString("Open a draft from disk before choosing package files.", comment: "")
+            message = String(localized: "Open a draft from disk before choosing package files.", table: "Common")
             messageIsWarning = true
             return
         }
 
         let panel = NSOpenPanel()
-        panel.title = NSLocalizedString("Choose Package Visual Asset", comment: "")
+        panel.title = String(localized: "Choose Package Visual Asset", table: "Common")
         panel.allowsMultipleSelection = false
         panel.canChooseDirectories = false
         panel.directoryURL = sourceDirectory
@@ -396,7 +396,7 @@ struct AutomationWorkflowDraftVisualAssetEditorView: View {
 
             guard let relativePath = relativePath(for: url, under: sourceDirectory),
                   let normalized = AutomationWorkflowDraftVisualAssets.normalizedRelativeAssetPath(relativePath) else {
-                message = NSLocalizedString("Choose an image inside the draft package folder.", comment: "")
+                message = String(localized: "Choose an image inside the draft package folder.", table: "Common")
                 messageIsWarning = true
                 return
             }
@@ -409,7 +409,7 @@ struct AutomationWorkflowDraftVisualAssetEditorView: View {
                 label = url.deletingPathExtension().lastPathComponent
             }
             message = String(
-                format: NSLocalizedString("Selected package asset %@", comment: ""),
+                format: String(localized: "Selected package asset %@", table: "Common"),
                 normalized
             )
             messageIsWarning = false
@@ -418,7 +418,7 @@ struct AutomationWorkflowDraftVisualAssetEditorView: View {
 
     private func registerAsset() {
         guard let normalizedPackagePath else {
-            message = NSLocalizedString("Use a safe package-relative path such as assets/icon.png.", comment: "")
+            message = String(localized: "Use a safe package-relative path such as assets/icon.png.", table: "Common")
             messageIsWarning = true
             return
         }
@@ -430,8 +430,8 @@ struct AutomationWorkflowDraftVisualAssetEditorView: View {
         )
         onRegisterAsset(assetKind, asset)
         message = String(
-            format: NSLocalizedString("Registered %@ %@", comment: ""),
-            assetKind == Self.baselineKind ? NSLocalizedString("baseline", comment: "") : NSLocalizedString("image", comment: ""),
+            format: String(localized: "Registered %@ %@", table: "Common"),
+            assetKind == Self.baselineKind ? String(localized: "baseline", table: "Common") : String(localized: "image", table: "Common"),
             key
         )
         messageIsWarning = false
@@ -439,7 +439,7 @@ struct AutomationWorkflowDraftVisualAssetEditorView: View {
 
     private func importExternalAsset() {
         guard let sourceDirectory else {
-            message = NSLocalizedString("Open a draft from disk before importing visual assets.", comment: "")
+            message = String(localized: "Open a draft from disk before importing visual assets.", table: "Common")
             messageIsWarning = true
             return
         }
@@ -449,7 +449,7 @@ struct AutomationWorkflowDraftVisualAssetEditorView: View {
             ? AutomationWorkflowDraftVisualAssetImportKind.baseline
             : .image
         isImportingAsset = true
-        message = NSLocalizedString("Choose an image to copy into this draft package.", comment: "")
+        message = String(localized: "Choose an image to copy into this draft package.", table: "Common")
         messageIsWarning = false
         AutomationWorkflowDraftVisualAssetImportPresenter.importAsset(
             kind: importKind,
@@ -463,7 +463,7 @@ struct AutomationWorkflowDraftVisualAssetEditorView: View {
                 packagePath = result.relativePath
                 onRegisterAsset(registrationKind, result.asset)
                 message = String(
-                    format: NSLocalizedString("Imported asset %@", comment: ""),
+                    format: String(localized: "Imported asset %@", table: "Common"),
                     result.relativePath
                 )
                 messageIsWarning = false
@@ -483,14 +483,14 @@ struct AutomationWorkflowDraftVisualAssetEditorView: View {
 
     private func captureBaseline() {
         guard let sourceDirectory else {
-            message = NSLocalizedString("Open a draft from disk before capturing a baseline.", comment: "")
+            message = String(localized: "Open a draft from disk before capturing a baseline.", table: "Common")
             messageIsWarning = true
             return
         }
 
         assetKind = Self.baselineKind
         isCapturingBaseline = true
-        message = NSLocalizedString("Draw a screen region to capture as a package baseline.", comment: "")
+        message = String(localized: "Draw a screen region to capture as a package baseline.", table: "Common")
         messageIsWarning = false
         AutomationWorkflowDraftBaselineCapturePresenter.captureBaseline(
             packageDirectory: sourceDirectory,
@@ -503,7 +503,7 @@ struct AutomationWorkflowDraftVisualAssetEditorView: View {
                 packagePath = result.relativePath
                 onRegisterAsset(Self.baselineKind, result.asset)
                 message = String(
-                    format: NSLocalizedString("Captured baseline %@", comment: ""),
+                    format: String(localized: "Captured baseline %@", table: "Common"),
                     result.relativePath
                 )
                 messageIsWarning = false

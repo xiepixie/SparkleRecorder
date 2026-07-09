@@ -196,7 +196,7 @@ private struct CountdownView: View {
                     .contentTransition(.numericText(countsDown: true))
                     .shadow(color: .black.opacity(0.15), radius: 4, y: 2)
 
-                Text(NSLocalizedString("RECORDING IN", comment: ""))
+                Text("RECORDING IN", tableName: "Recording")
                     .font(.system(size: 13, weight: .bold, design: .rounded))
                     .foregroundStyle(.secondary)
                     .tracking(3.5)
@@ -205,7 +205,7 @@ private struct CountdownView: View {
         }
         .frame(width: 200, height: 200)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(Text(String(format: NSLocalizedString("Recording starts in %d seconds", comment: ""), model.remaining)))
+        .accessibilityLabel(Text(String(format: String(localized: "Recording starts in %d seconds", table: "Recording"), model.remaining)))
         .onAppear { pulse = true }
         .onChange(of: model.sessionSeed) {
             // Restart the pulse for each new countdown session.

@@ -56,22 +56,22 @@ struct AutomationWorkflowDraftPreviewSheet: View {
         .frame(minWidth: 760, idealWidth: 820, minHeight: 640, idealHeight: 700)
         .alert(importConfirmationTitle, isPresented: $isShowingImportConfirmation) {
             if existingWorkflowName == nil {
-                Button(NSLocalizedString("Import", comment: ""), action: confirmImport)
+                Button(String(localized: "Import", table: "Common"), action: confirmImport)
             } else {
-                Button(NSLocalizedString("Replace", comment: ""), role: .destructive, action: confirmImport)
+                Button(String(localized: "Replace", table: "Common"), role: .destructive, action: confirmImport)
             }
-            Button(NSLocalizedString("Cancel", comment: ""), role: .cancel) {}
+            Button(String(localized: "Cancel", table: "Common"), role: .cancel) {}
         } message: {
             Text(importConfirmationMessage)
         }
-        .alert(NSLocalizedString("Draft edit failed", comment: ""), isPresented: $isShowingDraftEditError) {
-            Button(NSLocalizedString("OK", comment: ""), role: .cancel) {}
+        .alert(String(localized: "Draft edit failed", table: "Common"), isPresented: $isShowingDraftEditError) {
+            Button(String(localized: "OK", table: "Common"), role: .cancel) {}
         } message: {
             Text(draftEditErrorMessage)
         }
         .alert(taskRemovalConfirmationTitle, isPresented: $isShowingTaskRemovalConfirmation) {
-            Button(NSLocalizedString("Remove Task", comment: ""), role: .destructive, action: confirmTaskRemoval)
-            Button(NSLocalizedString("Cancel", comment: ""), role: .cancel) {}
+            Button(String(localized: "Remove Task", table: "Automation"), role: .destructive, action: confirmTaskRemoval)
+            Button(String(localized: "Cancel", table: "Common"), role: .cancel) {}
         } message: {
             Text(taskRemovalConfirmationMessage)
         }
@@ -116,7 +116,7 @@ struct AutomationWorkflowDraftPreviewSheet: View {
 
     private var summarySection: some View {
         VStack(alignment: .leading, spacing: 8) {
-            AutomationSectionHeader(title: NSLocalizedString("DRAFT SUMMARY", comment: ""))
+            AutomationSectionHeader(title: String(localized: "DRAFT SUMMARY", table: "Common"))
 
             LazyVGrid(
                 columns: [GridItem(.adaptive(minimum: 116), spacing: 8, alignment: .leading)],
@@ -124,42 +124,42 @@ struct AutomationWorkflowDraftPreviewSheet: View {
                 spacing: 8
             ) {
                 summaryPill(
-                    title: NSLocalizedString("Tasks", comment: ""),
+                    title: String(localized: "Tasks", table: "Automation"),
                     value: "\(previewState.projection.taskRows.count)",
                     systemImage: "square.stack.3d.up"
                 )
                 summaryPill(
-                    title: NSLocalizedString("Dependencies", comment: ""),
+                    title: String(localized: "Dependencies", table: "Common"),
                     value: "\(previewState.projection.dependencyRows.count)",
                     systemImage: "arrow.triangle.branch"
                 )
                 summaryPill(
-                    title: NSLocalizedString("Loops", comment: ""),
+                    title: String(localized: "Loops", table: "Common"),
                     value: "\(previewState.projection.loopExpansionRows.count)",
                     systemImage: "arrow.triangle.2.circlepath"
                 )
                 summaryPill(
-                    title: NSLocalizedString("Visual", comment: ""),
+                    title: String(localized: "Visual", table: "Common"),
                     value: "\(previewState.projection.visualAssetRows.count)",
                     systemImage: "viewfinder"
                 )
                 summaryPill(
-                    title: NSLocalizedString("Macros", comment: ""),
+                    title: String(localized: "Macros", table: "EditorUX"),
                     value: "\(previewState.projection.macroCatalogCount)",
                     systemImage: "record.circle"
                 )
                 summaryPill(
-                    title: NSLocalizedString("Issues", comment: ""),
+                    title: String(localized: "Issues", table: "Common"),
                     value: "\(previewState.projection.issueRows.count)",
                     systemImage: "exclamationmark.circle"
                 )
                 summaryPill(
-                    title: NSLocalizedString("Simulated", comment: ""),
+                    title: String(localized: "Simulated", table: "Common"),
                     value: "\(previewState.projection.simulationRows.count)",
                     systemImage: "play.circle"
                 )
                 summaryPill(
-                    title: NSLocalizedString("Dry-run", comment: ""),
+                    title: String(localized: "Dry-run", table: "Automation"),
                     value: dryRunSummaryValue,
                     systemImage: "doc.badge.gearshape"
                 )
@@ -174,7 +174,7 @@ struct AutomationWorkflowDraftPreviewSheet: View {
         if !previewState.projection.loopExpansionRows.isEmpty {
             VStack(alignment: .leading, spacing: 8) {
                 AutomationSectionHeader(
-                    title: NSLocalizedString("LOOP EXPANSION", comment: ""),
+                    title: String(localized: "LOOP EXPANSION", table: "Common"),
                     count: previewState.projection.loopExpansionRows.count
                 )
 
@@ -192,7 +192,7 @@ struct AutomationWorkflowDraftPreviewSheet: View {
         if !previewState.projection.visualAssetRows.isEmpty {
             VStack(alignment: .leading, spacing: 8) {
                 AutomationSectionHeader(
-                    title: NSLocalizedString("VISUAL EVIDENCE", comment: ""),
+                    title: String(localized: "VISUAL EVIDENCE", table: "Common"),
                     count: previewState.projection.visualAssetRows.count
                 )
 
@@ -257,17 +257,17 @@ struct AutomationWorkflowDraftPreviewSheet: View {
         if !previewState.document.workflow.tasks.isEmpty || taskRemovalSnapshot != nil {
             VStack(alignment: .leading, spacing: 8) {
                 AutomationSectionHeader(
-                    title: NSLocalizedString("DRAFT TASK REMOVE", comment: ""),
+                    title: String(localized: "DRAFT TASK REMOVE", table: "Automation"),
                     count: previewState.document.workflow.tasks.count
                 )
 
                 HStack(spacing: 8) {
                     if previewState.document.workflow.tasks.isEmpty {
-                        Label(NSLocalizedString("No tasks in draft", comment: ""), systemImage: "square.dashed")
+                        Label(String(localized: "No tasks in draft", table: "Automation"), systemImage: "square.dashed")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     } else {
-                        Picker(NSLocalizedString("Task", comment: ""), selection: $selectedTaskRemovalKey) {
+                        Picker(String(localized: "Task", table: "Automation"), selection: $selectedTaskRemovalKey) {
                             ForEach(previewState.document.workflow.tasks, id: \.key) { task in
                                 Text(task.name ?? task.key).tag(task.key)
                             }
@@ -282,11 +282,11 @@ struct AutomationWorkflowDraftPreviewSheet: View {
                     Spacer(minLength: 0)
 
                     if taskRemovalSnapshot != nil {
-                        Button(NSLocalizedString("Undo Task Removal", comment: ""), systemImage: "arrow.uturn.backward", action: undoTaskRemoval)
+                        Button(String(localized: "Undo Task Removal", table: "Automation"), systemImage: "arrow.uturn.backward", action: undoTaskRemoval)
                             .buttonStyle(.bordered)
                     }
 
-                    Button(NSLocalizedString("Remove Task", comment: ""), systemImage: "trash", role: .destructive, action: requestTaskRemoval)
+                    Button(String(localized: "Remove Task", table: "Automation"), systemImage: "trash", role: .destructive, action: requestTaskRemoval)
                         .buttonStyle(.bordered)
                         .disabled(selectedTaskForRemoval == nil)
                 }
@@ -310,12 +310,12 @@ struct AutomationWorkflowDraftPreviewSheet: View {
     private var taskSection: some View {
         VStack(alignment: .leading, spacing: 8) {
             AutomationSectionHeader(
-                title: NSLocalizedString("DRAFT TASKS", comment: ""),
+                title: String(localized: "DRAFT TASKS", table: "Automation"),
                 count: previewState.projection.taskRows.count
             )
 
             if previewState.projection.taskRows.isEmpty {
-                Label(NSLocalizedString("No tasks in draft", comment: ""), systemImage: "square.dashed")
+                Label(String(localized: "No tasks in draft", table: "Automation"), systemImage: "square.dashed")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             } else {
@@ -331,12 +331,12 @@ struct AutomationWorkflowDraftPreviewSheet: View {
     private var dependencySection: some View {
         VStack(alignment: .leading, spacing: 8) {
             AutomationSectionHeader(
-                title: NSLocalizedString("DRAFT DEPENDENCIES", comment: ""),
+                title: String(localized: "DRAFT DEPENDENCIES", table: "Common"),
                 count: previewState.projection.dependencyRows.count
             )
 
             if previewState.projection.dependencyRows.isEmpty {
-                Label(NSLocalizedString("No dependencies in draft", comment: ""), systemImage: "arrow.triangle.branch")
+                Label(String(localized: "No dependencies in draft", table: "Common"), systemImage: "arrow.triangle.branch")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             } else {
@@ -352,12 +352,12 @@ struct AutomationWorkflowDraftPreviewSheet: View {
     private var validationSection: some View {
         VStack(alignment: .leading, spacing: 8) {
             AutomationSectionHeader(
-                title: NSLocalizedString("VALIDATION", comment: ""),
+                title: String(localized: "VALIDATION", table: "Common"),
                 count: previewState.projection.issueRows.count
             )
 
             if previewState.projection.issueRows.isEmpty {
-                Label(NSLocalizedString("No validation issues", comment: ""), systemImage: "checkmark.circle")
+                Label(String(localized: "No validation issues", table: "Common"), systemImage: "checkmark.circle")
                     .font(.caption)
                     .foregroundStyle(Brand.libraryGreen)
             } else {
@@ -373,12 +373,12 @@ struct AutomationWorkflowDraftPreviewSheet: View {
     private var simulationSection: some View {
         VStack(alignment: .leading, spacing: 8) {
             AutomationSectionHeader(
-                title: NSLocalizedString("SIMULATION", comment: ""),
+                title: String(localized: "SIMULATION", table: "Common"),
                 count: previewState.projection.simulationRows.count
             )
 
             if previewState.projection.simulationRows.isEmpty {
-                Label(NSLocalizedString("No simulated steps", comment: ""), systemImage: "play.slash")
+                Label(String(localized: "No simulated steps", table: "Common"), systemImage: "play.slash")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             } else {
@@ -388,7 +388,7 @@ struct AutomationWorkflowDraftPreviewSheet: View {
 
                 if !previewState.projection.resourceRows.isEmpty {
                     Divider().opacity(0.45)
-                    Text(NSLocalizedString("RESOURCE TIMELINE", comment: ""))
+                    Text("RESOURCE TIMELINE", tableName: "EditorUX")
                         .font(.caption2)
                         .bold()
                         .foregroundStyle(.secondary)
@@ -399,7 +399,7 @@ struct AutomationWorkflowDraftPreviewSheet: View {
 
                 if !previewState.projection.branchRows.isEmpty {
                     Divider().opacity(0.45)
-                    Text(NSLocalizedString("BRANCHES", comment: ""))
+                    Text("BRANCHES", tableName: "Automation")
                         .font(.caption2)
                         .bold()
                         .foregroundStyle(.secondary)
@@ -418,7 +418,7 @@ struct AutomationWorkflowDraftPreviewSheet: View {
         if !previewState.projection.nextActionRows.isEmpty {
             VStack(alignment: .leading, spacing: 8) {
                 AutomationSectionHeader(
-                    title: NSLocalizedString("NEXT ACTIONS", comment: ""),
+                    title: String(localized: "NEXT ACTIONS", table: "EditorUX"),
                     count: previewState.projection.nextActionRows.count
                 )
 
@@ -539,7 +539,7 @@ struct AutomationWorkflowDraftPreviewSheet: View {
                     )
                     loopMetricPill(
                         value: "\(row.bodyStepCount)",
-                        title: NSLocalizedString("body steps", comment: "")
+                        title: String(localized: "body steps", table: "Common")
                     )
                     loopMetricPill(
                         value: "\(row.expandedTaskCount)",
@@ -626,7 +626,7 @@ struct AutomationWorkflowDraftPreviewSheet: View {
                     .fixedSize(horizontal: false, vertical: true)
 
                 HStack(spacing: 6) {
-                    visualEvidencePill(row.assetKey ?? NSLocalizedString("No asset ref", comment: ""))
+                    visualEvidencePill(row.assetKey ?? String(localized: "No asset ref", table: "Common"))
                     if let regionKey = row.regionKey {
                         visualEvidencePill(regionKey)
                     }
@@ -699,7 +699,7 @@ struct AutomationWorkflowDraftPreviewSheet: View {
             Spacer(minLength: 0)
 
             if row.candidateCount > 0 {
-                Text(String(format: NSLocalizedString("%d candidates", comment: ""), row.candidateCount))
+                Text(String(format: String(localized: "%d candidates", table: "Common"), row.candidateCount))
                     .font(.caption2)
                     .foregroundStyle(.secondary)
             }
@@ -764,7 +764,7 @@ struct AutomationWorkflowDraftPreviewSheet: View {
                 .font(.caption2.monospaced())
                 .foregroundStyle(.secondary)
             Spacer(minLength: 0)
-            Text(String(format: NSLocalizedString("%.1fs", comment: ""), row.durationSeconds))
+            Text(String(format: String(localized: "%.1fs", table: "Common"), row.durationSeconds))
                 .font(.caption2.monospacedDigit())
                 .foregroundStyle(.tertiary)
         }
@@ -786,7 +786,7 @@ struct AutomationWorkflowDraftPreviewSheet: View {
             Text(row.to)
                 .font(.caption2.monospaced())
             Spacer(minLength: 0)
-            Text(row.fired ? NSLocalizedString("Fired", comment: "") : NSLocalizedString("Skipped", comment: ""))
+            Text(row.fired ? String(localized: "Fired", table: "Common") : String(localized: "Skipped", table: "Common"))
                 .font(.caption2)
                 .bold()
                 .foregroundStyle(row.fired ? Brand.libraryGreen : .secondary)
@@ -853,30 +853,30 @@ struct AutomationWorkflowDraftPreviewSheet: View {
 
     private var taskRemovalImpactLabel: String {
         guard selectedTaskForRemoval != nil else {
-            return NSLocalizedString("No task selected", comment: "")
+            return String(localized: "No task selected", table: "Automation")
         }
         return String(
-            format: NSLocalizedString("%d dependent edges will be removed", comment: ""),
+            format: String(localized: "%d dependent edges will be removed", table: "Automation"),
             selectedTaskRemovalDependencyCount
         )
     }
 
     private var taskRemovalConfirmationTitle: String {
         guard let selectedTaskForRemoval else {
-            return NSLocalizedString("Remove Task?", comment: "")
+            return String(localized: "Remove Task?", table: "Automation")
         }
         return String(
-            format: NSLocalizedString("Remove %@?", comment: ""),
+            format: String(localized: "Remove %@?", table: "Common"),
             taskRemovalDisplayName(for: selectedTaskForRemoval)
         )
     }
 
     private var taskRemovalConfirmationMessage: String {
         guard let selectedTaskForRemoval else {
-            return NSLocalizedString("This edit only changes the draft preview.", comment: "")
+            return String(localized: "This edit only changes the draft preview.", table: "Automation")
         }
         return String(
-            format: NSLocalizedString("This removes task \"%@\" and %d dependent edges from the draft preview. Saved workflows are unchanged until you import.", comment: ""),
+            format: String(localized: "This removes task \"%@\" and %d dependent edges from the draft preview. Saved workflows are unchanged until you import.", table: "Common"),
             taskRemovalDisplayName(for: selectedTaskForRemoval),
             selectedTaskRemovalDependencyCount
         )
@@ -884,17 +884,17 @@ struct AutomationWorkflowDraftPreviewSheet: View {
 
     private var dryRunSummaryValue: String {
         guard let importPreview = previewState.projection.importPreview else {
-            return NSLocalizedString("Not run", comment: "")
+            return String(localized: "Not run", table: "Automation")
         }
         return importPreview.isImportable
-            ? NSLocalizedString("Ready", comment: "")
-            : NSLocalizedString("Blocked", comment: "")
+            ? String(localized: "Ready", table: "Common")
+            : String(localized: "Blocked", table: "Common")
     }
 
     private var importButtonTitle: String {
         existingWorkflowName == nil
-            ? NSLocalizedString("Import Workflow", comment: "")
-            : NSLocalizedString("Replace Workflow", comment: "")
+            ? String(localized: "Import Workflow", table: "Automation")
+            : String(localized: "Replace Workflow", table: "Automation")
     }
 
     private var importButtonImage: String {
@@ -904,18 +904,18 @@ struct AutomationWorkflowDraftPreviewSheet: View {
     private var importButtonHelp: String {
         if previewState.canImportCompiledWorkflow {
             return existingWorkflowName == nil
-                ? NSLocalizedString("Import the reviewed workflow draft", comment: "")
-                : NSLocalizedString("Replace the existing workflow with this reviewed draft", comment: "")
+                ? String(localized: "Import the reviewed workflow draft", table: "Automation")
+                : String(localized: "Replace the existing workflow with this reviewed draft", table: "Automation")
         }
-        return NSLocalizedString("Resolve import issues before importing", comment: "")
+        return String(localized: "Resolve import issues before importing", table: "EditorUX")
     }
 
     private var importConfirmationTitle: String {
         let workflowName = previewState.compiledWorkflow?.name ?? previewState.projection.workflowName
         if existingWorkflowName == nil {
-            return String(format: NSLocalizedString("Import %@?", comment: ""), workflowName)
+            return String(format: String(localized: "Import %@?", table: "Common"), workflowName)
         }
-        return String(format: NSLocalizedString("Replace %@?", comment: ""), workflowName)
+        return String(format: String(localized: "Replace %@?", table: "Common"), workflowName)
     }
 
     private var importConfirmationMessage: String {
@@ -923,14 +923,14 @@ struct AutomationWorkflowDraftPreviewSheet: View {
         let dependencyCount = previewState.compiledWorkflow?.dependencies.count ?? previewState.projection.importPreview?.dependencyCount ?? 0
         if let existingWorkflowName {
             return String(
-                format: NSLocalizedString("This will replace the existing workflow \"%@\" with %d tasks and %d dependencies. It will not run until you start it.", comment: ""),
+                format: String(localized: "This will replace the existing workflow \"%@\" with %d tasks and %d dependencies. It will not run until you start it.", table: "Common"),
                 existingWorkflowName,
                 taskCount,
                 dependencyCount
             )
         }
         return String(
-            format: NSLocalizedString("This will add a workflow with %d tasks and %d dependencies. It will not run until you start it.", comment: ""),
+            format: String(localized: "This will add a workflow with %d tasks and %d dependencies. It will not run until you start it.", table: "Automation"),
             taskCount,
             dependencyCount
         )
@@ -979,7 +979,7 @@ struct AutomationWorkflowDraftPreviewSheet: View {
             )
             taskRemovalSnapshot = previousDocument
             taskRemovalMessage = String(
-                format: NSLocalizedString("Removed %@ and %d dependent edges from this draft preview.", comment: ""),
+                format: String(localized: "Removed %@ and %d dependent edges from this draft preview.", table: "Automation"),
                 taskRemovalDisplayName(for: selectedTaskForRemoval),
                 removedDependencyCount
             )
@@ -996,7 +996,7 @@ struct AutomationWorkflowDraftPreviewSheet: View {
         }
         rebuildPreview(with: taskRemovalSnapshot)
         self.taskRemovalSnapshot = nil
-        taskRemovalMessage = NSLocalizedString("Task removal undone.", comment: "")
+        taskRemovalMessage = String(localized: "Task removal undone.", table: "Automation")
     }
 
     private func applyConditionEdit(_ edit: AutomationWorkflowDraftConditionEdit) {
@@ -1099,7 +1099,7 @@ struct AutomationWorkflowDraftPreviewSheet: View {
             patchChangedTaskKeys = editResult.changedTaskKeys
             patchChangedDependencyKeys = editResult.changedDependencyKeys
             patchApplyMessage = String(
-                format: NSLocalizedString("Applied patch: %d task changes, %d dependency changes.", comment: ""),
+                format: String(localized: "Applied patch: %d task changes, %d dependency changes.", table: "Automation"),
                 editResult.changedTaskKeys.count,
                 editResult.changedDependencyKeys.count
             )
@@ -1145,15 +1145,15 @@ struct AutomationWorkflowDraftPreviewSheet: View {
 
     private func taskImage(for typeLabel: String) -> String {
         switch typeLabel {
-        case NSLocalizedString("Macro", comment: ""):
+        case String(localized: "Macro", table: "EditorUX"):
             return "play.rectangle"
-        case NSLocalizedString("Condition", comment: ""):
+        case String(localized: "Condition", table: "Automation"):
             return "diamond"
-        case NSLocalizedString("Delay", comment: ""):
+        case String(localized: "Delay", table: "EditorUX"):
             return "timer"
-        case NSLocalizedString("Notification", comment: ""):
+        case String(localized: "Notification", table: "Common"):
             return "bell"
-        case NSLocalizedString("Loop", comment: ""):
+        case String(localized: "Loop", table: "Common"):
             return "arrow.triangle.2.circlepath"
         default:
             return "square"
@@ -1174,13 +1174,13 @@ struct AutomationWorkflowDraftPreviewSheet: View {
     private func visualAssetSourceLine(for row: AutomationWorkflowDraftPreviewProjection.VisualAssetRow) -> String? {
         var parts: [String] = []
         if let sourceFrameShortID = row.sourceFrameShortID {
-            parts.append(String(format: NSLocalizedString("frame %@", comment: ""), sourceFrameShortID))
+            parts.append(String(format: String(localized: "frame %@", table: "Common"), sourceFrameShortID))
         }
         if let sourceSurfaceID = row.sourceSurfaceID {
-            parts.append(String(format: NSLocalizedString("surface %@", comment: ""), sourceSurfaceID))
+            parts.append(String(format: String(localized: "surface %@", table: "Common"), sourceSurfaceID))
         }
         if let sha256 = row.sha256 {
-            parts.append(String(format: NSLocalizedString("sha %@", comment: ""), String(sha256.prefix(10))))
+            parts.append(String(format: String(localized: "sha %@", table: "Common"), String(sha256.prefix(10))))
         }
         return parts.isEmpty ? nil : parts.joined(separator: " | ")
     }
@@ -1188,12 +1188,12 @@ struct AutomationWorkflowDraftPreviewSheet: View {
     private func visualAssetBoundsLine(for row: AutomationWorkflowDraftPreviewProjection.VisualAssetRow) -> String? {
         var parts: [String] = []
         if let sourceBoundsLabel = row.sourceBoundsLabel {
-            let space = row.sourceBoundsSpaceLabel ?? NSLocalizedString("Unknown space", comment: "")
-            parts.append(String(format: NSLocalizedString("crop %@ (%@)", comment: ""), sourceBoundsLabel, space))
+            let space = row.sourceBoundsSpaceLabel ?? String(localized: "Unknown space", table: "Common")
+            parts.append(String(format: String(localized: "crop %@ (%@)", table: "Common"), sourceBoundsLabel, space))
         }
         if let regionBoundsLabel = row.regionBoundsLabel {
-            let space = row.regionSpaceLabel ?? NSLocalizedString("Unknown space", comment: "")
-            parts.append(String(format: NSLocalizedString("search %@ (%@)", comment: ""), regionBoundsLabel, space))
+            let space = row.regionSpaceLabel ?? String(localized: "Unknown space", table: "Common")
+            parts.append(String(format: String(localized: "search %@ (%@)", table: "Common"), regionBoundsLabel, space))
         }
         return parts.isEmpty ? nil : parts.joined(separator: " | ")
     }

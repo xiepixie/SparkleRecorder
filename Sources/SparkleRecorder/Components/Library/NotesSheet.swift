@@ -11,8 +11,8 @@ struct NotesSheet: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             VStack(alignment: .leading, spacing: 4) {
-                Text(NSLocalizedString("Notes", comment: "")).font(.system(size: 14, weight: .semibold))
-                Text(String(format: NSLocalizedString("A free-form scratchpad attached to %@.", comment: ""), macro.name))
+                Text("Notes", tableName: "Common").font(.system(size: 14, weight: .semibold))
+                Text(String(format: String(localized: "A free-form scratchpad attached to %@.", table: "Automation"), macro.name))
                     .font(.system(size: 11))
                     .foregroundStyle(.secondary)
             }
@@ -21,7 +21,7 @@ struct NotesSheet: View {
                 RoundedRectangle(cornerRadius: 8, style: .continuous)
                     .stroke(Color.primary.opacity(0.15), lineWidth: 0.5)
                 if text.isEmpty {
-                    Text(NSLocalizedString("What does this macro do? When did you build it? Any caveats…", comment: ""))
+                    Text("What does this macro do? When did you build it? Any caveats…", tableName: "EditorUX")
                         .font(.system(size: 11))
                         .foregroundStyle(.tertiary)
                         .padding(.horizontal, 8)
@@ -38,9 +38,9 @@ struct NotesSheet: View {
 
             HStack {
                 Spacer()
-                Button(NSLocalizedString("Cancel", comment: ""), action: onCancel)
+                Button(String(localized: "Cancel", table: "Common"), action: onCancel)
                     .keyboardShortcut(.cancelAction)
-                Button(NSLocalizedString("Save", comment: ""), action: onSave)
+                Button(String(localized: "Save", table: "Common"), action: onSave)
                     .keyboardShortcut(.defaultAction)
                     .buttonStyle(.borderedProminent)
             }

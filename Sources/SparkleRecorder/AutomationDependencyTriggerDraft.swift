@@ -15,19 +15,19 @@ enum AutomationDependencyTriggerDraft: String, CaseIterable, Identifiable {
     var title: String {
         switch self {
         case .onSuccess:
-            return NSLocalizedString("Success", comment: "")
+            return String(localized: "Success", table: "Common")
         case .onFailure:
-            return NSLocalizedString("Failure", comment: "")
+            return String(localized: "Failure", table: "Common")
         case .onTimeout:
-            return NSLocalizedString("Timeout", comment: "")
+            return String(localized: "Timeout", table: "Common")
         case .onCancelled:
-            return NSLocalizedString("Cancelled", comment: "")
+            return String(localized: "Cancelled", table: "Common")
         case .onConditionMatched:
-            return NSLocalizedString("Condition matched", comment: "")
+            return String(localized: "Condition matched", table: "Automation")
         case .onConditionNotMatched:
-            return NSLocalizedString("Condition not matched", comment: "")
+            return String(localized: "Condition not matched", table: "Automation")
         case .always:
-            return NSLocalizedString("Always", comment: "")
+            return String(localized: "Always", table: "Common")
         }
     }
 

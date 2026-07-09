@@ -1,0 +1,1288 @@
+{
+  "sourceLanguage": "en",
+  "strings": {
+    "Action recording": {
+      "extractionState": "manual",
+      "generatesSymbol": false,
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Action recording"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "动作录制中"
+          }
+        }
+      }
+    },
+    "As SparkleRecorder File…": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "As SparkleRecorder File…"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "SparkleRecorder 文件…"
+          }
+        }
+      }
+    },
+    "Capture anything": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Capture anything"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "记录常用操作"
+          }
+        }
+      }
+    },
+    "Click anywhere on the screen to pick coordinate": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Click anywhere on the screen to pick coordinate"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "在屏幕任意位置点击以选取坐标"
+          }
+        }
+      }
+    },
+    "Click the menu-bar icon or this Dock icon to open the library. Press Record to capture your first macro — SparkleRecorder will count down %d seconds before it starts so you have time to switch to the right window.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Click the menu-bar icon or this Dock icon to open the library. Press Record to capture your first macro — SparkleRecorder will count down %d seconds before it starts so you have time to switch to the right window."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "点按菜单栏图标或 Dock 图标打开宏库。点按“录制”捕获第一个宏。开始前会倒计时 %d 秒，方便你切到目标窗口。"
+          }
+        }
+      }
+    },
+    "Click the menu-bar icon or this Dock icon to open the library. Press Record to capture your first macro — recording starts immediately.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Click the menu-bar icon or this Dock icon to open the library. Press Record to capture your first macro — recording starts immediately."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "点按菜单栏图标或 Dock 图标打开宏库。点按“录制”即可捕获第一个宏，录制会立即开始。"
+          }
+        }
+      }
+    },
+    "Click to Record": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Click to Record"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "点击录入"
+          }
+        }
+      }
+    },
+    "Click to record shortcut": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Click to record shortcut"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "点击录入快捷键"
+          }
+        }
+      }
+    },
+    "Drag to capture baseline": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Drag to capture baseline"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "拖动以捕获基准图"
+          }
+        }
+      }
+    },
+    "Edits the captured key and modifiers while keeping the action timing in place.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Edits the captured key and modifiers while keeping the action timing in place."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "编辑捕获的按键和修饰键，同时保留该动作的时间位置。"
+          }
+        }
+      }
+    },
+    "Grant Accessibility & Input Monitoring to record and replay.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Grant Accessibility & Input Monitoring to record and replay."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "授予“辅助功能”和“输入监控”权限后即可录制和回放。"
+          }
+        }
+      }
+    },
+    "Grant Accessibility, Input Monitoring & Screen Recording to record and replay.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Grant Accessibility, Input Monitoring & Screen Recording to record and replay."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "授予“辅助功能”、“输入监控”和“屏幕录制”权限后即可录制和回放。"
+          }
+        }
+      }
+    },
+    "Grant the required permissions before recording video, keyframes and playable macro events.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Grant the required permissions before recording video, keyframes and playable macro events."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "请先授予必需权限，再录制视频、关键帧和可回放宏事件。"
+          }
+        }
+      }
+    },
+    "Menu bar only hides the Dock icon — open SparkleRecorder from the menu-bar icon.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Menu bar only hides the Dock icon — open SparkleRecorder from the menu-bar icon."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "隐藏 Dock 图标后，可从菜单栏图标打开 SparkleRecorder。"
+          }
+        }
+      }
+    },
+    "Menu bar only hides the Dock icon. Use the menu-bar icon to reopen SparkleRecorder.": {
+      "extractionState": "manual",
+      "generatesSymbol": false,
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Menu bar only hides the Dock icon. Use the menu-bar icon to reopen SparkleRecorder."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "“仅在菜单栏显示”会隐藏 Dock 图标。请使用菜单栏图标重新打开 SparkleRecorder。"
+          }
+        }
+      }
+    },
+    "Move selected recorded actions earlier.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Move selected recorded actions earlier."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "将选中的录制动作提前。"
+          }
+        }
+      }
+    },
+    "Move selected recorded actions later.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Move selected recorded actions later."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "将选中的录制动作延后。"
+          }
+        }
+      }
+    },
+    "New Recording": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "New Recording"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "新录制"
+          }
+        }
+      }
+    },
+    "Open the blocked permission rows below, then check again before recording.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open the blocked permission rows below, then check again before recording."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "打开下方被阻止的权限项，然后在录制前再次检查。"
+          }
+        }
+      }
+    },
+    "Pick coordinate from screen": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pick coordinate from screen"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "从屏幕选取坐标"
+          }
+        }
+      }
+    },
+    "Pick text from screen": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pick text from screen"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "从屏幕选取文本"
+          }
+        }
+      }
+    },
+    "Playable macro events still record; missing context is visible instead of being guessed.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Playable macro events still record; missing context is visible instead of being guessed."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "可回放宏事件仍会录制；缺失上下文会明确显示，而不是被猜测填充。"
+          }
+        }
+      }
+    },
+    "Press Record to capture your first macro. SparkleRecorder will count down 3 seconds before it begins.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Press Record to capture your first macro. SparkleRecorder will count down 3 seconds before it begins."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "点按“录制”捕获第一个宏。开始前会倒计时 3 秒。"
+          }
+        }
+      }
+    },
+    "RECORDING IN": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "RECORDING IN"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "即将录制"
+          }
+        }
+      }
+    },
+    "Ready to record!": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ready to record!"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "准备录制！"
+          }
+        }
+      }
+    },
+    "Record": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Record"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "录制"
+          }
+        }
+      }
+    },
+    "Record (F6)": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Record (F6)"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "录制 (F6)"
+          }
+        }
+      }
+    },
+    "Record / Stop": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Record / Stop"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "录制 / 停止"
+          }
+        }
+      }
+    },
+    "Record a macro first": {
+      "extractionState": "manual",
+      "generatesSymbol": false,
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Record a macro first"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "请先录制一个宏"
+          }
+        }
+      }
+    },
+    "Record a macro or insert an action from the sidebar.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Record a macro or insert an action from the sidebar."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "录制一个宏，或从侧边栏插入动作。"
+          }
+        }
+      }
+    },
+    "Record macro": {
+      "extractionState": "manual",
+      "generatesSymbol": false,
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Record macro"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "录制宏"
+          }
+        }
+      }
+    },
+    "Record mouse moves": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Record mouse moves"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "记录鼠标移动"
+          }
+        }
+      }
+    },
+    "Record or insert actions before stretching time.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Record or insert actions before stretching time."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "请先录制或插入动作，再拉伸时间。"
+          }
+        }
+      }
+    },
+    "Record or insert an action": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Record or insert an action"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "录制或插入动作"
+          }
+        }
+      }
+    },
+    "Record or insert the first action.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Record or insert the first action."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "录制或插入第一个动作。"
+          }
+        }
+      }
+    },
+    "Record something to get started!": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Record something to get started!"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "先录制一个宏吧。"
+          }
+        }
+      }
+    },
+    "Recording": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Recording"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "录制中"
+          }
+        }
+      },
+      "generatesSymbol": false
+    },
+    "Recording active": {
+      "extractionState": "manual",
+      "generatesSymbol": false,
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Recording active"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "录制中"
+          }
+        }
+      }
+    },
+    "Recording starts in %d seconds": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Recording starts in %d seconds"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%d 秒后开始录制"
+          }
+        }
+      }
+    },
+    "Recording…": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Recording…"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "录制中…"
+          }
+        }
+      },
+      "generatesSymbol": false
+    },
+    "Required to play back your recordings.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Required to play back your recordings."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "用于回放录制内容。"
+          }
+        }
+      }
+    },
+    "Required to record your inputs.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Required to record your inputs."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "用于录制你的输入。"
+          }
+        }
+      }
+    },
+    "Screen Recording": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Screen Recording"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "屏幕录制"
+          }
+        }
+      }
+    },
+    "Screen capture": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Screen capture"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "屏幕捕获"
+          }
+        }
+      }
+    },
+    "Screen target": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Screen target"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "屏幕定位目标"
+          }
+        }
+      }
+    },
+    "Screen text": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Screen text"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "屏幕文本"
+          }
+        }
+      }
+    },
+    "Select a continuous set of recorded actions, name it, then create one behavior block.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Select a continuous set of recorded actions, name it, then create one behavior block."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "选择一段连续的录制动作，命名后创建为一个行为块。"
+          }
+        }
+      }
+    },
+    "Select at least one recorded action as the Repeat-Until body.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Select at least one recorded action as the Repeat-Until body."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "至少选择一个录制动作作为 Repeat-Until 循环体。"
+          }
+        }
+      }
+    },
+    "Select at least two recorded actions; wait gaps alone cannot create a behavior.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Select at least two recorded actions; wait gaps alone cannot create a behavior."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "至少选择两个录制动作；单独的等待间隔不能创建行为。"
+          }
+        }
+      }
+    },
+    "Select one continuous block of recorded actions. Wait gaps can stay between them.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Select one continuous block of recorded actions. Wait gaps can stay between them."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "请选择一段连续的录制动作；中间的等待间隔可以自动保留。"
+          }
+        }
+      }
+    },
+    "Select recorded actions or wait gaps with duration to delete.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Select recorded actions or wait gaps with duration to delete."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "请选择录制动作，或有时长的等待间隔来删除。"
+          }
+        }
+      }
+    },
+    "Select recorded actions or wait gaps with duration to duplicate.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Select recorded actions or wait gaps with duration to duplicate."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "请选择录制动作，或有时长的等待间隔来复制。"
+          }
+        }
+      }
+    },
+    "Select recorded actions to reorder them.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Select recorded actions to reorder them."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "请选择要重新排序的录制动作。"
+          }
+        }
+      }
+    },
+    "Select recorded actions to shift their timing.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Select recorded actions to shift their timing."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "请选择要调整时间的录制动作。"
+          }
+        }
+      }
+    },
+    "Select two or more recorded actions to create a behavior.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Select two or more recorded actions to create a behavior."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "选择两个或更多录制动作来创建行为。"
+          }
+        }
+      }
+    },
+    "Semantic recording can start with limited context": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Semantic recording can start with limited context"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "语义录制可在有限上下文中开始"
+          }
+        }
+      }
+    },
+    "Semantic recording is blocked": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Semantic recording is blocked"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "语义录制已阻止"
+          }
+        }
+      }
+    },
+    "Semantic recording is ready": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Semantic recording is ready"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "语义录制已就绪"
+          }
+        }
+      }
+    },
+    "Show floating HUD": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Show floating HUD"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "显示悬浮状态窗"
+          }
+        }
+      }
+    },
+    "Show or hide the on-screen coordinate preview overlay": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Show or hide the on-screen coordinate preview overlay"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "显示或隐藏屏幕坐标预览层"
+          }
+        }
+      }
+    },
+    "Start recording": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Start recording"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "开始录制"
+          }
+        }
+      }
+    },
+    "Start semantic recording": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Start semantic recording"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "开始语义录制"
+          }
+        }
+      }
+    },
+    "Start the next recording from the menu bar when you are ready.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Start the next recording from the menu bar when you are ready."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "准备好后，从菜单栏开始下一次录制。"
+          }
+        }
+      }
+    },
+    "Stop recording": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Stop recording"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "停止录制"
+          }
+        }
+      }
+    },
+    "The little macro recorder for macOS that's quietly doing your repetitive work.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The little macro recorder for macOS that's quietly doing your repetitive work."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "一款轻量的 macOS 宏录制工具，安静替你处理重复操作。"
+          }
+        }
+      }
+    },
+    "The next recording can save video, keyframes, OCR, AX context and window metadata together.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The next recording can save video, keyframes, OCR, AX context and window metadata together."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "下一次录制可以同时保存视频、关键帧、OCR、AX 上下文和窗口元数据。"
+          }
+        }
+      }
+    },
+    "This row no longer matches its recorded wait event. Refresh the action list, then try again.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This row no longer matches its recorded wait event. Refresh the action list, then try again."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "这一行已不再匹配原录制等待事件。刷新动作列表后重试。"
+          }
+        }
+      }
+    },
+    "This wait row has no recorded wait event to replace. Add Click Text instead.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This wait row has no recorded wait event to replace. Add Click Text instead."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "这个等待行没有可替换的已录制等待事件。请改用添加点击文本。"
+          }
+        }
+      }
+    },
+    "This wait row has no recorded wait event to reuse. Insert Click Text manually instead.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This wait row has no recorded wait event to reuse. Insert Click Text manually instead."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "这个等待行没有可复用的已录制等待事件。请改为手动插入点击文本。"
+          }
+        }
+      }
+    },
+    "Video recording": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Video recording"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "视频录制"
+          }
+        }
+      }
+    },
+    "Video, keyframes, playable events and semantic observations are available.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Video, keyframes, playable events and semantic observations are available."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "视频、关键帧、可回放事件和语义观察均可用。"
+          }
+        }
+      }
+    },
+    "Welcome to SparkleRecorder": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Welcome to SparkleRecorder"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "欢迎使用 SparkleRecorder"
+          }
+        }
+      }
+    },
+    "You can record now, or grant the recommended permission first for richer context.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "You can record now, or grant the recommended permission first for richer context."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "你可以现在录制，也可以先授予推荐权限以获得更完整的上下文。"
+          }
+        }
+      }
+    },
+    "macOS requires explicit consent to capture and post input events. We never see what you type or click outside of recordings you initiate.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "macOS requires explicit consent to capture and post input events. We never see what you type or click outside of recordings you initiate."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "macOS 需要明确授权，才能录制和发送输入事件。除你主动开始的录制外，我们不会查看你的输入或点击。"
+          }
+        }
+      }
+    },
+    "to record · ": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "to record · "
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "录制 · "
+          }
+        }
+      }
+    }
+  },
+  "version": "1.1"
+}

@@ -94,8 +94,8 @@ struct AutomationTaskInspectorView: View {
             }
         }
         .alert(deleteTaskTitle, isPresented: $isConfirmingDeleteTask) {
-            Button(NSLocalizedString("Delete Task", comment: ""), role: .destructive, action: deleteTask)
-            Button(NSLocalizedString("Cancel", comment: ""), role: .cancel) {}
+            Button(String(localized: "Delete Task", table: "Automation"), role: .destructive, action: deleteTask)
+            Button(String(localized: "Cancel", table: "Common"), role: .cancel) {}
         } message: {
             Text(deleteTaskMessage)
         }
@@ -150,7 +150,7 @@ struct AutomationTaskInspectorView: View {
         }
         .pickerStyle(.segmented)
         .labelsHidden()
-        .help(NSLocalizedString("Inspector section", comment: ""))
+        .help(String(localized: "Inspector section", table: "Common"))
     }
 
     private var blockTab: some View {
@@ -253,24 +253,24 @@ struct AutomationTaskInspectorView: View {
 
     private var identitySection: some View {
         VStack(alignment: .leading, spacing: 8) {
-            TextField(NSLocalizedString("Task name", comment: ""), text: $nameDraft)
+            TextField(String(localized: "Task name", table: "Automation"), text: $nameDraft)
                 .textFieldStyle(.roundedBorder)
                 .onSubmit(saveTask)
 
-            Toggle(NSLocalizedString("Enabled", comment: ""), isOn: $isEnabledDraft)
+            Toggle(String(localized: "Enabled", table: "Common"), isOn: $isEnabledDraft)
                 .toggleStyle(.switch)
 
-            detailRow(NSLocalizedString("Kind", comment: ""), kindLabel)
-            detailRow(NSLocalizedString("Resources", comment: ""), resourceLabel)
+            detailRow(String(localized: "Kind", table: "Common"), kindLabel)
+            detailRow(String(localized: "Resources", table: "Common"), resourceLabel)
         }
         .padding(.vertical, 8)
     }
 
     private var scheduleSection: some View {
         VStack(alignment: .leading, spacing: 10) {
-            AutomationSectionHeader(title: NSLocalizedString("SCHEDULE", comment: ""))
+            AutomationSectionHeader(title: String(localized: "SCHEDULE", table: "Common"))
 
-            Picker(NSLocalizedString("Schedule", comment: ""), selection: $scheduleMode) {
+            Picker(String(localized: "Schedule", table: "Common"), selection: $scheduleMode) {
                 ForEach(ScheduleMode.allCases) { mode in
                     Text(mode.title).tag(mode)
                 }
@@ -279,30 +279,30 @@ struct AutomationTaskInspectorView: View {
 
             switch scheduleMode {
             case .manual:
-                Label(NSLocalizedString("Manual start only", comment: ""), systemImage: "hand.tap")
+                Label(String(localized: "Manual start only", table: "Common"), systemImage: "hand.tap")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             case .once:
                 DatePicker(
-                    NSLocalizedString("Start", comment: ""),
+                    String(localized: "Start", table: "Common"),
                     selection: $onceDateDraft,
                     displayedComponents: [.date, .hourAndMinute]
                 )
             case .repeating:
                 DatePicker(
-                    NSLocalizedString("Start", comment: ""),
+                    String(localized: "Start", table: "Common"),
                     selection: $repeatStartDraft,
                     displayedComponents: [.date, .hourAndMinute]
                 )
 
                 HStack(spacing: 8) {
-                    LabeledContent(NSLocalizedString("Every", comment: "")) {
-                        TextField(NSLocalizedString("Count", comment: ""), value: $repeatEveryDraft, format: .number)
+                    LabeledContent(String(localized: "Every", table: "Common")) {
+                        TextField(String(localized: "Count", table: "Common"), value: $repeatEveryDraft, format: .number)
                             .textFieldStyle(.roundedBorder)
                             .frame(width: 58)
                     }
 
-                    Picker(NSLocalizedString("Unit", comment: ""), selection: $repeatUnitDraft) {
+                    Picker(String(localized: "Unit", table: "Common"), selection: $repeatUnitDraft) {
                         ForEach(RepeatUnit.allCases) { unit in
                             Text(unit.title).tag(unit)
                         }
@@ -316,13 +316,13 @@ struct AutomationTaskInspectorView: View {
 
     private var conditionDefinitionSection: some View {
         VStack(alignment: .leading, spacing: 10) {
-            AutomationSectionHeader(title: NSLocalizedString("CONDITION", comment: ""))
+            AutomationSectionHeader(title: String(localized: "CONDITION", table: "Automation"))
 
             Form {
-                TextField(NSLocalizedString("Name", comment: ""), text: $conditionNameDraft)
+                TextField(String(localized: "Name", table: "Common"), text: $conditionNameDraft)
                     .textFieldStyle(.roundedBorder)
 
-                Picker(NSLocalizedString("Condition type", comment: ""), selection: conditionIntentBinding) {
+                Picker(String(localized: "Condition type", table: "Automation"), selection: conditionIntentBinding) {
                     ForEach(ConditionIntent.allCases) { intent in
                         Label(intent.title, systemImage: intent.systemImage).tag(intent)
                     }
@@ -337,11 +337,11 @@ struct AutomationTaskInspectorView: View {
 
     private var macroSection: some View {
         VStack(alignment: .leading, spacing: 10) {
-            AutomationSectionHeader(title: NSLocalizedString("MACRO", comment: ""))
+            AutomationSectionHeader(title: String(localized: "MACRO", table: "EditorUX"))
 
-            Picker(NSLocalizedString("Macro source", comment: ""), selection: $selectedMacroID) {
+            Picker(String(localized: "Macro source", table: "EditorUX"), selection: $selectedMacroID) {
                 if selectedMacroID == nil || selectedMacro == nil {
-                    Text(NSLocalizedString("Missing macro", comment: "")).tag(selectedMacroID)
+                    Text("Missing macro", tableName: "EditorUX").tag(selectedMacroID)
                 }
                 ForEach(macros) { macro in
                     Text(macro.name).tag(Optional(macro.id))
@@ -350,9 +350,9 @@ struct AutomationTaskInspectorView: View {
             .pickerStyle(.menu)
 
             if let selectedMacro {
-                detailRow(NSLocalizedString("Events", comment: ""), "\(selectedMacro.eventCount)")
+                detailRow(String(localized: "Events", table: "EditorUX"), "\(selectedMacro.eventCount)")
             } else {
-                Label(NSLocalizedString("Missing macro", comment: ""), systemImage: "exclamationmark.triangle")
+                Label(String(localized: "Missing macro", table: "EditorUX"), systemImage: "exclamationmark.triangle")
                     .font(.caption)
                     .foregroundStyle(Brand.sigAmber)
             }
@@ -362,10 +362,10 @@ struct AutomationTaskInspectorView: View {
 
     private var delaySection: some View {
         VStack(alignment: .leading, spacing: 10) {
-            AutomationSectionHeader(title: NSLocalizedString("DELAY", comment: ""))
+            AutomationSectionHeader(title: String(localized: "DELAY", table: "EditorUX"))
 
             numericField(
-                NSLocalizedString("Duration (s)", comment: ""),
+                String(localized: "Duration (s)", table: "Common"),
                 value: $delayDurationDraft,
                 width: 86
             )
@@ -375,17 +375,17 @@ struct AutomationTaskInspectorView: View {
 
     private var notificationSection: some View {
         VStack(alignment: .leading, spacing: 10) {
-            AutomationSectionHeader(title: NSLocalizedString("NOTIFICATION", comment: ""))
+            AutomationSectionHeader(title: String(localized: "NOTIFICATION", table: "Common"))
 
             Form {
-                TextField(NSLocalizedString("Notification title", comment: ""), text: $notificationTitleDraft)
+                TextField(String(localized: "Notification title", table: "Common"), text: $notificationTitleDraft)
                     .textFieldStyle(.roundedBorder)
 
-                TextField(NSLocalizedString("Message", comment: ""), text: $notificationBodyDraft, axis: .vertical)
+                TextField(String(localized: "Message", table: "Common"), text: $notificationBodyDraft, axis: .vertical)
                     .textFieldStyle(.roundedBorder)
                     .lineLimit(2...4)
 
-                Picker(NSLocalizedString("Severity", comment: ""), selection: $notificationSeverityDraft) {
+                Picker(String(localized: "Severity", table: "Common"), selection: $notificationSeverityDraft) {
                     ForEach(notificationSeverityOptions, id: \.self) { severity in
                         Text(notificationSeverityTitle(severity)).tag(severity)
                     }
@@ -400,20 +400,20 @@ struct AutomationTaskInspectorView: View {
     private var conditionSourceFields: some View {
         switch conditionMode {
         case .manualApproval:
-            LabeledContent(NSLocalizedString("Prompt", comment: "")) {
-                Label(NSLocalizedString("Manual approval prompt", comment: ""), systemImage: "hand.raised.fill")
+            LabeledContent(String(localized: "Prompt", table: "Common")) {
+                Label(String(localized: "Manual approval prompt", table: "Common"), systemImage: "hand.raised.fill")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
         case .externalSignal:
-            TextField(NSLocalizedString("Signal Name", comment: ""), text: $signalNameDraft)
+            TextField(String(localized: "Signal Name", table: "Common"), text: $signalNameDraft)
                 .textFieldStyle(.roundedBorder)
 
             LabeledContent("") {
                 AutomationExternalSignalSourceView(signalName: signalNameDraft)
             }
         case .ocrText:
-            TextField(NSLocalizedString("Text to Find", comment: ""), text: $ocrTextDraft)
+            TextField(String(localized: "Text to Find", table: "Common"), text: $ocrTextDraft)
                 .textFieldStyle(.roundedBorder)
 
             AutomationConditionObservationCard(
@@ -430,13 +430,13 @@ struct AutomationTaskInspectorView: View {
                 tint: hasOCRRegionDraft ? Brand.libraryGreen : Brand.sigAmber
             )
 
-            Picker(NSLocalizedString("Match Logic", comment: ""), selection: $ocrMatchModeDraft) {
-                Text(NSLocalizedString("Contains", comment: "")).tag(TextMatchMode.contains)
-                Text(NSLocalizedString("Exact", comment: "")).tag(TextMatchMode.exact)
+            Picker(String(localized: "Match Logic", table: "Common"), selection: $ocrMatchModeDraft) {
+                Text("Contains", tableName: "Common").tag(TextMatchMode.contains)
+                Text("Exact", tableName: "Common").tag(TextMatchMode.exact)
             }
             .pickerStyle(.segmented)
 
-            Picker(NSLocalizedString("Region Space", comment: ""), selection: $ocrSearchRegionSpaceDraft) {
+            Picker(String(localized: "Region Space", table: "Common"), selection: $ocrSearchRegionSpaceDraft) {
                 ForEach(AutomationOCRSearchRegionSpace.allCases, id: \.self) { space in
                     Text(space.title).tag(space)
                 }
@@ -464,7 +464,7 @@ struct AutomationTaskInspectorView: View {
                 )
             }
 
-            Toggle(NSLocalizedString("Require Visible Text", comment: ""), isOn: $ocrRequiresVisibleDraft)
+            Toggle(String(localized: "Require Visible Text", table: "Common"), isOn: $ocrRequiresVisibleDraft)
                 .toggleStyle(.switch)
         case .visual:
             AutomationVisualConditionEditorView(
@@ -502,7 +502,7 @@ struct AutomationTaskInspectorView: View {
                 onPickPixel: applyPickedVisualPixel
             )
         case .previousOutcome:
-            Picker(NSLocalizedString("Outcome", comment: ""), selection: $outcomePredicateDraft) {
+            Picker(String(localized: "Outcome", table: "Common"), selection: $outcomePredicateDraft) {
                 ForEach(outcomeOptions, id: \.tag) { option in
                     Text(option.title).tag(option.tag)
                 }
@@ -513,21 +513,21 @@ struct AutomationTaskInspectorView: View {
 
     private var executionPolicySection: some View {
         VStack(alignment: .leading, spacing: 10) {
-            AutomationSectionHeader(title: NSLocalizedString("EXECUTION POLICY", comment: ""))
+            AutomationSectionHeader(title: String(localized: "EXECUTION POLICY", table: "Common"))
 
-            Toggle(NSLocalizedString("Time limit", comment: ""), isOn: $hasTaskTimeoutDraft)
+            Toggle(String(localized: "Time limit", table: "Common"), isOn: $hasTaskTimeoutDraft)
                 .toggleStyle(.switch)
 
             if hasTaskTimeoutDraft {
                 numericField(
-                    NSLocalizedString("Seconds", comment: ""),
+                    String(localized: "Seconds", table: "Common"),
                     value: $taskTimeoutDraft,
                     width: 78
                 )
             }
 
-            LabeledContent(NSLocalizedString("Retry attempts", comment: "")) {
-                TextField(NSLocalizedString("Count", comment: ""), value: $retryAttemptsDraft, format: .number)
+            LabeledContent(String(localized: "Retry attempts", table: "Common")) {
+                TextField(String(localized: "Count", table: "Common"), value: $retryAttemptsDraft, format: .number)
                     .textFieldStyle(.roundedBorder)
                     .frame(width: 58)
             }
@@ -542,23 +542,23 @@ struct AutomationTaskInspectorView: View {
 
     private var conditionWaitPolicyEditor: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Label(NSLocalizedString("Condition wait", comment: ""), systemImage: "timer")
+            Label(String(localized: "Condition wait", table: "Automation"), systemImage: "timer")
                 .font(.caption)
                 .foregroundStyle(.secondary)
 
-            Toggle(NSLocalizedString("Enable Timeout", comment: ""), isOn: $hasConditionTimeoutDraft)
+            Toggle(String(localized: "Enable Timeout", table: "Common"), isOn: $hasConditionTimeoutDraft)
                 .toggleStyle(.switch)
 
             if hasConditionTimeoutDraft {
                 numericField(
-                    NSLocalizedString("Timeout (s)", comment: ""),
+                    String(localized: "Timeout (s)", table: "Common"),
                     value: $conditionTimeoutDraft,
                     width: 78
                 )
             }
 
             numericField(
-                NSLocalizedString("Polling (s)", comment: ""),
+                String(localized: "Polling (s)", table: "Common"),
                 value: $conditionPollingDraft,
                 width: 78
             )
@@ -567,7 +567,7 @@ struct AutomationTaskInspectorView: View {
 
     private var resourcePolicyEditor: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Label(NSLocalizedString("Resource policy", comment: ""), systemImage: "slider.horizontal.3")
+            Label(String(localized: "Resource policy", table: "Common"), systemImage: "slider.horizontal.3")
                 .font(.caption)
                 .foregroundStyle(.secondary)
 
@@ -582,13 +582,13 @@ struct AutomationTaskInspectorView: View {
             }
 
             if !requiredResources.isEmpty {
-                Text(NSLocalizedString("Required resources are locked by this task type.", comment: ""))
+                Text("Required resources are locked by this task type.", tableName: "Automation")
                     .font(.caption2)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
 
-            Picker(NSLocalizedString("Priority", comment: ""), selection: $resourcePriorityDraft) {
+            Picker(String(localized: "Priority", table: "Common"), selection: $resourcePriorityDraft) {
                 ForEach(resourcePriorityOptions, id: \.self) { priority in
                     Text(resourcePriorityTitle(priority)).tag(priority)
                 }
@@ -596,13 +596,13 @@ struct AutomationTaskInspectorView: View {
             .pickerStyle(.segmented)
             .disabled(draftedResourceRequirement.resources.isEmpty)
 
-            Toggle(NSLocalizedString("Max resource wait", comment: ""), isOn: $hasMaxResourceWaitDraft)
+            Toggle(String(localized: "Max resource wait", table: "EditorUX"), isOn: $hasMaxResourceWaitDraft)
                 .toggleStyle(.switch)
                 .disabled(draftedResourceRequirement.resources.isEmpty)
 
             if hasMaxResourceWaitDraft, !draftedResourceRequirement.resources.isEmpty {
                 numericField(
-                    NSLocalizedString("Wait (s)", comment: ""),
+                    String(localized: "Wait (s)", table: "EditorUX"),
                     value: $maxResourceWaitDraft,
                     width: 78
                 )
@@ -612,7 +612,7 @@ struct AutomationTaskInspectorView: View {
 
     private var resourceSection: some View {
         VStack(alignment: .leading, spacing: 10) {
-            AutomationSectionHeader(title: NSLocalizedString("RESOURCES", comment: ""))
+            AutomationSectionHeader(title: String(localized: "RESOURCES", table: "Common"))
             resourcePolicyEditor
         }
         .padding(.vertical, 8)
@@ -621,7 +621,7 @@ struct AutomationTaskInspectorView: View {
     private var saveFooter: some View {
         VStack(alignment: .leading, spacing: 8) {
             Button(action: saveTask) {
-                Label(NSLocalizedString("Save Task", comment: ""), systemImage: "checkmark")
+                Label(String(localized: "Save Task", table: "Automation"), systemImage: "checkmark")
                     .frame(maxWidth: .infinity)
             }
             .buttonStyle(.bordered)
@@ -633,11 +633,11 @@ struct AutomationTaskInspectorView: View {
 
     private var dangerSection: some View {
         VStack(alignment: .leading, spacing: 8) {
-            AutomationSectionHeader(title: NSLocalizedString("DANGER ZONE", comment: ""))
+            AutomationSectionHeader(title: String(localized: "DANGER ZONE", table: "Common"))
             Button(role: .destructive) {
                 isConfirmingDeleteTask = true
             } label: {
-                Label(NSLocalizedString("Delete Task", comment: ""), systemImage: "trash")
+                Label(String(localized: "Delete Task", table: "Automation"), systemImage: "trash")
                     .frame(maxWidth: .infinity)
             }
             .buttonStyle(.bordered)
@@ -650,20 +650,20 @@ struct AutomationTaskInspectorView: View {
     private var kindLabel: String {
         switch task.kind {
         case .macro:
-            return NSLocalizedString("Macro", comment: "")
+            return String(localized: "Macro", table: "EditorUX")
         case .condition:
-            return NSLocalizedString("Condition", comment: "")
+            return String(localized: "Condition", table: "Automation")
         case .delay:
-            return NSLocalizedString("Delay", comment: "")
+            return String(localized: "Delay", table: "EditorUX")
         case .notification:
-            return NSLocalizedString("Notification", comment: "")
+            return String(localized: "Notification", table: "Common")
         }
     }
 
     private var resourceLabel: String {
         let resources = draftedResourceRequirement.resources
         if resources.isEmpty {
-            return NSLocalizedString("None", comment: "")
+            return String(localized: "None", table: "Common")
         }
         return resources
             .sorted { resourceSortIndex($0) < resourceSortIndex($1) }
@@ -731,35 +731,35 @@ struct AutomationTaskInspectorView: View {
     private func notificationSeverityTitle(_ severity: AutomationNotificationSeverity) -> String {
         switch severity {
         case .info:
-            return NSLocalizedString("Info", comment: "")
+            return String(localized: "Info", table: "Common")
         case .warning:
-            return NSLocalizedString("Warning", comment: "")
+            return String(localized: "Warning", table: "Common")
         case .error:
-            return NSLocalizedString("Error", comment: "")
+            return String(localized: "Error", table: "Common")
         }
     }
 
     private func resourceTitle(_ resource: AutomationResource) -> String {
         switch resource {
         case .foregroundInput:
-            return NSLocalizedString("Needs mouse and keyboard", comment: "")
+            return String(localized: "Needs mouse and keyboard", table: "Common")
         case .screenCapture:
-            return NSLocalizedString("Screen capture", comment: "")
+            return String(localized: "Screen capture", table: "Recording")
         case .accessibility:
-            return NSLocalizedString("Accessibility", comment: "")
+            return String(localized: "Accessibility", table: "Settings")
         case .network:
-            return NSLocalizedString("Network", comment: "")
+            return String(localized: "Network", table: "Common")
         }
     }
 
     private func resourcePriorityTitle(_ priority: AutomationResourcePriority) -> String {
         switch priority {
         case .low:
-            return NSLocalizedString("Low", comment: "")
+            return String(localized: "Low", table: "Common")
         case .normal:
-            return NSLocalizedString("Normal", comment: "")
+            return String(localized: "Normal", table: "Common")
         case .high:
-            return NSLocalizedString("High", comment: "")
+            return String(localized: "High", table: "Common")
         }
     }
 
@@ -854,13 +854,13 @@ struct AutomationTaskInspectorView: View {
 
     private var outcomeOptions: [(tag: String, title: String)] {
         [
-            (AutomationOutcomePredicate.anyTerminal.rawValue, NSLocalizedString("Any terminal", comment: "")),
-            (AutomationOutcomePredicate.success.rawValue, NSLocalizedString("Success", comment: "")),
-            (AutomationOutcomePredicate.failure.rawValue, NSLocalizedString("Failure", comment: "")),
-            (AutomationOutcomePredicate.timeout.rawValue, NSLocalizedString("Timeout", comment: "")),
-            (AutomationOutcomePredicate.cancelled.rawValue, NSLocalizedString("Cancelled", comment: "")),
-            (AutomationOutcomePredicate.conditionMatched.rawValue, NSLocalizedString("Condition matched", comment: "")),
-            (AutomationOutcomePredicate.conditionNotMatched.rawValue, NSLocalizedString("Condition not matched", comment: ""))
+            (AutomationOutcomePredicate.anyTerminal.rawValue, String(localized: "Any terminal", table: "Common")),
+            (AutomationOutcomePredicate.success.rawValue, String(localized: "Success", table: "Common")),
+            (AutomationOutcomePredicate.failure.rawValue, String(localized: "Failure", table: "Common")),
+            (AutomationOutcomePredicate.timeout.rawValue, String(localized: "Timeout", table: "Common")),
+            (AutomationOutcomePredicate.cancelled.rawValue, String(localized: "Cancelled", table: "Common")),
+            (AutomationOutcomePredicate.conditionMatched.rawValue, String(localized: "Condition matched", table: "Automation")),
+            (AutomationOutcomePredicate.conditionNotMatched.rawValue, String(localized: "Condition not matched", table: "Automation"))
         ]
     }
 
@@ -890,17 +890,17 @@ struct AutomationTaskInspectorView: View {
     private var ocrRegionStatusTitle: String {
         switch ocrSearchRegionSpaceDraft {
         case .automatic, .displayAbsolute:
-            return NSLocalizedString("Display coordinates", comment: "")
+            return String(localized: "Display coordinates", table: "Common")
         case .displayNormalized:
-            return NSLocalizedString("Display-relative coordinates", comment: "")
+            return String(localized: "Display-relative coordinates", table: "Common")
         case .windowLocal:
-            return NSLocalizedString("Window coordinates", comment: "")
+            return String(localized: "Window coordinates", table: "Common")
         case .windowNormalized:
-            return NSLocalizedString("Window-relative coordinates", comment: "")
+            return String(localized: "Window-relative coordinates", table: "Common")
         case .contentLocal:
-            return NSLocalizedString("Content coordinates", comment: "")
+            return String(localized: "Content coordinates", table: "Common")
         case .contentNormalized:
-            return NSLocalizedString("Content-relative coordinates", comment: "")
+            return String(localized: "Content-relative coordinates", table: "Common")
         }
     }
 
@@ -909,28 +909,28 @@ struct AutomationTaskInspectorView: View {
         case .automatic, .displayAbsolute:
             let displayCount = NSScreen.screens.count
             if displayCount > 1 {
-                return NSLocalizedString("Draw Region records bounds on the display where you drag. Use this when the automation should stay tied to that monitor.", comment: "")
+                return String(localized: "Draw Region records bounds on the display where you drag. Use this when the automation should stay tied to that monitor.", table: "Automation")
             }
-            return NSLocalizedString("Draw Region records display-pixel bounds. Use this when the automation should inspect a fixed screen area.", comment: "")
+            return String(localized: "Draw Region records display-pixel bounds. Use this when the automation should inspect a fixed screen area.", table: "Automation")
         case .displayNormalized:
-            return NSLocalizedString("Bounds are normalized to the selected display, which makes the region more tolerant of display size changes.", comment: "")
+            return String(localized: "Bounds are normalized to the selected display, which makes the region more tolerant of display size changes.", table: "EditorUX")
         case .windowLocal, .windowNormalized:
             if let targetSurfaceForOCRPicker {
                 return String(
-                    format: NSLocalizedString("Window context is available from %@. Draw Region can refresh it from the window under the pointer.", comment: ""),
+                    format: String(localized: "Window context is available from %@. Draw Region can refresh it from the window under the pointer.", table: "EditorUX"),
                     targetSurfaceForOCRPicker.windowContextLabel
                 )
             }
-            return NSLocalizedString("No linked window context is available yet. Draw Region over the target window, or switch to display coordinates.", comment: "")
+            return String(localized: "No linked window context is available yet. Draw Region over the target window, or switch to display coordinates.", table: "EditorUX")
         case .contentLocal, .contentNormalized:
             if let targetSurfaceForOCRPicker,
                targetSurfaceForOCRPicker.recordedContentFrame != nil {
                 return String(
-                    format: NSLocalizedString("Content context is available from %@. Use this for OCR inside the app content area.", comment: ""),
+                    format: String(localized: "Content context is available from %@. Use this for OCR inside the app content area.", table: "EditorUX"),
                     targetSurfaceForOCRPicker.windowContextLabel
                 )
             }
-            return NSLocalizedString("Content bounds are not available yet. Draw Region over the app content, or switch to window/display coordinates.", comment: "")
+            return String(localized: "Content bounds are not available yet. Draw Region over the app content, or switch to window/display coordinates.", table: "EditorUX")
         }
     }
 
@@ -976,41 +976,41 @@ struct AutomationTaskInspectorView: View {
     private var visualRegionStatusTitle: String {
         switch visualSearchRegionSpaceDraft {
         case .automatic, .displayAbsolute, .displayNormalized:
-            return NSLocalizedString("Display bounds", comment: "")
+            return String(localized: "Display bounds", table: "Common")
         case .windowLocal, .windowNormalized:
             return targetSurfaceForOCRPicker == nil
-                ? NSLocalizedString("Window context missing", comment: "")
-                : NSLocalizedString("Window bounds", comment: "")
+                ? String(localized: "Window context missing", table: "Common")
+                : String(localized: "Window bounds", table: "Common")
         case .contentLocal, .contentNormalized:
             return targetSurfaceForOCRPicker?.recordedContentFrame == nil
-                ? NSLocalizedString("Content context missing", comment: "")
-                : NSLocalizedString("Content bounds", comment: "")
+                ? String(localized: "Content context missing", table: "Common")
+                : String(localized: "Content bounds", table: "Common")
         }
     }
 
     private var visualRegionStatusDetail: String {
         switch visualSearchRegionSpaceDraft {
         case .automatic, .displayAbsolute:
-            return NSLocalizedString("Draw Bounds records display-pixel bounds for the watched visual area.", comment: "")
+            return String(localized: "Draw Bounds records display-pixel bounds for the watched visual area.", table: "Common")
         case .displayNormalized:
-            return NSLocalizedString("Bounds are normalized to the selected display for more tolerant screen-size changes.", comment: "")
+            return String(localized: "Bounds are normalized to the selected display for more tolerant screen-size changes.", table: "Common")
         case .windowLocal, .windowNormalized:
             if let targetSurfaceForOCRPicker {
                 return String(
-                    format: NSLocalizedString("Window context is available from %@. Draw over the target window to bind this visual wait.", comment: ""),
+                    format: String(localized: "Window context is available from %@. Draw over the target window to bind this visual wait.", table: "Common"),
                     targetSurfaceForOCRPicker.windowContextLabel
                 )
             }
-            return NSLocalizedString("No linked window context is available yet. Draw over the target window, or switch to display coordinates.", comment: "")
+            return String(localized: "No linked window context is available yet. Draw over the target window, or switch to display coordinates.", table: "Common")
         case .contentLocal, .contentNormalized:
             if let targetSurfaceForOCRPicker,
                targetSurfaceForOCRPicker.recordedContentFrame != nil {
                 return String(
-                    format: NSLocalizedString("Content context is available from %@. Use this for app-content visual waits.", comment: ""),
+                    format: String(localized: "Content context is available from %@. Use this for app-content visual waits.", table: "Common"),
                     targetSurfaceForOCRPicker.windowContextLabel
                 )
             }
-            return NSLocalizedString("Content bounds are not available yet. Draw over app content, or switch to window/display coordinates.", comment: "")
+            return String(localized: "Content bounds are not available yet. Draw over app content, or switch to window/display coordinates.", table: "Common")
         }
     }
 
@@ -1085,7 +1085,7 @@ struct AutomationTaskInspectorView: View {
 
     private func visualRegionDetail(_ region: AutomationWorkflowDraftVisualRegion) -> String {
         String(
-            format: NSLocalizedString("%@ bounds %@, %@, %@ x %@", comment: ""),
+            format: String(localized: "%@ bounds %@, %@, %@ x %@", table: "Common"),
             region.space.titleForVisualCondition,
             formattedVisualAssetValue(Double(region.bounds.x)),
             formattedVisualAssetValue(Double(region.bounds.y)),
@@ -1099,7 +1099,7 @@ struct AutomationTaskInspectorView: View {
         let checksum = asset.sha256?.trimmingCharacters(in: .whitespacesAndNewlines)
             .nilIfEmptyForTaskInspector
             .map { sha in
-                String(format: NSLocalizedString("SHA %@", comment: ""), String(sha.prefix(8)))
+                String(format: String(localized: "SHA %@", table: "Common"), String(sha.prefix(8)))
             }
         return [path, checksum]
             .compactMap { $0 }
@@ -1351,12 +1351,12 @@ struct AutomationTaskInspectorView: View {
     }
 
     private var deleteTaskTitle: String {
-        String(format: NSLocalizedString("Delete %@?", comment: ""), task.name)
+        String(format: String(localized: "Delete %@?", table: "Common"), task.name)
     }
 
     private var deleteTaskMessage: String {
         String(
-            format: NSLocalizedString("This removes \"%@\" from the workflow and removes dependencies attached to it.", comment: ""),
+            format: String(localized: "This removes \"%@\" from the workflow and removes dependencies attached to it.", table: "Common"),
             task.name
         )
     }
@@ -1611,7 +1611,7 @@ private extension PlaybackSurface {
         if let appName, !appName.isEmpty {
             return appName
         }
-        return NSLocalizedString("linked macro surface", comment: "")
+        return String(localized: "linked macro surface", table: "EditorUX")
     }
 }
 
@@ -1626,13 +1626,13 @@ private enum TaskInspectorTab: String, CaseIterable, Identifiable {
     var title: String {
         switch self {
         case .block:
-            return NSLocalizedString("Block", comment: "")
+            return String(localized: "Block", table: "Common")
         case .flow:
-            return NSLocalizedString("Flow", comment: "")
+            return String(localized: "Flow", table: "Common")
         case .run:
-            return NSLocalizedString("Run", comment: "")
+            return String(localized: "Run", table: "Automation")
         case .advanced:
-            return NSLocalizedString("Advanced", comment: "")
+            return String(localized: "Advanced", table: "Settings")
         }
     }
 
@@ -1660,11 +1660,11 @@ private enum ScheduleMode: String, CaseIterable, Identifiable {
     var title: String {
         switch self {
         case .manual:
-            return NSLocalizedString("Manual", comment: "")
+            return String(localized: "Manual", table: "Common")
         case .once:
-            return NSLocalizedString("Once", comment: "")
+            return String(localized: "Once", table: "Common")
         case .repeating:
-            return NSLocalizedString("Repeating", comment: "")
+            return String(localized: "Repeating", table: "Common")
         }
     }
 }
@@ -1680,13 +1680,13 @@ private enum RepeatUnit: String, CaseIterable, Identifiable {
     var title: String {
         switch self {
         case .minutes:
-            return NSLocalizedString("Minutes", comment: "")
+            return String(localized: "Minutes", table: "Common")
         case .hours:
-            return NSLocalizedString("Hours", comment: "")
+            return String(localized: "Hours", table: "Common")
         case .days:
-            return NSLocalizedString("Days", comment: "")
+            return String(localized: "Days", table: "Common")
         case .weeks:
-            return NSLocalizedString("Weeks", comment: "")
+            return String(localized: "Weeks", table: "Common")
         }
     }
 }
@@ -1707,15 +1707,15 @@ private enum ConditionMode: String, CaseIterable, Identifiable {
     var title: String {
         switch self {
         case .manualApproval:
-            return NSLocalizedString("Manual approval", comment: "")
+            return String(localized: "Manual approval", table: "Common")
         case .externalSignal:
-            return NSLocalizedString("External signal", comment: "")
+            return String(localized: "External signal", table: "Common")
         case .ocrText:
-            return NSLocalizedString("Screen text", comment: "")
+            return String(localized: "Screen text", table: "Recording")
         case .visual:
-            return NSLocalizedString("Visual condition", comment: "")
+            return String(localized: "Visual condition", table: "Common")
         case .previousOutcome:
-            return NSLocalizedString("Previous outcome", comment: "")
+            return String(localized: "Previous outcome", table: "Common")
         }
     }
 
@@ -1757,11 +1757,11 @@ private enum ConditionIntent: String, CaseIterable, Identifiable {
     var title: String {
         switch self {
         case .manualApproval:
-            return NSLocalizedString("Manual approval", comment: "")
+            return String(localized: "Manual approval", table: "Common")
         case .externalSignal:
-            return NSLocalizedString("External signal", comment: "")
+            return String(localized: "External signal", table: "Common")
         case .ocrText:
-            return NSLocalizedString("OCR text", comment: "")
+            return String(localized: "OCR text", table: "EditorUX")
         case .imageAppeared:
             return AutomationVisualConditionPresentation.title(for: AutomationVisualConditionType.imageAppeared)
         case .imageDisappeared:
@@ -1771,7 +1771,7 @@ private enum ConditionIntent: String, CaseIterable, Identifiable {
         case .pixelMatched:
             return AutomationVisualConditionPresentation.title(for: AutomationVisualConditionType.pixelMatched)
         case .previousOutcome:
-            return NSLocalizedString("Previous outcome", comment: "")
+            return String(localized: "Previous outcome", table: "Common")
         }
     }
 
@@ -1801,19 +1801,19 @@ private extension AutomationOCRSearchRegionSpace {
     var title: String {
         switch self {
         case .automatic:
-            return NSLocalizedString("Automatic", comment: "")
+            return String(localized: "Automatic", table: "Common")
         case .displayAbsolute:
-            return NSLocalizedString("Display absolute", comment: "")
+            return String(localized: "Display absolute", table: "Common")
         case .displayNormalized:
-            return NSLocalizedString("Display normalized", comment: "")
+            return String(localized: "Display normalized", table: "Common")
         case .windowLocal:
-            return NSLocalizedString("Window local", comment: "")
+            return String(localized: "Window local", table: "Common")
         case .windowNormalized:
-            return NSLocalizedString("Window normalized", comment: "")
+            return String(localized: "Window normalized", table: "Common")
         case .contentLocal:
-            return NSLocalizedString("Content local", comment: "")
+            return String(localized: "Content local", table: "Common")
         case .contentNormalized:
-            return NSLocalizedString("Content normalized", comment: "")
+            return String(localized: "Content normalized", table: "Common")
         }
     }
 

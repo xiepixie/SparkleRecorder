@@ -132,7 +132,7 @@ struct AutomationConditionProgressView: View {
         }
         if let pixelSampleRadius = progress.pixelSampleRadius {
             badge(
-                String(format: NSLocalizedString("Radius %d", comment: ""), pixelSampleRadius),
+                String(format: String(localized: "Radius %d", table: "Common"), pixelSampleRadius),
                 systemImage: "circle.grid.3x3"
             )
         }
@@ -170,9 +170,9 @@ struct AutomationConditionProgressView: View {
     private var pollingLabel: String {
         let seconds = progress.pollingInterval.formatted(.number.precision(.fractionLength(2)))
         if progress.isActivelyPolling {
-            return String(format: NSLocalizedString("Polling every %@s", comment: ""), seconds)
+            return String(format: String(localized: "Polling every %@s", table: "Common"), seconds)
         }
-        return String(format: NSLocalizedString("Checks every %@s", comment: ""), seconds)
+        return String(format: String(localized: "Checks every %@s", table: "Common"), seconds)
     }
 }
 
@@ -180,7 +180,7 @@ enum AutomationConditionProgressFormatter {
     static func accessibilitySummary(for progress: AutomationConditionProgressProjection) -> String {
         var parts = [progress.kindLabel, progress.targetLabel, progress.detail]
         if progress.isActivelyPolling {
-            parts.append(NSLocalizedString("Actively polling", comment: ""))
+            parts.append(String(localized: "Actively polling", table: "Common"))
         }
         if let runtimeSummary = AutomationRuntimeDetailFormatter.accessibilitySummary(
             timeoutCountdown: progress.timeoutCountdown,

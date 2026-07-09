@@ -12,12 +12,12 @@ struct EditorFooter: View {
         VStack(spacing: 0) {
             Divider()
             HStack(spacing: 14) {
-                Label(String(format: NSLocalizedString("%d events", comment: ""), eventCount), systemImage: "wave.3.right")
+                Label(String(format: String(localized: "%d events", table: "EditorUX"), eventCount), systemImage: "wave.3.right")
                 Text("·").foregroundStyle(.tertiary)
                 Label(formatDuration(duration), systemImage: "clock")
                 if selectedCount > 0 {
                     Text("·").foregroundStyle(.tertiary)
-                    Label(String(format: NSLocalizedString("%d selected", comment: ""), selectedCount), systemImage: "checkmark.circle.fill")
+                    Label(String(format: String(localized: "%d selected", table: "Common"), selectedCount), systemImage: "checkmark.circle.fill")
                         .foregroundStyle(.tint)
                 }
                 Spacer()
@@ -25,7 +25,7 @@ struct EditorFooter: View {
                     .foregroundStyle(footerHealthTint)
                     .help(macroEditorHealthDetail(health))
                 Text("·").foregroundStyle(.tertiary)
-                Text(NSLocalizedString("Edits apply live", comment: ""))
+                Text("Edits apply live", tableName: "Common")
                     .font(.system(size: 10))
                     .foregroundStyle(.tertiary)
             }

@@ -7,7 +7,7 @@ struct AutomationTaskRuntimeDetailView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            AutomationSectionHeader(title: NSLocalizedString("RUN STATUS", comment: ""))
+            AutomationSectionHeader(title: String(localized: "RUN STATUS", table: "Common"))
 
             HStack(alignment: .top, spacing: 8) {
                 Label(projection.status.label, systemImage: projection.status.systemImage)
@@ -42,24 +42,24 @@ struct AutomationTaskRuntimeDetailView: View {
 
             if let timeoutCountdown = projection.timeoutCountdown {
                 runtimeRow(
-                    NSLocalizedString("Deadline", comment: ""),
+                    String(localized: "Deadline", table: "Common"),
                     timeoutCountdown.deadline.formatted(date: .omitted, time: .shortened)
                 )
                 runtimeRow(
-                    NSLocalizedString("Timeout", comment: ""),
+                    String(localized: "Timeout", table: "Common"),
                     durationLabel(timeoutCountdown.timeout)
                 )
             }
 
             if let retryAttemptSummary = projection.retryAttemptSummary {
-                runtimeRow(NSLocalizedString("Attempt", comment: ""), retryAttemptSummary.label)
+                runtimeRow(String(localized: "Attempt", table: "Common"), retryAttemptSummary.label)
                 runtimeRow(
-                    NSLocalizedString("Remaining", comment: ""),
+                    String(localized: "Remaining", table: "Common"),
                     remainingAttemptLabel(retryAttemptSummary.remainingAttempts)
                 )
                 if let nextRetryAt = retryAttemptSummary.nextRetryAt {
                     runtimeRow(
-                        NSLocalizedString("Next retry", comment: ""),
+                        String(localized: "Next retry", table: "Common"),
                         nextRetryAt.formatted(date: .omitted, time: .shortened)
                     )
                 }
@@ -68,12 +68,12 @@ struct AutomationTaskRuntimeDetailView: View {
             if let nextScheduledOccurrence = projection.nextScheduledOccurrence {
                 AutomationNextScheduleBadge(
                     date: nextScheduledOccurrence,
-                    title: NSLocalizedString("Next", comment: "")
+                    title: String(localized: "Next", table: "Common")
                 )
             }
 
             if projection.hasEvidence {
-                Label(NSLocalizedString("Evidence available", comment: ""), systemImage: "doc.richtext")
+                Label(String(localized: "Evidence available", table: "Automation"), systemImage: "doc.richtext")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -101,23 +101,23 @@ struct AutomationTaskRuntimeDetailView: View {
         let seconds = max(0, Int(ceil(duration)))
         if seconds >= 60 {
             return String(
-                format: NSLocalizedString("%dm %02ds", comment: ""),
+                format: String(localized: "%dm %02ds", table: "Common"),
                 seconds / 60,
                 seconds % 60
             )
         }
         return String(
-            format: NSLocalizedString("%ds", comment: ""),
+            format: String(localized: "%ds", table: "Common"),
             seconds
         )
     }
 
     private func remainingAttemptLabel(_ count: Int) -> String {
         if count == 1 {
-            return NSLocalizedString("1 attempt", comment: "")
+            return String(localized: "1 attempt", table: "Common")
         }
         return String(
-            format: NSLocalizedString("%d attempts", comment: ""),
+            format: String(localized: "%d attempts", table: "Common"),
             count
         )
     }

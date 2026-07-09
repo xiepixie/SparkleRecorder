@@ -30,7 +30,7 @@ struct AutomationTaskRunConditionEvidenceView: View {
 
             if !evidence.artifacts.isEmpty {
                 VStack(alignment: .leading, spacing: 6) {
-                    Text(NSLocalizedString("Diagnostic artifacts", comment: ""))
+                    Text("Diagnostic artifacts", tableName: "Common")
                         .font(.caption2)
                         .bold()
                         .foregroundStyle(.secondary)
@@ -46,12 +46,12 @@ struct AutomationTaskRunConditionEvidenceView: View {
 
             VStack(alignment: .leading, spacing: 4) {
                 AutomationTaskRunDetailRowView(
-                    title: NSLocalizedString("Target", comment: ""),
+                    title: String(localized: "Target", table: "Common"),
                     value: evidence.targetDescription
                 )
                 AutomationTaskRunDetailRowView(
-                    title: NSLocalizedString("Samples", comment: ""),
-                    value: String(format: NSLocalizedString("%d", comment: ""), evidence.sampleCount)
+                    title: String(localized: "Samples", table: "Common"),
+                    value: String(format: String(localized: "%d", table: "Common"), evidence.sampleCount)
                 )
                 if let score = evidence.score {
                     AutomationTaskRunDetailRowView(
@@ -61,19 +61,19 @@ struct AutomationTaskRunConditionEvidenceView: View {
                 }
                 if let threshold = evidence.threshold {
                     AutomationTaskRunDetailRowView(
-                        title: NSLocalizedString("Threshold", comment: ""),
+                        title: String(localized: "Threshold", table: "Common"),
                         value: scoreLabel(threshold)
                     )
                 }
                 if let region = evidence.resolvedSearchRegion {
                     AutomationTaskRunDetailRowView(
-                        title: NSLocalizedString("Region", comment: ""),
+                        title: String(localized: "Region", table: "EditorUX"),
                         value: rectLabel(region)
                     )
                 }
                 if let lastSampleAt = evidence.lastSampleAt {
                     AutomationTaskRunDetailRowView(
-                        title: NSLocalizedString("Last sample", comment: ""),
+                        title: String(localized: "Last sample", table: "Common"),
                         value: timeSummary(lastSampleAt)
                     )
                 }
@@ -101,11 +101,11 @@ struct AutomationTaskRunConditionEvidenceView: View {
     private var title: String {
         switch evidence.kind {
         case .ocrText:
-            return NSLocalizedString("Text diagnostics", comment: "")
+            return String(localized: "Text diagnostics", table: "Common")
         case .regionChanged, .imageAppeared, .imageDisappeared, .pixelMatched:
-            return NSLocalizedString("Visual diagnostics", comment: "")
+            return String(localized: "Visual diagnostics", table: "Common")
         case .previousOutcome, .externalSignal, .manualApproval:
-            return NSLocalizedString("Condition diagnostics", comment: "")
+            return String(localized: "Condition diagnostics", table: "Common")
         }
     }
 
@@ -146,75 +146,75 @@ struct AutomationTaskRunConditionEvidenceView: View {
     private var outcomeLabel: String {
         switch evidence.outcome {
         case .conditionMatched:
-            return NSLocalizedString("Matched", comment: "")
+            return String(localized: "Matched", table: "Common")
         case .conditionNotMatched:
-            return NSLocalizedString("Not matched", comment: "")
+            return String(localized: "Not matched", table: "Common")
         case .permissionDenied:
-            return NSLocalizedString("Permission", comment: "")
+            return String(localized: "Permission", table: "Common")
         case .rejected:
-            return NSLocalizedString("Rejected", comment: "")
+            return String(localized: "Rejected", table: "Common")
         case .succeeded:
-            return NSLocalizedString("Success", comment: "")
+            return String(localized: "Success", table: "Common")
         case .failed:
-            return NSLocalizedString("Failure", comment: "")
+            return String(localized: "Failure", table: "Common")
         case .cancelled:
-            return NSLocalizedString("Cancelled", comment: "")
+            return String(localized: "Cancelled", table: "Common")
         case .timedOut:
-            return NSLocalizedString("Timeout", comment: "")
+            return String(localized: "Timeout", table: "Common")
         case .resourceConflict:
-            return NSLocalizedString("Resource conflict", comment: "")
+            return String(localized: "Resource conflict", table: "Common")
         case .missingMacro:
-            return NSLocalizedString("Missing macro", comment: "")
+            return String(localized: "Missing macro", table: "EditorUX")
         }
     }
 
     private var scoreTitle: String {
         switch evidence.kind {
         case .regionChanged:
-            return NSLocalizedString("Change score", comment: "")
+            return String(localized: "Change score", table: "Common")
         case .imageAppeared, .imageDisappeared:
-            return NSLocalizedString("Similarity", comment: "")
+            return String(localized: "Similarity", table: "Common")
         case .pixelMatched:
-            return NSLocalizedString("Similarity", comment: "")
+            return String(localized: "Similarity", table: "Common")
         case .ocrText, .previousOutcome, .externalSignal, .manualApproval:
-            return NSLocalizedString("Score", comment: "")
+            return String(localized: "Score", table: "Common")
         }
     }
 
     private func title(for field: AutomationConditionDiagnosticField) -> String {
         switch field.id {
         case "baselineRef":
-            return NSLocalizedString("Baseline", comment: "")
+            return String(localized: "Baseline", table: "Common")
         case "condition":
-            return NSLocalizedString("Condition", comment: "")
+            return String(localized: "Condition", table: "Automation")
         case "currentColor":
-            return NSLocalizedString("Current color", comment: "")
+            return String(localized: "Current color", table: "Common")
         case "detections":
-            return NSLocalizedString("Detected text count", comment: "")
+            return String(localized: "Detected text count", table: "Common")
         case "imageRef":
-            return NSLocalizedString("Image", comment: "")
+            return String(localized: "Image", table: "Common")
         case "lastTexts":
-            return NSLocalizedString("Last texts", comment: "")
+            return String(localized: "Last texts", table: "Common")
         case "matchedText":
-            return NSLocalizedString("Matched text", comment: "")
+            return String(localized: "Matched text", table: "Common")
         case "matchMode":
-            return NSLocalizedString("Match mode", comment: "")
+            return String(localized: "Match mode", table: "Common")
         case "pixel":
-            return NSLocalizedString("Pixel", comment: "")
+            return String(localized: "Pixel", table: "Common")
         case "regionRef":
-            return NSLocalizedString("Region", comment: "")
+            return String(localized: "Region", table: "EditorUX")
         case "samples":
-            return NSLocalizedString("Samples", comment: "")
+            return String(localized: "Samples", table: "Common")
         case "score":
             return scoreTitle
         case "searchRegion":
-            return NSLocalizedString("Search region", comment: "")
+            return String(localized: "Search region", table: "EditorUX")
         case "targetColor":
-            return NSLocalizedString("Target color", comment: "")
+            return String(localized: "Target color", table: "Common")
         case "targetText":
-            return NSLocalizedString("Target text", comment: "")
+            return String(localized: "Target text", table: "Common")
         case "threshold":
-            return NSLocalizedString("Threshold", comment: "")
+            return String(localized: "Threshold", table: "Common")
         default:
             return field.title
         }
@@ -223,22 +223,22 @@ struct AutomationTaskRunConditionEvidenceView: View {
     private func title(for artifact: AutomationConditionDiagnosticArtifact) -> String {
         switch artifact.kind {
         case .displaySampleImage:
-            return NSLocalizedString("Last sample image", comment: "")
+            return String(localized: "Last sample image", table: "Common")
         case .regionSampleImage:
-            return NSLocalizedString("Region sample image", comment: "")
+            return String(localized: "Region sample image", table: "Common")
         case .templateImage:
-            return NSLocalizedString("Template image", comment: "")
+            return String(localized: "Template image", table: "Common")
         case .baselineImage:
-            return NSLocalizedString("Baseline image", comment: "")
+            return String(localized: "Baseline image", table: "Common")
         }
     }
 
     private func rectLabel(_ rect: RectValue) -> String {
-        String(format: NSLocalizedString("%.0f, %.0f %.0fx%.0f", comment: ""), rect.x, rect.y, rect.width, rect.height)
+        String(format: String(localized: "%.0f, %.0f %.0fx%.0f", table: "Common"), rect.x, rect.y, rect.width, rect.height)
     }
 
     private func scoreLabel(_ score: Double) -> String {
-        String(format: NSLocalizedString("%.2f", comment: ""), score)
+        String(format: String(localized: "%.2f", table: "Common"), score)
     }
 
     private func timeSummary(_ date: Date) -> String {
@@ -318,22 +318,22 @@ private struct AutomationConditionDiagnosticArtifactCardView: View {
 
             VStack(alignment: .leading, spacing: 3) {
                 AutomationTaskRunDetailRowView(
-                    title: NSLocalizedString("Path", comment: ""),
+                    title: String(localized: "Path", table: "Common"),
                     value: artifact.relativePath
                 )
                 AutomationTaskRunDetailRowView(
-                    title: NSLocalizedString("Type", comment: ""),
+                    title: String(localized: "Type", table: "Common"),
                     value: artifact.contentType
                 )
                 if let pixelBounds = artifact.pixelBounds {
                     AutomationTaskRunDetailRowView(
-                        title: NSLocalizedString("Bounds", comment: ""),
+                        title: String(localized: "Bounds", table: "Common"),
                         value: rectLabel(pixelBounds)
                     )
                 }
                 if let createdAt = artifact.createdAt {
                     AutomationTaskRunDetailRowView(
-                        title: NSLocalizedString("Captured", comment: ""),
+                        title: String(localized: "Captured", table: "Common"),
                         value: createdAt.formatted(date: .abbreviated, time: .standard)
                     )
                 }
@@ -385,13 +385,13 @@ private struct AutomationConditionDiagnosticArtifactCardView: View {
 
         switch artifact.kind {
         case .displaySampleImage:
-            return NSLocalizedString("Last sample", comment: "")
+            return String(localized: "Last sample", table: "Common")
         case .regionSampleImage:
-            return NSLocalizedString("Watched region", comment: "")
+            return String(localized: "Watched region", table: "Common")
         case .templateImage:
-            return NSLocalizedString("Template image", comment: "")
+            return String(localized: "Template image", table: "Common")
         case .baselineImage:
-            return NSLocalizedString("Baseline image", comment: "")
+            return String(localized: "Baseline image", table: "Common")
         }
     }
 
@@ -432,29 +432,29 @@ private struct AutomationConditionDiagnosticArtifactCardView: View {
 
     private var status: String {
         guard let payload else {
-            return NSLocalizedString("Loading", comment: "")
+            return String(localized: "Loading", table: "Common")
         }
         switch payload.state {
         case .loaded:
-            return NSLocalizedString("Ready", comment: "")
+            return String(localized: "Ready", table: "Common")
         case .missing:
-            return NSLocalizedString("Missing", comment: "")
+            return String(localized: "Missing", table: "Common")
         case .invalidPath:
-            return NSLocalizedString("Invalid path", comment: "")
+            return String(localized: "Invalid path", table: "Common")
         case .unreadable:
-            return NSLocalizedString("Unreadable", comment: "")
+            return String(localized: "Unreadable", table: "Common")
         }
     }
 
     @ViewBuilder
     private func artifactActionButtons(_ payload: AutomationConditionEvidenceArtifactPayload) -> some View {
-        Button(NSLocalizedString("Open", comment: ""), systemImage: "arrow.up.right.square") {
+        Button(String(localized: "Open", table: "Common"), systemImage: "arrow.up.right.square") {
             actionFeedback = AutomationConditionEvidenceArtifactPresenter.open(payload)
         }
         .buttonStyle(.bordered)
         .controlSize(.small)
 
-        Button(NSLocalizedString("Reveal", comment: ""), systemImage: "folder") {
+        Button(String(localized: "Reveal", table: "Common"), systemImage: "folder") {
             actionFeedback = AutomationConditionEvidenceArtifactPresenter.reveal(payload)
         }
         .buttonStyle(.bordered)
@@ -464,13 +464,13 @@ private struct AutomationConditionDiagnosticArtifactCardView: View {
     private func unavailableLabel(for state: AutomationConditionEvidenceArtifactLoadState) -> String {
         switch state {
         case .loaded:
-            return NSLocalizedString("Artifact preview unavailable", comment: "")
+            return String(localized: "Artifact preview unavailable", table: "Common")
         case .missing:
-            return NSLocalizedString("Artifact file is missing", comment: "")
+            return String(localized: "Artifact file is missing", table: "Common")
         case .invalidPath:
-            return NSLocalizedString("Artifact path is invalid", comment: "")
+            return String(localized: "Artifact path is invalid", table: "Common")
         case .unreadable:
-            return NSLocalizedString("Artifact preview unavailable", comment: "")
+            return String(localized: "Artifact preview unavailable", table: "Common")
         }
     }
 
@@ -479,9 +479,9 @@ private struct AutomationConditionDiagnosticArtifactCardView: View {
     ) -> String {
         switch feedback {
         case .succeeded(.open):
-            return NSLocalizedString("Artifact opened in the default viewer.", comment: "")
+            return String(localized: "Artifact opened in the default viewer.", table: "Common")
         case .succeeded(.reveal):
-            return NSLocalizedString("Artifact revealed in Finder.", comment: "")
+            return String(localized: "Artifact revealed in Finder.", table: "Common")
         case .failed(.open, let message), .failed(.reveal, let message):
             return message
         }
@@ -523,6 +523,6 @@ private struct AutomationConditionDiagnosticArtifactCardView: View {
     }
 
     private func rectLabel(_ rect: RectValue) -> String {
-        String(format: NSLocalizedString("%.0f, %.0f %.0fx%.0f", comment: ""), rect.x, rect.y, rect.width, rect.height)
+        String(format: String(localized: "%.0f, %.0f %.0fx%.0f", table: "Common"), rect.x, rect.y, rect.width, rect.height)
     }
 }

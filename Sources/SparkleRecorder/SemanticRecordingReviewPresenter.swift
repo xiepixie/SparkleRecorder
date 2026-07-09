@@ -59,21 +59,21 @@ enum SemanticRecordingReviewPresenterError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .applicationSupportDirectoryUnavailable:
-            return NSLocalizedString("Application Support directory is unavailable.", comment: "")
+            return String(localized: "Application Support directory is unavailable.", table: "Common")
         case .couldNotDecodeFrameImage(let path):
-            return String(format: NSLocalizedString("Could not decode frame image %@.", comment: ""), path)
+            return String(format: String(localized: "Could not decode frame image %@.", table: "Common"), path)
         case .emptyCropRegion(let key):
-            return String(format: NSLocalizedString("Selected crop region is empty for %@.", comment: ""), key)
+            return String(format: String(localized: "Selected crop region is empty for %@.", table: "Common"), key)
         case .emptyPixelSample(let key):
-            return String(format: NSLocalizedString("Could not sample pixel color for %@.", comment: ""), key)
+            return String(format: String(localized: "Could not sample pixel color for %@.", table: "Common"), key)
         case .missingPixelSampleBounds(let key):
-            return String(format: NSLocalizedString("Pixel sample %@ does not have bounds.", comment: ""), key)
+            return String(format: String(localized: "Pixel sample %@ does not have bounds.", table: "Common"), key)
         case .missingPixelSampleFrame(let frameID):
-            return String(format: NSLocalizedString("Pixel sample frame %@ is missing.", comment: ""), frameID.uuidString)
+            return String(format: String(localized: "Pixel sample frame %@ is missing.", table: "Common"), frameID.uuidString)
         case .pngEncodingFailed(let key):
-            return String(format: NSLocalizedString("Could not encode cropped asset %@.", comment: ""), key)
+            return String(format: String(localized: "Could not encode cropped asset %@.", table: "Common"), key)
         case .unsupportedPixelSampleCandidate(let key):
-            return String(format: NSLocalizedString("Candidate %@ is not a pixel sample.", comment: ""), key)
+            return String(format: String(localized: "Candidate %@ is not a pixel sample.", table: "Common"), key)
         }
     }
 }
@@ -178,9 +178,9 @@ enum SemanticRecordingReviewPresenter {
         onReview: @escaping (Result<SemanticRecordingReviewState, Error>) -> Void
     ) {
         let panel = NSOpenPanel()
-        panel.title = NSLocalizedString("Open Macro Review Bundle", comment: "")
-        panel.prompt = NSLocalizedString("Open Review", comment: "")
-        panel.message = NSLocalizedString("Choose a semantic recording bundle folder or its manifest.json.", comment: "")
+        panel.title = String(localized: "Open Macro Review Bundle", table: "Common")
+        panel.prompt = String(localized: "Open Review", table: "Common")
+        panel.message = String(localized: "Choose a semantic recording bundle folder or its manifest.json.", table: "Common")
         panel.allowsMultipleSelection = false
         panel.canChooseDirectories = true
         panel.canChooseFiles = true
@@ -260,13 +260,13 @@ enum SemanticRecordingReviewPresenter {
         in state: SemanticRecordingReviewState
     ) -> SemanticRecordingReviewArtifactActionFeedback {
         guard let status = state.artifactStatus(for: path), status.exists else {
-            return .failed(.open, NSLocalizedString("Artifact is missing from the bundle.", comment: ""))
+            return .failed(.open, String(localized: "Artifact is missing from the bundle.", table: "Common"))
         }
 
         let didOpen = NSWorkspace.shared.open(status.url)
         return didOpen
             ? .succeeded(.open, status.path)
-            : .failed(.open, NSLocalizedString("macOS could not open this artifact.", comment: ""))
+            : .failed(.open, String(localized: "macOS could not open this artifact.", table: "Common"))
     }
 
     static func revealArtifact(
@@ -274,7 +274,7 @@ enum SemanticRecordingReviewPresenter {
         in state: SemanticRecordingReviewState
     ) -> SemanticRecordingReviewArtifactActionFeedback {
         guard let status = state.artifactStatus(for: path), status.exists else {
-            return .failed(.reveal, NSLocalizedString("Artifact is missing from the bundle.", comment: ""))
+            return .failed(.reveal, String(localized: "Artifact is missing from the bundle.", table: "Common"))
         }
 
         NSWorkspace.shared.activateFileViewerSelecting([status.url])
@@ -287,18 +287,18 @@ enum SemanticRecordingReviewPresenter {
         do {
             let bundleRef = try RecordingArtifactRef(reference.bundleRelativePath)
             guard let appSupportRootURL else {
-                return .failed(.reveal, NSLocalizedString("Application Support directory is unavailable.", comment: ""))
+                return .failed(.reveal, String(localized: "Application Support directory is unavailable.", table: "Common"))
             }
             let directory = appSupportRootURL.appendingRecordingArtifactRef(bundleRef)
             guard FileManager.default.fileExists(atPath: directory.path) else {
-                return .failed(.reveal, NSLocalizedString("Macro Review bundle is missing from Application Support.", comment: ""))
+                return .failed(.reveal, String(localized: "Macro Review bundle is missing from Application Support.", table: "Common"))
             }
             NSWorkspace.shared.activateFileViewerSelecting([directory])
             return .succeeded(.reveal, bundleRef.path)
         } catch {
             return .failed(
                 .reveal,
-                String(format: NSLocalizedString("Could not reveal Macro Review bundle: %@", comment: ""), String(describing: error))
+                String(format: String(localized: "Could not reveal Macro Review bundle: %@", table: "Common"), String(describing: error))
             )
         }
     }
@@ -385,7 +385,7 @@ enum SemanticRecordingReviewPresenter {
             baseDocument = AutomationWorkflowDraftExporter.export(workflow).document
         } else {
             baseDocument = AutomationWorkflowDraftDocument(workflow: AutomationWorkflowDraft(
-                name: NSLocalizedString("Macro Review Draft", comment: "")
+                name: String(localized: "Macro Review Draft", table: "Common")
             ))
         }
 
@@ -577,8 +577,8 @@ enum SemanticRecordingReviewPresenter {
         onComplete: @escaping (Result<URL, Error>) -> Void
     ) {
         let panel = NSSavePanel()
-        panel.title = NSLocalizedString("Save Workflow Draft Patch", comment: "")
-        panel.prompt = NSLocalizedString("Save Patch", comment: "")
+        panel.title = String(localized: "Save Workflow Draft Patch", table: "Common")
+        panel.prompt = String(localized: "Save Patch", table: "Common")
         panel.allowedContentTypes = [.json]
         panel.nameFieldStringValue = defaultName
 

@@ -25,19 +25,19 @@ struct AutomationWorkflowSettingsView: View {
     var body: some View {
         Form {
             Section {
-                TextField(NSLocalizedString("Workflow Name", comment: ""), text: $nameDraft)
+                TextField(String(localized: "Workflow Name", table: "Common"), text: $nameDraft)
                     .textFieldStyle(.roundedBorder)
                     .onSubmit(saveWorkflowName)
 
                 HStack {
                     Spacer()
-                    Button(NSLocalizedString("Save Workflow", comment: "")) {
+                    Button(String(localized: "Save Workflow", table: "Automation")) {
                         saveWorkflowName()
                     }
                     .disabled(trimmedName.isEmpty || trimmedName == workflow.name)
                 }
             } header: {
-                Text(NSLocalizedString("General", comment: ""))
+                Text("General", tableName: "Common")
             }
 
             Section {
@@ -51,7 +51,7 @@ struct AutomationWorkflowSettingsView: View {
 
                 if let nextScheduledOccurrence {
                     HStack {
-                        Label(NSLocalizedString("Next Schedule", comment: ""), systemImage: "clock")
+                        Label(String(localized: "Next Schedule", table: "Common"), systemImage: "clock")
                         Spacer()
                         VStack(alignment: .trailing) {
                             Text(nextScheduledOccurrence, style: .time)
@@ -62,39 +62,39 @@ struct AutomationWorkflowSettingsView: View {
                     }
                 }
             } header: {
-                Text(NSLocalizedString("Status", comment: ""))
+                Text("Status", tableName: "Common")
             }
 
             Section {
                 Button(action: onImportWorkflowPackage) {
-                    Label(NSLocalizedString("Import Workflow Package", comment: ""), systemImage: "square.and.arrow.down")
+                    Label(String(localized: "Import Workflow Package", table: "Automation"), systemImage: "square.and.arrow.down")
                 }
                 
                 Button(action: { onExportWorkflowPackage(workflow) }) {
-                    Label(NSLocalizedString("Export Workflow Package", comment: ""), systemImage: "square.and.arrow.up")
+                    Label(String(localized: "Export Workflow Package", table: "Automation"), systemImage: "square.and.arrow.up")
                 }
                 
                 Button(action: { onExportWorkflowDraft(workflow) }) {
-                    Label(NSLocalizedString("Export AI Draft", comment: ""), systemImage: "doc.badge.gearshape")
+                    Label(String(localized: "Export AI Draft", table: "Common"), systemImage: "doc.badge.gearshape")
                 }
-                .help(NSLocalizedString("Export AI-editable draft JSON", comment: ""))
+                .help(String(localized: "Export AI-editable draft JSON", table: "Common"))
                 
                 Button(action: { onShareWorkflowPackage(workflow) }) {
-                    Label(NSLocalizedString("Share Workflow", comment: ""), systemImage: "square.and.arrow.up.on.square")
+                    Label(String(localized: "Share Workflow", table: "Automation"), systemImage: "square.and.arrow.up.on.square")
                 }
             } header: {
-                Text(NSLocalizedString("Data", comment: ""))
+                Text("Data", tableName: "Common")
             }
 
             Section {
                 Button(role: .destructive) {
                     isConfirmingDeleteWorkflow = true
                 } label: {
-                    Label(NSLocalizedString("Delete Workflow", comment: ""), systemImage: "trash")
+                    Label(String(localized: "Delete Workflow", table: "Automation"), systemImage: "trash")
                         .foregroundStyle(.red)
                 }
             } header: {
-                Text(NSLocalizedString("Danger Zone", comment: ""))
+                Text("Danger Zone", tableName: "Common")
             }
             
             Section {
@@ -107,7 +107,7 @@ struct AutomationWorkflowSettingsView: View {
                 )
                 .frame(minHeight: 200)
             } header: {
-                Text(NSLocalizedString("Task List Overview", comment: ""))
+                Text("Task List Overview", tableName: "Common")
             }
         }
         .formStyle(.grouped)
@@ -117,8 +117,8 @@ struct AutomationWorkflowSettingsView: View {
         .onChange(of: workflow.id) { resetDraft() }
         .onChange(of: workflow.name) { resetDraft() }
         .alert(deleteWorkflowTitle, isPresented: $isConfirmingDeleteWorkflow) {
-            Button(NSLocalizedString("Delete", comment: ""), role: .destructive, action: deleteWorkflow)
-            Button(NSLocalizedString("Cancel", comment: ""), role: .cancel) {}
+            Button(String(localized: "Delete", table: "Common"), role: .destructive, action: deleteWorkflow)
+            Button(String(localized: "Cancel", table: "Common"), role: .cancel) {}
         } message: {
             Text(deleteWorkflowMessage)
         }
@@ -197,11 +197,11 @@ struct AutomationWorkflowSettingsView: View {
     }
 
     private var deleteWorkflowTitle: String {
-        String(format: NSLocalizedString("Delete Workflow \"%@\"?", comment: ""), workflow.name)
+        String(format: String(localized: "Delete Workflow \"%@\"?", table: "Common"), workflow.name)
     }
 
     private var deleteWorkflowMessage: String {
-        NSLocalizedString("This action cannot be undone. All tasks, conditions, and run history will be permanently deleted.", comment: "")
+        String(localized: "This action cannot be undone. All tasks, conditions, and run history will be permanently deleted.", table: "Common")
     }
 
     private func deleteWorkflow() {

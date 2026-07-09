@@ -11,7 +11,7 @@ struct EditorExportButton: View {
     var body: some View {
         HStack(spacing: 0) {
             Button(action: action) {
-                Label(NSLocalizedString("Export", comment: ""), systemImage: "square.and.arrow.up")
+                Label(String(localized: "Export", table: "Common"), systemImage: "square.and.arrow.up")
                     .labelStyle(.titleAndIcon)
                     .font(.system(size: 11, weight: .medium))
                     .foregroundStyle(.white)
@@ -36,7 +36,7 @@ struct EditorExportButton: View {
             }
             .buttonStyle(.plain)
             .popover(isPresented: $showInfo) {
-                Text(NSLocalizedString("Exports a double-clickable .command script", comment: ""))
+                Text("Exports a double-clickable .command script", tableName: "EditorUX")
                     .font(.system(size: 11))
                     .multilineTextAlignment(.leading)
                     .fixedSize(horizontal: false, vertical: true)
@@ -50,6 +50,6 @@ struct EditorExportButton: View {
         )
         .animation(reduceMotion ? .linear(duration: 0.01) : Brand.hoverAnimation, value: hovered)
         .onHover { hovered = $0 }
-        .accessibilityLabel(NSLocalizedString("Export", comment: ""))
+        .accessibilityLabel(String(localized: "Export", table: "Common"))
     }
 }

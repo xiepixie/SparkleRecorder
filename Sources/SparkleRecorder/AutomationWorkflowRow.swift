@@ -23,8 +23,8 @@ struct AutomationWorkflowRow: View {
             }
 
             HStack(spacing: 8) {
-                Label(String(format: NSLocalizedString("%d tasks", comment: ""), workflow.nodes.count), systemImage: "circle.grid.cross")
-                Label(String(format: NSLocalizedString("%d dependencies", comment: ""), workflow.edges.count), systemImage: "arrow.triangle.branch")
+                Label(String(format: String(localized: "%d tasks", table: "Automation"), workflow.nodes.count), systemImage: "circle.grid.cross")
+                Label(String(format: String(localized: "%d dependencies", table: "Common"), workflow.edges.count), systemImage: "arrow.triangle.branch")
             }
             .font(.caption)
             .foregroundStyle(.secondary)
@@ -36,7 +36,7 @@ struct AutomationWorkflowRow: View {
 
             AutomationNextScheduleBadge(
                 date: workflow.nextScheduledOccurrence,
-                title: NSLocalizedString("Next", comment: ""),
+                title: String(localized: "Next", table: "Common"),
                 isCompact: true
             )
         }
@@ -51,7 +51,7 @@ struct AutomationWorkflowRow: View {
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(String(
-            format: NSLocalizedString("%@, %d tasks, %d dependencies", comment: ""),
+            format: String(localized: "%@, %d tasks, %d dependencies", table: "Automation"),
             workflow.name,
             workflow.nodes.count,
             workflow.edges.count

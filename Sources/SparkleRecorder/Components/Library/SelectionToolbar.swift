@@ -8,6 +8,7 @@ struct SelectionToolbar: View {
     let onDelete: () -> Void
     let onExport: () -> Void
     let onAddTag: () -> Void
+    let onCreateSequence: () -> Void
 
     @State private var confirmDelete = false
 
@@ -18,37 +19,41 @@ struct SelectionToolbar: View {
                     .foregroundStyle(.secondary)
             }
             .buttonStyle(.plain)
-            .accessibilityLabel(NSLocalizedString("Clear selection", comment: ""))
-            Text(String(format: NSLocalizedString("%d selected", comment: ""), selectionCount))
+            .accessibilityLabel(String(localized: "Clear selection", table: "Common"))
+            Text(String(format: String(localized: "%d selected", table: "Common"), selectionCount))
                 .font(.system(size: 11.5, weight: .semibold))
                 .foregroundStyle(.primary)
 
             Spacer()
 
-            Button(NSLocalizedString("Add Tag…", comment: ""), systemImage: "tag", action: onAddTag)
+            Button(String(localized: "Create Sequence…", table: "Common"), systemImage: "arrow.right.circle", action: onCreateSequence)
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+
+            Button(String(localized: "Add Tag…", table: "Common"), systemImage: "tag", action: onAddTag)
                 .buttonStyle(.bordered)
                 .controlSize(.small)
                 .disabled(selectionCount != 1)
 
-            Button(NSLocalizedString("Export", comment: ""), systemImage: "square.and.arrow.up", action: onExport)
+            Button(String(localized: "Export", table: "Common"), systemImage: "square.and.arrow.up", action: onExport)
                 .buttonStyle(.bordered)
                 .controlSize(.small)
 
-            Button(NSLocalizedString("Delete", comment: ""), systemImage: "trash", role: .destructive) {
+            Button(String(localized: "Delete", table: "Common"), systemImage: "trash", role: .destructive) {
                 confirmDelete = true
             }
             .buttonStyle(.bordered)
             .controlSize(.small)
             .tint(.red)
             .confirmationDialog(
-                String(format: NSLocalizedString("Delete %d macros?", comment: ""), selectionCount),
+                String(format: String(localized: "Delete %d macros?", table: "EditorUX"), selectionCount),
                 isPresented: $confirmDelete,
                 titleVisibility: .visible
             ) {
-                Button(NSLocalizedString("Delete", comment: ""), role: .destructive) { onDelete() }
-                Button(NSLocalizedString("Cancel", comment: ""), role: .cancel) {}
+                Button(String(localized: "Delete", table: "Common"), role: .destructive) { onDelete() }
+                Button(String(localized: "Cancel", table: "Common"), role: .cancel) {}
             } message: {
-                Text(NSLocalizedString("This can't be undone.", comment: ""))
+                Text("This can't be undone.", tableName: "Common")
             }
         }
         .padding(.horizontal, 10)

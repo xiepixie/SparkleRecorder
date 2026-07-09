@@ -8,7 +8,7 @@ struct AutomationTaskRunEvidenceBindingView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 5) {
             AutomationTaskRunDetailRowView(
-                title: NSLocalizedString("Binding", comment: ""),
+                title: String(localized: "Binding", table: "Common"),
                 value: bindingLabel
             )
 
@@ -25,15 +25,15 @@ struct AutomationTaskRunEvidenceBindingView: View {
         switch payload.source {
         case .perRun:
             guard payload.manifest != nil else {
-                return NSLocalizedString("Report file", comment: "")
+                return String(localized: "Report file", table: "Common")
             }
             return bindingWarning == nil
-                ? NSLocalizedString("Verified", comment: "")
-                : NSLocalizedString("Needs review", comment: "")
+                ? String(localized: "Verified", table: "Common")
+                : String(localized: "Needs review", table: "Common")
         case .latestMatchingRun:
-            return NSLocalizedString("Legacy latest match", comment: "")
+            return String(localized: "Legacy latest match", table: "Common")
         case .latestMacro:
-            return NSLocalizedString("Latest macro only", comment: "")
+            return String(localized: "Latest macro only", table: "Common")
         }
     }
 
@@ -41,18 +41,18 @@ struct AutomationTaskRunEvidenceBindingView: View {
         if let evidenceID = run.evidenceID,
            let manifest = payload.manifest,
            manifest.evidenceID != evidenceID {
-            return NSLocalizedString("Manifest evidence ID does not match this run.", comment: "")
+            return String(localized: "Manifest evidence ID does not match this run.", table: "Common")
         }
 
         if let manifest = payload.manifest,
            manifest.runID != payload.report.runID {
-            return NSLocalizedString("Manifest run ID does not match the report.", comment: "")
+            return String(localized: "Manifest run ID does not match the report.", table: "Common")
         }
 
         if let evidenceID = run.evidenceID,
            payload.report.runID != evidenceID,
            payload.source != .latestMacro {
-            return NSLocalizedString("Report run ID does not match this run.", comment: "")
+            return String(localized: "Report run ID does not match this run.", table: "Common")
         }
 
         return nil

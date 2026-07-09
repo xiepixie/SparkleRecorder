@@ -40,17 +40,17 @@ struct AutomationTaskRunHistoryView: View {
 
         VStack(alignment: .leading, spacing: 10) {
             AutomationSectionHeader(
-                title: NSLocalizedString("RUN HISTORY", comment: ""),
+                title: String(localized: "RUN HISTORY", table: "Automation"),
                 count: runs.count
             )
 
             if runs.isEmpty {
                 Label {
                     VStack(alignment: .leading, spacing: 3) {
-                        Text(NSLocalizedString("No task runs yet", comment: ""))
+                        Text("No task runs yet", tableName: "Automation")
                             .font(.caption)
                             .bold()
-                        Text(NSLocalizedString("Manual or scheduled runs will appear here with timing, outcome, and evidence.", comment: ""))
+                        Text("Manual or scheduled runs will appear here with timing, outcome, and evidence.", tableName: "Automation")
                             .font(.caption)
                             .foregroundStyle(.tertiary)
                             .fixedSize(horizontal: false, vertical: true)
@@ -74,7 +74,7 @@ struct AutomationTaskRunHistoryView: View {
                             )
                         }
                         .buttonStyle(.plain)
-                        .accessibilityHint(NSLocalizedString("Shows run details", comment: ""))
+                        .accessibilityHint(String(localized: "Shows run details", table: "Common"))
 
                         if run.id != visibleRuns.last?.id {
                             Divider().opacity(0.45)
@@ -99,7 +99,7 @@ struct AutomationTaskRunHistoryView: View {
                 }
 
                 if runs.count > visibleRuns.count {
-                    Text(String(format: NSLocalizedString("%d older runs hidden", comment: ""), runs.count - visibleRuns.count))
+                    Text(String(format: String(localized: "%d older runs hidden", table: "Automation"), runs.count - visibleRuns.count))
                         .font(.caption)
                         .foregroundStyle(.tertiary)
                 }

@@ -55,7 +55,7 @@ final class SettingsWindowController: NSWindowController {
                 .environmentObject(controller.library)
         )
         let win = NSWindow(contentViewController: host)
-        win.title = NSLocalizedString("Settings", comment: "")
+        win.title = String(localized: "Settings", table: "Settings")
         win.setContentSize(NSSize(width: 600, height: 640))
         win.styleMask = [.titled, .closable, .resizable]
         win.minSize = NSSize(width: 520, height: 460)

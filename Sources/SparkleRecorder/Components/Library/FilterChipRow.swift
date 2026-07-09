@@ -54,7 +54,7 @@ struct FilterChipRow: View {
             )
         }
         .buttonStyle(HoverPressButtonStyle(hoverScale: 1.05))
-        .accessibilityLabel(Text(String(format: NSLocalizedString("Filter: %@", comment: ""), item.label)))
+        .accessibilityLabel(Text(String(format: String(localized: "Filter: %@", table: "Common"), item.label)))
         .accessibilityAddTraits(selected ? .isSelected : [])
     }
 }

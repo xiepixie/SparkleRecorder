@@ -10,7 +10,7 @@ final class EditorWindowController: NSWindowController, NSWindowDelegate {
     init<V: View>(rootView: V) {
         let host = NSHostingController(rootView: rootView)
         let win = NSWindow(contentViewController: host)
-        win.title = NSLocalizedString("Macro Editor", comment: "")
+        win.title = String(localized: "Macro Editor", table: "EditorUX")
         win.setContentSize(NSSize(width: 1200, height: 800))
         win.styleMask = [.titled, .closable, .resizable, .miniaturizable, .fullSizeContentView]
         win.minSize = NSSize(width: 860, height: 620)
@@ -257,14 +257,14 @@ struct EditorView: View {
                 existingWorkflowName: nil,
                 onImportWorkflow: { _, _ in
                     showRepeatUntilDraftAlert(
-                        title: NSLocalizedString("Open Workflow to import", comment: ""),
-                        message: NSLocalizedString("Repeat-Until drafts from Macro Editor stay in preview until structured loop runtime support lands.", comment: "")
+                        title: String(localized: "Open Workflow to import", table: "Automation"),
+                        message: String(localized: "Repeat-Until drafts from Macro Editor stay in preview until structured loop runtime support lands.", table: "Automation")
                     )
                 }
             )
         }
         .alert(repeatUntilDraftAlertTitle, isPresented: $isShowingRepeatUntilDraftAlert) {
-            Button(NSLocalizedString("OK", comment: ""), role: .cancel) {}
+            Button(String(localized: "OK", table: "Common"), role: .cancel) {}
         } message: {
             Text(repeatUntilDraftAlertMessage)
         }
@@ -478,7 +478,7 @@ struct EditorView: View {
                 guard let session = self.activeDragSession, session.groupID == groupID, let rec = recorder else { return }
                 rec.loadEvents(session.snapshot, duration: session.liveDuration)
                 self.activeDragSession = nil
-                self.withUndo(NSLocalizedString("Adjust Drag Start", comment: "")) {
+                self.withUndo(String(localized: "Adjust Drag Start", table: "EditorUX")) {
                     if let start = session.group.startPoint,
                        let end = session.group.endPoint {
                         let newStart = CGPoint(x: start.x + dx, y: start.y + dy)
@@ -499,7 +499,7 @@ struct EditorView: View {
                 guard let session = self.activeDragSession, session.groupID == groupID, let rec = recorder else { return }
                 rec.loadEvents(session.snapshot, duration: session.liveDuration)
                 self.activeDragSession = nil
-                self.withUndo(NSLocalizedString("Adjust Swipe Destination", comment: "")) {
+                self.withUndo(String(localized: "Adjust Swipe Destination", table: "Common")) {
                     if let start = session.group.startPoint,
                        let end = session.group.endPoint {
                         let newEnd = CGPoint(x: end.x + dx, y: end.y + dy)
@@ -514,8 +514,8 @@ struct EditorView: View {
                 rec.loadEvents(session.snapshot, duration: session.liveDuration)
                 self.activeDragSession = nil
                 let undoName = session.group.kind.previewsPointSequence
-                    ? NSLocalizedString("Move Click Points", comment: "")
-                    : NSLocalizedString("Move Drag Path", comment: "")
+                    ? String(localized: "Move Click Points", table: "EditorUX")
+                    : String(localized: "Move Drag Path", table: "EditorUX")
                 self.withUndo(undoName) {
                     rec.events.translateEvents(at: session.eventIndices, dx: dx, dy: dy, surfaces: currentMacro?.surfaces ?? [:])
                 }
@@ -526,7 +526,7 @@ struct EditorView: View {
                 guard let session = self.activeDragSession, session.groupID == groupID, let rec = recorder else { return }
                 rec.loadEvents(session.snapshot, duration: session.liveDuration)
                 self.activeDragSession = nil
-                self.withUndo(NSLocalizedString("Move Click Point", comment: "")) {
+                self.withUndo(String(localized: "Move Click Point", table: "EditorUX")) {
                     rec.events.translateMultiPointClickPoint(
                         at: session.eventIndices,
                         pointIndex: pointIndex,
@@ -618,7 +618,7 @@ struct EditorView: View {
         // Hide the preview overlay during coordinate picking so it doesn't intercept mouse events
         CoordinatePreviewOverlay.shared.hide()
         
-        let editorWin = NSApp.windows.first(where: { $0.title == NSLocalizedString("Macro Editor", comment: "") })
+        let editorWin = NSApp.windows.first(where: { $0.title == String(localized: "Macro Editor", table: "EditorUX") })
         editorWin?.orderOut(nil)
         
         CoordinatePickerOverlay.shared.onPicked = { [weak recorder] pt in
@@ -643,13 +643,13 @@ struct EditorView: View {
             
             guard let rec = recorder else { return }
             if isEndPoint {
-                self.withUndo(NSLocalizedString("Pick End Coordinate", comment: "")) {
+                self.withUndo(String(localized: "Pick End Coordinate", table: "Common")) {
                     if let start = grp.startPoint, let end = grp.endPoint {
                         rec.events.conformPath(at: grp.eventIndices, startPoint: start, oldEndPoint: end, newEndPoint: finalPt, surfaces: currentMacro?.surfaces ?? [:])
                     }
                 }
             } else {
-                self.withUndo(NSLocalizedString("Pick Coordinate", comment: "")) {
+                self.withUndo(String(localized: "Pick Coordinate", table: "Common")) {
                     let oldStart = grp.startPoint ?? CGPoint.zero
                     let dx = finalPt.x - oldStart.x
                     let dy = finalPt.y - oldStart.y
@@ -672,7 +672,7 @@ struct EditorView: View {
     func startPickingAdditionalClickPoint() {
         CoordinatePreviewOverlay.shared.hide()
 
-        let editorWin = NSApp.windows.first(where: { $0.title == NSLocalizedString("Macro Editor", comment: "") })
+        let editorWin = NSApp.windows.first(where: { $0.title == String(localized: "Macro Editor", table: "EditorUX") })
         editorWin?.orderOut(nil)
 
         CoordinatePickerOverlay.shared.onPicked = { [weak recorder] pt in
@@ -697,7 +697,7 @@ struct EditorView: View {
             guard let rec = recorder else { return }
             let previousLiveDuration = rec.liveDuration
             let previousLastEventTime = rec.events.last?.time
-            self.withUndo(NSLocalizedString("Add Click Point", comment: "")) {
+            self.withUndo(String(localized: "Add Click Point", table: "EditorUX")) {
                 rec.events.appendMultiPointClick(at: row.group.eventIndices, point: finalPt)
                 rec.liveDuration = rec.events.liveDurationPreservingTrailingWait(
                     previousLiveDuration: previousLiveDuration,
@@ -738,7 +738,7 @@ struct EditorView: View {
         TextPickerOverlay.shared.onPicked = { [weak recorder] anchor in
             guard let rec = recorder else { return }
             
-            self.withUndo(NSLocalizedString("Pick Target Text", comment: "")) {
+            self.withUndo(String(localized: "Pick Target Text", table: "EditorUX")) {
                 for row in targetRows {
                     if let sId = finalSurfaceId {
                         rec.events.updateSurfaceId(at: row.group.eventIndices, surfaceId: sId)
@@ -789,8 +789,8 @@ struct EditorView: View {
     func createRepeatUntilDraftFromSelection(maxAttempts: Int, timeoutSeconds: TimeInterval, pollingSeconds: TimeInterval, failurePolicy: String) {
         guard let currentMacro = library.currentMacro else {
             showRepeatUntilDraftAlert(
-                title: NSLocalizedString("No macro selected", comment: ""),
-                message: NSLocalizedString("Select a saved macro before creating a Repeat-Until draft.", comment: "")
+                title: String(localized: "No macro selected", table: "EditorUX"),
+                message: String(localized: "Select a saved macro before creating a Repeat-Until draft.", table: "EditorUX")
             )
             return
         }
@@ -815,7 +815,7 @@ struct EditorView: View {
         guard plan.readiness.canCreate,
               let document = plan.document else {
             showRepeatUntilDraftAlert(
-                title: NSLocalizedString("Repeat Until unavailable", comment: ""),
+                title: String(localized: "Repeat Until unavailable", table: "Common"),
                 message: macroEditorRepeatUntilReadinessHelp(plan.readiness)
             )
             return
@@ -839,7 +839,7 @@ struct EditorView: View {
         let catalog = library.macros.map(AutomationWorkflowDraftMacroCatalogEntry.init(macro:))
         repeatUntilDraftPreviewState = AutomationWorkflowDraftPreviewPresenter.previewState(
             document: document,
-            sourceName: NSLocalizedString("Macro Editor Repeat Until", comment: ""),
+            sourceName: String(localized: "Macro Editor Repeat Until", table: "EditorUX"),
             macroCatalog: catalog
         )
     }
@@ -852,12 +852,12 @@ struct EditorView: View {
         if let selectedBehaviorName {
             return "\(macro.name) - \(selectedBehaviorName)"
         }
-        return "\(macro.name) - \(NSLocalizedString("Repeat Body", comment: ""))"
+        return "\(macro.name) - \(String(localized: "Repeat Body", table: "Common"))"
     }
 
     func repeatUntilBodyMacroTags(from macro: SavedMacro) -> [String] {
         var tags = macro.tags
-        let behaviorTag = NSLocalizedString("Behavior", comment: "")
+        let behaviorTag = String(localized: "Behavior", table: "Common")
         if !tags.contains(behaviorTag) {
             tags.append(behaviorTag)
         }
@@ -873,17 +873,17 @@ struct EditorView: View {
     func macroEditorRepeatUntilReadinessHelp(_ readiness: MacroEditorRepeatUntilDraftReadiness) -> String {
         switch readiness {
         case .ready:
-            return NSLocalizedString("Create a reusable behavior macro and preview the Repeat-Until workflow draft.", comment: "")
+            return String(localized: "Create a reusable behavior macro and preview the Repeat-Until workflow draft.", table: "Automation")
         case .noSelection:
-            return NSLocalizedString("Select a behavior body and one text wait condition.", comment: "")
+            return String(localized: "Select a behavior body and one text wait condition.", table: "Automation")
         case .missingBody:
-            return NSLocalizedString("Select at least one recorded action as the Repeat-Until body.", comment: "")
+            return String(localized: "Select at least one recorded action as the Repeat-Until body.", table: "Recording")
         case .multipleUntilConditions:
-            return NSLocalizedString("Select only one Wait Text, Wait Text Gone, or Verify Text condition.", comment: "")
+            return String(localized: "Select only one Wait Text, Wait Text Gone, or Verify Text condition.", table: "Automation")
         case .missingUntilCondition:
-            return NSLocalizedString("Select one Wait Text, Wait Text Gone, or Verify Text condition as the Until check.", comment: "")
+            return String(localized: "Select one Wait Text, Wait Text Gone, or Verify Text condition as the Until check.", table: "Automation")
         case .missingUntilText:
-            return NSLocalizedString("Pick or type target text before creating Repeat Until.", comment: "")
+            return String(localized: "Pick or type target text before creating Repeat Until.", table: "EditorUX")
         }
     }
     
@@ -899,7 +899,7 @@ struct EditorView: View {
         let allDisabled = indicesToToggle.allSatisfy { recorder.events[$0].isDisabled == true }
         let newState = !allDisabled
         
-        withUndo(newState ? NSLocalizedString("Disable Action", comment: "") : NSLocalizedString("Enable Action", comment: "")) {
+        withUndo(newState ? String(localized: "Disable Action", table: "EditorUX") : String(localized: "Enable Action", table: "EditorUX")) {
             for idx in indicesToToggle {
                 recorder.events[idx].isDisabled = newState
             }
@@ -923,7 +923,7 @@ struct EditorView: View {
         
         controller.preparePlaybackContext(for: macro) { [weak controller] context in
             guard let controller else { return }
-            controller.state.statusMessage = NSLocalizedString("Playing preview…", comment: "")
+            controller.state.statusMessage = String(localized: "Playing preview…", table: "Common")
             controller.player.play(
                 macroID: macro?.id,
                 events: mutableSlice,

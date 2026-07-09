@@ -89,8 +89,8 @@ struct AutomationFlowGraphView: View {
                             .lineLimit(1)
 
                         HStack(spacing: 8) {
-                            Label(String(format: NSLocalizedString("%d tasks", comment: ""), workflow.nodes.count), systemImage: "circle.grid.cross")
-                            Label(String(format: NSLocalizedString("%d links", comment: ""), workflow.edges.count), systemImage: "arrow.triangle.branch")
+                            Label(String(format: String(localized: "%d tasks", table: "Automation"), workflow.nodes.count), systemImage: "circle.grid.cross")
+                            Label(String(format: String(localized: "%d links", table: "Common"), workflow.edges.count), systemImage: "arrow.triangle.branch")
                             Label(workflow.status.label, systemImage: workflow.status.systemImage)
                                 .foregroundStyle(workflow.status.tint)
                         }
@@ -460,11 +460,11 @@ private struct AutomationFlowGraphEmptyCanvasView: View {
                 .foregroundStyle(isActive ? Brand.libraryGreen : Color.secondary.opacity(0.6))
                 .accessibilityHidden(true)
 
-            Text(NSLocalizedString("No task nodes", comment: ""))
+            Text("No task nodes", tableName: "Automation")
                 .font(.system(size: 13, weight: .semibold))
                 .foregroundStyle(isActive ? Brand.libraryGreen : Color.secondary)
 
-            Text(NSLocalizedString("Workflow structure appears here.", comment: ""))
+            Text("Workflow structure appears here.", tableName: "Automation")
                 .font(.caption)
                 .foregroundStyle(.tertiary)
         }

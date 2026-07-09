@@ -14,7 +14,7 @@ enum AutomationWorkflowDraftBaselineCapturePresenter {
         onError: @escaping (String) -> Void
     ) {
         guard let screen = NSScreen.main ?? NSScreen.screens.first else {
-            onError(NSLocalizedString("No display is available for baseline capture.", comment: ""))
+            onError(String(localized: "No display is available for baseline capture.", table: "Common"))
             return
         }
 
@@ -24,10 +24,10 @@ enum AutomationWorkflowDraftBaselineCapturePresenter {
         let displayID = displayID(for: screen)
 
         AutomationScreenRegionPicker.pickRegion(
-            instructionTitle: NSLocalizedString("Drag to capture baseline", comment: ""),
+            instructionTitle: String(localized: "Drag to capture baseline", table: "Recording"),
             onPicked: { selection in
             guard let region = selection.searchRegion(in: .displayAbsolute) else {
-                onError(NSLocalizedString("Could not resolve the selected baseline region.", comment: ""))
+                onError(String(localized: "Could not resolve the selected baseline region.", table: "Common"))
                 return
             }
             let previewImage = selection.preview?.cgImage
@@ -48,7 +48,7 @@ enum AutomationWorkflowDraftBaselineCapturePresenter {
                 } catch {
                     await MainActor.run {
                         onError(String(
-                            format: NSLocalizedString("Could not capture baseline: %@", comment: ""),
+                            format: String(localized: "Could not capture baseline: %@", table: "Common"),
                             String(describing: error)
                         ))
                     }
@@ -56,7 +56,7 @@ enum AutomationWorkflowDraftBaselineCapturePresenter {
             }
         },
             onCancelled: {
-                onError(NSLocalizedString("Baseline capture cancelled.", comment: ""))
+                onError(String(localized: "Baseline capture cancelled.", table: "Common"))
             }
         )
     }

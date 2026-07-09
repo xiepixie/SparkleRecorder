@@ -26,7 +26,7 @@ struct AutomationFlowGraphNodeView: View {
                 Spacer(minLength: 0)
 
                 AutomationNodeToolButton(
-                    title: NSLocalizedString("Inspect task", comment: ""),
+                    title: String(localized: "Inspect task", table: "Automation"),
                     systemImage: "sidebar.right",
                     tint: Brand.libraryBlue,
                     isActive: isSelected,
@@ -43,7 +43,7 @@ struct AutomationFlowGraphNodeView: View {
 
                 if let runID = node.runID, canCancel {
                     AutomationNodeToolButton(
-                        title: NSLocalizedString("Cancel run", comment: ""),
+                        title: String(localized: "Cancel run", table: "Automation"),
                         systemImage: "xmark",
                         tint: Brand.red500,
                         isActive: true,
@@ -51,7 +51,7 @@ struct AutomationFlowGraphNodeView: View {
                     )
                 } else {
                     AutomationNodeToolButton(
-                        title: NSLocalizedString("Run task now", comment: ""),
+                        title: String(localized: "Run task now", table: "Automation"),
                         systemImage: "play.fill",
                         tint: Brand.libraryGreen,
                         isActive: false,
@@ -103,7 +103,7 @@ struct AutomationFlowGraphNodeView: View {
                 if let nextScheduledOccurrence = node.nextScheduledOccurrence {
                     AutomationNextScheduleBadge(
                         date: nextScheduledOccurrence,
-                        title: NSLocalizedString("Next", comment: ""),
+                        title: String(localized: "Next", table: "Common"),
                         isCompact: true
                     )
                 } else {
@@ -129,20 +129,20 @@ struct AutomationFlowGraphNodeView: View {
         .scaleEffect(isDragging ? 1.015 : 1)
         .zIndex(isDragging ? 1 : 0)
         .preventWindowDrag()
-        .help(NSLocalizedString("Drag to move task", comment: ""))
+        .help(String(localized: "Drag to move task", table: "Automation"))
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(accessibilitySummary)
-        .accessibilityHint(NSLocalizedString("Drag to move task", comment: ""))
+        .accessibilityHint(String(localized: "Drag to move task", table: "Automation"))
     }
 
     private var connectButtonTitle: String {
         if canCompleteConnection {
             return String(
-                format: NSLocalizedString("Connect with %@", comment: ""),
+                format: String(localized: "Connect with %@", table: "Common"),
                 connectionTriggerTitle
             )
         }
-        return NSLocalizedString("Start dependency", comment: "")
+        return String(localized: "Start dependency", table: "Automation")
     }
 
     private var showsJoinPolicy: Bool {
@@ -179,17 +179,17 @@ struct AutomationFlowGraphNodeView: View {
 
     private var accessibilitySummary: String {
         var summary = String(
-            format: NSLocalizedString("%@, %@, %@", comment: ""),
+            format: String(localized: "%@, %@, %@", table: "Common"),
             node.title,
             node.status.label,
             node.resourceLabel
         )
         if node.hasEvidence {
-            summary += ", " + NSLocalizedString("Evidence available", comment: "")
+            summary += ", " + String(localized: "Evidence available", table: "Automation")
         }
         if showsJoinPolicy {
             summary += ", " + String(
-                format: NSLocalizedString("Join policy: %@", comment: ""),
+                format: String(localized: "Join policy: %@", table: "Common"),
                 node.joinPolicyLabel
             )
         }

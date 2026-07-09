@@ -38,7 +38,7 @@ struct CompactMacroRow: View {
                             KeyCapView(text: hk.name, size: .sm)
                         }
                         .buttonStyle(.plain)
-                        .help(String(format: NSLocalizedString("Hotkey: %@ — click to change", comment: ""), hk.name))
+                        .help(String(format: String(localized: "Hotkey: %@ — click to change", table: "EditorUX"), hk.name))
                     }
                     
                     if macro.favorite {
@@ -62,7 +62,7 @@ struct CompactMacroRow: View {
                 .buttonStyle(.plain)
                 .onHover { editHovered = $0 }
                 .padding(.trailing, 4)
-                .help(NSLocalizedString("Edit in Main Window", comment: ""))
+                .help(String(localized: "Edit in Main Window", table: "Common"))
                 
                 Button(action: onPlay) {
                     Image(systemName: "play.fill")
@@ -77,7 +77,7 @@ struct CompactMacroRow: View {
                 }
                 .buttonStyle(.plain)
                 .onHover { playHovered = $0 }
-                .help(NSLocalizedString("Play", comment: ""))
+                .help(String(localized: "Play", table: "Common"))
             }
         }
         .padding(.horizontal, 12)
@@ -98,8 +98,8 @@ struct CompactMacroRow: View {
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(macro.name)
         .accessibilityAction { onSelect([]) }
-        .accessibilityAction(named: NSLocalizedString("Play", comment: "")) { onPlay() }
-        .accessibilityAction(named: NSLocalizedString("Edit", comment: "")) { onEdit() }
+        .accessibilityAction(named: String(localized: "Play", table: "Common")) { onPlay() }
+        .accessibilityAction(named: String(localized: "Edit", table: "Common")) { onEdit() }
         .animation(.spring(response: 0.2, dampingFraction: 0.8), value: hovered)
     }
     

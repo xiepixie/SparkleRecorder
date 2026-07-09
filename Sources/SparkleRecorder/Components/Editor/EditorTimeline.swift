@@ -17,15 +17,15 @@ struct EditorTimeline: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
-                Text(NSLocalizedString("TIMELINE", comment: ""))
+                Text("TIMELINE", tableName: "EditorUX")
                     .font(.system(size: 10.5, weight: .semibold))
                     .tracking(0.7)
                     .foregroundStyle(.secondary)
                 Spacer()
-                LegendChip(label: NSLocalizedString("Keys", comment: ""),    tint: Brand.sigBlue)
-                LegendChip(label: NSLocalizedString("Clicks", comment: ""),  tint: Brand.sigGreen)
-                LegendChip(label: NSLocalizedString("Scrolls", comment: ""), tint: Brand.sigTeal)
-                LegendChip(label: NSLocalizedString("Drags", comment: ""),   tint: Brand.sigViolet)
+                LegendChip(label: String(localized: "Keys", table: "Common"),    tint: Brand.sigBlue)
+                LegendChip(label: String(localized: "Clicks", table: "EditorUX"),  tint: Brand.sigGreen)
+                LegendChip(label: String(localized: "Scrolls", table: "Common"), tint: Brand.sigTeal)
+                LegendChip(label: String(localized: "Drags", table: "EditorUX"),   tint: Brand.sigViolet)
             }
 
             GeometryReader { geo in
@@ -137,7 +137,7 @@ struct EditorTimeline: View {
                     .padding(.horizontal, 8).padding(.vertical, 3)
                     .background(Capsule().fill(themeColor.opacity(0.12)))
                 }
-	                Text(NSLocalizedString("Drag on timeline to select a range; a tiny range selects the nearest action.", comment: ""))
+	                Text("Drag on timeline to select a range; a tiny range selects the nearest action.", tableName: "EditorUX")
 	                    .font(.system(size: 10))
 	                    .foregroundStyle(.secondary)
                 Spacer()

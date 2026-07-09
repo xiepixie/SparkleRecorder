@@ -44,7 +44,7 @@ struct AutomationJoinPolicyBadgeView: View {
     private var helpText: String {
         if incomingDependencyCount > 1 {
             return String(
-                format: NSLocalizedString("%@ across %d incoming branches", comment: ""),
+                format: String(localized: "%@ across %d incoming branches", table: "Common"),
                 label,
                 incomingDependencyCount
             )
@@ -55,11 +55,11 @@ struct AutomationJoinPolicyBadgeView: View {
     private var accessibilityText: String {
         if incomingDependencyCount > 1 {
             return String(
-                format: NSLocalizedString("Join policy: %@, %d incoming branches", comment: ""),
+                format: String(localized: "Join policy: %@, %d incoming branches", table: "Common"),
                 label,
                 incomingDependencyCount
             )
         }
-        return String(format: NSLocalizedString("Join policy: %@", comment: ""), label)
+        return String(format: String(localized: "Join policy: %@", table: "Common"), label)
     }
 }

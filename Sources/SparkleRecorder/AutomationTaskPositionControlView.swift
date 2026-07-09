@@ -10,7 +10,7 @@ struct AutomationTaskPositionControlView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
-                AutomationSectionHeader(title: NSLocalizedString("POSITION", comment: ""))
+                AutomationSectionHeader(title: String(localized: "POSITION", table: "Common"))
                 Spacer(minLength: 0)
                 Text(positionSummary)
                     .font(.caption.monospacedDigit())
@@ -20,27 +20,27 @@ struct AutomationTaskPositionControlView: View {
             HStack(spacing: 8) {
                 Spacer(minLength: 0)
                 moveButton(
-                    title: NSLocalizedString("Move task left", comment: ""),
+                    title: String(localized: "Move task left", table: "Automation"),
                     systemImage: "arrow.left",
                     dx: -step,
                     dy: 0
                 )
                 VStack(spacing: 8) {
                     moveButton(
-                        title: NSLocalizedString("Move task up", comment: ""),
+                        title: String(localized: "Move task up", table: "Automation"),
                         systemImage: "arrow.up",
                         dx: 0,
                         dy: -step
                     )
                     moveButton(
-                        title: NSLocalizedString("Move task down", comment: ""),
+                        title: String(localized: "Move task down", table: "Automation"),
                         systemImage: "arrow.down",
                         dx: 0,
                         dy: step
                     )
                 }
                 moveButton(
-                    title: NSLocalizedString("Move task right", comment: ""),
+                    title: String(localized: "Move task right", table: "Automation"),
                     systemImage: "arrow.right",
                     dx: step,
                     dy: 0

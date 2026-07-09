@@ -11,9 +11,9 @@ struct LibraryHeader: View {
     @EnvironmentObject var state: AppState
 
     private var statusText: String {
-        if state.isRecording { return NSLocalizedString("Recording…", comment: "") }
-        if state.isPlaying     { return NSLocalizedString("Playing…", comment: "") }
-        let format = NSLocalizedString("Idle · %d macros", comment: "")
+        if state.isRecording { return String(localized: "Recording…", table: "Recording") }
+        if state.isPlaying     { return String(localized: "Playing…", table: "Common") }
+        let format = String(localized: "Idle · %d macros", table: "EditorUX")
         return String(format: format, macroCount)
     }
 
@@ -40,7 +40,7 @@ struct LibraryHeader: View {
                         } else {
                             RecDot(size: 8, glassWhite: false)
                         }
-                        Text(state.isRecording ? NSLocalizedString("Stop recording", comment: "") : NSLocalizedString("Record macro", comment: ""))
+                        Text(state.isRecording ? String(localized: "Stop recording", table: "Recording") : String(localized: "Record macro", table: "Recording"))
                             .font(.system(size: 13, weight: .semibold))
                             .foregroundStyle(state.isRecording ? .white : .primary)
                         Spacer(minLength: 0)
@@ -62,7 +62,7 @@ struct LibraryHeader: View {
                     .shadow(color: state.isRecording ? Brand.red500.opacity(0.3) : .clear, radius: 8, x: 0, y: 4)
                 }
                 .buttonStyle(HoverPressButtonStyle(hoverScale: 1.012))
-                .accessibilityLabel(state.isRecording ? NSLocalizedString("Stop recording", comment: "") : NSLocalizedString("Record macro", comment: ""))
+                .accessibilityLabel(state.isRecording ? String(localized: "Stop recording", table: "Recording") : String(localized: "Record macro", table: "Recording"))
                 
                 // Search Button
                 Button {
@@ -73,7 +73,7 @@ struct LibraryHeader: View {
                     HStack(spacing: 4) {
                         Image(systemName: "magnifyingglass")
                             .font(.system(size: 11, weight: .medium))
-                        Text(NSLocalizedString("Search", comment: ""))
+                        Text("Search", tableName: "Common")
                             .font(.system(size: 11, weight: .medium))
                         KeyCapView(text: "⌘", size: .sm)
                         KeyCapView(text: "K", size: .sm)

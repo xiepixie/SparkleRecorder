@@ -10,11 +10,11 @@ enum AutomationManualApprovalPresenter {
                 alert.alertStyle = .informational
                 alert.messageText = request.condition.name
                 alert.informativeText = String(
-                    format: NSLocalizedString("Approve automation task \"%@\"?", comment: ""),
+                    format: String(localized: "Approve automation task \"%@\"?", table: "Common"),
                     taskName(for: request)
                 )
-                alert.addButton(withTitle: NSLocalizedString("Approve", comment: ""))
-                alert.addButton(withTitle: NSLocalizedString("Reject", comment: ""))
+                alert.addButton(withTitle: String(localized: "Approve", table: "Common"))
+                alert.addButton(withTitle: String(localized: "Reject", table: "Common"))
                 return alert.runModal() == .alertFirstButtonReturn
             }
         }

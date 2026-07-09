@@ -182,25 +182,25 @@ enum AutomationRuntimeDetailFormatter {
         if compact {
             if seconds >= 60 {
                 return String(
-                    format: NSLocalizedString("%dm", comment: ""),
+                    format: String(localized: "%dm", table: "Common"),
                     seconds / 60
                 )
             }
             return String(
-                format: NSLocalizedString("%ds", comment: ""),
+                format: String(localized: "%ds", table: "Common"),
                 seconds
             )
         }
 
         if seconds >= 60 {
             return String(
-                format: NSLocalizedString("%dm %02ds left", comment: ""),
+                format: String(localized: "%dm %02ds left", table: "Common"),
                 seconds / 60,
                 seconds % 60
             )
         }
         return String(
-            format: NSLocalizedString("%ds left", comment: ""),
+            format: String(localized: "%ds left", table: "Common"),
             seconds
         )
     }
@@ -223,14 +223,14 @@ enum AutomationRuntimeDetailFormatter {
         if let timeoutCountdown {
             let seconds = max(0, Int(ceil(timeoutCountdown.remaining)))
             parts.append(String(
-                format: NSLocalizedString("%d seconds until timeout", comment: ""),
+                format: String(localized: "%d seconds until timeout", table: "Common"),
                 seconds
             ))
         }
         if let retryAttemptSummary {
             parts.append(retryAttemptSummary.label)
             if retryAttemptSummary.nextRetryAt != nil {
-                parts.append(NSLocalizedString("Retry is scheduled", comment: ""))
+                parts.append(String(localized: "Retry is scheduled", table: "Common"))
             }
         }
         return parts.isEmpty ? nil : parts.joined(separator: ", ")

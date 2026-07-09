@@ -284,8 +284,8 @@ struct SemanticRecordingReviewFixtureView: View {
                 Button("", systemImage: "xmark", action: dismiss.callAsFunction)
                     .buttonStyle(.bordered)
                     .controlSize(.small)
-                    .help(NSLocalizedString("Close Macro Review", comment: ""))
-                    .accessibilityLabel(NSLocalizedString("Close Macro Review", comment: ""))
+                    .help(String(localized: "Close Macro Review", table: "Common"))
+                    .accessibilityLabel(String(localized: "Close Macro Review", table: "Common"))
             }
         }
     }
@@ -399,7 +399,7 @@ struct SemanticRecordingReviewFixtureView: View {
                         frameBackdrop(frame)
                         if let regionSelection, regionSelection.frameID == frame.id {
                             overlayRect(
-                                title: NSLocalizedString("Selected region", comment: ""),
+                                title: String(localized: "Selected region", table: "Common"),
                                 bounds: regionSelection.bounds,
                                 imageSize: frame.imageSize,
                                 canvasSize: proxy.size,
@@ -578,7 +578,7 @@ struct SemanticRecordingReviewFixtureView: View {
                 sectionTitle("Run Target")
                 inspectorRow(
                     title: runTargetEvidence.title,
-                    subtitle: NSLocalizedString("Opened from Run Detail", comment: ""),
+                    subtitle: String(localized: "Opened from Run Detail", table: "Common"),
                     detail: runTargetEvidence.detail,
                     accent: Color(red: 0.34, green: 0.72, blue: 0.95)
                 )
@@ -599,7 +599,7 @@ struct SemanticRecordingReviewFixtureView: View {
                 sectionTitle("Run Target")
                 inspectorRow(
                     title: runTargetPresentation.title,
-                    subtitle: NSLocalizedString("Opened from Run Detail", comment: ""),
+                    subtitle: String(localized: "Opened from Run Detail", table: "Common"),
                     detail: runTargetPresentation.detail,
                     accent: Color(red: 0.34, green: 0.72, blue: 0.95)
                 )
@@ -626,9 +626,9 @@ struct SemanticRecordingReviewFixtureView: View {
                 sectionTitle("Bundle Health")
                 inspectorRow(
                     title: reviewState.validationIssues.isEmpty
-                        ? NSLocalizedString("Bundle ready", comment: "")
+                        ? String(localized: "Bundle ready", table: "Common")
                         : String(
-                            format: NSLocalizedString("%d validation issues", comment: ""),
+                            format: String(localized: "%d validation issues", table: "Common"),
                             reviewState.validationIssues.count
                         ),
                     subtitle: reviewState.sourceName,
@@ -640,19 +640,19 @@ struct SemanticRecordingReviewFixtureView: View {
 
                 HStack(spacing: 8) {
                     bundleHealthMetric(
-                        NSLocalizedString("Available", comment: ""),
+                        String(localized: "Available", table: "Common"),
                         "\(counts.available)/\(counts.total)",
                         tint: Color(red: 0.48, green: 0.76, blue: 0.52)
                     )
                     bundleHealthMetric(
-                        NSLocalizedString("Missing", comment: ""),
+                        String(localized: "Missing", table: "Common"),
                         "\(counts.missing)",
                         tint: counts.missing == 0
                             ? Color.white.opacity(0.40)
                             : Color(red: 1.00, green: 0.72, blue: 0.30)
                     )
                     bundleHealthMetric(
-                        NSLocalizedString("Suppressed", comment: ""),
+                        String(localized: "Suppressed", table: "Common"),
                         "\(projection.suppressionRows.count)",
                         tint: projection.suppressionRows.isEmpty
                             ? Color.white.opacity(0.40)
@@ -664,7 +664,7 @@ struct SemanticRecordingReviewFixtureView: View {
                     VStack(alignment: .leading, spacing: 6) {
                         ForEach(Array(reviewState.validationIssues.prefix(2).enumerated()), id: \.offset) { _, issue in
                             bundleHealthInfoRow(
-                                title: NSLocalizedString("Validation", comment: ""),
+                                title: String(localized: "Validation", table: "Common"),
                                 value: validationIssueLabel(issue),
                                 systemImage: "exclamationmark.triangle",
                                 tint: Color(red: 1.00, green: 0.72, blue: 0.30)
@@ -697,14 +697,14 @@ struct SemanticRecordingReviewFixtureView: View {
             VStack(alignment: .leading, spacing: 10) {
                 sectionTitle("Selected Region")
                 inspectorRow(
-                    title: regionSelection.label ?? NSLocalizedString("Reviewed frame selection", comment: ""),
+                    title: regionSelection.label ?? String(localized: "Reviewed frame selection", table: "Common"),
                     subtitle: regionSelection.candidateKind.rawValue,
                     detail: regionSelectionDetail(regionSelection),
                     accent: Color(red: 0.48, green: 0.76, blue: 0.52)
                 )
 
                 HStack(spacing: 8) {
-                    Button(NSLocalizedString("Draft Selection", comment: ""), systemImage: "selection.pin.in.out") {
+                    Button(String(localized: "Draft Selection", table: "Common"), systemImage: "selection.pin.in.out") {
                         if let candidate = selectedCandidate(in: frame) ?? frame.conditionCandidates.first {
                             createDraftPatch(for: candidate)
                         }
@@ -718,13 +718,13 @@ struct SemanticRecordingReviewFixtureView: View {
                     }
                     .buttonStyle(.bordered)
                     .controlSize(.small)
-                    .help(NSLocalizedString("Clear selected frame region", comment: ""))
-                    .accessibilityLabel(NSLocalizedString("Clear selected frame region", comment: ""))
+                    .help(String(localized: "Clear selected frame region", table: "Common"))
+                    .accessibilityLabel(String(localized: "Clear selected frame region", table: "Common"))
 
                     Spacer(minLength: 0)
                 }
 
-                Text(NSLocalizedString("Drafts from this region stay review-only until Draft Preview import.", comment: ""))
+                Text("Drafts from this region stay review-only until Draft Preview import.", tableName: "Common")
                     .font(.system(size: 11, weight: .medium))
                     .foregroundStyle(Color.white.opacity(0.46))
                     .fixedSize(horizontal: false, vertical: true)
@@ -749,14 +749,14 @@ struct SemanticRecordingReviewFixtureView: View {
 
                         HStack(spacing: 8) {
                             let repeatUntilResolution = repeatUntilBodyResolution
-                            Button(NSLocalizedString("Draft Patch", comment: ""), systemImage: "doc.badge.gearshape") {
+                            Button(String(localized: "Draft Patch", table: "Common"), systemImage: "doc.badge.gearshape") {
                                 createDraftPatch(for: candidate)
                             }
                             .buttonStyle(.bordered)
                             .controlSize(.small)
                             .disabled(bundle == nil)
 
-                            Button(NSLocalizedString("Repeat Until", comment: ""), systemImage: "repeat") {
+                            Button(String(localized: "Repeat Until", table: "Common"), systemImage: "repeat") {
                                 createRepeatUntilDraftPatch(for: candidate)
                             }
                             .buttonStyle(.bordered)
@@ -780,15 +780,15 @@ struct SemanticRecordingReviewFixtureView: View {
                                 .buttonStyle(.bordered)
                                 .controlSize(.small)
                                 .disabled(reviewState.artifactStatus(for: candidate.artifactPath)?.exists != true)
-                                .help(NSLocalizedString("Open candidate artifact", comment: ""))
-                                .accessibilityLabel(NSLocalizedString("Open candidate artifact", comment: ""))
+                                .help(String(localized: "Open candidate artifact", table: "Common"))
+                                .accessibilityLabel(String(localized: "Open candidate artifact", table: "Common"))
                             }
                         }
 
                         if candidate.kind == .pixelMatched {
                             VStack(alignment: .leading, spacing: 6) {
                                 AutomationVisualColorPickerView(colorHex: pixelColorBinding(for: candidate))
-                                Text(NSLocalizedString("Choose the target pixel color before creating a reviewed condition.", comment: ""))
+                                Text("Choose the target pixel color before creating a reviewed condition.", tableName: "Common")
                                     .font(.system(size: 11, weight: .medium))
                                     .foregroundStyle(Color.white.opacity(0.48))
                                     .fixedSize(horizontal: false, vertical: true)
@@ -822,12 +822,12 @@ struct SemanticRecordingReviewFixtureView: View {
                     }
                 }
             } label: {
-                Label(NSLocalizedString("Body", comment: ""), systemImage: "list.bullet")
+                Label(String(localized: "Body", table: "Common"), systemImage: "list.bullet")
             }
             .buttonStyle(.bordered)
             .controlSize(.small)
             .help(repeatUntilBodyMenuHelp(options: options))
-            .accessibilityLabel(NSLocalizedString("Choose Repeat-Until body macro", comment: ""))
+            .accessibilityLabel(String(localized: "Choose Repeat-Until body macro", table: "Common"))
         }
     }
 
@@ -846,13 +846,13 @@ struct SemanticRecordingReviewFixtureView: View {
                 draftPatchActionContract(draftPatchResult)
 
                 HStack(spacing: 8) {
-                    Button(NSLocalizedString("Preview Draft", comment: ""), systemImage: "doc.text.magnifyingglass") {
+                    Button(String(localized: "Preview Draft", table: "Common"), systemImage: "doc.text.magnifyingglass") {
                         openDraftPreview(draftPatchResult)
                     }
                     .buttonStyle(.bordered)
                     .controlSize(.small)
 
-                    Button(NSLocalizedString("Save Patch", comment: ""), systemImage: "square.and.arrow.down") {
+                    Button(String(localized: "Save Patch", table: "Common"), systemImage: "square.and.arrow.down") {
                         saveDraftPatch(draftPatchResult.patch)
                     }
                     .buttonStyle(.bordered)
@@ -938,14 +938,14 @@ struct SemanticRecordingReviewFixtureView: View {
                         suggestionEvidenceSummary(suggestion)
 
                         HStack(spacing: 8) {
-                            Button(NSLocalizedString("Accept", comment: ""), systemImage: "checkmark.circle") {
+                            Button(String(localized: "Accept", table: "Common"), systemImage: "checkmark.circle") {
                                 acceptSuggestion(suggestion)
                             }
                             .buttonStyle(.bordered)
                             .controlSize(.small)
                             .disabled(bundle == nil)
 
-                            Button(NSLocalizedString("Reject", comment: ""), systemImage: "xmark.circle") {
+                            Button(String(localized: "Reject", table: "Common"), systemImage: "xmark.circle") {
                                 rejectSuggestion(suggestion)
                             }
                             .buttonStyle(.bordered)
@@ -966,8 +966,8 @@ struct SemanticRecordingReviewFixtureView: View {
                                 }
                                 .buttonStyle(.bordered)
                                 .controlSize(.small)
-                                .help(NSLocalizedString("Undo suggestion review decision", comment: ""))
-                                .accessibilityLabel(NSLocalizedString("Undo suggestion review decision", comment: ""))
+                                .help(String(localized: "Undo suggestion review decision", table: "Common"))
+                                .accessibilityLabel(String(localized: "Undo suggestion review decision", table: "Common"))
                             }
 
                             Spacer(minLength: 0)
@@ -1024,7 +1024,7 @@ struct SemanticRecordingReviewFixtureView: View {
                 Image(systemName: "checklist")
                     .font(.system(size: 10, weight: .semibold))
                     .foregroundStyle(Color(red: 0.34, green: 0.72, blue: 0.95))
-                Text(NSLocalizedString("Review Actions", comment: ""))
+                Text("Review Actions", tableName: "Common")
                     .font(.system(size: 10, weight: .semibold))
                     .foregroundStyle(Color.white.opacity(0.52))
                 Text(reviewActionEvidenceLabel(accept.evidence))
@@ -1083,7 +1083,7 @@ struct SemanticRecordingReviewFixtureView: View {
                 Image(systemName: "checklist")
                     .font(.system(size: 10, weight: .semibold))
                     .foregroundStyle(Color(red: 0.34, green: 0.72, blue: 0.95))
-                Text(NSLocalizedString("Review Action", comment: ""))
+                Text("Review Action", tableName: "Common")
                     .font(.system(size: 10, weight: .semibold))
                     .foregroundStyle(Color.white.opacity(0.52))
                 Text(reviewActionEvidenceLabel(semantics.evidence))
@@ -1135,7 +1135,7 @@ struct SemanticRecordingReviewFixtureView: View {
                 Image(systemName: "checklist")
                     .font(.system(size: 10, weight: .semibold))
                     .foregroundStyle(Color(red: 0.34, green: 0.72, blue: 0.95))
-                Text(NSLocalizedString("Review Actions", comment: ""))
+                Text("Review Actions", tableName: "Common")
                     .font(.system(size: 10, weight: .semibold))
                     .foregroundStyle(Color.white.opacity(0.52))
                 Text(result.actionEvidence.draftTaskKey ?? result.taskKey)
@@ -1320,25 +1320,25 @@ struct SemanticRecordingReviewFixtureView: View {
         let semantics = decision.actionSemantics(for: suggestion)
         let evidenceValue = suggestion.evidence.first
             .map(suggestionDecisionEvidenceLabel)
-            ?? NSLocalizedString("No evidence ref recorded.", comment: "")
+            ?? String(localized: "No evidence ref recorded.", table: "Common")
 
         switch decision {
         case .accepted:
             return [
                 (
-                    NSLocalizedString("Action", comment: ""),
+                    String(localized: "Action", table: "Common"),
                     "\(semantics.actionName.rawValue) · \(mutationBoundaryLabel(semantics.mutationBoundary))",
                     "checkmark.circle",
                     Color(red: 0.48, green: 0.76, blue: 0.52)
                 ),
                 (
-                    NSLocalizedString("Evidence", comment: ""),
+                    String(localized: "Evidence", table: "Automation"),
                     evidenceValue,
                     "link",
                     Color(red: 0.34, green: 0.72, blue: 0.95)
                 ),
                 (
-                    NSLocalizedString("Patch", comment: ""),
+                    String(localized: "Patch", table: "Common"),
                     acceptedSuggestionPatchExplanation(suggestion),
                     "doc.badge.gearshape",
                     Color(red: 0.48, green: 0.76, blue: 0.52)
@@ -1347,19 +1347,19 @@ struct SemanticRecordingReviewFixtureView: View {
         case .rejected:
             return [
                 (
-                    NSLocalizedString("Action", comment: ""),
+                    String(localized: "Action", table: "Common"),
                     "\(semantics.actionName.rawValue) · \(mutationBoundaryLabel(semantics.mutationBoundary))",
                     "xmark.circle",
                     Color(red: 1.00, green: 0.50, blue: 0.58)
                 ),
                 (
-                    NSLocalizedString("Decision", comment: ""),
-                    NSLocalizedString("No workflow change recorded for this suggestion.", comment: ""),
+                    String(localized: "Decision", table: "Common"),
+                    String(localized: "No workflow change recorded for this suggestion.", table: "Common"),
                     "xmark.circle",
                     Color(red: 1.00, green: 0.50, blue: 0.58)
                 ),
                 (
-                    NSLocalizedString("Evidence", comment: ""),
+                    String(localized: "Evidence", table: "Automation"),
                     evidenceValue,
                     "link",
                     Color.white.opacity(0.48)
@@ -1503,7 +1503,7 @@ struct SemanticRecordingReviewFixtureView: View {
             parts.append(detail)
         }
         return parts.isEmpty
-            ? NSLocalizedString("Sensitive context was recorded and kept as review evidence.", comment: "")
+            ? String(localized: "Sensitive context was recorded and kept as review evidence.", table: "Common")
             : parts.joined(separator: " · ")
     }
 
@@ -1558,16 +1558,16 @@ struct SemanticRecordingReviewFixtureView: View {
                         }
                         .buttonStyle(.bordered)
                         .controlSize(.small)
-                        .help(String(format: NSLocalizedString("Open %@", comment: ""), path))
-                        .accessibilityLabel(String(format: NSLocalizedString("Open %@", comment: ""), path))
+                        .help(String(format: String(localized: "Open %@", table: "Common"), path))
+                        .accessibilityLabel(String(format: String(localized: "Open %@", table: "Common"), path))
 
                         Button("", systemImage: "folder") {
                             artifactFeedback = SemanticRecordingReviewPresenter.revealArtifact(path: path, in: reviewState)
                         }
                         .buttonStyle(.bordered)
                         .controlSize(.small)
-                        .help(String(format: NSLocalizedString("Reveal %@", comment: ""), path))
-                        .accessibilityLabel(String(format: NSLocalizedString("Reveal %@", comment: ""), path))
+                        .help(String(format: String(localized: "Reveal %@", table: "Common"), path))
+                        .accessibilityLabel(String(format: String(localized: "Reveal %@", table: "Common"), path))
                     }
                 }
             }
@@ -1579,17 +1579,17 @@ struct SemanticRecordingReviewFixtureView: View {
     ) -> some View {
         VStack(spacing: 8) {
             comparisonArtifactTile(
-                title: NSLocalizedString("Source", comment: ""),
+                title: String(localized: "Source", table: "Common"),
                 path: comparison.sourceArtifactPath,
                 systemImage: "record.circle"
             )
             comparisonArtifactTile(
-                title: NSLocalizedString("Runtime", comment: ""),
+                title: String(localized: "Runtime", table: "Common"),
                 path: comparison.runtimeArtifactPath,
                 systemImage: "play.circle"
             )
             comparisonArtifactTile(
-                title: NSLocalizedString("Diff", comment: ""),
+                title: String(localized: "Diff", table: "Common"),
                 path: comparison.diffArtifactPath,
                 systemImage: "square.split.2x1"
             )
@@ -1638,7 +1638,7 @@ struct SemanticRecordingReviewFixtureView: View {
                 .foregroundStyle(comparisonArtifactStatusTint(path: path))
                 .lineLimit(1)
 
-            Text(path.map(compactPath) ?? NSLocalizedString("No artifact ref", comment: ""))
+            Text(path.map(compactPath) ?? String(localized: "No artifact ref", table: "Common"))
                 .font(.system(size: 9, weight: .medium, design: .monospaced))
                 .foregroundStyle(Color.white.opacity(0.38))
                 .lineLimit(1)
@@ -1671,7 +1671,7 @@ struct SemanticRecordingReviewFixtureView: View {
                     .font(.system(size: 10, weight: .semibold))
                     .foregroundStyle(comparisonArtifactStatusTint(path: path))
                     .lineLimit(1)
-                Text(path.map(compactPath) ?? NSLocalizedString("No artifact ref", comment: ""))
+                Text(path.map(compactPath) ?? String(localized: "No artifact ref", table: "Common"))
                     .font(.system(size: 10, weight: .medium, design: .monospaced))
                     .foregroundStyle(Color.white.opacity(0.46))
                     .lineLimit(1)
@@ -1769,7 +1769,7 @@ struct SemanticRecordingReviewFixtureView: View {
                     surfaceID: frame.surfaceID,
                     bounds: bounds,
                     imageSize: frame.imageSize,
-                    label: NSLocalizedString("Selected frame region", comment: ""),
+                    label: String(localized: "Selected frame region", table: "Common"),
                     candidateKind: candidate?.kind ?? .ocrWait,
                     sourcePreviewRefID: candidate?.sourcePreviewRefID,
                     observationID: candidate?.observationID,
@@ -1904,7 +1904,7 @@ struct SemanticRecordingReviewFixtureView: View {
     ) {
         guard let bundle else {
             draftPatchResult = nil
-            draftPatchErrorMessage = NSLocalizedString("Open a live bundle before creating a draft patch.", comment: "")
+            draftPatchErrorMessage = String(localized: "Open a live bundle before creating a draft patch.", table: "Common")
             return
         }
 
@@ -1936,7 +1936,7 @@ struct SemanticRecordingReviewFixtureView: View {
     ) {
         guard let bundle else {
             draftPatchResult = nil
-            draftPatchErrorMessage = NSLocalizedString("Open a live bundle before creating a Repeat-Until loop.", comment: "")
+            draftPatchErrorMessage = String(localized: "Open a live bundle before creating a Repeat-Until loop.", table: "Common")
             return
         }
 
@@ -1983,7 +1983,7 @@ struct SemanticRecordingReviewFixtureView: View {
     ) {
         guard let bundle else {
             draftPatchResult = nil
-            draftPatchErrorMessage = NSLocalizedString("Open a live bundle before accepting a suggestion.", comment: "")
+            draftPatchErrorMessage = String(localized: "Open a live bundle before accepting a suggestion.", table: "Common")
             return
         }
         guard let match = SemanticRecordingReviewSuggestionPatchResolver.makeRequest(
@@ -1992,7 +1992,7 @@ struct SemanticRecordingReviewFixtureView: View {
             regionSelection: regionSelection
         ) else {
             draftPatchResult = nil
-            draftPatchErrorMessage = NSLocalizedString("No patchable evidence was found for this suggestion.", comment: "")
+            draftPatchErrorMessage = String(localized: "No patchable evidence was found for this suggestion.", table: "Common")
             return
         }
 
@@ -2138,7 +2138,7 @@ struct SemanticRecordingReviewFixtureView: View {
         SemanticRecordingReviewPresenter.savePatch(patch, defaultName: defaultName) { result in
             switch result {
             case .success(let url):
-                patchSaveMessage = String(format: NSLocalizedString("Saved %@", comment: ""), url.lastPathComponent)
+                patchSaveMessage = String(format: String(localized: "Saved %@", table: "Common"), url.lastPathComponent)
             case .failure(let error):
                 patchSaveMessage = String(describing: error)
             }
@@ -2190,12 +2190,12 @@ struct SemanticRecordingReviewFixtureView: View {
     ) -> String {
         if let selectedRepeatUntilBodyOption {
             return String(
-                format: NSLocalizedString("Repeat-Until body: %@", comment: ""),
+                format: String(localized: "Repeat-Until body: %@", table: "Common"),
                 selectedRepeatUntilBodyOption.title
             )
         }
         return String(
-            format: NSLocalizedString("Choose one of %d linked macros as the Repeat-Until body.", comment: ""),
+            format: String(localized: "Choose one of %d linked macros as the Repeat-Until body.", table: "Common"),
             options.count
         )
     }
@@ -2232,32 +2232,32 @@ struct SemanticRecordingReviewFixtureView: View {
 
     private func comparisonArtifactStatus(path: String?) -> String {
         guard let path else {
-            return NSLocalizedString("No ref", comment: "")
+            return String(localized: "No ref", table: "Common")
         }
         guard let reviewState else {
-            return NSLocalizedString("Safe ref", comment: "")
+            return String(localized: "Safe ref", table: "Common")
         }
         guard let status = reviewState.artifactStatus(for: path) else {
-            return NSLocalizedString("Untracked", comment: "")
+            return String(localized: "Untracked", table: "Common")
         }
         return status.exists
-            ? NSLocalizedString("Available", comment: "")
-            : NSLocalizedString("Missing file", comment: "")
+            ? String(localized: "Available", table: "Common")
+            : String(localized: "Missing file", table: "Common")
     }
 
     private func comparisonArtifactStatusDetail(path: String?) -> String? {
         guard path != nil else {
-            return NSLocalizedString("No artifact reference was recorded for this evidence slot.", comment: "")
+            return String(localized: "No artifact reference was recorded for this evidence slot.", table: "Common")
         }
         guard let reviewState else {
-            return NSLocalizedString("Open a stored or live bundle to verify file availability.", comment: "")
+            return String(localized: "Open a stored or live bundle to verify file availability.", table: "Common")
         }
         guard let status = reviewState.artifactStatus(for: path) else {
-            return NSLocalizedString("This ref is not in the loaded bundle artifact index.", comment: "")
+            return String(localized: "This ref is not in the loaded bundle artifact index.", table: "Common")
         }
         return status.exists
-            ? NSLocalizedString("Open/Reveal is available from this bundle.", comment: "")
-            : NSLocalizedString("Open/Reveal is unavailable; the file may have been pruned, not written yet, or omitted by sidecars.", comment: "")
+            ? String(localized: "Open/Reveal is available from this bundle.", table: "Common")
+            : String(localized: "Open/Reveal is unavailable; the file may have been pruned, not written yet, or omitted by sidecars.", table: "Common")
     }
 
     private func comparisonArtifactStatusTint(path: String?) -> Color {
@@ -2297,9 +2297,9 @@ struct SemanticRecordingReviewFixtureView: View {
     ) -> String {
         switch feedback {
         case .succeeded(.open, let path):
-            return String(format: NSLocalizedString("Opened %@", comment: ""), path)
+            return String(format: String(localized: "Opened %@", table: "Common"), path)
         case .succeeded(.reveal, let path):
-            return String(format: NSLocalizedString("Revealed %@", comment: ""), path)
+            return String(format: String(localized: "Revealed %@", table: "Common"), path)
         case .failed(_, let message):
             return message
         }
@@ -2357,7 +2357,7 @@ struct SemanticRecordingReviewFixtureView: View {
         } else if let observationID = evidence.observationIDs.first {
             parts.append("obs \(shortID(observationID))")
         }
-        return parts.isEmpty ? NSLocalizedString("evidence", comment: "") : parts.joined(separator: " · ")
+        return parts.isEmpty ? String(localized: "evidence", table: "Common") : parts.joined(separator: " · ")
     }
 
     private func suggestionDecisionEvidenceLabel(
@@ -2375,7 +2375,7 @@ struct SemanticRecordingReviewFixtureView: View {
         if let summary = evidence.summary {
             parts.append(summary)
         }
-        return parts.isEmpty ? NSLocalizedString("Evidence refs kept with this review decision.", comment: "") : parts.joined(separator: " · ")
+        return parts.isEmpty ? String(localized: "Evidence refs kept with this review decision.", table: "Common") : parts.joined(separator: " · ")
     }
 
     private func reviewActionEvidenceLabel(
@@ -2394,7 +2394,7 @@ struct SemanticRecordingReviewFixtureView: View {
             parts.append("obs \(shortID(observationID))")
         }
         return parts.isEmpty
-            ? NSLocalizedString("No evidence ref", comment: "")
+            ? String(localized: "No evidence ref", table: "Common")
             : parts.joined(separator: " · ")
     }
 
@@ -2461,15 +2461,15 @@ struct SemanticRecordingReviewFixtureView: View {
     ) -> String {
         switch boundary {
         case .reviewLocal:
-            return NSLocalizedString("Review local", comment: "")
+            return String(localized: "Review local", table: "Common")
         case .packageAssetOnly:
-            return NSLocalizedString("Package asset only", comment: "")
+            return String(localized: "Package asset only", table: "Common")
         case .draftPatchOnly:
-            return NSLocalizedString("Draft patch only", comment: "")
+            return String(localized: "Draft patch only", table: "Common")
         case .draftPreviewRequired:
-            return NSLocalizedString("Draft Preview required", comment: "")
+            return String(localized: "Draft Preview required", table: "Common")
         case .confirmedImport:
-            return NSLocalizedString("Confirmed import", comment: "")
+            return String(localized: "Confirmed import", table: "Common")
         }
     }
 
@@ -2478,7 +2478,7 @@ struct SemanticRecordingReviewFixtureView: View {
     ) -> String {
         guard draftPatchSourceSuggestionID == suggestion.id,
               let draftPatchResult else {
-            return NSLocalizedString("Patch can be regenerated from the cited evidence.", comment: "")
+            return String(localized: "Patch can be regenerated from the cited evidence.", table: "Common")
         }
 
         let operation = draftPatchResult.appliesToExistingTask ? "setCondition" : "addTask"
@@ -2504,9 +2504,9 @@ private enum SuggestionReviewDecision {
     var title: String {
         switch self {
         case .accepted:
-            return NSLocalizedString("Accepted", comment: "")
+            return String(localized: "Accepted", table: "Common")
         case .rejected:
-            return NSLocalizedString("Rejected", comment: "")
+            return String(localized: "Rejected", table: "Common")
         }
     }
 
@@ -2522,9 +2522,9 @@ private enum SuggestionReviewDecision {
     var detail: String {
         switch self {
         case .accepted:
-            return NSLocalizedString("Patch staged", comment: "")
+            return String(localized: "Patch staged", table: "Common")
         case .rejected:
-            return NSLocalizedString("No workflow change", comment: "")
+            return String(localized: "No workflow change", table: "Common")
         }
     }
 

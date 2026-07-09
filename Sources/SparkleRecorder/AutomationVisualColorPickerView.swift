@@ -7,7 +7,7 @@ struct AutomationVisualColorPickerView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             ColorPicker(
-                NSLocalizedString("Target color", comment: ""),
+                String(localized: "Target color", table: "Common"),
                 selection: colorSelection,
                 supportsOpacity: false
             )
@@ -23,12 +23,12 @@ struct AutomationVisualColorPickerView: View {
                     )
                     .accessibilityHidden(true)
 
-                TextField(NSLocalizedString("Hex", comment: ""), text: hexBinding)
+                TextField(String(localized: "Hex", table: "Common"), text: hexBinding)
                     .textFieldStyle(.roundedBorder)
                     .font(.caption)
                     .monospaced()
                     .frame(width: 96)
-                    .accessibilityLabel(NSLocalizedString("Target color hex", comment: ""))
+                    .accessibilityLabel(String(localized: "Target color hex", table: "Common"))
 
                 Spacer(minLength: 0)
             }
@@ -69,10 +69,10 @@ struct AutomationVisualColorPickerView: View {
 
     private var accessibilitySummary: String {
         if Self.color(from: colorHex) == nil {
-            return NSLocalizedString("Target color is not set", comment: "")
+            return String(localized: "Target color is not set", table: "Common")
         }
         return String(
-            format: NSLocalizedString("Target color %@", comment: ""),
+            format: String(localized: "Target color %@", table: "Common"),
             colorHex
         )
     }

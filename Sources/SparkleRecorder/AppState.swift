@@ -18,11 +18,11 @@ enum RecordingHUDMode: String, CaseIterable, Identifiable {
     var title: String {
         switch self {
         case .compact:
-            return NSLocalizedString("Compact", comment: "")
+            return String(localized: "Compact", table: "Common")
         case .expanded:
-            return NSLocalizedString("Expanded", comment: "")
+            return String(localized: "Expanded", table: "Common")
         case .menuBar:
-            return NSLocalizedString("Menu bar", comment: "")
+            return String(localized: "Menu bar", table: "Common")
         }
     }
 }

@@ -9,7 +9,7 @@ struct AutomationWorkflowTaskEmptyDropView: View {
     @State private var isTargeted = false
 
     var body: some View {
-        Label(NSLocalizedString("Drop a macro here", comment: ""), systemImage: "plus.circle")
+        Label(String(localized: "Drop a macro here", table: "EditorUX"), systemImage: "plus.circle")
             .font(.caption)
             .foregroundStyle(isActive ? Brand.libraryGreen : .secondary)
             .padding(8)
@@ -24,7 +24,7 @@ struct AutomationWorkflowTaskEmptyDropView: View {
             .onChange(of: isTargeted) {
                 onTargetChanged(isTargeted)
             }
-            .accessibilityHint(NSLocalizedString("Drop a macro to create the first task", comment: ""))
+            .accessibilityHint(String(localized: "Drop a macro to create the first task", table: "Common"))
     }
 
     private var background: some View {

@@ -33,26 +33,26 @@ struct AutomationWorkflowDraftVisualAssetActionButtonsView: View {
     }
 
     private var choosePackageButton: some View {
-        Button(NSLocalizedString("Choose Package", comment: ""), systemImage: "folder", action: onChoosePackage)
+        Button(String(localized: "Choose Package", table: "Common"), systemImage: "folder", action: onChoosePackage)
             .buttonStyle(.bordered)
             .disabled(!hasSourceDirectory)
-            .help(NSLocalizedString("Register an image that is already inside this draft package.", comment: ""))
+            .help(String(localized: "Register an image that is already inside this draft package.", table: "Common"))
     }
 
     private var importFileButton: some View {
         Button(
-            NSLocalizedString("Import File", comment: ""),
+            String(localized: "Import File", table: "Common"),
             systemImage: "square.and.arrow.down",
             action: onImportExternalAsset
         )
         .buttonStyle(.bordered)
         .disabled(!hasSourceDirectory || isImportingAsset)
-        .help(NSLocalizedString("Copy an external image into this draft package and register it.", comment: ""))
+        .help(String(localized: "Copy an external image into this draft package and register it.", table: "Common"))
     }
 
     private var captureBaselineButton: some View {
         Button(
-            NSLocalizedString("Capture Baseline", comment: ""),
+            String(localized: "Capture Baseline", table: "Common"),
             systemImage: "viewfinder.rectangular",
             action: onCaptureBaseline
         )
@@ -61,7 +61,7 @@ struct AutomationWorkflowDraftVisualAssetActionButtonsView: View {
     }
 
     private var registerAssetButton: some View {
-        Button(NSLocalizedString("Register Asset", comment: ""), systemImage: "plus", action: onRegisterAsset)
+        Button(String(localized: "Register Asset", table: "Common"), systemImage: "plus", action: onRegisterAsset)
             .buttonStyle(.bordered)
             .disabled(!canRegister)
     }

@@ -37,7 +37,7 @@ struct AutomationFlowGraphEdgeListView: View {
     }
 
     private func accessibilityLabel(for edge: AutomationDependencyEdgeProjection) -> String {
-        let noDelay = NSLocalizedString("No delay", comment: "")
+        let noDelay = String(localized: "No delay", table: "EditorUX")
         let base = edge.delayLabel == noDelay
             ? edge.triggerLabel
             : "\(edge.triggerLabel), \(edge.delayLabel)"

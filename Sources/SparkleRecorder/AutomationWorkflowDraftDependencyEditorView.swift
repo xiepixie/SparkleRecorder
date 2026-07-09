@@ -27,11 +27,11 @@ struct AutomationWorkflowDraftDependencyEditorView: View {
         if !document.workflow.dependencies.isEmpty {
             VStack(alignment: .leading, spacing: 8) {
                 AutomationSectionHeader(
-                    title: NSLocalizedString("DRAFT DEPENDENCY EDIT", comment: ""),
+                    title: String(localized: "DRAFT DEPENDENCY EDIT", table: "Automation"),
                     count: document.workflow.dependencies.count
                 )
 
-                Picker(NSLocalizedString("Dependency", comment: ""), selection: $selectedDependencyID) {
+                Picker(String(localized: "Dependency", table: "Automation"), selection: $selectedDependencyID) {
                     ForEach(Array(document.workflow.dependencies.enumerated()), id: \.offset) { _, dependency in
                         Text(dependencyTitle(for: dependency)).tag(displayKey(for: dependency))
                     }
@@ -41,7 +41,7 @@ struct AutomationWorkflowDraftDependencyEditorView: View {
                 }
 
                 HStack(spacing: 8) {
-                    Picker(NSLocalizedString("From", comment: ""), selection: $fromTaskKey) {
+                    Picker(String(localized: "From", table: "Common"), selection: $fromTaskKey) {
                         ForEach(document.workflow.tasks, id: \.key) { task in
                             Text(task.name ?? task.key).tag(task.key)
                         }
@@ -52,14 +52,14 @@ struct AutomationWorkflowDraftDependencyEditorView: View {
                         .foregroundStyle(.secondary)
                         .accessibilityHidden(true)
 
-                    Picker(NSLocalizedString("To", comment: ""), selection: $toTaskKey) {
+                    Picker(String(localized: "To", table: "Common"), selection: $toTaskKey) {
                         ForEach(document.workflow.tasks, id: \.key) { task in
                             Text(task.name ?? task.key).tag(task.key)
                         }
                     }
                     .frame(maxWidth: 180)
 
-                    Picker(NSLocalizedString("Trigger", comment: ""), selection: $trigger) {
+                    Picker(String(localized: "Trigger", table: "Automation"), selection: $trigger) {
                         ForEach(triggers, id: \.self) { trigger in
                             Text(triggerTitle(for: trigger)).tag(trigger)
                         }
@@ -68,24 +68,24 @@ struct AutomationWorkflowDraftDependencyEditorView: View {
                 }
 
                 HStack(spacing: 8) {
-                    Label(NSLocalizedString("Delay", comment: ""), systemImage: "timer")
+                    Label(String(localized: "Delay", table: "EditorUX"), systemImage: "timer")
                         .font(.caption)
                         .foregroundStyle(.secondary)
-                    TextField(NSLocalizedString("Delay", comment: ""), value: $delaySeconds, format: .number.precision(.fractionLength(1)))
+                    TextField(String(localized: "Delay", table: "EditorUX"), value: $delaySeconds, format: .number.precision(.fractionLength(1)))
                         .textFieldStyle(.roundedBorder)
                         .frame(width: 86)
 
-                    Toggle(NSLocalizedString("Enabled", comment: ""), isOn: $enabled)
+                    Toggle(String(localized: "Enabled", table: "Common"), isOn: $enabled)
                         .font(.caption)
                         .toggleStyle(.checkbox)
 
                     Spacer(minLength: 0)
 
-                    Button(NSLocalizedString("Remove Edge", comment: ""), systemImage: "trash", role: .destructive, action: removeDependency)
+                    Button(String(localized: "Remove Edge", table: "Common"), systemImage: "trash", role: .destructive, action: removeDependency)
                         .buttonStyle(.bordered)
                         .disabled(selectedDependency == nil)
 
-                    Button(NSLocalizedString("Apply Dependency", comment: ""), systemImage: "checkmark", action: applyDependency)
+                    Button(String(localized: "Apply Dependency", table: "Automation"), systemImage: "checkmark", action: applyDependency)
                         .buttonStyle(.bordered)
                         .disabled(!canApplyDependency)
                 }
@@ -191,19 +191,19 @@ struct AutomationWorkflowDraftDependencyEditorView: View {
     private func triggerTitle(for trigger: String) -> String {
         switch trigger {
         case "failure":
-            return NSLocalizedString("Failure", comment: "")
+            return String(localized: "Failure", table: "Common")
         case "timeout":
-            return NSLocalizedString("Timeout", comment: "")
+            return String(localized: "Timeout", table: "Common")
         case "cancelled":
-            return NSLocalizedString("Cancelled", comment: "")
+            return String(localized: "Cancelled", table: "Common")
         case "conditionMatched":
-            return NSLocalizedString("Condition matched", comment: "")
+            return String(localized: "Condition matched", table: "Automation")
         case "conditionNotMatched":
-            return NSLocalizedString("Condition not matched", comment: "")
+            return String(localized: "Condition not matched", table: "Automation")
         case "always":
-            return NSLocalizedString("Always", comment: "")
+            return String(localized: "Always", table: "Common")
         default:
-            return NSLocalizedString("Success", comment: "")
+            return String(localized: "Success", table: "Common")
         }
     }
 }

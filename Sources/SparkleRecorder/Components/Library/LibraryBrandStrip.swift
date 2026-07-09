@@ -38,7 +38,7 @@ struct LibraryBrandStrip: View {
                 .libraryControlSurface(cornerRadius: 10, tint: Brand.libraryBlue, isActive: settingsHovered)
                 .animation(reduceMotion ? .linear(duration: 0.01) : Brand.hoverAnimation, value: settingsHovered)
                 .onHover { settingsHovered = $0 }
-                .accessibilityLabel(NSLocalizedString("Settings", comment: ""))
+                .accessibilityLabel(String(localized: "Settings", table: "Settings"))
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 8)

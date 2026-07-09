@@ -11,9 +11,9 @@ struct StatsSummary: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            statRow(NSLocalizedString("Macros", comment: ""), "\(totalMacros)", icon: "tray.full")
-            statRow(NSLocalizedString("Total plays", comment: ""), "\(totalPlays)", icon: "play.circle")
-            statRow(NSLocalizedString("Time replayed", comment: ""), formatDuration(totalSaved), icon: "clock")
+            statRow(String(localized: "Macros", table: "EditorUX"), "\(totalMacros)", icon: "tray.full")
+            statRow(String(localized: "Total plays", table: "Common"), "\(totalPlays)", icon: "play.circle")
+            statRow(String(localized: "Time replayed", table: "Common"), formatDuration(totalSaved), icon: "clock")
 	        }
 	        .padding(8)
 	        .sectionSurface(cornerRadius: 9)

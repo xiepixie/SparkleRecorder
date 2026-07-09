@@ -40,7 +40,7 @@ struct AutomationVisualConditionEditorView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             if showsTypePicker {
-                Picker(NSLocalizedString("Visual wait", comment: ""), selection: $type) {
+                Picker(String(localized: "Visual wait", table: "Common"), selection: $type) {
                     ForEach(AutomationVisualConditionPresentation.allTypes, id: \.self) { type in
                         Label(
                             AutomationVisualConditionPresentation.title(for: type),
@@ -70,17 +70,17 @@ struct AutomationVisualConditionEditorView: View {
 
             if !regionReferenceOptions.isEmpty || !trimmedRegionRef.isEmpty {
                 AutomationVisualReferenceFieldView(
-                    title: NSLocalizedString("Saved watched area", comment: ""),
-                    textFieldTitle: NSLocalizedString("Saved watched area", comment: ""),
+                    title: String(localized: "Saved watched area", table: "Common"),
+                    textFieldTitle: String(localized: "Saved watched area", table: "Common"),
                     systemImage: "viewfinder.rectangular",
-                    emptyDetail: NSLocalizedString("No saved watched areas in this workflow.", comment: ""),
+                    emptyDetail: String(localized: "No saved watched areas in this workflow.", table: "Automation"),
                     options: regionReferenceOptions,
                     reference: $regionRef
                 )
             }
 
             if supportsBoundsPicker {
-                Picker(NSLocalizedString("Region space", comment: ""), selection: $searchRegionSpace) {
+                Picker(String(localized: "Region space", table: "EditorUX"), selection: $searchRegionSpace) {
                     ForEach(AutomationOCRSearchRegionSpace.allCases, id: \.self) { space in
                         Text(space.titleForVisualCondition).tag(space)
                     }
@@ -110,7 +110,7 @@ struct AutomationVisualConditionEditorView: View {
 
             typeSpecificFields
 
-            Toggle(NSLocalizedString("Require visible match", comment: ""), isOn: $requiresVisible)
+            Toggle(String(localized: "Require visible match", table: "Common"), isOn: $requiresVisible)
                 .toggleStyle(.switch)
         }
     }
@@ -143,10 +143,10 @@ struct AutomationVisualConditionEditorView: View {
         switch type {
         case .regionChanged:
             AutomationVisualReferenceFieldView(
-                title: NSLocalizedString("Baseline image", comment: ""),
-                textFieldTitle: NSLocalizedString("Baseline image", comment: ""),
+                title: String(localized: "Baseline image", table: "Common"),
+                textFieldTitle: String(localized: "Baseline image", table: "Common"),
                 systemImage: "rectangle.dashed",
-                emptyDetail: NSLocalizedString("No baseline images in this workflow yet.", comment: ""),
+                emptyDetail: String(localized: "No baseline images in this workflow yet.", table: "Automation"),
                 options: baselineReferenceOptions,
                 reference: $baselineRef,
                 onCapture: onCaptureBaseline
@@ -154,10 +154,10 @@ struct AutomationVisualConditionEditorView: View {
             thresholdFields
         case .imageAppeared, .imageDisappeared:
             AutomationVisualReferenceFieldView(
-                title: NSLocalizedString("Reference image", comment: ""),
-                textFieldTitle: NSLocalizedString("Reference image", comment: ""),
+                title: String(localized: "Reference image", table: "Common"),
+                textFieldTitle: String(localized: "Reference image", table: "Common"),
                 systemImage: "photo",
-                emptyDetail: NSLocalizedString("No reference images in this workflow yet.", comment: ""),
+                emptyDetail: String(localized: "No reference images in this workflow yet.", table: "Automation"),
                 options: imageReferenceOptions,
                 reference: $imageRef,
                 onCapture: onCaptureImage
@@ -165,12 +165,12 @@ struct AutomationVisualConditionEditorView: View {
             thresholdFields
         case .pixelMatched:
             AutomationVisualColorPickerView(colorHex: $colorHex)
-            Toggle(NSLocalizedString("Use exact pixel", comment: ""), isOn: $hasPixel)
+            Toggle(String(localized: "Use exact pixel", table: "Common"), isOn: $hasPixel)
                 .toggleStyle(.switch)
             if hasPixel {
                 HStack(spacing: 8) {
-                    numericField(NSLocalizedString("Pixel X", comment: ""), value: $pixelX, width: 74)
-                    numericField(NSLocalizedString("Pixel Y", comment: ""), value: $pixelY, width: 74)
+                    numericField(String(localized: "Pixel X", table: "Common"), value: $pixelX, width: 74)
+                    numericField(String(localized: "Pixel Y", table: "Common"), value: $pixelY, width: 74)
                 }
             }
             Stepper(
@@ -180,7 +180,7 @@ struct AutomationVisualConditionEditorView: View {
             ) {
                 Label(
                     String(
-                        format: NSLocalizedString("Sample radius %d", comment: ""),
+                        format: String(localized: "Sample radius %d", table: "Common"),
                         pixelSampleRadius
                     ),
                     systemImage: "circle.grid.3x3"
@@ -193,10 +193,10 @@ struct AutomationVisualConditionEditorView: View {
 
     private var thresholdFields: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Toggle(NSLocalizedString("Threshold", comment: ""), isOn: $hasThreshold)
+            Toggle(String(localized: "Threshold", table: "Common"), isOn: $hasThreshold)
                 .toggleStyle(.switch)
             if hasThreshold {
-                numericField(NSLocalizedString("Value", comment: ""), value: $threshold, width: 78)
+                numericField(String(localized: "Value", table: "Common"), value: $threshold, width: 78)
             }
         }
     }
@@ -221,8 +221,8 @@ struct AutomationVisualConditionEditorView: View {
 
     private var setupTitle: String {
         setupIsReady
-            ? NSLocalizedString("Visual check ready", comment: "")
-            : NSLocalizedString("Visual check needs setup", comment: "")
+            ? String(localized: "Visual check ready", table: "Common")
+            : String(localized: "Visual check needs setup", table: "Common")
     }
 
     private var setupIsReady: Bool {
@@ -234,8 +234,8 @@ struct AutomationVisualConditionEditorView: View {
             VisualSetupRow(
                 id: "watchedArea",
                 title: hasRegion
-                    ? NSLocalizedString("Watched area selected", comment: "")
-                    : NSLocalizedString("Watching full display", comment: ""),
+                    ? String(localized: "Watched area selected", table: "Common")
+                    : String(localized: "Watching full display", table: "Common"),
                 systemImage: hasRegion ? "rectangle.dashed" : "display",
                 tint: hasRegion ? Brand.libraryGreen : Brand.sigAmber,
                 isReady: true
@@ -247,8 +247,8 @@ struct AutomationVisualConditionEditorView: View {
             rows.append(VisualSetupRow(
                 id: "baselineImage",
                 title: trimmedBaselineRef.isEmpty
-                    ? NSLocalizedString("Needs baseline image", comment: "")
-                    : NSLocalizedString("Baseline image selected", comment: ""),
+                    ? String(localized: "Needs baseline image", table: "Common")
+                    : String(localized: "Baseline image selected", table: "Common"),
                 systemImage: trimmedBaselineRef.isEmpty ? "exclamationmark.triangle" : "rectangle.dashed",
                 tint: trimmedBaselineRef.isEmpty ? Brand.sigAmber : Brand.libraryGreen,
                 isReady: !trimmedBaselineRef.isEmpty
@@ -257,8 +257,8 @@ struct AutomationVisualConditionEditorView: View {
             rows.append(VisualSetupRow(
                 id: "referenceImage",
                 title: trimmedImageRef.isEmpty
-                    ? NSLocalizedString("Needs reference image", comment: "")
-                    : NSLocalizedString("Reference image selected", comment: ""),
+                    ? String(localized: "Needs reference image", table: "Common")
+                    : String(localized: "Reference image selected", table: "Common"),
                 systemImage: trimmedImageRef.isEmpty ? "exclamationmark.triangle" : "photo",
                 tint: trimmedImageRef.isEmpty ? Brand.sigAmber : Brand.libraryGreen,
                 isReady: !trimmedImageRef.isEmpty
@@ -267,8 +267,8 @@ struct AutomationVisualConditionEditorView: View {
             rows.append(VisualSetupRow(
                 id: "targetColor",
                 title: trimmedColorHex.isEmpty
-                    ? NSLocalizedString("Needs target color", comment: "")
-                    : NSLocalizedString("Target color selected", comment: ""),
+                    ? String(localized: "Needs target color", table: "Common")
+                    : String(localized: "Target color selected", table: "Common"),
                 systemImage: trimmedColorHex.isEmpty ? "exclamationmark.triangle" : "paintpalette",
                 tint: trimmedColorHex.isEmpty ? Brand.sigAmber : Brand.libraryGreen,
                 isReady: !trimmedColorHex.isEmpty
@@ -276,8 +276,8 @@ struct AutomationVisualConditionEditorView: View {
             rows.append(VisualSetupRow(
                 id: "samplePoint",
                 title: hasPixel || hasRegion
-                    ? NSLocalizedString("Sample point ready", comment: "")
-                    : NSLocalizedString("Needs pixel or watched area", comment: ""),
+                    ? String(localized: "Sample point ready", table: "Common")
+                    : String(localized: "Needs pixel or watched area", table: "Automation"),
                 systemImage: hasPixel || hasRegion ? "scope" : "exclamationmark.triangle",
                 tint: hasPixel || hasRegion ? Brand.libraryGreen : Brand.sigAmber,
                 isReady: hasPixel || hasRegion
@@ -364,7 +364,7 @@ private struct AutomationVisualRegionBoundsEditorView: View {
                 regionFields
 
                 Button(action: onClear) {
-                    Label(NSLocalizedString("Clear Bounds", comment: ""), systemImage: "xmark.circle")
+                    Label(String(localized: "Clear Bounds", table: "Common"), systemImage: "xmark.circle")
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
                 .buttonStyle(.bordered)
@@ -372,7 +372,7 @@ private struct AutomationVisualRegionBoundsEditorView: View {
             }
 
             Button(action: onDraw) {
-                Label(NSLocalizedString("Draw Bounds", comment: ""), systemImage: "viewfinder.rectangular")
+                Label(String(localized: "Draw Bounds", table: "Common"), systemImage: "viewfinder.rectangular")
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
             .buttonStyle(.bordered)
@@ -398,7 +398,7 @@ private struct AutomationVisualRegionBoundsEditorView: View {
                         .frame(width: previewRect.width, height: previewRect.height)
                         .offset(x: previewRect.minX, y: previewRect.minY)
                 } else {
-                    Label(NSLocalizedString("No bounds selected", comment: ""), systemImage: "viewfinder")
+                    Label(String(localized: "No bounds selected", table: "Common"), systemImage: "viewfinder")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -411,18 +411,18 @@ private struct AutomationVisualRegionBoundsEditorView: View {
 
     private var regionFields: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text(NSLocalizedString("Bounds", comment: ""))
+            Text("Bounds", tableName: "Common")
                 .font(.caption)
                 .foregroundStyle(.secondary)
 
             HStack(spacing: 8) {
-                numericField(NSLocalizedString("X", comment: ""), value: $regionX)
-                numericField(NSLocalizedString("Y", comment: ""), value: $regionY)
+                numericField(String(localized: "X", table: "Common"), value: $regionX)
+                numericField(String(localized: "Y", table: "Common"), value: $regionY)
             }
 
             HStack(spacing: 8) {
-                numericField(NSLocalizedString("W", comment: ""), value: $regionWidth)
-                numericField(NSLocalizedString("H", comment: ""), value: $regionHeight)
+                numericField(String(localized: "W", table: "Common"), value: $regionWidth)
+                numericField(String(localized: "H", table: "Common"), value: $regionHeight)
             }
         }
     }
@@ -477,11 +477,11 @@ private struct AutomationVisualRegionBoundsEditorView: View {
 
     private var previewAccessibilityLabel: String {
         guard hasRegion else {
-            return NSLocalizedString("No bounds selected", comment: "")
+            return String(localized: "No bounds selected", table: "Common")
         }
 
         return String(
-            format: NSLocalizedString("%@ bounds: x %@, y %@, width %@, height %@", comment: ""),
+            format: String(localized: "%@ bounds: x %@, y %@, width %@, height %@", table: "Common"),
             spaceTitle,
             formatted(regionX),
             formatted(regionY),
@@ -502,19 +502,19 @@ extension AutomationOCRSearchRegionSpace {
     var titleForVisualCondition: String {
         switch self {
         case .automatic:
-            return NSLocalizedString("Automatic", comment: "")
+            return String(localized: "Automatic", table: "Common")
         case .displayAbsolute:
-            return NSLocalizedString("Display absolute", comment: "")
+            return String(localized: "Display absolute", table: "Common")
         case .displayNormalized:
-            return NSLocalizedString("Display normalized", comment: "")
+            return String(localized: "Display normalized", table: "Common")
         case .windowLocal:
-            return NSLocalizedString("Window local", comment: "")
+            return String(localized: "Window local", table: "Common")
         case .windowNormalized:
-            return NSLocalizedString("Window normalized", comment: "")
+            return String(localized: "Window normalized", table: "Common")
         case .contentLocal:
-            return NSLocalizedString("Content local", comment: "")
+            return String(localized: "Content local", table: "Common")
         case .contentNormalized:
-            return NSLocalizedString("Content normalized", comment: "")
+            return String(localized: "Content normalized", table: "Common")
         }
     }
 

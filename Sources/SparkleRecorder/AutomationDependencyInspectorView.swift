@@ -44,12 +44,12 @@ struct AutomationDependencyInspectorView: View {
         }
         .pickerStyle(.segmented)
         .labelsHidden()
-        .help(NSLocalizedString("Dependency section", comment: ""))
+        .help(String(localized: "Dependency section", table: "Automation"))
     }
 
     private var linkTab: some View {
         VStack(alignment: .leading, spacing: 8) {
-            AutomationSectionHeader(title: NSLocalizedString("DEPENDENCY", comment: ""))
+            AutomationSectionHeader(title: String(localized: "DEPENDENCY", table: "Automation"))
 
             AutomationInspectorReferenceButton(
                 title: taskName(dependency.fromTaskID),
@@ -67,7 +67,7 @@ struct AutomationDependencyInspectorView: View {
 
             if let sourceConditionSummary {
                 VStack(alignment: .leading, spacing: 6) {
-                    Label(NSLocalizedString("Source condition", comment: ""), systemImage: "slider.horizontal.3")
+                    Label(String(localized: "Source condition", table: "Automation"), systemImage: "slider.horizontal.3")
                         .font(.caption)
                         .bold()
                         .foregroundStyle(Brand.libraryBlue)
@@ -76,7 +76,7 @@ struct AutomationDependencyInspectorView: View {
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                     Button(action: { onSelectTask(dependency.fromTaskID) }) {
-                        Label(NSLocalizedString("Edit Source Condition", comment: ""), systemImage: "square.and.pencil")
+                        Label(String(localized: "Edit Source Condition", table: "Automation"), systemImage: "square.and.pencil")
                             .frame(maxWidth: .infinity, alignment: .leading)
                     }
                     .buttonStyle(.bordered)
@@ -91,9 +91,9 @@ struct AutomationDependencyInspectorView: View {
 
     private var timingTab: some View {
         VStack(alignment: .leading, spacing: 8) {
-            AutomationSectionHeader(title: NSLocalizedString("LINK TRIGGER", comment: ""))
+            AutomationSectionHeader(title: String(localized: "LINK TRIGGER", table: "Automation"))
 
-            Picker(NSLocalizedString("Run when", comment: ""), selection: $triggerDraft) {
+            Picker(String(localized: "Run when", table: "Automation"), selection: $triggerDraft) {
                 ForEach(triggerOptions) { option in
                     Text(option.title).tag(option)
                 }
@@ -101,13 +101,13 @@ struct AutomationDependencyInspectorView: View {
             .pickerStyle(.menu)
 
             LabeledContent(delayFieldTitle) {
-                TextField(NSLocalizedString("Seconds", comment: ""), value: $delaySeconds, format: .number)
+                TextField(String(localized: "Seconds", table: "Common"), value: $delaySeconds, format: .number)
                     .textFieldStyle(.roundedBorder)
                     .frame(width: 86)
             }
 
             if sourceCanProvideDynamicDelay {
-                Toggle(NSLocalizedString("Use recognized time", comment: ""), isOn: $usesRecognizedTimeDelay)
+                Toggle(String(localized: "Use recognized time", table: "Common"), isOn: $usesRecognizedTimeDelay)
                     .toggleStyle(.checkbox)
                     .help(NSLocalizedString(
                         "Read a duration from the source condition evidence and use the delay field as fallback.",
@@ -115,9 +115,9 @@ struct AutomationDependencyInspectorView: View {
                     ))
 
                 if usesRecognizedTimeDelay {
-                    LabeledContent(NSLocalizedString("Maximum wait (s)", comment: "")) {
+                    LabeledContent(String(localized: "Maximum wait (s)", table: "EditorUX")) {
                         TextField(
-                            NSLocalizedString("Seconds", comment: ""),
+                            String(localized: "Seconds", table: "Common"),
                             value: $maximumRecognizedDelaySeconds,
                             format: .number
                         )
@@ -180,7 +180,7 @@ struct AutomationDependencyInspectorView: View {
     }
 
     private func taskName(_ taskID: UUID) -> String {
-        workflow.task(id: taskID)?.name ?? NSLocalizedString("Missing task", comment: "")
+        workflow.task(id: taskID)?.name ?? String(localized: "Missing task", table: "Automation")
     }
 
     private var triggerOptions: [AutomationDependencyTriggerDraft] {
@@ -189,8 +189,8 @@ struct AutomationDependencyInspectorView: View {
 
     private var delayFieldTitle: String {
         usesRecognizedTimeDelay
-            ? NSLocalizedString("Fallback (s)", comment: "")
-            : NSLocalizedString("Delay", comment: "")
+            ? String(localized: "Fallback (s)", table: "Common")
+            : String(localized: "Delay", table: "EditorUX")
     }
 
     private var sourceCanProvideDynamicDelay: Bool {
@@ -217,19 +217,19 @@ struct AutomationDependencyInspectorView: View {
     private func conditionSummary(_ condition: AutomationConditionSpec) -> String {
         switch condition.kind {
         case .manualApproval:
-            return NSLocalizedString("Manual approval", comment: "")
+            return String(localized: "Manual approval", table: "Common")
         case .externalSignal(let signalName):
             let trimmed = signalName.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !trimmed.isEmpty else {
-                return NSLocalizedString("External signal", comment: "")
+                return String(localized: "External signal", table: "Common")
             }
-            return String(format: NSLocalizedString("External signal: %@", comment: ""), trimmed)
+            return String(format: String(localized: "External signal: %@", table: "Common"), trimmed)
         case .ocrText(let ocr):
             let trimmed = ocr.text.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !trimmed.isEmpty else {
-                return NSLocalizedString("OCR text", comment: "")
+                return String(localized: "OCR text", table: "EditorUX")
             }
-            return String(format: NSLocalizedString("OCR text: %@", comment: ""), trimmed)
+            return String(format: String(localized: "OCR text: %@", table: "EditorUX"), trimmed)
         case .visual(let visual):
             return AutomationVisualConditionPresentation.title(for: visual.type)
         case .previousOutcome(let predicate):
@@ -240,19 +240,19 @@ struct AutomationDependencyInspectorView: View {
     private func outcomePredicateTitle(_ predicate: AutomationOutcomePredicate) -> String {
         switch predicate {
         case .anyTerminal:
-            return NSLocalizedString("Any terminal", comment: "")
+            return String(localized: "Any terminal", table: "Common")
         case .success:
-            return NSLocalizedString("Success", comment: "")
+            return String(localized: "Success", table: "Common")
         case .failure:
-            return NSLocalizedString("Failure", comment: "")
+            return String(localized: "Failure", table: "Common")
         case .timeout:
-            return NSLocalizedString("Timeout", comment: "")
+            return String(localized: "Timeout", table: "Common")
         case .cancelled:
-            return NSLocalizedString("Cancelled", comment: "")
+            return String(localized: "Cancelled", table: "Common")
         case .conditionMatched:
-            return NSLocalizedString("Condition matched", comment: "")
+            return String(localized: "Condition matched", table: "Automation")
         case .conditionNotMatched:
-            return NSLocalizedString("Condition not matched", comment: "")
+            return String(localized: "Condition not matched", table: "Automation")
         }
     }
 
@@ -267,9 +267,9 @@ private enum DependencyInspectorTab: String, CaseIterable, Identifiable {
     var title: String {
         switch self {
         case .link:
-            return NSLocalizedString("Link", comment: "")
+            return String(localized: "Link", table: "Common")
         case .timing:
-            return NSLocalizedString("Timing", comment: "")
+            return String(localized: "Timing", table: "Common")
         }
     }
 

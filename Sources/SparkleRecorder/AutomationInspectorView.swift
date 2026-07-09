@@ -27,7 +27,7 @@ struct AutomationInspectorView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            AutomationSectionHeader(title: NSLocalizedString("INSPECTOR", comment: ""))
+            AutomationSectionHeader(title: String(localized: "INSPECTOR", table: "Common"))
                 .padding(.horizontal, 12)
                 .padding(.top, 12)
 
@@ -84,8 +84,8 @@ struct AutomationInspectorView: View {
                         } else {
                             AutomationEmptyState(
                                 systemImage: "cursorarrow.rays",
-                                title: NSLocalizedString("No Selection", comment: ""),
-                                subtitle: NSLocalizedString("Select a task or dependency to inspect its properties. Use the Workflow tab for workflow configurations.", comment: "")
+                                title: String(localized: "No Selection", table: "Common"),
+                                subtitle: String(localized: "Select a task or dependency to inspect its properties. Use the Workflow tab for workflow configurations.", table: "Automation")
                             )
                             .padding(.top, 40)
                         }
@@ -100,8 +100,8 @@ struct AutomationInspectorView: View {
                         } else {
                             AutomationEmptyState(
                                 systemImage: "cursorarrow.rays",
-                                title: NSLocalizedString("No Selection", comment: ""),
-                                subtitle: NSLocalizedString("Select a task or dependency to inspect its properties. Use the Workflow tab for workflow configurations.", comment: "")
+                                title: String(localized: "No Selection", table: "Common"),
+                                subtitle: String(localized: "Select a task or dependency to inspect its properties. Use the Workflow tab for workflow configurations.", table: "Automation")
                             )
                             .padding(.top, 40)
                         }
@@ -112,8 +112,8 @@ struct AutomationInspectorView: View {
             } else {
                 AutomationEmptyState(
                     systemImage: "slider.horizontal.3",
-                    title: NSLocalizedString("No workflow selected", comment: ""),
-                    subtitle: NSLocalizedString("Create a workflow to edit workflow details.", comment: "")
+                    title: String(localized: "No workflow selected", table: "Automation"),
+                    subtitle: String(localized: "Create a workflow to edit workflow details.", table: "Automation")
                 )
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
@@ -181,20 +181,20 @@ private struct AutomationWorkflowInspectorSummaryView: View {
 
             VStack(alignment: .leading, spacing: 8) {
                 AutomationWorkflowInspectorSummaryRow(
-                    title: NSLocalizedString("Tasks", comment: ""),
+                    title: String(localized: "Tasks", table: "Automation"),
                     value: "\(projection?.nodes.count ?? workflow.tasks.count)",
                     systemImage: "circle.grid.cross"
                 )
 
                 AutomationWorkflowInspectorSummaryRow(
-                    title: NSLocalizedString("Links", comment: ""),
+                    title: String(localized: "Links", table: "Common"),
                     value: "\(projection?.edges.count ?? workflow.dependencies.count)",
                     systemImage: "arrow.triangle.branch"
                 )
 
                 if let nextScheduledOccurrence = projection?.nextScheduledOccurrence {
                     AutomationWorkflowInspectorSummaryRow(
-                        title: NSLocalizedString("Next", comment: ""),
+                        title: String(localized: "Next", table: "Common"),
                         value: nextScheduledOccurrence.formatted(date: .omitted, time: .shortened),
                         detail: nextScheduledTaskName,
                         systemImage: "clock"
@@ -202,7 +202,7 @@ private struct AutomationWorkflowInspectorSummaryView: View {
                 }
 
                 AutomationWorkflowInspectorSummaryRow(
-                    title: NSLocalizedString("Modified", comment: ""),
+                    title: String(localized: "Modified", table: "Common"),
                     value: workflow.modifiedAt.formatted(date: .abbreviated, time: .shortened),
                     systemImage: "calendar"
                 )

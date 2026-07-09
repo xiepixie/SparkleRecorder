@@ -43,7 +43,7 @@ enum AutomationWorkflowDraftVisualAssetImportPresenter {
                 } catch {
                     await MainActor.run {
                         onError(String(
-                            format: NSLocalizedString("Could not import visual asset: %@", comment: ""),
+                            format: String(localized: "Could not import visual asset: %@", table: "Common"),
                             String(describing: error)
                         ))
                     }

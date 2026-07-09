@@ -8,14 +8,14 @@ struct AutomationTaskJoinPolicyEditorView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 8) {
-                Label(NSLocalizedString("Join policy", comment: ""), systemImage: "arrow.triangle.merge")
+                Label(String(localized: "Join policy", table: "Common"), systemImage: "arrow.triangle.merge")
                     .font(.caption)
                     .bold()
                     .foregroundStyle(.secondary)
 
                 Spacer(minLength: 8)
 
-                Picker(NSLocalizedString("Join policy", comment: ""), selection: $selection) {
+                Picker(String(localized: "Join policy", table: "Common"), selection: $selection) {
                     ForEach(policyOptions, id: \.self) { policy in
                         Text(title(for: policy)).tag(policy)
                     }
@@ -52,7 +52,7 @@ struct AutomationTaskJoinPolicyEditorView: View {
 
     private var incomingCountLabel: String {
         String(
-            format: NSLocalizedString("%d incoming", comment: ""),
+            format: String(localized: "%d incoming", table: "Common"),
             incomingDependencyCount
         )
     }
@@ -60,13 +60,13 @@ struct AutomationTaskJoinPolicyEditorView: View {
     private var accessibilityText: String {
         if incomingDependencyCount > 0 {
             return String(
-                format: NSLocalizedString("Join policy, %@, %@", comment: ""),
+                format: String(localized: "Join policy, %@, %@", table: "Common"),
                 title(for: selection),
                 incomingCountLabel
             )
         }
         return String(
-            format: NSLocalizedString("Join policy, %@", comment: ""),
+            format: String(localized: "Join policy, %@", table: "Common"),
             title(for: selection)
         )
     }
@@ -74,22 +74,22 @@ struct AutomationTaskJoinPolicyEditorView: View {
     private func title(for policy: AutomationJoinPolicy) -> String {
         switch policy {
         case .all:
-            return NSLocalizedString("All incoming branches", comment: "")
+            return String(localized: "All incoming branches", table: "Common")
         case .any:
-            return NSLocalizedString("Any incoming branch", comment: "")
+            return String(localized: "Any incoming branch", table: "Common")
         case .firstMatched:
-            return NSLocalizedString("First matching branch", comment: "")
+            return String(localized: "First matching branch", table: "Common")
         }
     }
 
     private func detail(for policy: AutomationJoinPolicy) -> String {
         switch policy {
         case .all:
-            return NSLocalizedString("Run after every incoming branch for this task is satisfied.", comment: "")
+            return String(localized: "Run after every incoming branch for this task is satisfied.", table: "Common")
         case .any:
-            return NSLocalizedString("Run as soon as one incoming branch is ready.", comment: "")
+            return String(localized: "Run as soon as one incoming branch is ready.", table: "Common")
         case .firstMatched:
-            return NSLocalizedString("Lock onto the first incoming branch that matches and ignore later matches for this run.", comment: "")
+            return String(localized: "Lock onto the first incoming branch that matches and ignore later matches for this run.", table: "Common")
         }
     }
 }

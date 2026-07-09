@@ -12,14 +12,14 @@ struct AutomationTaskRunBranchContextView: View {
             VStack(alignment: .leading, spacing: 7) {
                 AutomationSectionHeader(
                     title: hasDurableEvidence
-                        ? NSLocalizedString("BRANCH EVIDENCE", comment: "")
-                        : NSLocalizedString("BRANCH CONTEXT", comment: ""),
+                        ? String(localized: "BRANCH EVIDENCE", table: "Common")
+                        : String(localized: "BRANCH CONTEXT", table: "Common"),
                     count: rows.count
                 )
 
                 Text(hasDurableEvidence
-                    ? NSLocalizedString("Persisted on this run", comment: "")
-                    : NSLocalizedString("Projection fallback", comment: ""))
+                    ? String(localized: "Persisted on this run", table: "Common")
+                    : String(localized: "Projection fallback", table: "Common"))
                     .font(.caption2)
                     .foregroundStyle(.tertiary)
                     .lineLimit(1)
@@ -131,7 +131,7 @@ struct AutomationTaskRunBranchContextView: View {
     }
 
     private func taskName(_ taskID: UUID) -> String {
-        workflow.task(id: taskID)?.name ?? NSLocalizedString("Missing task", comment: "")
+        workflow.task(id: taskID)?.name ?? String(localized: "Missing task", table: "Automation")
     }
 
     private struct BranchContextRow: Identifiable {
@@ -151,9 +151,9 @@ struct AutomationTaskRunBranchContextView: View {
         var relationshipLabel: String {
             switch relationship {
             case .incoming:
-                return NSLocalizedString("Started by branch", comment: "")
+                return String(localized: "Started by branch", table: "Common")
             case .outgoing:
-                return NSLocalizedString("Decision from this run", comment: "")
+                return String(localized: "Decision from this run", table: "Common")
             }
         }
 
@@ -183,65 +183,65 @@ struct AutomationTaskRunBranchContextView: View {
     private func triggerLabel(for trigger: AutomationDependencyTrigger) -> String {
         switch trigger {
         case .onSuccess:
-            return NSLocalizedString("On success", comment: "")
+            return String(localized: "On success", table: "Common")
         case .onFailure:
-            return NSLocalizedString("On failure", comment: "")
+            return String(localized: "On failure", table: "Common")
         case .onTimeout:
-            return NSLocalizedString("On timeout", comment: "")
+            return String(localized: "On timeout", table: "Common")
         case .onCancelled:
-            return NSLocalizedString("On cancel", comment: "")
+            return String(localized: "On cancel", table: "Common")
         case .onConditionMatched:
-            return NSLocalizedString("Condition matched", comment: "")
+            return String(localized: "Condition matched", table: "Automation")
         case .onConditionNotMatched:
-            return NSLocalizedString("Condition not matched", comment: "")
+            return String(localized: "Condition not matched", table: "Automation")
         case .onOutcome(let predicate):
             return predicateLabel(for: predicate)
         case .always:
-            return NSLocalizedString("Always", comment: "")
+            return String(localized: "Always", table: "Common")
         }
     }
 
     private func predicateLabel(for predicate: AutomationOutcomePredicate) -> String {
         switch predicate {
         case .success:
-            return NSLocalizedString("Success", comment: "")
+            return String(localized: "Success", table: "Common")
         case .failure:
-            return NSLocalizedString("Failure", comment: "")
+            return String(localized: "Failure", table: "Common")
         case .timeout:
-            return NSLocalizedString("Timeout", comment: "")
+            return String(localized: "Timeout", table: "Common")
         case .cancelled:
-            return NSLocalizedString("Cancelled", comment: "")
+            return String(localized: "Cancelled", table: "Common")
         case .conditionMatched:
-            return NSLocalizedString("Condition matched", comment: "")
+            return String(localized: "Condition matched", table: "Automation")
         case .conditionNotMatched:
-            return NSLocalizedString("Condition not matched", comment: "")
+            return String(localized: "Condition not matched", table: "Automation")
         case .anyTerminal:
-            return NSLocalizedString("Any terminal outcome", comment: "")
+            return String(localized: "Any terminal outcome", table: "Common")
         }
     }
 
     private func outcomeLabel(for outcome: AutomationOutcome) -> String {
         switch outcome {
         case .succeeded:
-            return NSLocalizedString("Success", comment: "")
+            return String(localized: "Success", table: "Common")
         case .failed:
-            return NSLocalizedString("Failure", comment: "")
+            return String(localized: "Failure", table: "Common")
         case .cancelled:
-            return NSLocalizedString("Cancelled", comment: "")
+            return String(localized: "Cancelled", table: "Common")
         case .timedOut:
-            return NSLocalizedString("Timeout", comment: "")
+            return String(localized: "Timeout", table: "Common")
         case .resourceConflict:
-            return NSLocalizedString("Resource conflict", comment: "")
+            return String(localized: "Resource conflict", table: "Common")
         case .permissionDenied:
-            return NSLocalizedString("Permission denied", comment: "")
+            return String(localized: "Permission denied", table: "Settings")
         case .conditionMatched:
-            return NSLocalizedString("Condition matched", comment: "")
+            return String(localized: "Condition matched", table: "Automation")
         case .conditionNotMatched:
-            return NSLocalizedString("Condition not matched", comment: "")
+            return String(localized: "Condition not matched", table: "Automation")
         case .missingMacro:
-            return NSLocalizedString("Missing macro", comment: "")
+            return String(localized: "Missing macro", table: "EditorUX")
         case .rejected:
-            return NSLocalizedString("Rejected", comment: "")
+            return String(localized: "Rejected", table: "Common")
         }
     }
 }

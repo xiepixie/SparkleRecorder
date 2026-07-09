@@ -33,6 +33,7 @@ struct MacroCard: View {
     let onSetChain: (UUID?) -> Void
     let chainCandidates: [(UUID, String)]
     let chainTargetName: String?
+    let onCreateSequence: () -> Void
 
     @State private var hovered = false
     @State private var dragOver = false
@@ -96,23 +97,23 @@ struct MacroCard: View {
             .accessibilityLabel(accessibilitySummary)
             .accessibilityAddTraits(isCurrent ? [.isButton, .isSelected] : .isButton)
             .accessibilityAction { onSelect([]) }
-	            .accessibilityAction(named: NSLocalizedString("Play", comment: "")) { onPlay() }
-	            .accessibilityAction(named: NSLocalizedString("Edit", comment: "")) { onEdit() }
-	            .accessibilityAction(named: macro.favorite ? NSLocalizedString("Remove favorite", comment: "") : NSLocalizedString("Add favorite", comment: "")) { onToggleFavorite() }
-	            .accessibilityAction(named: NSLocalizedString("Rename", comment: "")) { onStartRename() }
-	            .accessibilityAction(named: NSLocalizedString("Delete", comment: "")) { onDelete() }
+	            .accessibilityAction(named: String(localized: "Play", table: "Common")) { onPlay() }
+	            .accessibilityAction(named: String(localized: "Edit", table: "Common")) { onEdit() }
+	            .accessibilityAction(named: macro.favorite ? String(localized: "Remove favorite", table: "Common") : String(localized: "Add favorite", table: "Common")) { onToggleFavorite() }
+	            .accessibilityAction(named: String(localized: "Rename", table: "Common")) { onStartRename() }
+	            .accessibilityAction(named: String(localized: "Delete", table: "Common")) { onDelete() }
 	            .contextMenu { cardMenuItems(includePlayEdit: true) }
-	            .alert(NSLocalizedString("Custom playback speed", comment: ""), isPresented: $showCustomSpeed) {
-	                TextField(NSLocalizedString("e.g. 1.75", comment: ""), text: $customSpeedText)
-	                Button(NSLocalizedString("Cancel", comment: ""), role: .cancel) {}
-	                Button(NSLocalizedString("Set", comment: "")) {
+	            .alert(String(localized: "Custom playback speed", table: "Common"), isPresented: $showCustomSpeed) {
+	                TextField(String(localized: "e.g. 1.75", table: "Common"), text: $customSpeedText)
+	                Button(String(localized: "Cancel", table: "Common"), role: .cancel) {}
+	                Button(String(localized: "Set", table: "Common")) {
                     let trimmed = customSpeedText.trimmingCharacters(in: .whitespaces)
                     if let v = Double(trimmed) {
                         onSetSpeed(max(0.1, min(10.0, v)))
                     }
                 }
             } message: {
-                Text(NSLocalizedString("Multiplier between 0.1× and 10×.", comment: ""))
+                Text("Multiplier between 0.1× and 10×.", tableName: "Automation")
             }
 
     }
@@ -194,29 +195,31 @@ struct MacroCard: View {
 	    @ViewBuilder
 	    func cardMenuItems(includePlayEdit: Bool) -> some View {
 	        if includePlayEdit {
-	            Button { onPlay() } label: { Label(NSLocalizedString("Play", comment: ""), systemImage: "play.fill") }
-	            Button { onEdit() } label: { Label(NSLocalizedString("Edit…", comment: ""), systemImage: "slider.horizontal.below.rectangle") }
+	            Button { onPlay() } label: { Label(String(localized: "Play", table: "Common"), systemImage: "play.fill") }
+	            Button { onEdit() } label: { Label(String(localized: "Edit…", table: "Common"), systemImage: "slider.horizontal.below.rectangle") }
 	            Divider()
 	        }
-	        Button { onStartRename() } label: { Label(NSLocalizedString("Rename…", comment: ""), systemImage: "pencil") }
+	        Button { onCreateSequence() } label: { Label(String(localized: "Create Sequence…", table: "Common"), systemImage: "arrow.right.circle") }
+	        Divider()
+	        Button { onStartRename() } label: { Label(String(localized: "Rename…", table: "Common"), systemImage: "pencil") }
 	        Button { onToggleFavorite() } label: {
-	            Label(macro.favorite ? NSLocalizedString("Unfavorite", comment: "") : NSLocalizedString("Favorite", comment: ""), systemImage: macro.favorite ? "star.slash" : "star")
+	            Label(macro.favorite ? String(localized: "Unfavorite", table: "Common") : String(localized: "Favorite", table: "Common"), systemImage: macro.favorite ? "star.slash" : "star")
 	        }
 	        Divider()
-	        Button { onOpenNotes() } label: { Label(NSLocalizedString("Notes…", comment: ""), systemImage: "text.alignleft") }
-	        Button(action: onAddTag) { Label(NSLocalizedString("Add Tag…", comment: ""), systemImage: "tag") }
-	        Button { onAssignHotkey() } label: { Label(NSLocalizedString("Assign Hotkey…", comment: ""), systemImage: "keyboard") }
+	        Button { onOpenNotes() } label: { Label(String(localized: "Notes…", table: "Common"), systemImage: "text.alignleft") }
+	        Button(action: onAddTag) { Label(String(localized: "Add Tag…", table: "Common"), systemImage: "tag") }
+	        Button { onAssignHotkey() } label: { Label(String(localized: "Assign Hotkey…", table: "Common"), systemImage: "keyboard") }
 	        if macro.hotkey != nil {
-	            Button { onClearHotkey() } label: { Label(NSLocalizedString("Clear Hotkey", comment: ""), systemImage: "keyboard.badge.ellipsis") }
+	            Button { onClearHotkey() } label: { Label(String(localized: "Clear Hotkey", table: "Common"), systemImage: "keyboard.badge.ellipsis") }
 	        }
 	        Divider()
 	        
-	        Button { controller.bindCurrentWindow(to: macro.id) } label: { Label(NSLocalizedString("Bind Active Window", comment: ""), systemImage: "window.badge.key") }
+	        Button { controller.bindCurrentWindow(to: macro.id) } label: { Label(String(localized: "Bind Active Window", table: "Common"), systemImage: "window.badge.key") }
 	        if macro.surfaces.values.first != nil {
 	            Button(action: { controller.library.setFollowWindowOffset(id: macro.id, enabled: !macro.followWindowOffset) }) {
-	                Label(NSLocalizedString("Follow Window Position", comment: ""), systemImage: macro.followWindowOffset ? "checkmark.circle" : "circle")
+	                Label(String(localized: "Follow Window Position", table: "Common"), systemImage: macro.followWindowOffset ? "checkmark.circle" : "circle")
 	            }
-	            Button { controller.clearWindowBinding(for: macro.id) } label: { Label(NSLocalizedString("Clear Window Binding", comment: ""), systemImage: "xmark.rectangle") }
+	            Button { controller.clearWindowBinding(for: macro.id) } label: { Label(String(localized: "Clear Window Binding", table: "Common"), systemImage: "xmark.rectangle") }
 	        }
 	        Divider()
 
@@ -224,13 +227,13 @@ struct MacroCard: View {
         colorSubmenu()
         chainSubmenu()
         Divider()
-	        Button { onDuplicate() } label: { Label(NSLocalizedString("Duplicate", comment: ""), systemImage: "plus.square.on.square") }
-	        Menu(NSLocalizedString("Export", comment: "")) {
-	            Button { onExport() } label: { Label(NSLocalizedString("As SparkleRecorder File…", comment: ""), systemImage: "doc.badge.plus") }
-	            Button { onExportText() } label: { Label(NSLocalizedString("As Text…", comment: ""), systemImage: "doc.plaintext") }
+	        Button { onDuplicate() } label: { Label(String(localized: "Duplicate", table: "Common"), systemImage: "plus.square.on.square") }
+	        Menu(String(localized: "Export", table: "Common")) {
+	            Button { onExport() } label: { Label(String(localized: "As SparkleRecorder File…", table: "Recording"), systemImage: "doc.badge.plus") }
+	            Button { onExportText() } label: { Label(String(localized: "As Text…", table: "EditorUX"), systemImage: "doc.plaintext") }
 	        }
 	        Divider()
-	        Button(role: .destructive) { onDelete() } label: { Label(NSLocalizedString("Delete", comment: ""), systemImage: "trash") }
+	        Button(role: .destructive) { onDelete() } label: { Label(String(localized: "Delete", table: "Common"), systemImage: "trash") }
 	    }
 
     private var cardContent: some View {
@@ -240,7 +243,7 @@ struct MacroCard: View {
                 MacroIconView(macro: macro, onSetIcon: onSetIcon)
 
                 if isRenaming {
-                    TextField(NSLocalizedString("Name", comment: ""), text: $renameText, onCommit: onCommitRename)
+                    TextField(String(localized: "Name", table: "Common"), text: $renameText, onCommit: onCommitRename)
                         .textFieldStyle(.plain)
                         .font(.system(size: 12, weight: .semibold))
                         .padding(.horizontal, 5)
@@ -275,7 +278,7 @@ struct MacroCard: View {
                             .foregroundStyle(.secondary)
                     }
                     .buttonStyle(.plain)
-                    .help(NSLocalizedString("Has notes — click to open", comment: ""))
+                    .help(String(localized: "Has notes — click to open", table: "EditorUX"))
                 }
 
                 if let hk = macro.hotkey {
@@ -283,8 +286,8 @@ struct MacroCard: View {
                         KeyCapView(text: hk.name)
                     }
                     .buttonStyle(.plain)
-                    .help(String(format: NSLocalizedString("Hotkey: %@ — click to change", comment: ""), hk.name))
-                    .accessibilityLabel(String(format: NSLocalizedString("Change hotkey %@", comment: ""), hk.name))
+                    .help(String(format: String(localized: "Hotkey: %@ — click to change", table: "EditorUX"), hk.name))
+                    .accessibilityLabel(String(format: String(localized: "Change hotkey %@", table: "Common"), hk.name))
                 }
 
                 Button(action: onToggleFavorite) {
@@ -293,8 +296,8 @@ struct MacroCard: View {
                         .foregroundStyle(macro.favorite ? AnyShapeStyle(.yellow) : AnyShapeStyle(.tertiary))
                 }
                 .buttonStyle(.plain)
-                .help(macro.favorite ? NSLocalizedString("Unstar", comment: "") : NSLocalizedString("Star", comment: ""))
-                .accessibilityLabel(macro.favorite ? NSLocalizedString("Remove favorite", comment: "") : NSLocalizedString("Add favorite", comment: ""))
+                .help(macro.favorite ? String(localized: "Unstar", table: "Common") : String(localized: "Star", table: "Common"))
+                .accessibilityLabel(macro.favorite ? String(localized: "Remove favorite", table: "Common") : String(localized: "Add favorite", table: "Common"))
             }
 
             // Tiny waveform
@@ -327,7 +330,7 @@ struct MacroCard: View {
                     Image(systemName: "window.badge.key")
                         .font(.system(size: 9))
                         .foregroundStyle(Brand.sigTeal)
-                    Text(String(format: NSLocalizedString("Bound: %@ (%dx%d)", comment: ""), surface.appName ?? NSLocalizedString("Window", comment: ""), Int(surface.recordedFrame.width), Int(surface.recordedFrame.height)))
+                    Text(String(format: String(localized: "Bound: %@ (%dx%d)", table: "Common"), surface.appName ?? String(localized: "Window", table: "Common"), Int(surface.recordedFrame.width), Int(surface.recordedFrame.height)))
                         .font(.system(size: 9.5, weight: .medium))
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
@@ -335,7 +338,7 @@ struct MacroCard: View {
                         Text("·")
                             .font(.system(size: 9.5))
                             .foregroundStyle(.tertiary)
-                        Text(NSLocalizedString("Offset dx/dy enabled", comment: ""))
+                        Text("Offset dx/dy enabled", tableName: "Common")
                             .font(.system(size: 9))
                             .foregroundStyle(.secondary)
                     }
@@ -345,7 +348,7 @@ struct MacroCard: View {
                             controller.clearWindowBinding(for: macro.id)
                         }
                     }) {
-                        Label(NSLocalizedString("Clear window binding", comment: ""), systemImage: "xmark")
+                        Label(String(localized: "Clear window binding", table: "Common"), systemImage: "xmark")
                             .labelStyle(.iconOnly)
                             .font(.system(size: 9.5, weight: .bold))
                             .foregroundStyle(clearButtonHovered ? AnyShapeStyle(Color.red.opacity(0.92)) : AnyShapeStyle(Color.secondary))
@@ -359,7 +362,7 @@ struct MacroCard: View {
                             .overlay(Circle().strokeBorder(Color.red.opacity(clearButtonHovered ? 0.22 : 0.0), lineWidth: 0.5))
                     )
                     .animation(hoverAnimation, value: clearButtonHovered)
-                    .help(NSLocalizedString("Clear window binding", comment: ""))
+                    .help(String(localized: "Clear window binding", table: "Common"))
                     .onHover { clearButtonHovered = $0 }
                 }
                 .padding(.vertical, 1)
@@ -371,15 +374,15 @@ struct MacroCard: View {
             HStack(spacing: 4) {
                 metaRow
                 Spacer()
-                CardActionButton(systemImage: "play.fill", tint: Brand.libraryGreen, label: String(format: NSLocalizedString("Play %@", comment: ""), macro.name)) { onPlay() }
-                    .help(NSLocalizedString("Play", comment: ""))
+                CardActionButton(systemImage: "play.fill", tint: Brand.libraryGreen, label: String(format: String(localized: "Play %@", table: "Common"), macro.name)) { onPlay() }
+                    .help(String(localized: "Play", table: "Common"))
                 LoopChip(loops: macro.loops, onChange: onSetLoops)
-                CardActionButton(systemImage: "slider.horizontal.below.rectangle", tint: Brand.libraryBlue, label: String(format: NSLocalizedString("Edit %@", comment: ""), macro.name)) { onEdit() }
-                    .help(NSLocalizedString("Edit", comment: ""))
+                CardActionButton(systemImage: "slider.horizontal.below.rectangle", tint: Brand.libraryBlue, label: String(format: String(localized: "Edit %@", table: "Common"), macro.name)) { onEdit() }
+                    .help(String(localized: "Edit", table: "Common"))
 	                Menu {
 	                    cardMenuItems(includePlayEdit: false)
 	                } label: {
-	                    Label(NSLocalizedString("More actions", comment: ""), systemImage: "ellipsis")
+	                    Label(String(localized: "More actions", table: "EditorUX"), systemImage: "ellipsis")
 	                        .labelStyle(.iconOnly)
 	                        .font(.system(size: 10, weight: .bold))
 	                        .foregroundStyle(moreButtonHovered ? AnyShapeStyle(Color.white) : AnyShapeStyle(Color.secondary))
@@ -392,7 +395,7 @@ struct MacroCard: View {
 	                .libraryControlSurface(cornerRadius: 8, tint: Brand.libraryBlue, isActive: moreButtonHovered, activeFillOpacity: 0.68)
 	                .animation(hoverAnimation, value: moreButtonHovered)
 	                .onHover { moreButtonHovered = $0 }
-	                .accessibilityLabel(NSLocalizedString("More actions", comment: ""))
+	                .accessibilityLabel(String(localized: "More actions", table: "EditorUX"))
             }
         }
     }
@@ -401,16 +404,16 @@ struct MacroCard: View {
     private var accessibilitySummary: String {
         var parts = [macro.name, durationText]
         if macro.playCount > 0 {
-            parts.append(String(format: NSLocalizedString("played %d times", comment: ""), macro.playCount))
+            parts.append(String(format: String(localized: "played %d times", table: "Common"), macro.playCount))
         }
         if let hotkey = macro.hotkey {
-            parts.append(String(format: NSLocalizedString("hotkey %@", comment: ""), hotkey.name))
+            parts.append(String(format: String(localized: "hotkey %@", table: "Common"), hotkey.name))
         }
         if let accentName {
-            parts.append(String(format: NSLocalizedString("color %@", comment: ""), accentDisplayName(accentName)))
+            parts.append(String(format: String(localized: "color %@", table: "Common"), accentDisplayName(accentName)))
         }
         if macro.favorite {
-            parts.append(NSLocalizedString("favorite", comment: ""))
+            parts.append(String(localized: "favorite", table: "Common"))
         }
         return parts.joined(separator: ", ")
     }
@@ -432,7 +435,7 @@ struct MacroCard: View {
                 Image(systemName: "arrow.right")
                     .font(.system(size: 8, weight: .black))
                     .foregroundStyle(.tertiary)
-                    .help(chainTargetName.map { String(format: NSLocalizedString("Chains to %@", comment: ""), $0) } ?? NSLocalizedString("Chained", comment: ""))
+                    .help(chainTargetName.map { String(format: String(localized: "Chains to %@", table: "Common"), $0) } ?? String(localized: "Chained", table: "Common"))
             }
         }
         .lineLimit(1)
@@ -443,7 +446,7 @@ struct MacroCard: View {
 
     @ViewBuilder
     func speedSubmenu() -> some View {
-        Menu(NSLocalizedString("Speed", comment: "")) {
+        Menu(String(localized: "Speed", table: "Common")) {
             ForEach([0.25, 0.5, 1.0, 2.0, 4.0, 8.0], id: \.self) { v in
                 Button {
                     onSetSpeed(v)
@@ -456,7 +459,7 @@ struct MacroCard: View {
                 }
             }
             Divider()
-            Button(NSLocalizedString("Custom…", comment: "")) {
+            Button(String(localized: "Custom…", table: "Common")) {
                 customSpeedText = String(format: "%g", macro.speed)
                 showCustomSpeed = true
             }
@@ -466,7 +469,7 @@ struct MacroCard: View {
     @ViewBuilder
     func colorSubmenu() -> some View {
         let currentAccent = accentName
-        Menu(NSLocalizedString("Color", comment: "")) {
+        Menu(String(localized: "Color", table: "Common")) {
             Button {
                 onSetAccent(nil)
             } label: {
@@ -487,14 +490,14 @@ struct MacroCard: View {
     @ViewBuilder
     func chainSubmenu() -> some View {
         let candidates = chainCandidates.filter { $0.0 != macro.id }
-        Menu(NSLocalizedString("Chain To", comment: "")) {
+        Menu(String(localized: "Chain To", table: "Common")) {
             Button {
                 onSetChain(nil)
             } label: {
                 if macro.chainTo == nil {
-                    Label(NSLocalizedString("None", comment: ""), systemImage: "checkmark")
+                    Label(String(localized: "None", table: "Common"), systemImage: "checkmark")
                 } else {
-                    Text(NSLocalizedString("None", comment: ""))
+                    Text("None", tableName: "Common")
                 }
             }
             if !candidates.isEmpty { Divider() }

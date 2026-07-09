@@ -20,7 +20,7 @@ struct ActionListView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 10) {
-                Text(NSLocalizedString("ACTIONS", comment: ""))
+                Text("ACTIONS", tableName: "EditorUX")
                     .font(.system(size: 10.5, weight: .semibold))
                     .tracking(0.7)
                     .foregroundStyle(.secondary)
@@ -60,7 +60,7 @@ struct ActionListView: View {
                     .font(.system(size: 10.5, weight: .semibold))
                     .foregroundStyle(Brand.accent(library.currentMacro?.accent))
 
-                    Text(String(format: NSLocalizedString("%d selected", comment: ""), selection.count))
+                    Text(String(format: String(localized: "%d selected", table: "Common"), selection.count))
                         .font(.system(size: 10.5, weight: .medium))
                         .foregroundStyle(Brand.accent(library.currentMacro?.accent))
 
@@ -80,9 +80,9 @@ struct ActionListView: View {
 	                            Image(systemName: "sparkles.rectangle.stack")
 	                                .font(.system(size: 22, weight: .semibold))
 	                                .foregroundStyle(.secondary)
-	                            Text(NSLocalizedString("No actions yet", comment: ""))
+	                            Text("No actions yet", tableName: "EditorUX")
 	                                .font(.system(size: 12, weight: .semibold))
-	                            Text(NSLocalizedString("Record a macro or insert an action from the sidebar.", comment: ""))
+	                            Text("Record a macro or insert an action from the sidebar.", tableName: "Recording")
 	                                .font(.system(size: 10.5))
 	                                .foregroundStyle(.secondary)
 	                        }
@@ -172,10 +172,10 @@ struct ActionListView: View {
     private var headerRow: some View {
         HStack(spacing: 0) {
             Text("#").frame(width: EventCol.num, alignment: .center)
-            Text(NSLocalizedString("TIME", comment: "")).frame(width: EventCol.time, alignment: .center)
-            Text(NSLocalizedString("ACTION", comment: "")).frame(maxWidth: .infinity, alignment: .center)
-            Text(NSLocalizedString("POSITION", comment: "")).frame(width: EventCol.pos, alignment: .center)
-            Text(NSLocalizedString("KEY", comment: "")).frame(width: EventCol.key, alignment: .center)
+            Text("TIME", tableName: "Common").frame(width: EventCol.time, alignment: .center)
+            Text("ACTION", tableName: "EditorUX").frame(maxWidth: .infinity, alignment: .center)
+            Text("POSITION", tableName: "Common").frame(width: EventCol.pos, alignment: .center)
+            Text("KEY", tableName: "Common").frame(width: EventCol.key, alignment: .center)
         }
         .font(.system(size: 9.5, weight: .semibold))
         .tracking(0.6)
@@ -322,7 +322,7 @@ struct ActionListView: View {
               abs(plan.delta) > 0.000_001 else { return }
 
         var movedEvents: [RecordedEvent] = []
-        withUndo(NSLocalizedString("Move Action", comment: "")) {
+        withUndo(String(localized: "Move Action", table: "EditorUX")) {
             for idx in plan.sourceEventIndices where recorder.events.indices.contains(idx) {
                 recorder.events[idx].time = max(0, recorder.events[idx].time + plan.delta)
             }
@@ -469,7 +469,7 @@ struct ActionListView: View {
         }
         let movedRange = adjTargetIndex ..< (adjTargetIndex + count)
 
-        withUndo(NSLocalizedString("Move Action", comment: "")) {
+        withUndo(String(localized: "Move Action", table: "EditorUX")) {
             recorder.events.reorderGroup(sourceEventIndices: sourceEventIndices, beforeEventIndex: targetEventIndex)
         }
 
@@ -532,7 +532,7 @@ struct ActionListView: View {
             selection = [row.id]
             lastAnchor = row.id
         } label: {
-            Label(NSLocalizedString("Select Action", comment: ""), systemImage: "checkmark.circle")
+            Label(String(localized: "Select Action", table: "EditorUX"), systemImage: "checkmark.circle")
         }
         
         Divider()
@@ -541,7 +541,7 @@ struct ActionListView: View {
             Button {
                 playFromHere(row)
             } label: {
-                Label(NSLocalizedString("Play From Here", comment: ""), systemImage: "play.fill")
+                Label(String(localized: "Play From Here", table: "Common"), systemImage: "play.fill")
             }
         }
         
@@ -549,7 +549,7 @@ struct ActionListView: View {
             Button {
                 playThisActionOnly(row)
             } label: {
-                Label(NSLocalizedString("Play This Action Only", comment: ""), systemImage: "play.circle")
+                Label(String(localized: "Play This Action Only", table: "EditorUX"), systemImage: "play.circle")
             }
         }
         
@@ -559,7 +559,7 @@ struct ActionListView: View {
                 toggleDisabledState(Set(contextSnapshot(anchor: row).groupIDs))
             } label: {
                 Label(
-                    isCurrentlyDisabled ? NSLocalizedString("Enable Action", comment: "") : NSLocalizedString("Disable Action", comment: ""),
+                    isCurrentlyDisabled ? String(localized: "Enable Action", table: "EditorUX") : String(localized: "Disable Action", table: "EditorUX"),
                     systemImage: isCurrentlyDisabled ? "play.slash.fill" : "nosign"
                 )
             }
@@ -572,8 +572,8 @@ struct ActionListView: View {
         } label: {
             Label(
                 snapshot.containsBehavior
-                    ? NSLocalizedString("Duplicate Behavior", comment: "")
-                    : NSLocalizedString("Duplicate Action", comment: ""),
+                    ? String(localized: "Duplicate Behavior", table: "Common")
+                    : String(localized: "Duplicate Action", table: "EditorUX"),
                 systemImage: "plus.square.on.square"
             )
         }
@@ -584,7 +584,7 @@ struct ActionListView: View {
             Button {
                 convertWaitToClickText(anchor: row)
             } label: {
-                Label(NSLocalizedString("Convert to Click Text", comment: ""), systemImage: "cursorarrow.click")
+                Label(String(localized: "Convert to Click Text", table: "EditorUX"), systemImage: "cursorarrow.click")
             }
             .disabled(!conversionReadiness.canConvert)
             .help(textClickConversionReadinessHelp(conversionReadiness))
@@ -593,7 +593,7 @@ struct ActionListView: View {
         Button(role: .destructive) {
             deleteRows(anchor: row)
         } label: {
-            Label(NSLocalizedString("Delete Actions", comment: ""), systemImage: "trash")
+            Label(String(localized: "Delete Actions", table: "EditorUX"), systemImage: "trash")
         }
         .disabled(deletionPlan(anchor: row).isEmpty)
         
@@ -602,7 +602,7 @@ struct ActionListView: View {
         Button {
             bindRows(anchor: row)
         } label: {
-            Label(NSLocalizedString("Create Behavior", comment: ""), systemImage: "square.stack.3d.down.right")
+            Label(String(localized: "Create Behavior", table: "Common"), systemImage: "square.stack.3d.down.right")
         }
         .help(behaviorBindReadinessHelp(snapshot.behaviorBindReadiness))
         .disabled(!snapshot.canBindBehavior)
@@ -610,7 +610,7 @@ struct ActionListView: View {
         Button {
             unbindRows(anchor: row)
         } label: {
-            Label(NSLocalizedString("Unbind Behavior", comment: ""), systemImage: "square.stack.3d.down.forward")
+            Label(String(localized: "Unbind Behavior", table: "Common"), systemImage: "square.stack.3d.down.forward")
         }
         .disabled(!snapshot.containsBehavior)
     }
@@ -692,7 +692,7 @@ struct ActionListView: View {
             return afterIdx..<(afterIdx + indices.count)
         }()
         
-        withUndo(NSLocalizedString("Duplicate Action", comment: "")) {
+        withUndo(String(localized: "Duplicate Action", table: "EditorUX")) {
             recorder.events.applyPassiveWaitDuplicationPlan(waitPlan)
             if let liveDuration = waitPlan.liveDurationAfterDuplication {
                 recorder.liveDuration = liveDuration
@@ -772,7 +772,7 @@ struct ActionListView: View {
         guard !plan.isEmpty else { return }
 
         let insertedEvents = plan.insertedEvents
-        withUndo(NSLocalizedString("Convert Wait to Click Text", comment: "")) {
+        withUndo(String(localized: "Convert Wait to Click Text", table: "EditorUX")) {
             recorder.events.applyTextClickConversionPlan(plan)
             if let liveDuration = plan.liveDurationAfterConversion {
                 recorder.liveDuration = liveDuration
@@ -789,7 +789,7 @@ struct ActionListView: View {
         let plan = deletionPlan(anchor: row)
         guard !plan.isEmpty else { return }
         selection.subtract(snapshot.groupIDs)
-        withUndo(NSLocalizedString("Delete Actions", comment: "")) {
+        withUndo(String(localized: "Delete Actions", table: "EditorUX")) {
             recorder.events.applyActionGroupDeletionPlan(plan)
             if let liveDuration = plan.liveDurationAfterDeletion {
                 recorder.liveDuration = liveDuration
@@ -805,9 +805,9 @@ struct ActionListView: View {
             partial.insert(item)
         }
         let id = BehaviorGroupID()
-        let name = String(format: NSLocalizedString("Behavior %d", comment: ""), existing.count + 1)
+        let name = String(format: String(localized: "Behavior %d", table: "Common"), existing.count + 1)
         
-        withUndo(NSLocalizedString("Create Behavior", comment: "")) {
+        withUndo(String(localized: "Create Behavior", table: "Common")) {
             recorder.events.bindBehavior(at: indices, id: id, name: name)
         }
 
@@ -819,7 +819,7 @@ struct ActionListView: View {
         let indices = snapshot.eventIndices
         guard !indices.isEmpty, snapshot.containsBehavior else { return }
         let affectedEventIndices = Set(indices)
-        withUndo(NSLocalizedString("Unbind Behavior", comment: "")) {
+        withUndo(String(localized: "Unbind Behavior", table: "Common")) {
             recorder.events.unbindBehavior(at: indices)
         }
 

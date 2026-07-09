@@ -15,10 +15,10 @@ struct PermissionBanner: View {
                 .font(.system(size: 16))
 
             VStack(alignment: .leading, spacing: 2) {
-                Text(NSLocalizedString("Permissions required", comment: ""))
+                Text("Permissions required", tableName: "Settings")
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundStyle(.primary)
-                Text(NSLocalizedString("Grant Accessibility, Input Monitoring & Screen Recording to record and replay.", comment: ""))
+                Text("Grant Accessibility, Input Monitoring & Screen Recording to record and replay.", tableName: "Recording")
                     .font(.system(size: 10.5))
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -26,7 +26,7 @@ struct PermissionBanner: View {
 
             Spacer()
 
-            Button(NSLocalizedString("Open", comment: "")) {
+            Button(String(localized: "Open", table: "Common")) {
                 if !accessibilityGranted {
                     controller.openAccessibilityPrefs()
                 } else if !inputMonitoringGranted {

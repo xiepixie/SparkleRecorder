@@ -15,15 +15,15 @@ enum AutomationWorkflowDraftExportPresenter {
 
         guard result.isExportable else {
             showIssues(
-                title: NSLocalizedString("Workflow draft export blocked", comment: ""),
-                message: NSLocalizedString("Resolve workflow validation errors before exporting an AI-editable draft.", comment: ""),
+                title: String(localized: "Workflow draft export blocked", table: "Automation"),
+                message: String(localized: "Resolve workflow validation errors before exporting an AI-editable draft.", table: "Automation"),
                 issues: result.issues
             )
             return
         }
 
         let panel = NSSavePanel()
-        panel.title = NSLocalizedString("Export AI Draft", comment: "")
+        panel.title = String(localized: "Export AI Draft", table: "Common")
         panel.nameFieldStringValue = "\(safeFileName(workflow.name)).workflow-draft.json"
         panel.allowedContentTypes = [.json]
         panel.canCreateDirectories = true
@@ -40,7 +40,7 @@ enum AutomationWorkflowDraftExportPresenter {
                 showSuccess(result: result, url: url)
             } catch {
                 showError(
-                    title: NSLocalizedString("Export failed", comment: ""),
+                    title: String(localized: "Export failed", table: "Common"),
                     message: String(describing: error)
                 )
             }
@@ -57,7 +57,7 @@ enum AutomationWorkflowDraftExportPresenter {
     private static func showSuccess(result: AutomationWorkflowDraftExportResult, url: URL) {
         let warningIssues = result.issues.filter { $0.severity != .error }
         let message = String(
-            format: NSLocalizedString("Exported %@ with %d tasks and %d dependencies to %@.", comment: ""),
+            format: String(localized: "Exported %@ with %d tasks and %d dependencies to %@.", table: "Automation"),
             result.workflowName,
             result.document.workflow.tasks.count,
             result.document.workflow.dependencies.count,
@@ -66,16 +66,16 @@ enum AutomationWorkflowDraftExportPresenter {
 
         let warningSummary: String
         if warningIssues.isEmpty {
-            warningSummary = NSLocalizedString("Open the exported draft with AI Draft preview to validate or edit it before importing.", comment: "")
+            warningSummary = String(localized: "Open the exported draft with AI Draft preview to validate or edit it before importing.", table: "EditorUX")
         } else {
             warningSummary = String(
-                format: NSLocalizedString("%d export warnings need review before re-import.", comment: ""),
+                format: String(localized: "%d export warnings need review before re-import.", table: "EditorUX"),
                 warningIssues.count
             )
         }
 
         showIssues(
-            title: NSLocalizedString("Workflow draft exported", comment: ""),
+            title: String(localized: "Workflow draft exported", table: "Automation"),
             message: "\(message)\n\n\(warningSummary)",
             issues: warningIssues
         )
@@ -90,7 +90,7 @@ enum AutomationWorkflowDraftExportPresenter {
         alert.alertStyle = issues.contains { $0.severity == .error } ? .warning : .informational
         alert.messageText = title
         alert.informativeText = issueMessage(message, issues: issues)
-        alert.addButton(withTitle: NSLocalizedString("OK", comment: ""))
+        alert.addButton(withTitle: String(localized: "OK", table: "Common"))
         alert.runModal()
     }
 
@@ -110,7 +110,7 @@ enum AutomationWorkflowDraftExportPresenter {
 
     private static func safeFileName(_ name: String) -> String {
         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
-        let base = trimmed.isEmpty ? NSLocalizedString("Workflow", comment: "") : trimmed
+        let base = trimmed.isEmpty ? String(localized: "Workflow", table: "Automation") : trimmed
         let invalid = CharacterSet(charactersIn: "/:\\?%*|\"<>")
         return base
             .components(separatedBy: invalid)

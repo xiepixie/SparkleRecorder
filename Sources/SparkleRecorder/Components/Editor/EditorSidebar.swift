@@ -84,11 +84,11 @@ struct EditorSidebar: View {
     func inspectorTabContent() -> some View {
         Group {
             if selection.count == 1 {
-                section(NSLocalizedString("Selected action", comment: ""), icon: "slider.horizontal.3") {
+                section(String(localized: "Selected action", table: "EditorUX"), icon: "slider.horizontal.3") {
                     selectedActionInspector()
                 }
             } else if selection.count > 1 {
-                section(NSLocalizedString("Batch edit", comment: ""), icon: "slider.horizontal.3") {
+                section(String(localized: "Batch edit", table: "Common"), icon: "slider.horizontal.3") {
                     batchEditInspector()
                 }
             }
@@ -100,11 +100,11 @@ struct EditorSidebar: View {
     @ViewBuilder
     func orchestrateTabContent() -> some View {
         if selection.isEmpty {
-            section(NSLocalizedString("Global actions", comment: ""), icon: "globe") {
+            section(String(localized: "Global actions", table: "EditorUX"), icon: "globe") {
                 clearAllButton()
             }
         } else {
-            section(NSLocalizedString("Selection", comment: ""), icon: "checklist") {
+            section(String(localized: "Selection", table: "Common"), icon: "checklist") {
                 selectionActionsContent()
             }
             
@@ -114,7 +114,7 @@ struct EditorSidebar: View {
             
             repeatUntilSection()
             
-            section(NSLocalizedString("Time Adjustments", comment: ""), icon: "timer") {
+            section(String(localized: "Time Adjustments", table: "Common"), icon: "timer") {
                 timeAdjustmentsContent()
             }
         }
@@ -122,13 +122,13 @@ struct EditorSidebar: View {
 
     @ViewBuilder
     func insertTabContent() -> some View {
-        section(NSLocalizedString("Insert action", comment: ""), icon: "plus.square") {
+        section(String(localized: "Insert action", table: "EditorUX"), icon: "plus.square") {
             insertActionContent()
         }
         
         let behaviors = boundBehaviors
         if !behaviors.isEmpty {
-            section(NSLocalizedString("Reusable Behaviors", comment: ""), icon: "rectangle.stack") {
+            section(String(localized: "Reusable Behaviors", table: "Common"), icon: "rectangle.stack") {
                 VStack(spacing: 6) {
                     ForEach(behaviors, id: \.id) { behavior in
                         Button {
@@ -140,10 +140,10 @@ struct EditorSidebar: View {
                                     .foregroundStyle(Brand.sigAmber)
                                 
                                 VStack(alignment: .leading, spacing: 1) {
-                                    Text(behavior.behaviorGroupName ?? NSLocalizedString("Behavior", comment: ""))
+                                    Text(behavior.behaviorGroupName ?? String(localized: "Behavior", table: "Common"))
                                         .font(.system(size: 11, weight: .semibold))
                                         .foregroundStyle(.primary)
-                                    Text(String(format: NSLocalizedString("%d actions", comment: ""), behavior.containedActionCount ?? 1))
+                                    Text(String(format: String(localized: "%d actions", table: "EditorUX"), behavior.containedActionCount ?? 1))
                                         .font(.system(size: 9))
                                         .foregroundStyle(.secondary)
                                 }
@@ -181,7 +181,7 @@ struct EditorSidebar: View {
                                             .font(.system(size: 12))
                                         VStack(alignment: .leading, spacing: 0) {
                                             let actionNumber = (rows.firstIndex(where: { $0.id == id }) ?? 0) + 1
-                                            Text(String(format: NSLocalizedString("Action #%d", comment: ""), actionNumber))
+                                            Text(String(format: String(localized: "Action #%d", table: "EditorUX"), actionNumber))
                                                 .font(.system(size: 11, weight: .semibold))
                                             Text(humanActionKindName(grp.kind))
                                                 .font(.system(size: 10))
@@ -202,22 +202,22 @@ struct EditorSidebar: View {
                                         )
 
             		                        inspectorGrid {
-            			                            labeledField(grp.kind.isPassiveWait ? NSLocalizedString("Wait Duration (s)", comment: "") : NSLocalizedString("Time (s)", comment: ""), text: $inspTime)
+            			                            labeledField(grp.kind.isPassiveWait ? String(localized: "Wait Duration (s)", table: "EditorUX") : String(localized: "Time (s)", table: "Common"), text: $inspTime)
 
             		                            if grp.kind == .waitForText || grp.kind == .waitForTextGone {
-            		                                labeledDoubleField(NSLocalizedString("Timeout (s)", comment: ""), value: $inspTimeout)
+            		                                labeledDoubleField(String(localized: "Timeout (s)", table: "Common"), value: $inspTimeout)
             		                            }
 
             			                            if grp.kind.canUseLocatorStrategy {
-            		                                gridField(NSLocalizedString("Strategy", comment: "")) {
+            		                                gridField(String(localized: "Strategy", table: "Common")) {
             		                                    Picker("", selection: Binding(
             		                                        get: { inspStrategy },
             		                                        set: { inspStrategy = $0; applyInspector() }
             		                                    )) {
-            		                                        Text(NSLocalizedString("Offset", comment: "")).tag(CoordinateStrategy.windowLocalPreferred)
-            		                                        Text(NSLocalizedString("Proportional", comment: "")).tag(CoordinateStrategy.normalizedPreferred)
-            		                                        Text(NSLocalizedString("Absolute", comment: "")).tag(CoordinateStrategy.absoluteOnly)
-            		                                        Text(NSLocalizedString("Text (OCR)", comment: "")).tag(CoordinateStrategy.locatorOnly)
+            		                                        Text("Offset", tableName: "Common").tag(CoordinateStrategy.windowLocalPreferred)
+            		                                        Text("Proportional", tableName: "Common").tag(CoordinateStrategy.normalizedPreferred)
+            		                                        Text("Absolute", tableName: "Common").tag(CoordinateStrategy.absoluteOnly)
+            		                                        Text("Text (OCR)", tableName: "EditorUX").tag(CoordinateStrategy.locatorOnly)
             		                                    }
             		                                    .pickerStyle(.segmented)
             		                                    .labelsHidden()
@@ -225,11 +225,11 @@ struct EditorSidebar: View {
             		                                }
 
             		                                if inspStrategy == .locatorOnly {
-            		                                    labeledDoubleField(NSLocalizedString("Timeout (s)", comment: ""), value: $inspTimeout)
-            		                                    gridField(NSLocalizedString("Target Text", comment: "")) {
+            		                                    labeledDoubleField(String(localized: "Timeout (s)", table: "Common"), value: $inspTimeout)
+            		                                    gridField(String(localized: "Target Text", table: "EditorUX")) {
             		                                        TargetTextEditorInnerView(text: Binding(get: { inspOCRText }, set: { inspOCRText = $0; applyInspector() }), onPick: onPickText)
             		                                    }
-            		                                    gridField(NSLocalizedString("Fallback", comment: "")) {
+            		                                    gridField(String(localized: "Fallback", table: "Common")) {
             		                                        locatorPlaybackPolicyView()
             		                                    }
             		                                } else {
@@ -237,32 +237,32 @@ struct EditorSidebar: View {
             		                                    labeledField("Y", text: $inspY)
             		                                }
             			                            } else if grp.kind.editsPathTarget {
-            		                                gridField(NSLocalizedString("Start", comment: "")) { Text("") }
+            		                                gridField(String(localized: "Start", table: "Common")) { Text("") }
             		                                labeledField("X", text: $inspX)
             		                                labeledField("Y", text: $inspY)
-            		                                gridField(NSLocalizedString("End", comment: "")) { Text("") }
+            		                                gridField(String(localized: "End", table: "Common")) { Text("") }
             		                                labeledField("X", text: $inspEndX)
             		                                labeledField("Y", text: $inspEndY)
             		                            }
 
             			                            if grp.kind.editsKeyboardInput {
-            		                                gridField(NSLocalizedString("Key code", comment: "")) {
+            		                                gridField(String(localized: "Key code", table: "Common")) {
             		                                    ShortcutRecorderField(
             		                                        currentBinding: keyboardShortcutBinding(for: grp),
             		                                        allHotkeys: [],
             		                                        allowsClear: false,
-            		                                        recordingPrompt: NSLocalizedString("Press any key…", comment: ""),
-            		                                        emptyPrompt: NSLocalizedString("Click to record shortcut", comment: ""),
+            		                                        recordingPrompt: String(localized: "Press any key…", table: "Common"),
+            		                                        emptyPrompt: String(localized: "Click to record shortcut", table: "Recording"),
             		                                        onRecord: applyRecordedShortcut
             		                                    )
             		                                }
-            		                                labeledField(NSLocalizedString("Raw Code", comment: ""), text: $inspKey)
+            		                                labeledField(String(localized: "Raw Code", table: "Common"), text: $inspKey)
             			                            } else if grp.kind.editsSemanticTextTarget {
-            			                                gridField(NSLocalizedString("Target Text", comment: "")) {
+            			                                gridField(String(localized: "Target Text", table: "EditorUX")) {
             			                                    TargetTextEditorInnerView(text: Binding(get: { inspOCRText }, set: { inspOCRText = $0; applyInspector() }), onPick: onPickText)
             			                                }
                                             if grp.kind == .waitForText || grp.kind == .waitForTextGone || grp.kind == .verifyText {
-            			                                    gridField(NSLocalizedString("Must Exist", comment: "")) {
+            			                                    gridField(String(localized: "Must Exist", table: "Common")) {
             			                                    Toggle("", isOn: Binding(
             			                                        get: { inspVerifyMustExist },
             			                                        set: { inspVerifyMustExist = $0; applyInspector() }
@@ -294,17 +294,17 @@ struct EditorSidebar: View {
 
                                             if grp.kind.canConvertClickType {
                                                 VStack(alignment: .leading, spacing: 6) {
-                                                    Text(NSLocalizedString("Action Type", comment: ""))
+                                                    Text("Action Type", tableName: "EditorUX")
                                                         .font(.system(size: 9.5, weight: .semibold))
                                                         .foregroundStyle(.secondary)
                                                     Picker("", selection: Binding(
                                                         get: { grp.kind },
                                                         set: { convertClickType(grp: grp, newKind: $0) }
                                                     )) {
-                                                        Text(NSLocalizedString("Click", comment: "")).tag(ActionGroupKind.click)
-                                                        Text(NSLocalizedString("Double", comment: "")).tag(ActionGroupKind.doubleClick)
-                                                        Text(NSLocalizedString("Triple+", comment: "")).tag(ActionGroupKind.repeatedClick)
-                                                        Text(NSLocalizedString("Long Press", comment: "")).tag(ActionGroupKind.longPress)
+                                                        Text("Click", tableName: "EditorUX").tag(ActionGroupKind.click)
+                                                        Text("Double", tableName: "Common").tag(ActionGroupKind.doubleClick)
+                                                        Text("Triple+", tableName: "Common").tag(ActionGroupKind.repeatedClick)
+                                                        Text("Long Press", tableName: "Common").tag(ActionGroupKind.longPress)
                                                     }
                                                     .pickerStyle(.segmented)
                                                     .labelsHidden()
@@ -314,7 +314,7 @@ struct EditorSidebar: View {
 
                                             if grp.kind.canRetargetCoordinate && inspStrategy != .locatorOnly {
                                                 Button(action: { onPickCoordinate(false) }) {
-                                                    Label(NSLocalizedString("Retarget Coordinate", comment: ""), systemImage: "scope")
+                                                    Label(String(localized: "Retarget Coordinate", table: "Common"), systemImage: "scope")
                                                         .frame(maxWidth: .infinity)
                                                 }
                                                 .buttonStyle(.bordered)
@@ -336,7 +336,7 @@ struct EditorSidebar: View {
                                                 Button {
                                                     insertClickTextAfterSelectedWait(grp)
                                                 } label: {
-                                                    Label(NSLocalizedString("Add Click Text", comment: ""), systemImage: "cursorarrow.click")
+                                                    Label(String(localized: "Add Click Text", table: "EditorUX"), systemImage: "cursorarrow.click")
                                                         .frame(maxWidth: .infinity)
                                                 }
                                                 .buttonStyle(.bordered)
@@ -347,7 +347,7 @@ struct EditorSidebar: View {
                                                 Button {
                                                     convertWaitToClickText(grp)
                                                 } label: {
-                                                    Label(NSLocalizedString("Convert to Click Text", comment: ""), systemImage: "cursorarrow.click")
+                                                    Label(String(localized: "Convert to Click Text", table: "EditorUX"), systemImage: "cursorarrow.click")
                                                         .frame(maxWidth: .infinity)
                                                 }
                                                 .buttonStyle(.bordered)
@@ -369,14 +369,14 @@ struct EditorSidebar: View {
     @ViewBuilder
     func batchEditInspector() -> some View {
         VStack(alignment: .leading, spacing: 14) {
-            Text(String(format: NSLocalizedString("Batch edit %d actions", comment: ""), selection.count))
+            Text(String(format: String(localized: "Batch edit %d actions", table: "EditorUX"), selection.count))
                 .font(.system(size: 11, weight: .semibold))
                 .foregroundStyle(Brand.sigBlue)
 
             let textTargetGroups = selectedTextTargetGroups()
             if !textTargetGroups.isEmpty {
                 VStack(alignment: .leading, spacing: 6) {
-                    Text(NSLocalizedString("Shared Text Target", comment: ""))
+                    Text("Shared Text Target", tableName: "EditorUX")
                         .font(.system(size: 9.5, weight: .semibold))
                         .foregroundStyle(.secondary)
                     let textTargetReadiness = batchTextTargetReadiness(for: textTargetGroups, targetText: inspOCRText)
@@ -388,8 +388,8 @@ struct EditorSidebar: View {
                         onPick: onPickText
                     )
                     HStack(spacing: 6) {
-                        labeledInlineDoubleField(NSLocalizedString("Timeout", comment: ""), value: $inspTimeout)
-                        Button(NSLocalizedString("Apply to Selected", comment: "")) { applyBatchTextTarget() }
+                        labeledInlineDoubleField(String(localized: "Timeout", table: "Common"), value: $inspTimeout)
+                        Button(String(localized: "Apply to Selected", table: "Common")) { applyBatchTextTarget() }
                             .buttonStyle(.borderedProminent)
                             .controlSize(.small)
                             .disabled(!textTargetReadiness.canApply)
@@ -404,16 +404,16 @@ struct EditorSidebar: View {
             }
 
             VStack(alignment: .leading, spacing: 6) {
-                Text(NSLocalizedString("Align Coordinates", comment: ""))
+                Text("Align Coordinates", tableName: "Common")
                      .font(.system(size: 9.5, weight: .semibold))
                      .foregroundStyle(.secondary)
                 let alignXReadiness = coordinateAlignmentReadiness(axis: .x)
                 let alignYReadiness = coordinateAlignmentReadiness(axis: .y)
                 HStack {
-                     Button(NSLocalizedString("Align X to First", comment: "")) { alignSelectedCoordinates(axis: .x) }
+                     Button(String(localized: "Align X to First", table: "Common")) { alignSelectedCoordinates(axis: .x) }
                         .disabled(!alignXReadiness.canAlign)
                         .help(batchCoordinateAlignmentReadinessHelp(alignXReadiness))
-                     Button(NSLocalizedString("Align Y to First", comment: "")) { alignSelectedCoordinates(axis: .y) }
+                     Button(String(localized: "Align Y to First", table: "Common")) { alignSelectedCoordinates(axis: .y) }
                         .disabled(!alignYReadiness.canAlign)
                         .help(batchCoordinateAlignmentReadinessHelp(alignYReadiness))
                 }
@@ -429,7 +429,7 @@ struct EditorSidebar: View {
             }
 
             VStack(alignment: .leading, spacing: 6) {
-                Text(NSLocalizedString("Standardize Timeout", comment: ""))
+                Text("Standardize Timeout", tableName: "Common")
                      .font(.system(size: 9.5, weight: .semibold))
                      .foregroundStyle(.secondary)
                 let timeoutReadiness = batchTimeoutReadiness(
@@ -447,7 +447,7 @@ struct EditorSidebar: View {
                      .controlSize(.small)
                      .frame(width: 60)
 
-                     Button(NSLocalizedString("Apply to Selected", comment: "")) { applyBatchTimeout() }
+                     Button(String(localized: "Apply to Selected", table: "Common")) { applyBatchTimeout() }
                         .buttonStyle(.bordered)
                         .controlSize(.small)
                         .disabled(!timeoutReadiness.canApply)
@@ -481,7 +481,7 @@ struct EditorSidebar: View {
 
         HStack(spacing: 6) {
             Button(action: deleteSelected) {
-                Label(NSLocalizedString("Delete", comment: ""), systemImage: "trash")
+                Label(String(localized: "Delete", table: "Common"), systemImage: "trash")
                     .frame(maxWidth: .infinity)
             }
             .keyboardShortcut(.delete, modifiers: [])
@@ -491,8 +491,8 @@ struct EditorSidebar: View {
             Button(action: duplicateSelected) {
                 Label(
                     selectionSnapshot.containsBehavior
-                        ? NSLocalizedString("Duplicate Behavior", comment: "")
-                        : NSLocalizedString("Duplicate", comment: ""),
+                        ? String(localized: "Duplicate Behavior", table: "Common")
+                        : String(localized: "Duplicate", table: "Common"),
                     systemImage: "plus.square.on.square"
                 )
                     .frame(maxWidth: .infinity)
@@ -518,14 +518,14 @@ struct EditorSidebar: View {
                 direction: .after
             )
             Button(action: trimBefore) {
-                Label(NSLocalizedString("Trim before", comment: ""), systemImage: "arrow.left.to.line")
+                Label(String(localized: "Trim before", table: "Common"), systemImage: "arrow.left.to.line")
                     .frame(maxWidth: .infinity)
             }
             .disabled(!trimBeforeReadiness.canTrim)
             .help(actionTrimReadinessHelp(trimBeforeReadiness, direction: .before))
 
             Button(action: trimAfter) {
-                Label(NSLocalizedString("Trim after", comment: ""), systemImage: "arrow.right.to.line")
+                Label(String(localized: "Trim after", table: "Common"), systemImage: "arrow.right.to.line")
                     .frame(maxWidth: .infinity)
             }
             .disabled(!trimAfterReadiness.canTrim)
@@ -542,21 +542,21 @@ struct EditorSidebar: View {
         Button(role: .destructive) {
             confirmClearAll = true
         } label: {
-            Label(NSLocalizedString("Clear all", comment: ""), systemImage: "trash.slash")
+            Label(String(localized: "Clear all", table: "Common"), systemImage: "trash.slash")
                 .frame(maxWidth: .infinity)
         }
         .buttonStyle(.bordered)
         .controlSize(.small)
         .disabled(rows.isEmpty)
         .confirmationDialog(
-            NSLocalizedString("Remove all events from this macro?", comment: ""),
+            String(localized: "Remove all events from this macro?", table: "EditorUX"),
             isPresented: $confirmClearAll,
             titleVisibility: .visible
         ) {
-            Button(NSLocalizedString("Clear All Events", comment: ""), role: .destructive) { clearAll() }
-            Button(NSLocalizedString("Cancel", comment: ""), role: .cancel) {}
+            Button(String(localized: "Clear All Events", table: "EditorUX"), role: .destructive) { clearAll() }
+            Button(String(localized: "Cancel", table: "Common"), role: .cancel) {}
         } message: {
-            Text(NSLocalizedString("You can undo this with ⌘Z while the editor is open.", comment: ""))
+            Text("You can undo this with ⌘Z while the editor is open.", tableName: "EditorUX")
         }
 
     }
@@ -569,7 +569,7 @@ struct EditorSidebar: View {
             Divider().opacity(0.3)
             
             HStack {
-                Text(NSLocalizedString("Default Delay", comment: ""))
+                Text("Default Delay", tableName: "EditorUX")
                     .font(.system(size: 11))
                     .foregroundStyle(.secondary)
                 
@@ -582,7 +582,7 @@ struct EditorSidebar: View {
                         .frame(width: 55)
                         .multilineTextAlignment(.trailing)
                     
-                    Text(NSLocalizedString("ms", comment: ""))
+                    Text("ms", tableName: "Common")
                         .font(.system(size: 11))
                         .foregroundStyle(.secondary)
                     
@@ -604,90 +604,90 @@ struct EditorSidebar: View {
         LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
             // Row 1: Basic Input
             insertActionButton(
-                title: NSLocalizedString("Click", comment: ""),
-                subtitle: NSLocalizedString("Fixed point", comment: ""),
+                title: String(localized: "Click", table: "EditorUX"),
+                subtitle: String(localized: "Fixed point", table: "Common"),
                 icon: "hand.point.up.left",
                 tint: Brand.sigGreen
             ) { insertAction(.click) }
 
             insertActionButton(
-                title: NSLocalizedString("Key", comment: ""),
-                subtitle: NSLocalizedString("Keyboard", comment: ""),
+                title: String(localized: "Key", table: "Common"),
+                subtitle: String(localized: "Keyboard", table: "Common"),
                 icon: "keyboard",
                 tint: Brand.sigBlue
             ) { insertAction(.keyPress) }
 
             // Row 2: Extended Mouse
             insertActionButton(
-                title: NSLocalizedString("Double Click", comment: ""),
-                subtitle: NSLocalizedString("Fixed point", comment: ""),
+                title: String(localized: "Double Click", table: "EditorUX"),
+                subtitle: String(localized: "Fixed point", table: "Common"),
                 icon: "cursorarrow.click.2",
                 tint: Brand.sigGreen
             ) { insertAction(.doubleClick) }
 
             insertActionButton(
-                title: NSLocalizedString("Drag", comment: ""),
-                subtitle: NSLocalizedString("Path", comment: ""),
+                title: String(localized: "Drag", table: "EditorUX"),
+                subtitle: String(localized: "Path", table: "Common"),
                 icon: "hand.draw",
                 tint: Brand.sigBlue
             ) { insertAction(.drag) }
 
             // Row 3: Navigation & Timing
             insertActionButton(
-                title: NSLocalizedString("Scroll", comment: ""),
-                subtitle: NSLocalizedString("Wheel", comment: ""),
+                title: String(localized: "Scroll", table: "Common"),
+                subtitle: String(localized: "Wheel", table: "Common"),
                 icon: "arrow.up.and.down",
                 tint: Brand.sigBlue
             ) { insertAction(.scroll) }
 
             insertActionButton(
-                title: NSLocalizedString("Wait", comment: ""),
-                subtitle: NSLocalizedString("Delay", comment: ""),
+                title: String(localized: "Wait", table: "EditorUX"),
+                subtitle: String(localized: "Delay", table: "EditorUX"),
                 icon: "hourglass",
                 tint: .secondary
             ) { insertAction(.wait) }
 
             // Row 4: Vision & OCR Clicks
             insertActionButton(
-                title: NSLocalizedString("Click Text", comment: ""),
-                subtitle: NSLocalizedString("Wait then click", comment: ""),
+                title: String(localized: "Click Text", table: "EditorUX"),
+                subtitle: String(localized: "Wait then click", table: "EditorUX"),
                 icon: "text.cursor",
                 tint: Brand.sigTeal
             ) { insertTextClick() }
 
             insertActionButton(
-                title: NSLocalizedString("Reveal & Click", comment: ""),
-                subtitle: NSLocalizedString("Vision flow", comment: ""),
+                title: String(localized: "Reveal & Click", table: "EditorUX"),
+                subtitle: String(localized: "Vision flow", table: "Common"),
                 icon: "sparkles.rectangle.stack",
                 tint: Brand.sigTeal
             ) { insertRevealAndClickTextFlow() }
 
             // Row 5: Vision Waits
             insertActionButton(
-                title: NSLocalizedString("Wait Text", comment: ""),
-                subtitle: NSLocalizedString("Wait to appear", comment: ""),
+                title: String(localized: "Wait Text", table: "EditorUX"),
+                subtitle: String(localized: "Wait to appear", table: "EditorUX"),
                 icon: "text.magnifyingglass",
                 tint: Brand.sigViolet
             ) { insertAction(.waitForText) }
 
             insertActionButton(
-                title: NSLocalizedString("Wait Text Gone", comment: ""),
-                subtitle: NSLocalizedString("Wait to disappear", comment: ""),
+                title: String(localized: "Wait Text Gone", table: "EditorUX"),
+                subtitle: String(localized: "Wait to disappear", table: "EditorUX"),
                 icon: "text.badge.minus",
                 tint: Brand.sigAmber
             ) { insertAction(.waitForTextGone) }
 
             // Row 6: Verification & Misc
             insertActionButton(
-                title: NSLocalizedString("Verify Text", comment: ""),
-                subtitle: NSLocalizedString("Checkpoint", comment: ""),
+                title: String(localized: "Verify Text", table: "EditorUX"),
+                subtitle: String(localized: "Checkpoint", table: "Common"),
                 icon: "checkmark.seal",
                 tint: Brand.sigAmber
             ) { insertAction(.verifyText) }
 
             insertActionButton(
-                title: NSLocalizedString("Multi Click", comment: ""),
-                subtitle: NSLocalizedString("Several points", comment: ""),
+                title: String(localized: "Multi Click", table: "EditorUX"),
+                subtitle: String(localized: "Several points", table: "Common"),
                 icon: "point.3.connected.trianglepath.dotted",
                 tint: Brand.sigPink
             ) { insertAction(.multiPointClick) }
@@ -702,7 +702,7 @@ struct EditorSidebar: View {
         let shiftLaterReadiness = actionShiftReadiness(for: shiftGroups, direction: .later)
 
         VStack(alignment: .leading, spacing: 6) {
-            Text(NSLocalizedString("Shift Selected", comment: ""))
+            Text("Shift Selected", tableName: "Common")
                 .font(.system(size: 9.5, weight: .semibold))
                 .foregroundStyle(.secondary)
             HStack {
@@ -747,7 +747,7 @@ struct EditorSidebar: View {
                 factor: stretchFactor
             )
             HStack {
-                Text(NSLocalizedString("Time Stretch", comment: ""))
+                Text("Time Stretch", tableName: "Common")
                     .font(.system(size: 9.5, weight: .semibold))
                     .foregroundStyle(.secondary)
                 Spacer()
@@ -757,11 +757,11 @@ struct EditorSidebar: View {
             Slider(value: $stretchFactor, in: 0.25...4.0, step: 0.05)
                 .controlSize(.small)
             HStack {
-                Button(NSLocalizedString("Reset", comment: "")) { stretchFactor = 1.0 }
+                Button(String(localized: "Reset", table: "Common")) { stretchFactor = 1.0 }
                     .buttonStyle(.borderless)
                     .controlSize(.small)
                 Spacer()
-                Button(NSLocalizedString("Apply", comment: "")) { applyStretch() }
+                Button(String(localized: "Apply", table: "Common")) { applyStretch() }
                     .buttonStyle(.borderedProminent)
                     .controlSize(.small)
                     .disabled(!stretchReadiness.canApply)
@@ -793,7 +793,7 @@ struct EditorSidebar: View {
             repeatUntilReadiness: repeatUntilReadiness
         )
 
-        section(NSLocalizedString("Review", comment: ""), icon: "checklist.checked") {
+        section(String(localized: "Review", table: "Common"), icon: "checklist.checked") {
             VStack(alignment: .leading, spacing: 9) {
                 HStack(spacing: 8) {
                     Image(systemName: macroEditorSidebarHealthIcon(health))
@@ -815,17 +815,17 @@ struct EditorSidebar: View {
                 HStack(spacing: 6) {
                     reviewMetric(
                         value: health.recordedActionCount,
-                        label: NSLocalizedString("actions", comment: ""),
+                        label: String(localized: "actions", table: "EditorUX"),
                         tint: Brand.sigBlue
                     )
                     reviewMetric(
                         value: health.textTargetCount,
-                        label: NSLocalizedString("targets", comment: ""),
+                        label: String(localized: "targets", table: "Common"),
                         tint: Brand.sigAmber
                     )
                     reviewMetric(
                         value: health.behaviorCount,
-                        label: NSLocalizedString("blocks", comment: ""),
+                        label: String(localized: "blocks", table: "Common"),
                         tint: Brand.sigViolet
                     )
                 }
@@ -1008,7 +1008,7 @@ struct EditorSidebar: View {
 
     @ViewBuilder
     func behaviorSection() -> some View {
-        section(NSLocalizedString("Behavior", comment: ""), icon: "square.stack.3d.down.right") {
+        section(String(localized: "Behavior", table: "Common"), icon: "square.stack.3d.down.right") {
             VStack(alignment: .leading, spacing: 8) {
                 let bindReadiness = selectionSnapshot.behaviorBindReadiness
                 let selectedBehavior = selectedBehaviorGroup()
@@ -1017,14 +1017,14 @@ struct EditorSidebar: View {
                         for: selectedBehavior,
                         proposedName: inspBehaviorName
                     )
-                    Label(NSLocalizedString("Selected Behavior", comment: ""), systemImage: "checkmark.rectangle.stack")
+                    Label(String(localized: "Selected Behavior", table: "Common"), systemImage: "checkmark.rectangle.stack")
                         .font(.system(size: 10.5, weight: .semibold))
                         .foregroundStyle(Brand.sigAmber)
-                    Text(NSLocalizedString("Rename or split this behavior without changing the actions inside it.", comment: ""))
+                    Text("Rename or split this behavior without changing the actions inside it.", tableName: "EditorUX")
                         .font(.system(size: 10))
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
-                    TextField(NSLocalizedString("Behavior name", comment: ""), text: $inspBehaviorName)
+                    TextField(String(localized: "Behavior name", table: "Common"), text: $inspBehaviorName)
                         .textFieldStyle(.roundedBorder)
                         .font(.system(.callout, design: .monospaced))
                         .controlSize(.small)
@@ -1032,18 +1032,18 @@ struct EditorSidebar: View {
                     Button {
                         duplicateSelected()
                     } label: {
-                        Label(NSLocalizedString("Duplicate Behavior", comment: ""), systemImage: "plus.square.on.square")
+                        Label(String(localized: "Duplicate Behavior", table: "Common"), systemImage: "plus.square.on.square")
                             .frame(maxWidth: .infinity)
                     }
                     .buttonStyle(.bordered)
                     .controlSize(.small)
-                    .help(NSLocalizedString("Copy this behavior as a new reusable behavior block.", comment: ""))
+                    .help(String(localized: "Copy this behavior as a new reusable behavior block.", table: "Automation"))
 
                     HStack(spacing: 6) {
                         Button {
                             renameSelectedBehavior()
                         } label: {
-                            Label(NSLocalizedString("Rename Behavior", comment: ""), systemImage: "pencil")
+                            Label(String(localized: "Rename Behavior", table: "Common"), systemImage: "pencil")
                                 .frame(maxWidth: .infinity)
                         }
                         .disabled(!renameReadiness.canRename)
@@ -1052,7 +1052,7 @@ struct EditorSidebar: View {
                         Button {
                             unbindSelectedBehavior()
                         } label: {
-                            Label(NSLocalizedString("Unbind", comment: ""), systemImage: "square.stack.3d.down.forward")
+                            Label(String(localized: "Unbind", table: "Common"), systemImage: "square.stack.3d.down.forward")
                                 .frame(maxWidth: .infinity)
                         }
                     }
@@ -1066,14 +1066,14 @@ struct EditorSidebar: View {
                             .fixedSize(horizontal: false, vertical: true)
                     }
                 } else {
-                    Label(NSLocalizedString("New Behavior", comment: ""), systemImage: "plus.square.on.square")
+                    Label(String(localized: "New Behavior", table: "Common"), systemImage: "plus.square.on.square")
                         .font(.system(size: 10.5, weight: .semibold))
                         .foregroundStyle(Brand.sigAmber)
-                    Text(NSLocalizedString("Select a continuous set of recorded actions, name it, then create one behavior block.", comment: ""))
+                    Text("Select a continuous set of recorded actions, name it, then create one behavior block.", tableName: "Recording")
                         .font(.system(size: 10))
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
-                    TextField(NSLocalizedString("Behavior name", comment: ""), text: $inspBehaviorName)
+                    TextField(String(localized: "Behavior name", table: "Common"), text: $inspBehaviorName)
                         .textFieldStyle(.roundedBorder)
                         .font(.system(.callout, design: .monospaced))
                         .controlSize(.small)
@@ -1082,7 +1082,7 @@ struct EditorSidebar: View {
                         Button {
                             bindSelectedBehavior()
                         } label: {
-                            Label(NSLocalizedString("Create Behavior", comment: ""), systemImage: "square.stack.3d.down.right")
+                            Label(String(localized: "Create Behavior", table: "Common"), systemImage: "square.stack.3d.down.right")
                                 .frame(maxWidth: .infinity)
                         }
                         .help(behaviorBindReadinessHelp(bindReadiness))
@@ -1091,10 +1091,10 @@ struct EditorSidebar: View {
                         Button {
                             unbindSelectedBehavior()
                         } label: {
-                            Label(NSLocalizedString("Unbind", comment: ""), systemImage: "square.stack.3d.down.forward")
+                            Label(String(localized: "Unbind", table: "Common"), systemImage: "square.stack.3d.down.forward")
                                 .frame(maxWidth: .infinity)
                         }
-                        .help(NSLocalizedString("Show behavior events as separate actions again", comment: ""))
+                        .help(String(localized: "Show behavior events as separate actions again", table: "EditorUX"))
                         .disabled(!canUnbindSelection)
                     }
                     .buttonStyle(.bordered)
@@ -1120,15 +1120,15 @@ struct EditorSidebar: View {
         )
         
         if selection.count > 1 {
-            section(NSLocalizedString("Repeat Until Loop", comment: ""), icon: "arrow.triangle.2.circlepath") {
+            section(String(localized: "Repeat Until Loop", table: "Common"), icon: "arrow.triangle.2.circlepath") {
                 VStack(alignment: .leading, spacing: 8) {
                     // Loop Configuration Form
                     VStack(alignment: .leading, spacing: 8) {
                         HStack(spacing: 6) {
-                            Text(NSLocalizedString("Max Attempts", comment: ""))
+                            Text("Max Attempts", tableName: "Common")
                                 .font(.system(size: 11, weight: .medium))
                             Spacer()
-                            Text("\(loopMaxAttempts) " + NSLocalizedString("times", comment: ""))
+                            Text("\(loopMaxAttempts) " + String(localized: "times", table: "Common"))
                                 .font(.system(.callout, design: .monospaced))
                                 .foregroundStyle(.secondary)
                             Stepper("", value: $loopMaxAttempts, in: 1...100)
@@ -1139,7 +1139,7 @@ struct EditorSidebar: View {
                         Divider().opacity(0.3)
 
                         HStack(spacing: 6) {
-                            Text(NSLocalizedString("Timeout", comment: ""))
+                            Text("Timeout", tableName: "Common")
                                 .font(.system(size: 11, weight: .medium))
                             Spacer()
                             Text("\(Int(loopTimeoutSeconds))s")
@@ -1153,7 +1153,7 @@ struct EditorSidebar: View {
                         Divider().opacity(0.3)
 
                         HStack(spacing: 6) {
-                            Text(NSLocalizedString("Polling Interval", comment: ""))
+                            Text("Polling Interval", tableName: "Common")
                                 .font(.system(size: 11, weight: .medium))
                             Spacer()
                             Text(String(format: "%.1fs", loopPollingSeconds))
@@ -1167,13 +1167,13 @@ struct EditorSidebar: View {
                         Divider().opacity(0.3)
 
                         HStack(spacing: 6) {
-                            Text(NSLocalizedString("On Failure", comment: ""))
+                            Text("On Failure", tableName: "Common")
                                 .font(.system(size: 11, weight: .medium))
                             Spacer()
                             Picker("", selection: $loopFailurePolicy) {
-                                Text(NSLocalizedString("Abort Macro", comment: "")).tag("failRun")
-                                Text(NSLocalizedString("Pause & Approve", comment: "")).tag("requireManualApproval")
-                                Text(NSLocalizedString("Continue next", comment: "")).tag("continueWorkflow")
+                                Text("Abort Macro", tableName: "EditorUX").tag("failRun")
+                                Text("Pause & Approve", tableName: "Common").tag("requireManualApproval")
+                                Text("Continue next", tableName: "Common").tag("continueWorkflow")
                             }
                             .labelsHidden()
                             .pickerStyle(.menu)
@@ -1193,7 +1193,7 @@ struct EditorSidebar: View {
                             loopFailurePolicy
                         )
                     } label: {
-                        Label(NSLocalizedString("Preview Repeat Until", comment: ""), systemImage: "arrow.triangle.2.circlepath")
+                        Label(String(localized: "Preview Repeat Until", table: "Common"), systemImage: "arrow.triangle.2.circlepath")
                             .frame(maxWidth: .infinity)
                     }
                     .buttonStyle(.borderedProminent)
@@ -1201,7 +1201,7 @@ struct EditorSidebar: View {
                     .disabled(!repeatUntilReadiness.canCreate)
                     .help(repeatUntilReadinessHelp(repeatUntilReadiness))
                     
-                    Text(NSLocalizedString("Save the selected body as a behavior macro, then open a draft-only Repeat-Until preview.", comment: ""))
+                    Text("Save the selected body as a behavior macro, then open a draft-only Repeat-Until preview.", tableName: "EditorUX")
                         .font(.system(size: 10))
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
@@ -1354,15 +1354,15 @@ struct EditorSidebar: View {
     @ViewBuilder
     func locatorPlaybackPolicyView() -> some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text(NSLocalizedString("Playback if text is missing", comment: ""))
+            Text("Playback if text is missing", tableName: "EditorUX")
                 .font(.system(size: 9.5, weight: .medium))
                 .foregroundStyle(.secondary)
             Picker("", selection: Binding(
                 get: { inspFallbackPolicy },
                 set: { inspFallbackPolicy = $0; applyInspector() }
             )) {
-                Text(NSLocalizedString("Pause", comment: "")).tag(LocatorFallbackPolicy.fail)
-                Text(NSLocalizedString("Use fallback point", comment: "")).tag(LocatorFallbackPolicy.allowCoordinateFallback)
+                Text("Pause", tableName: "Common").tag(LocatorFallbackPolicy.fail)
+                Text("Use fallback point", tableName: "Common").tag(LocatorFallbackPolicy.allowCoordinateFallback)
             }
             .pickerStyle(.segmented)
             .controlSize(.small)
@@ -1394,29 +1394,29 @@ struct EditorSidebar: View {
     func textTargetReadinessTitle(_ readiness: TextTargetReadiness) -> String {
         switch readiness {
         case .missingText:
-            return NSLocalizedString("No target text", comment: "")
+            return String(localized: "No target text", table: "EditorUX")
         case .missingAnchor, .notTextTarget:
-            return NSLocalizedString("No text target", comment: "")
+            return String(localized: "No text target", table: "EditorUX")
         case .ready:
-            return NSLocalizedString("Text target ready", comment: "")
+            return String(localized: "Text target ready", table: "EditorUX")
         }
     }
 
     func textTargetReadinessDetail(_ readiness: TextTargetReadiness) -> String {
         switch readiness {
         case .missingText:
-            return NSLocalizedString("Pick text or type a non-empty target.", comment: "")
+            return String(localized: "Pick text or type a non-empty target.", table: "EditorUX")
         case .missingAnchor, .notTextTarget:
-            return NSLocalizedString("Pick text to create a searchable target.", comment: "")
+            return String(localized: "Pick text to create a searchable target.", table: "EditorUX")
         case .ready:
-            return NSLocalizedString("Playback will use the matched text target.", comment: "")
+            return String(localized: "Playback will use the matched text target.", table: "EditorUX")
         }
     }
 
     @ViewBuilder
     func multiPointClickEditor(for group: ActionGroup) -> some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text(NSLocalizedString("Click Points", comment: ""))
+            Text("Click Points", tableName: "EditorUX")
                 .font(.system(size: 9.5, weight: .semibold))
                 .foregroundStyle(.secondary)
 
@@ -1450,14 +1450,14 @@ struct EditorSidebar: View {
                 Button {
                     onAddClickPoint()
                 } label: {
-                    Label(NSLocalizedString("Add Point", comment: ""), systemImage: "plus")
+                    Label(String(localized: "Add Point", table: "Common"), systemImage: "plus")
                 }
                 .frame(maxWidth: .infinity)
 
                 Button {
                     removeLastMultiClickPoint(group)
                 } label: {
-                    Label(NSLocalizedString("Remove Last", comment: ""), systemImage: "minus")
+                    Label(String(localized: "Remove Last", table: "Common"), systemImage: "minus")
                 }
                 .frame(maxWidth: .infinity)
                 .disabled(!removalReadiness.canRemove)
@@ -1500,25 +1500,25 @@ struct EditorSidebar: View {
     @ViewBuilder
     func insertionTargetView() -> some View {
         HStack(spacing: 8) {
-            Text(NSLocalizedString("Insert Position", comment: ""))
+            Text("Insert Position", tableName: "Common")
                 .font(.system(size: 11))
                 .foregroundStyle(.secondary)
             
             Spacer()
             
             if rows.isEmpty {
-                Text(NSLocalizedString("Empty Timeline", comment: ""))
+                Text("Empty Timeline", tableName: "EditorUX")
                     .font(.system(size: 11))
                     .foregroundStyle(.secondary)
             } else {
                 HStack(spacing: 6) {
                     let val = insertionIndexBinding.wrappedValue
                     if val > rows.count {
-                        Text(NSLocalizedString("Append at end", comment: ""))
+                        Text("Append at end", tableName: "Common")
                             .font(.system(size: 11))
                             .foregroundStyle(.secondary)
                     } else {
-                        Text(NSLocalizedString("After Action #", comment: ""))
+                        Text("After Action #", tableName: "EditorUX")
                             .font(.system(size: 11))
                         
                         TextField("", value: insertionIndexBinding, format: .number)
@@ -1752,17 +1752,17 @@ struct EditorSidebar: View {
     func repeatUntilReadinessHelp(_ readiness: MacroEditorRepeatUntilDraftReadiness) -> String {
         switch readiness {
         case .ready:
-            return NSLocalizedString("Create a reusable behavior macro and preview the Repeat-Until workflow draft.", comment: "")
+            return String(localized: "Create a reusable behavior macro and preview the Repeat-Until workflow draft.", table: "Automation")
         case .noSelection:
-            return NSLocalizedString("Select a behavior body and one text wait condition.", comment: "")
+            return String(localized: "Select a behavior body and one text wait condition.", table: "Automation")
         case .missingBody:
-            return NSLocalizedString("Select at least one recorded action as the Repeat-Until body.", comment: "")
+            return String(localized: "Select at least one recorded action as the Repeat-Until body.", table: "Recording")
         case .multipleUntilConditions:
-            return NSLocalizedString("Select only one Wait Text, Wait Text Gone, or Verify Text condition.", comment: "")
+            return String(localized: "Select only one Wait Text, Wait Text Gone, or Verify Text condition.", table: "Automation")
         case .missingUntilCondition:
-            return NSLocalizedString("Select one Wait Text, Wait Text Gone, or Verify Text condition as the Until check.", comment: "")
+            return String(localized: "Select one Wait Text, Wait Text Gone, or Verify Text condition as the Until check.", table: "Automation")
         case .missingUntilText:
-            return NSLocalizedString("Pick or type target text before creating Repeat Until.", comment: "")
+            return String(localized: "Pick or type target text before creating Repeat Until.", table: "EditorUX")
         }
     }
     
@@ -1770,7 +1770,7 @@ struct EditorSidebar: View {
         let existing = recorder.events.compactMap(\.behaviorGroupID).reduce(into: Set<BehaviorGroupID>()) { partial, id in
             partial.insert(id)
         }
-        return String(format: NSLocalizedString("Behavior %d", comment: ""), existing.count + 1)
+        return String(format: String(localized: "Behavior %d", table: "Common"), existing.count + 1)
     }
 
     func behaviorNameForNewBinding() -> String {
@@ -1791,7 +1791,7 @@ struct EditorSidebar: View {
         let id = BehaviorGroupID()
         let name = behaviorNameForNewBinding()
         
-        withUndo(NSLocalizedString("Create Behavior", comment: "")) {
+        withUndo(String(localized: "Create Behavior", table: "Common")) {
             recorder.events.bindBehavior(at: indices, id: id, name: name)
         }
         
@@ -1805,7 +1805,7 @@ struct EditorSidebar: View {
             return
         }
 
-        withUndo(NSLocalizedString("Rename Behavior", comment: "")) {
+        withUndo(String(localized: "Rename Behavior", table: "Common")) {
             recorder.events.renameBehavior(id: id, name: behaviorNameDraft)
         }
 
@@ -1816,7 +1816,7 @@ struct EditorSidebar: View {
         let indices = selectedEventIndices()
         guard !indices.isEmpty, canUnbindSelection else { return }
         
-        withUndo(NSLocalizedString("Unbind Behavior", comment: "")) {
+        withUndo(String(localized: "Unbind Behavior", table: "Common")) {
             recorder.events.unbindBehavior(at: indices)
         }
         
@@ -1892,7 +1892,7 @@ struct EditorSidebar: View {
             return afterIdx ..< (afterIdx + sorted.count)
         }()
         
-        withUndo(NSLocalizedString("Duplicate Action", comment: "")) {
+        withUndo(String(localized: "Duplicate Action", table: "EditorUX")) {
             recorder.events.applyPassiveWaitDuplicationPlan(waitPlan)
             if let liveDuration = waitPlan.liveDurationAfterDuplication {
                 recorder.liveDuration = liveDuration
@@ -1967,7 +1967,7 @@ struct EditorSidebar: View {
         guard !plan.isEmpty else { return }
         
         selection.removeAll()
-        withUndo(NSLocalizedString("Delete Actions", comment: "")) {
+        withUndo(String(localized: "Delete Actions", table: "EditorUX")) {
             recorder.events.applyActionGroupDeletionPlan(plan)
             if let liveDuration = plan.liveDurationAfterDeletion {
                 recorder.liveDuration = liveDuration
@@ -1984,7 +1984,7 @@ struct EditorSidebar: View {
             direction: .before
         ).canTrim, let grp = trimGroups.first else { return }
         let cutoff = max(0, grp.startTime)
-        withUndo(NSLocalizedString("Trim Before", comment: "")) {
+        withUndo(String(localized: "Trim Before", table: "Common")) {
             recorder.events.removeAll { $0.time < cutoff }
             for idx in recorder.events.indices {
                 recorder.events[idx].time = max(0, recorder.events[idx].time - cutoff)
@@ -2010,7 +2010,7 @@ struct EditorSidebar: View {
             }
             return event.time > cutoff + epsilon
         }
-        withUndo(NSLocalizedString("Trim After", comment: "")) {
+        withUndo(String(localized: "Trim After", table: "Common")) {
             recorder.events.removeAll(where: shouldRemove)
             recorder.liveDuration = cutoff
         }
@@ -2019,14 +2019,14 @@ struct EditorSidebar: View {
 
     func clearAll() {
         selection.removeAll()
-        withUndo(NSLocalizedString("Clear All Events", comment: "")) {
+        withUndo(String(localized: "Clear All Events", table: "EditorUX")) {
             recorder.clearAll()
         }
     }
 
     func removeLastMultiClickPoint(_ group: ActionGroup) {
         guard multiPointClickPointRemovalReadiness(for: group).canRemove else { return }
-        withUndo(NSLocalizedString("Remove Click Point", comment: "")) {
+        withUndo(String(localized: "Remove Click Point", table: "EditorUX")) {
             recorder.events.removeLastMultiPointClick(at: group.eventIndices)
         }
         onLoadInspector()
@@ -2051,7 +2051,7 @@ struct EditorSidebar: View {
             return max(recorder.liveDuration, recorder.events.last?.time ?? 0) + waitDelta
         }()
         
-        withUndo(String(format: NSLocalizedString("Insert %@", comment: ""), humanActionKindName(kind))) {
+        withUndo(String(format: String(localized: "Insert %@", table: "Common"), humanActionKindName(kind))) {
             var insertedEvents: [RecordedEvent] = []
             switch kind {
             case .wait:
@@ -2111,7 +2111,7 @@ struct EditorSidebar: View {
         let previousLastEventTime = recorder.events.last?.time
         var insertedEvents: [RecordedEvent] = []
         
-        withUndo(NSLocalizedString("Insert Click Text", comment: "")) {
+        withUndo(String(localized: "Insert Click Text", table: "EditorUX")) {
             recorder.events.insertTextClick(at: clampedIndex)
             if let explicitStartTime = placement.explicitStartTime {
                 insertedEvents = retimeInsertedEvents(
@@ -2149,8 +2149,8 @@ struct EditorSidebar: View {
         
         let newBehaviorID = BehaviorGroupID()
         let newBehaviorName = String(
-            format: NSLocalizedString("Copy of %@", comment: ""),
-            group.behaviorGroupName ?? NSLocalizedString("Behavior", comment: "")
+            format: String(localized: "Copy of %@", table: "Common"),
+            group.behaviorGroupName ?? String(localized: "Behavior", table: "Common")
         )
         
         let insertionTime: TimeInterval = {
@@ -2172,7 +2172,7 @@ struct EditorSidebar: View {
             copies.append(copy)
         }
         
-        withUndo(String(format: NSLocalizedString("Insert Behavior: %@", comment: ""), newBehaviorName)) {
+        withUndo(String(format: String(localized: "Insert Behavior: %@", table: "Common"), newBehaviorName)) {
             for i in clampedIndex..<recorder.events.count {
                 recorder.events[i].time += srcDuration
             }
@@ -2224,7 +2224,7 @@ struct EditorSidebar: View {
         var insertedRange = insertionIndex..<insertionIndex
         var insertedEvents: [RecordedEvent] = []
 
-        withUndo(NSLocalizedString("Add Click Text After Wait", comment: "")) {
+        withUndo(String(localized: "Add Click Text After Wait", table: "EditorUX")) {
             insertedRange = recorder.events.insertTextClick(
                 at: insertionIndex,
                 textAnchor: anchor,
@@ -2261,7 +2261,7 @@ struct EditorSidebar: View {
         guard !plan.isEmpty else { return }
 
         let insertedEvents = plan.insertedEvents
-        withUndo(NSLocalizedString("Convert Wait to Click Text", comment: "")) {
+        withUndo(String(localized: "Convert Wait to Click Text", table: "EditorUX")) {
             recorder.events.applyTextClickConversionPlan(plan)
             if let liveDuration = plan.liveDurationAfterConversion {
                 recorder.liveDuration = liveDuration
@@ -2341,7 +2341,7 @@ struct EditorSidebar: View {
         var insertedRange = clampedIndex..<clampedIndex
         var insertedEvents: [RecordedEvent] = []
 
-        withUndo(NSLocalizedString("Insert Reveal and Click Text", comment: "")) {
+        withUndo(String(localized: "Insert Reveal and Click Text", table: "EditorUX")) {
             insertedRange = recorder.events.insertRevealAndClickTextFlow(at: clampedIndex, preDelay: delay)
             if let explicitStartTime = placement.explicitStartTime {
                 insertedEvents = retimeInsertedEvents(in: insertedRange, toStartTime: explicitStartTime)
@@ -2387,7 +2387,7 @@ struct EditorSidebar: View {
             factor: factor
         ).canApply else { return }
 
-        withUndo(NSLocalizedString("Time Stretch", comment: "")) {
+        withUndo(String(localized: "Time Stretch", table: "Common")) {
             let liveDuration = recorder.events.liveDurationAfterStretching(
                 recorder.liveDuration,
                 by: factor
@@ -2416,7 +2416,7 @@ struct EditorSidebar: View {
         )
         guard shiftPlan.canApply else { return }
 
-        withUndo(NSLocalizedString("Shift Actions", comment: "")) {
+        withUndo(String(localized: "Shift Actions", table: "EditorUX")) {
             recorder.events.shiftTime(of: indexSet, by: shiftPlan.delta)
             recorder.liveDuration = shiftPlan.liveDurationAfterShift
         }
@@ -2428,7 +2428,7 @@ struct EditorSidebar: View {
         let grp = row.group
         var editedWaitTargets: [(start: TimeInterval, end: TimeInterval)] = []
         
-        withUndo(NSLocalizedString("Edit Action", comment: "")) {
+        withUndo(String(localized: "Edit Action", table: "EditorUX")) {
             if grp.kind.isPassiveWait {
                 if let t = finiteInspectorDouble(inspTime), t >= 0 {
                     let plan = ActionGroupPassiveWaitDurationEditPlanner.plan(
@@ -2528,7 +2528,7 @@ struct EditorSidebar: View {
         guard grp.kind != newKind else { return }
         let previousLiveDuration = recorder.liveDuration
         let previousLastEventTime = recorder.events.last?.time
-        withUndo(NSLocalizedString("Convert Action Type", comment: "")) {
+        withUndo(String(localized: "Convert Action Type", table: "EditorUX")) {
             let indices = grp.eventIndices
             guard !indices.isEmpty else { return }
 
@@ -2562,7 +2562,7 @@ struct EditorSidebar: View {
         let targetVal = axis == .x ? sp.x : sp.y
         var didChange = false
         
-        withUndo(NSLocalizedString("Align Coordinates", comment: "")) {
+        withUndo(String(localized: "Align Coordinates", table: "Common")) {
             for grp in selectedGroups.dropFirst() {
                 guard let cp = grp.startPoint else { continue }
                 let deltaX = axis == .x ? (targetVal - cp.x) : 0
@@ -2594,7 +2594,7 @@ struct EditorSidebar: View {
             return
         }
         let editableGroups = batchTimeoutEditableGroups(for: selectedGroups, events: recorder.events)
-        withUndo(NSLocalizedString("Batch Set Timeout", comment: "")) {
+        withUndo(String(localized: "Batch Set Timeout", table: "Common")) {
             for grp in editableGroups {
                 if grp.kind.editsSemanticTextTarget {
                     let anchor = firstEvent(for: grp)?.textAnchor ?? grp.textAnchor
@@ -2631,7 +2631,7 @@ struct EditorSidebar: View {
             return
         }
 
-        withUndo(NSLocalizedString("Batch Set Text Target", comment: "")) {
+        withUndo(String(localized: "Batch Set Text Target", table: "EditorUX")) {
             for group in targetGroups {
                 let anchor = updatedAnchor(for: group, text: inspOCRText)
                 if group.kind.editsSemanticTextTarget {
@@ -2664,7 +2664,7 @@ struct TargetTextEditorInnerView: View {
     
     var body: some View {
         HStack(alignment: .center, spacing: 6) {
-            TextField(NSLocalizedString("e.g. Confirm", comment: ""), text: $text)
+            TextField(String(localized: "e.g. Confirm", table: "Common"), text: $text)
                 .textFieldStyle(.roundedBorder)
                 .font(.system(.callout, design: .monospaced))
                 .controlSize(.small)
@@ -2675,7 +2675,7 @@ struct TargetTextEditorInnerView: View {
             }
             .buttonStyle(.bordered)
             .controlSize(.small)
-            .help(NSLocalizedString("Pick text from screen", comment: ""))
+            .help(String(localized: "Pick text from screen", table: "Recording"))
         }
     }
 }
@@ -2701,10 +2701,10 @@ struct AnchorPositionCard: View {
             HStack(spacing: 6) {
                 Image(systemName: hasContentLock ? "rectangle.inset.filled.and.person.filled" : "display")
                     .foregroundStyle(Brand.sigAmber)
-                Text(hasContentLock ? NSLocalizedString("Content-locked target", comment: "") : NSLocalizedString("Screen target", comment: ""))
+                Text(hasContentLock ? String(localized: "Content-locked target", table: "Common") : String(localized: "Screen target", table: "Recording"))
                     .font(.system(size: 10.5, weight: .semibold))
                 Spacer()
-                Text(fallbackPolicy == .allowCoordinateFallback ? NSLocalizedString("Fallback on", comment: "") : NSLocalizedString("Pause on miss", comment: ""))
+                Text(fallbackPolicy == .allowCoordinateFallback ? String(localized: "Fallback on", table: "Common") : String(localized: "Pause on miss", table: "Common"))
                     .font(.system(size: 9.5, weight: .medium))
                     .foregroundStyle(.secondary)
             }
@@ -2712,7 +2712,7 @@ struct AnchorPositionCard: View {
             Divider()
             
             VStack(alignment: .leading, spacing: 4) {
-                Text(NSLocalizedString("Detected Text", comment: ""))
+                Text("Detected Text", tableName: "EditorUX")
                     .font(.system(size: 9.8, weight: .medium))
                     .foregroundStyle(.secondary)
                 Text(anchor.text)
@@ -2724,15 +2724,15 @@ struct AnchorPositionCard: View {
             
             Divider()
             
-            positionRow(color: Brand.sigGreen, title: NSLocalizedString("Text box", comment: ""), value: rectSummary(anchor.observedFrame))
+            positionRow(color: Brand.sigGreen, title: String(localized: "Text box", table: "EditorUX"), value: rectSummary(anchor.observedFrame))
             if let normalized = anchor.observedContentNormalizedFrame {
-                positionRow(color: Brand.sigBlue, title: NSLocalizedString("Content lock", comment: ""), value: normalizedRectSummary(normalized))
+                positionRow(color: Brand.sigBlue, title: String(localized: "Content lock", table: "Common"), value: normalizedRectSummary(normalized))
             }
             if let search = anchor.searchRegion {
-                positionRow(color: Brand.sigAmber, title: NSLocalizedString("Search region", comment: ""), value: rectSummary(search))
+                positionRow(color: Brand.sigAmber, title: String(localized: "Search region", table: "EditorUX"), value: rectSummary(search))
             }
             if let fallback = anchor.coordinateFallback {
-                positionRow(color: Brand.sigViolet, title: NSLocalizedString("Fallback point", comment: ""), value: pointSummary(fallback))
+                positionRow(color: Brand.sigViolet, title: String(localized: "Fallback point", table: "Common"), value: pointSummary(fallback))
             }
         }
         .padding(8)

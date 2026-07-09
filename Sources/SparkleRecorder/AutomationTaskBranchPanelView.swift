@@ -12,7 +12,7 @@ struct AutomationTaskBranchPanelView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             AutomationSectionHeader(
-                title: NSLocalizedString("IF / THEN / ELSE", comment: ""),
+                title: String(localized: "IF / THEN / ELSE", table: "Common"),
                 count: outgoingDependencies.count
             )
 
@@ -79,22 +79,22 @@ struct AutomationTaskBranchPanelView: View {
             }
             .buttonStyle(.plain)
 
-            Button(NSLocalizedString("Select target task", comment: ""), systemImage: "arrow.up.right.square") {
+            Button(String(localized: "Select target task", table: "Common"), systemImage: "arrow.up.right.square") {
                 onSelectTask(dependency.toTaskID)
             }
             .labelStyle(.iconOnly)
             .buttonStyle(.plain)
             .frame(width: 24, height: 24)
-            .help(NSLocalizedString("Select target task", comment: ""))
+            .help(String(localized: "Select target task", table: "Common"))
 
-            Button(NSLocalizedString("Delete Branch", comment: ""), systemImage: "trash", role: .destructive) {
+            Button(String(localized: "Delete Branch", table: "Common"), systemImage: "trash", role: .destructive) {
                 onAction(.deleteDependency(workflowID: workflow.id, dependencyID: dependency.id, at: Date()))
             }
             .labelStyle(.iconOnly)
             .buttonStyle(.plain)
             .frame(width: 24, height: 24)
             .foregroundStyle(Brand.red500)
-            .help(NSLocalizedString("Delete Branch", comment: ""))
+            .help(String(localized: "Delete Branch", table: "Common"))
         }
         .padding(8)
         .automationSubsurface(cornerRadius: 8, tint: branchTint(branchID))
@@ -121,11 +121,11 @@ struct AutomationTaskBranchPanelView: View {
         switch task.kind {
         case .condition(let spec):
             return String(
-                format: NSLocalizedString("When %@ finishes, branches below decide the next task.", comment: ""),
+                format: String(localized: "When %@ finishes, branches below decide the next task.", table: "Common"),
                 spec.name
             )
         case .macro, .delay, .notification:
-            return NSLocalizedString("Branches below decide the next task.", comment: "")
+            return String(localized: "Branches below decide the next task.", table: "Common")
         }
     }
 
@@ -157,15 +157,15 @@ struct AutomationTaskBranchPanelView: View {
     private func branchTitle(_ branchID: String) -> String {
         switch branchID {
         case "then":
-            return NSLocalizedString("Then", comment: "")
+            return String(localized: "Then", table: "Common")
         case "else":
-            return NSLocalizedString("Else", comment: "")
+            return String(localized: "Else", table: "Common")
         case "timeout":
-            return NSLocalizedString("Timeout", comment: "")
+            return String(localized: "Timeout", table: "Common")
         case "cancel":
-            return NSLocalizedString("Cancel", comment: "")
+            return String(localized: "Cancel", table: "Common")
         default:
-            return NSLocalizedString("Always", comment: "")
+            return String(localized: "Always", table: "Common")
         }
     }
 
@@ -201,22 +201,22 @@ struct AutomationTaskBranchPanelView: View {
 
     private func emptyBranchTitle(_ branchID: String) -> String {
         String(
-            format: NSLocalizedString("No %@ branch", comment: ""),
+            format: String(localized: "No %@ branch", table: "Common"),
             branchTitle(branchID).lowercased()
         )
     }
 
     private func targetName(for dependency: AutomationDependency) -> String {
-        workflow.task(id: dependency.toTaskID)?.name ?? NSLocalizedString("Missing task", comment: "")
+        workflow.task(id: dependency.toTaskID)?.name ?? String(localized: "Missing task", table: "Automation")
     }
 
     private func branchDetail(for dependency: AutomationDependency, branchID: String) -> String {
         let trigger = AutomationDependencyTriggerDraft.draft(for: dependency.trigger).title
         if dependency.dynamicDelay != nil {
             let delayLabel = dependencyEdgesByID[dependency.id]?.delayLabel ??
-                NSLocalizedString("Observed time", comment: "")
+                String(localized: "Observed time", table: "Common")
             return String(
-                format: NSLocalizedString("%@ · %@", comment: ""),
+                format: String(localized: "%@ · %@", table: "Common"),
                 trigger,
                 delayLabel
             )
@@ -225,7 +225,7 @@ struct AutomationTaskBranchPanelView: View {
             return trigger
         }
         return String(
-            format: NSLocalizedString("%@ · %.1fs delay", comment: ""),
+            format: String(localized: "%@ · %.1fs delay", table: "EditorUX"),
             trigger,
             dependency.delay
         )
@@ -237,7 +237,7 @@ struct AutomationTaskBranchPanelView: View {
 
     private func branchAccessibilityLabel(_ dependency: AutomationDependency, branchID: String) -> String {
         let base = String(
-            format: NSLocalizedString("%@ branch to %@, %@", comment: ""),
+            format: String(localized: "%@ branch to %@, %@", table: "Common"),
             branchTitle(branchID),
             targetName(for: dependency),
             branchDetail(for: dependency, branchID: branchID)

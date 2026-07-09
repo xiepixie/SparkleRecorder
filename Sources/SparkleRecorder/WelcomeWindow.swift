@@ -17,7 +17,7 @@ final class WelcomeWindowController: NSWindowController, NSWindowDelegate {
                 .frame(width: 560, height: 520)
         )
         let win = NSWindow(contentViewController: host)
-        win.title = NSLocalizedString("Welcome to SparkleRecorder", comment: "")
+        win.title = String(localized: "Welcome to SparkleRecorder", table: "Recording")
         win.setContentSize(NSSize(width: 560, height: 520))
         win.styleMask = [.titled, .closable, .fullSizeContentView]
         win.titlebarAppearsTransparent = true
@@ -103,7 +103,7 @@ private struct WelcomeView: View {
                 // Bottom controls
                 HStack {
                     if step != .welcome {
-                        Button(NSLocalizedString("Back", comment: "")) { withAnimation(.spring(response: 0.4)) { step = Step(rawValue: step.rawValue - 1) ?? .welcome } }
+                        Button(String(localized: "Back", table: "Common")) { withAnimation(.spring(response: 0.4)) { step = Step(rawValue: step.rawValue - 1) ?? .welcome } }
                             .buttonStyle(.bordered)
                             .controlSize(.large)
                     }
@@ -112,7 +112,7 @@ private struct WelcomeView: View {
                         Button {
                             onDone()
                         } label: {
-                            Text(NSLocalizedString("Get Started", comment: "")).frame(minWidth: 140)
+                            Text("Get Started", tableName: "Common").frame(minWidth: 140)
                         }
                         .keyboardShortcut(.defaultAction)
                         .buttonStyle(.borderedProminent)
@@ -122,7 +122,7 @@ private struct WelcomeView: View {
                         // Never trap the user: permissions can be skipped and
                         // granted later from Settings.
                         if step == .permissions && !(accessibility && inputMonitoring && screenCapture) {
-                            Button(NSLocalizedString("Skip for Now", comment: "")) {
+                            Button(String(localized: "Skip for Now", table: "Common")) {
                                 withAnimation(.spring(response: 0.4)) { step = .hotkeys }
                             }
                             .buttonStyle(.bordered)
@@ -152,10 +152,10 @@ private struct WelcomeView: View {
 
     private var nextLabel: String {
         switch step {
-        case .welcome:     return NSLocalizedString("Next", comment: "")
-        case .permissions: return (accessibility && inputMonitoring && screenCapture) ? NSLocalizedString("Continue", comment: "") : NSLocalizedString("Waiting…", comment: "")
-        case .hotkeys:     return NSLocalizedString("Next", comment: "")
-        case .ready:       return NSLocalizedString("Get Started", comment: "")
+        case .welcome:     return String(localized: "Next", table: "Common")
+        case .permissions: return (accessibility && inputMonitoring && screenCapture) ? String(localized: "Continue", table: "Common") : String(localized: "Waiting…", table: "EditorUX")
+        case .hotkeys:     return String(localized: "Next", table: "Common")
+        case .ready:       return String(localized: "Get Started", table: "Common")
         }
     }
 
@@ -186,9 +186,9 @@ private struct WelcomeStep: View {
                 .animation(.spring(response: 0.6, dampingFraction: 0.55).delay(0.1), value: bounce)
                 .onAppear { bounce = true }
 
-            Text(NSLocalizedString("Welcome to SparkleRecorder", comment: ""))
+            Text("Welcome to SparkleRecorder", tableName: "Recording")
                 .font(.system(size: 26, weight: .bold))
-            Text(NSLocalizedString("The little macro recorder for macOS that's quietly doing your repetitive work.", comment: ""))
+            Text("The little macro recorder for macOS that's quietly doing your repetitive work.", tableName: "Recording")
                 .font(.system(size: 13))
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
@@ -196,14 +196,14 @@ private struct WelcomeStep: View {
  
             VStack(alignment: .leading, spacing: 12) {
                 FeatureRow(icon: "wave.3.right", tint: .red,
-                           title: NSLocalizedString("Capture anything", comment: ""),
-                           subtitle: NSLocalizedString("Mouse clicks, drags, scrolls, and the keyboard.", comment: ""))
+                           title: String(localized: "Capture anything", table: "Recording"),
+                           subtitle: String(localized: "Mouse clicks, drags, scrolls, and the keyboard.", table: "EditorUX"))
                 FeatureRow(icon: "infinity", tint: .green,
-                           title: NSLocalizedString("Replay on demand", comment: ""),
-                           subtitle: NSLocalizedString("Once, N times, or forever — at any speed.", comment: ""))
+                           title: String(localized: "Replay on demand", table: "Common"),
+                           subtitle: String(localized: "Once, N times, or forever — at any speed.", table: "Automation"))
                 FeatureRow(icon: "keyboard", tint: .blue,
-                           title: NSLocalizedString("Trigger from anywhere", comment: ""),
-                           subtitle: NSLocalizedString("Assign a global hotkey to any macro.", comment: ""))
+                           title: String(localized: "Trigger from anywhere", table: "Automation"),
+                           subtitle: String(localized: "Assign a global hotkey to any macro.", table: "EditorUX"))
             }
             .padding(16)
             .frame(maxWidth: 420)
@@ -231,9 +231,9 @@ private struct PermissionsStep: View {
                 .font(.system(size: 56, weight: .light))
                 .foregroundStyle(.tint)
 
-            Text(NSLocalizedString("Two quick permissions", comment: ""))
+            Text("Two quick permissions", tableName: "Settings")
                 .font(.system(size: 22, weight: .bold))
-            Text(NSLocalizedString("macOS requires explicit consent to capture and post input events. We never see what you type or click outside of recordings you initiate.", comment: ""))
+            Text("macOS requires explicit consent to capture and post input events. We never see what you type or click outside of recordings you initiate.", tableName: "Recording")
                 .font(.system(size: 12))
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
@@ -241,20 +241,20 @@ private struct PermissionsStep: View {
  
             VStack(spacing: 10) {
                 PermissionCard(
-                    title: NSLocalizedString("Accessibility", comment: ""),
-                    subtitle: NSLocalizedString("Required to play back your recordings.", comment: ""),
+                    title: String(localized: "Accessibility", table: "Settings"),
+                    subtitle: String(localized: "Required to play back your recordings.", table: "Recording"),
                     granted: accessibility,
                     action: { controller.openAccessibilityPrefs() }
                 )
                 PermissionCard(
-                    title: NSLocalizedString("Input Monitoring", comment: ""),
-                    subtitle: NSLocalizedString("Required to record your inputs.", comment: ""),
+                    title: String(localized: "Input Monitoring", table: "Common"),
+                    subtitle: String(localized: "Required to record your inputs.", table: "Recording"),
                     granted: inputMonitoring,
                     action: { controller.openInputMonitoringPrefs() }
                 )
                 PermissionCard(
-                    title: NSLocalizedString("Screen Recording", comment: ""),
-                    subtitle: NSLocalizedString("Required for visual window mapping & OCR.", comment: ""),
+                    title: String(localized: "Screen Recording", table: "Recording"),
+                    subtitle: String(localized: "Required for visual window mapping & OCR.", table: "EditorUX"),
                     granted: screenCapture,
                     action: { controller.openScreenCapturePrefs() }
                 )
@@ -273,22 +273,22 @@ private struct HotkeysStep: View {
                 .font(.system(size: 56, weight: .light))
                 .foregroundStyle(.tint)
 
-            Text(NSLocalizedString("Global hotkeys", comment: ""))
+            Text("Global hotkeys", tableName: "Common")
                 .font(.system(size: 22, weight: .bold))
-            Text(NSLocalizedString("Trigger recording, stop, and play from any app — without bringing SparkleRecorder to the front. You can change these in Preferences.", comment: ""))
+            Text("Trigger recording, stop, and play from any app — without bringing SparkleRecorder to the front. You can change these in Preferences.", tableName: "Automation")
                 .font(.system(size: 12))
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
                 .frame(maxWidth: 440)
 
             VStack(spacing: 10) {
-                HotkeyExplain(label: NSLocalizedString("Record / Stop", comment: ""), binding: controller.state.recordHotkey, tint: .red, systemImage: "record.circle")
-                HotkeyExplain(label: NSLocalizedString("Stop everything", comment: ""), binding: controller.state.stopHotkey, tint: .orange, systemImage: "stop.circle")
-                HotkeyExplain(label: NSLocalizedString("Play current", comment: ""), binding: controller.state.playHotkey, tint: .green, systemImage: "play.circle")
+                HotkeyExplain(label: String(localized: "Record / Stop", table: "Recording"), binding: controller.state.recordHotkey, tint: .red, systemImage: "record.circle")
+                HotkeyExplain(label: String(localized: "Stop everything", table: "Common"), binding: controller.state.stopHotkey, tint: .orange, systemImage: "stop.circle")
+                HotkeyExplain(label: String(localized: "Play current", table: "Common"), binding: controller.state.playHotkey, tint: .green, systemImage: "play.circle")
             }
             .frame(maxWidth: 440)
 
-            Text(NSLocalizedString("Pro tip: each saved macro can also have its OWN hotkey from the card menu — set one and that macro plays from anywhere.", comment: ""))
+            Text("Pro tip: each saved macro can also have its OWN hotkey from the card menu — set one and that macro plays from anywhere.", tableName: "EditorUX")
                 .font(.system(size: 11))
                 .foregroundStyle(.tertiary)
                 .multilineTextAlignment(.center)
@@ -305,10 +305,10 @@ private struct ReadyStep: View {
     private var countdownSentence: String {
         let secs = controller.state.countdownSeconds
         if secs > 0 {
-            let format = NSLocalizedString("Click the menu-bar icon or this Dock icon to open the library. Press Record to capture your first macro — SparkleRecorder will count down %d seconds before it starts so you have time to switch to the right window.", comment: "")
+            let format = String(localized: "Click the menu-bar icon or this Dock icon to open the library. Press Record to capture your first macro — SparkleRecorder will count down %d seconds before it starts so you have time to switch to the right window.", table: "Recording")
             return String(format: format, secs)
         }
-        return NSLocalizedString("Click the menu-bar icon or this Dock icon to open the library. Press Record to capture your first macro — recording starts immediately.", comment: "")
+        return String(localized: "Click the menu-bar icon or this Dock icon to open the library. Press Record to capture your first macro — recording starts immediately.", table: "Recording")
     }
 
     var body: some View {
@@ -322,7 +322,7 @@ private struct ReadyStep: View {
                     .font(.system(size: 38, weight: .heavy))
                     .foregroundStyle(.white)
             }
-            Text(NSLocalizedString("You're all set", comment: ""))
+            Text("You're all set", tableName: "Common")
                 .font(.system(size: 22, weight: .bold))
             Text(countdownSentence)
                 .font(.system(size: 12))
@@ -332,15 +332,15 @@ private struct ReadyStep: View {
 
             HStack(spacing: 8) {
                 KeyCapView(text: controller.state.recordHotkey.name)
-                Text(NSLocalizedString("to record · ", comment: ""))
+                Text("to record · ", tableName: "Recording")
                     .font(.system(size: 11))
                     .foregroundStyle(.secondary)
                 KeyCapView(text: controller.state.playHotkey.name)
-                Text(NSLocalizedString("to play · ", comment: ""))
+                Text("to play · ", tableName: "Common")
                     .font(.system(size: 11))
                     .foregroundStyle(.secondary)
                 KeyCapView(text: controller.state.stopHotkey.name)
-                Text(NSLocalizedString("to stop", comment: ""))
+                Text("to stop", tableName: "Common")
                     .font(.system(size: 11))
                     .foregroundStyle(.secondary)
             }
@@ -413,7 +413,7 @@ private struct PermissionCard: View {
                 Text(subtitle).font(.system(size: 11)).foregroundStyle(.secondary)
             }
             Spacer()
-            Button(granted ? NSLocalizedString("Granted", comment: "") : NSLocalizedString("Open Settings", comment: ""), action: action)
+            Button(granted ? String(localized: "Granted", table: "Settings") : String(localized: "Open Settings", table: "Settings"), action: action)
                 .controlSize(.small)
                 .disabled(granted)
         }

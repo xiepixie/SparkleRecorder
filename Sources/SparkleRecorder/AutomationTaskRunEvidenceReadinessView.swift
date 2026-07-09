@@ -8,7 +8,7 @@ struct AutomationTaskRunEvidenceReadinessView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             AutomationSectionHeader(
-                title: NSLocalizedString("DRILL-IN READINESS", comment: ""),
+                title: String(localized: "DRILL-IN READINESS", table: "Common"),
                 count: rows.count
             )
 
@@ -55,7 +55,7 @@ struct AutomationTaskRunEvidenceReadinessView: View {
         [
             ReadinessRow(
                 id: "visual-diagnostics",
-                title: NSLocalizedString("Visual diagnostics", comment: ""),
+                title: String(localized: "Visual diagnostics", table: "Common"),
                 status: diagnosticsStatus,
                 detail: diagnosticsDetail,
                 systemImage: diagnosticsSystemImage,
@@ -63,7 +63,7 @@ struct AutomationTaskRunEvidenceReadinessView: View {
             ),
             ReadinessRow(
                 id: "branch-evidence",
-                title: NSLocalizedString("Branch evidence", comment: ""),
+                title: String(localized: "Branch evidence", table: "Common"),
                 status: branchStatus,
                 detail: branchDetail,
                 systemImage: "arrow.triangle.branch",
@@ -71,7 +71,7 @@ struct AutomationTaskRunEvidenceReadinessView: View {
             ),
             ReadinessRow(
                 id: "file-actions",
-                title: NSLocalizedString("File actions", comment: ""),
+                title: String(localized: "File actions", table: "Common"),
                 status: fileActionStatus,
                 detail: fileActionDetail,
                 systemImage: "folder.badge.gearshape",
@@ -90,8 +90,8 @@ struct AutomationTaskRunEvidenceReadinessView: View {
 
     private var diagnosticsStatus: String {
         hasConditionDiagnostics
-            ? NSLocalizedString("Durable", comment: "")
-            : NSLocalizedString("Missing payload", comment: "")
+            ? String(localized: "Durable", table: "Common")
+            : String(localized: "Missing payload", table: "Common")
     }
 
     private var diagnosticsSystemImage: String {
@@ -100,22 +100,22 @@ struct AutomationTaskRunEvidenceReadinessView: View {
 
     private var diagnosticsDetail: String {
         guard let evidence = run.conditionEvidence else {
-            return NSLocalizedString("No watched region, last sample, OCR text, pixel color, template score, or crop reference is saved in this run yet.", comment: "")
+            return String(localized: "No watched region, last sample, OCR text, pixel color, template score, or crop reference is saved in this run yet.", table: "Common")
         }
 
         var parts = [
             evidence.observedSummary,
-            String(format: NSLocalizedString("%d samples", comment: ""), evidence.sampleCount)
+            String(format: String(localized: "%d samples", table: "Common"), evidence.sampleCount)
         ]
         if let score = evidence.score {
-            parts.append(String(format: NSLocalizedString("score %.2f", comment: ""), score))
+            parts.append(String(format: String(localized: "score %.2f", table: "Common"), score))
         }
         if let threshold = evidence.threshold {
-            parts.append(String(format: NSLocalizedString("threshold %.2f", comment: ""), threshold))
+            parts.append(String(format: String(localized: "threshold %.2f", table: "Common"), threshold))
         }
         if !evidence.artifacts.isEmpty {
             parts.append(String(
-                format: NSLocalizedString("%d artifacts", comment: ""),
+                format: String(localized: "%d artifacts", table: "Common"),
                 evidence.artifacts.count
             ))
         }
@@ -124,14 +124,14 @@ struct AutomationTaskRunEvidenceReadinessView: View {
 
     private var branchStatus: String {
         if hasDurableBranchEvidence {
-            return NSLocalizedString("Durable", comment: "")
+            return String(localized: "Durable", table: "Common")
         }
 
         switch payload.source {
         case .perRun:
-            return NSLocalizedString("No branch payload", comment: "")
+            return String(localized: "No branch payload", table: "Common")
         case .latestMatchingRun, .latestMacro:
-            return NSLocalizedString("No durable binding", comment: "")
+            return String(localized: "No durable binding", table: "Common")
         }
     }
 
@@ -139,25 +139,25 @@ struct AutomationTaskRunEvidenceReadinessView: View {
         if let branchEvidence = run.branchEvidence,
            !branchEvidence.isEmpty {
             return String(
-                format: NSLocalizedString("%d branch decisions are persisted on this run history record; the Branch Evidence section shows trigger, target run, delay, join policy, and reason.", comment: ""),
+                format: String(localized: "%d branch decisions are persisted on this run history record; the Branch Evidence section shows trigger, target run, delay, join policy, and reason.", table: "Common"),
                 branchEvidence.count
             )
         }
 
-        return NSLocalizedString("This report has no persisted branch decisions for the selected run. Older or branchless runs may still show projection context outside the macro evidence report.", comment: "")
+        return String(localized: "This report has no persisted branch decisions for the selected run. Older or branchless runs may still show projection context outside the macro evidence report.", table: "Common")
     }
 
     private var fileActionStatus: String {
         payload.screenshotURL == nil
-            ? NSLocalizedString("Report only", comment: "")
-            : NSLocalizedString("Ready", comment: "")
+            ? String(localized: "Report only", table: "Common")
+            : String(localized: "Ready", table: "Common")
     }
 
     private var fileActionDetail: String {
         if payload.screenshotURL == nil {
-            return NSLocalizedString("Reveal Report can locate the bound report file in Finder. No failure screenshot is available for Open Screenshot.", comment: "")
+            return String(localized: "Reveal Report can locate the bound report file in Finder. No failure screenshot is available for Open Screenshot.", table: "Common")
         }
-        return NSLocalizedString("Reveal Report locates the bound report in Finder; Open Screenshot opens the saved failure image in the default viewer and reports failure if the file is gone.", comment: "")
+        return String(localized: "Reveal Report locates the bound report in Finder; Open Screenshot opens the saved failure image in the default viewer and reports failure if the file is gone.", table: "Common")
     }
 
     private struct ReadinessRow: Identifiable {

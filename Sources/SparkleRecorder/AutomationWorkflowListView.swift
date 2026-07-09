@@ -54,7 +54,7 @@ struct AutomationWorkflowListView: View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 8) {
                 HStack(spacing: 6) {
-                    Text(NSLocalizedString("WORKFLOWS", comment: ""))
+                    Text("WORKFLOWS", tableName: "Automation")
                         .font(.system(size: 10.5, weight: .semibold))
                         .tracking(0.7)
                         .foregroundStyle(.secondary)
@@ -69,31 +69,31 @@ struct AutomationWorkflowListView: View {
 
                 Spacer(minLength: 0)
 
-                Button(NSLocalizedString("New Workflow", comment: ""), systemImage: "plus", action: onCreateWorkflow)
+                Button(String(localized: "New Workflow", table: "Automation"), systemImage: "plus", action: onCreateWorkflow)
                     .labelStyle(.iconOnly)
                     .buttonStyle(.borderless)
                     .frame(width: 26, height: 26)
-                    .help(NSLocalizedString("New Workflow", comment: ""))
+                    .help(String(localized: "New Workflow", table: "Automation"))
 
-                Button(NSLocalizedString("Import Workflow Package", comment: ""), systemImage: "square.and.arrow.down", action: onImportWorkflowPackage)
+                Button(String(localized: "Import Workflow Package", table: "Automation"), systemImage: "square.and.arrow.down", action: onImportWorkflowPackage)
                     .labelStyle(.iconOnly)
                     .buttonStyle(.borderless)
                     .frame(width: 26, height: 26)
-                    .help(NSLocalizedString("Import Workflow Package", comment: ""))
+                    .help(String(localized: "Import Workflow Package", table: "Automation"))
 
-                Button(NSLocalizedString("Export All Workflows", comment: ""), systemImage: "square.and.arrow.up", action: onExportWorkflowPackage)
+                Button(String(localized: "Export All Workflows", table: "Automation"), systemImage: "square.and.arrow.up", action: onExportWorkflowPackage)
                     .labelStyle(.iconOnly)
                     .buttonStyle(.borderless)
                     .frame(width: 26, height: 26)
                     .disabled(projection.workflows.isEmpty)
-                    .help(NSLocalizedString("Export All Workflows", comment: ""))
+                    .help(String(localized: "Export All Workflows", table: "Automation"))
 
-                Button(NSLocalizedString("Share All Workflows", comment: ""), systemImage: "square.and.arrow.up.on.square", action: onShareWorkflowPackage)
+                Button(String(localized: "Share All Workflows", table: "Automation"), systemImage: "square.and.arrow.up.on.square", action: onShareWorkflowPackage)
                     .labelStyle(.iconOnly)
                     .buttonStyle(.borderless)
                     .frame(width: 26, height: 26)
                     .disabled(projection.workflows.isEmpty)
-                    .help(NSLocalizedString("Share All Workflows", comment: ""))
+                    .help(String(localized: "Share All Workflows", table: "Automation"))
             }
             .padding(.horizontal, 12)
             .padding(.top, 12)
@@ -102,8 +102,8 @@ struct AutomationWorkflowListView: View {
                 if projection.workflows.isEmpty {
                     AutomationEmptyState(
                         systemImage: "square.stack.3d.up.slash",
-                        title: NSLocalizedString("No workflows", comment: ""),
-                        subtitle: NSLocalizedString("Create an automation workflow to see it in this list.", comment: "")
+                        title: String(localized: "No workflows", table: "Automation"),
+                        subtitle: String(localized: "Create an automation workflow to see it in this list.", table: "Automation")
                     )
                     .frame(maxWidth: .infinity, minHeight: 156)
                 } else {

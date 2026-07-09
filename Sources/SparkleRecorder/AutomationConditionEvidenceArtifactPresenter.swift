@@ -52,13 +52,13 @@ enum AutomationConditionEvidenceArtifactPresenter {
         guard let url = payload.url else {
             return .failed(
                 .reveal,
-                message: NSLocalizedString("Artifact path is unavailable.", comment: "")
+                message: String(localized: "Artifact path is unavailable.", table: "Common")
             )
         }
         guard FileManager.default.fileExists(atPath: url.path) else {
             return .failed(
                 .reveal,
-                message: NSLocalizedString("Artifact file no longer exists.", comment: "")
+                message: String(localized: "Artifact file no longer exists.", table: "Common")
             )
         }
 
@@ -72,19 +72,19 @@ enum AutomationConditionEvidenceArtifactPresenter {
         guard let url = payload.url else {
             return .failed(
                 .open,
-                message: NSLocalizedString("Artifact path is unavailable.", comment: "")
+                message: String(localized: "Artifact path is unavailable.", table: "Common")
             )
         }
         guard FileManager.default.fileExists(atPath: url.path) else {
             return .failed(
                 .open,
-                message: NSLocalizedString("Artifact file no longer exists.", comment: "")
+                message: String(localized: "Artifact file no longer exists.", table: "Common")
             )
         }
         guard NSWorkspace.shared.open(url) else {
             return .failed(
                 .open,
-                message: NSLocalizedString("macOS could not open the artifact.", comment: "")
+                message: String(localized: "macOS could not open the artifact.", table: "Common")
             )
         }
 

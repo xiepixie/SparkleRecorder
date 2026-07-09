@@ -38,7 +38,7 @@ struct ActionRowView: View {
                         .font(.system(size: 10, weight: .semibold))
                         .foregroundStyle(.secondary)
                         .opacity(isDraggable && (hovered || isMoving) ? 1.0 : 0.0)
-                        .help(isDraggable ? NSLocalizedString("Drag to reorder", comment: "") : "")
+                        .help(isDraggable ? String(localized: "Drag to reorder", table: "EditorUX") : "")
                     Spacer()
                 }
                 .padding(.leading, 6)
@@ -102,13 +102,13 @@ struct ActionRowView: View {
                             .truncationMode(.tail)
                             .foregroundStyle(Brand.sigAmber)
                     } else {
-                        Text(NSLocalizedString("No target text", comment: ""))
+                        Text("No target text", tableName: "EditorUX")
                             .lineLimit(1)
                             .truncationMode(.tail)
                             .foregroundStyle(Brand.sigAmber)
                     }
                 } else if g.kind.previewsPointSequence {
-                    Text(String(format: NSLocalizedString("%d points", comment: ""), max(g.path.count, g.clickCount)))
+                    Text(String(format: String(localized: "%d points", table: "Common"), max(g.path.count, g.clickCount)))
                 } else if let sp = g.startPoint {
                     if let ep = g.endPoint, g.kind.editsPathTarget {
                         Text("(\(Int(sp.x)),\(Int(sp.y)))→(\(Int(ep.x)),\(Int(ep.y)))")

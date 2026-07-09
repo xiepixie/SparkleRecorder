@@ -9,12 +9,12 @@ struct AutomationWorkflowDraftPatchSectionView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             AutomationSectionHeader(
-                title: NSLocalizedString("DRAFT PATCH", comment: ""),
+                title: String(localized: "DRAFT PATCH", table: "Common"),
                 count: changedTaskKeys.count + changedDependencyKeys.count
             )
 
             HStack(spacing: 8) {
-                Label(NSLocalizedString("Patch", comment: ""), systemImage: "doc.badge.gearshape")
+                Label(String(localized: "Patch", table: "Common"), systemImage: "doc.badge.gearshape")
                     .font(.caption)
                     .foregroundStyle(.secondary)
 
@@ -27,19 +27,19 @@ struct AutomationWorkflowDraftPatchSectionView: View {
 
                 Spacer(minLength: 0)
 
-                Button(NSLocalizedString("Apply Patch…", comment: ""), systemImage: "square.and.arrow.down", action: onApplyPatch)
+                Button(String(localized: "Apply Patch…", table: "Common"), systemImage: "square.and.arrow.down", action: onApplyPatch)
                     .buttonStyle(.bordered)
-                    .help(NSLocalizedString("Apply workflow draft patch", comment: ""))
+                    .help(String(localized: "Apply workflow draft patch", table: "Automation"))
             }
 
             if !changedTaskKeys.isEmpty || !changedDependencyKeys.isEmpty {
                 HStack(alignment: .top, spacing: 8) {
                     changedKeysGroup(
-                        title: NSLocalizedString("Tasks", comment: ""),
+                        title: String(localized: "Tasks", table: "Automation"),
                         keys: changedTaskKeys
                     )
                     changedKeysGroup(
-                        title: NSLocalizedString("Dependencies", comment: ""),
+                        title: String(localized: "Dependencies", table: "Common"),
                         keys: changedDependencyKeys
                     )
                 }
@@ -56,7 +56,7 @@ struct AutomationWorkflowDraftPatchSectionView: View {
                 .bold()
                 .foregroundStyle(.secondary)
             if keys.isEmpty {
-                Text(NSLocalizedString("No changes", comment: ""))
+                Text("No changes", tableName: "Common")
                     .font(.caption2)
                     .foregroundStyle(.tertiary)
             } else {
@@ -67,7 +67,7 @@ struct AutomationWorkflowDraftPatchSectionView: View {
                         .truncationMode(.middle)
                 }
                 if keys.count > 4 {
-                    Text(String(format: NSLocalizedString("+%d more", comment: ""), keys.count - 4))
+                    Text(String(format: String(localized: "+%d more", table: "Common"), keys.count - 4))
                         .font(.caption2)
                         .foregroundStyle(.tertiary)
                 }

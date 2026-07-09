@@ -18,26 +18,26 @@ struct AutomationWorkflowTaskRowView: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
             .buttonStyle(.plain)
-            .accessibilityHint(NSLocalizedString("Open task details", comment: ""))
+            .accessibilityHint(String(localized: "Open task details", table: "Common"))
 
             HStack(spacing: 2) {
                 if isPreviewDragSource {
-                    Label(NSLocalizedString("Moving", comment: ""), systemImage: "arrow.up.and.down")
+                    Label(String(localized: "Moving", table: "Common"), systemImage: "arrow.up.and.down")
                         .labelStyle(.iconOnly)
                         .font(.caption2.weight(.semibold))
                         .foregroundStyle(Brand.libraryGreen)
-                        .help(NSLocalizedString("Task is being reordered", comment: ""))
+                        .help(String(localized: "Task is being reordered", table: "Common"))
                 }
 
                 moveButton(
                     direction: .up,
-                    title: NSLocalizedString("Move task up", comment: ""),
+                    title: String(localized: "Move task up", table: "Automation"),
                     systemImage: "chevron.up",
                     isDisabled: position == 0
                 )
                 moveButton(
                     direction: .down,
-                    title: NSLocalizedString("Move task down", comment: ""),
+                    title: String(localized: "Move task down", table: "Automation"),
                     systemImage: "chevron.down",
                     isDisabled: position >= taskCount - 1
                 )

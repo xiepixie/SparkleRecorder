@@ -17,7 +17,7 @@ struct MacroIconView: View {
     var body: some View {
         let tint = cardAccentColor(for: macro.accent)
         Menu {
-            Section(NSLocalizedString("SF Symbol", comment: "")) {
+            Section(String(localized: "SF Symbol", table: "Common")) {
                 ForEach(Self.symbolPalette, id: \.self) { s in
                     Button {
                         onSetIcon(s)
@@ -27,7 +27,7 @@ struct MacroIconView: View {
                 }
             }
             Divider()
-            Button(NSLocalizedString("Reset", comment: ""), role: .destructive) { onSetIcon(nil) }
+            Button(String(localized: "Reset", table: "Common"), role: .destructive) { onSetIcon(nil) }
         } label: {
             ZStack {
                 RoundedRectangle(cornerRadius: 6, style: .continuous)
@@ -48,7 +48,7 @@ struct MacroIconView: View {
         .menuStyle(.borderlessButton)
         .menuIndicator(.hidden)
         .frame(width: 22, height: 22)
-        .help(NSLocalizedString("Change icon", comment: ""))
-        .accessibilityLabel(Text(NSLocalizedString("Change icon", comment: "")))
+        .help(String(localized: "Change icon", table: "Common"))
+        .accessibilityLabel(Text("Change icon", tableName: "Common"))
     }
 }

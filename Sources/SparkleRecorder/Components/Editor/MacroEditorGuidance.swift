@@ -124,8 +124,8 @@ func macroEditorGuidanceItems(
             MacroEditorGuidanceItem(
                 kind: .empty,
                 priority: .next,
-                title: NSLocalizedString("Record or insert an action", comment: ""),
-                detail: NSLocalizedString("The editor is ready for the first macro action.", comment: ""),
+                title: String(localized: "Record or insert an action", table: "Recording"),
+                detail: String(localized: "The editor is ready for the first macro action.", table: "EditorUX"),
                 systemImage: "record.circle",
                 actionTitle: nil,
                 action: .none
@@ -149,15 +149,15 @@ func macroEditorGuidanceItems(
                 kind: .missingTextTarget,
                 priority: .blocking,
                 title: String(
-                    format: NSLocalizedString("Text targets need review (%d)", comment: ""),
+                    format: String(localized: "Text targets need review (%d)", table: "EditorUX"),
                     missingTextTargets.count
                 ),
                 detail: String(
-                    format: NSLocalizedString("Text waits and text clicks need a target. Pending: %@", comment: ""),
+                    format: String(localized: "Text waits and text clicks need a target. Pending: %@", table: "EditorUX"),
                     indicesList
                 ),
                 systemImage: "text.viewfinder",
-                actionTitle: NSLocalizedString("Pick First", comment: ""),
+                actionTitle: String(localized: "Pick First", table: "Common"),
                 action: .pickText([first.id])
             )
         )
@@ -168,10 +168,10 @@ func macroEditorGuidanceItems(
             MacroEditorGuidanceItem(
                 kind: .repeatUntilReady,
                 priority: .next,
-                title: NSLocalizedString("Repeat Until is ready", comment: ""),
-                detail: NSLocalizedString("The selected body and text condition can become a bounded loop preview.", comment: ""),
+                title: String(localized: "Repeat Until is ready", table: "Common"),
+                detail: String(localized: "The selected body and text condition can become a bounded loop preview.", table: "Automation"),
                 systemImage: "arrow.triangle.2.circlepath",
-                actionTitle: NSLocalizedString("Preview", comment: ""),
+                actionTitle: String(localized: "Preview", table: "Common"),
                 action: .createRepeatUntil
             )
         )
@@ -186,10 +186,10 @@ func macroEditorGuidanceItems(
                 MacroEditorGuidanceItem(
                     kind: .behaviorReady,
                     priority: .next,
-                    title: NSLocalizedString("Behavior selection is ready", comment: ""),
-                    detail: NSLocalizedString("The selected actions can be kept together as one reusable block.", comment: ""),
+                    title: String(localized: "Behavior selection is ready", table: "Common"),
+                    detail: String(localized: "The selected actions can be kept together as one reusable block.", table: "EditorUX"),
                     systemImage: "square.stack.3d.down.right",
-                    actionTitle: NSLocalizedString("Create", comment: ""),
+                    actionTitle: String(localized: "Create", table: "Common"),
                     action: .createBehavior
                 )
             )
@@ -207,15 +207,15 @@ func macroEditorGuidanceItems(
                 kind: .fixedCoordinateClicks,
                 priority: .improve,
                 title: String(
-                    format: NSLocalizedString("Fixed clicks to check (%d)", comment: ""),
+                    format: String(localized: "Fixed clicks to check (%d)", table: "EditorUX"),
                     fixedCoordinateClicks.count
                 ),
                 detail: String(
-                    format: NSLocalizedString("Coordinate clicks are less reliable than text clicks. Pending: %@", comment: ""),
+                    format: String(localized: "Coordinate clicks are less reliable than text clicks. Pending: %@", table: "EditorUX"),
                     indicesList
                 ),
                 systemImage: "cursorarrow.motionlines.click",
-                actionTitle: NSLocalizedString("Bind First", comment: ""),
+                actionTitle: String(localized: "Bind First", table: "Common"),
                 action: .pickText([first.id])
             )
         )
@@ -230,15 +230,15 @@ func macroEditorGuidanceItems(
                 kind: .longWaits,
                 priority: .improve,
                 title: String(
-                    format: NSLocalizedString("Long waits to review (%d)", comment: ""),
+                    format: String(localized: "Long waits to review (%d)", table: "EditorUX"),
                     longWaits.count
                 ),
                 detail: String(
-                    format: NSLocalizedString("Long delays may be better as a Wait Text. Pending: %@", comment: ""),
+                    format: String(localized: "Long delays may be better as a Wait Text. Pending: %@", table: "EditorUX"),
                     indicesList
                 ),
                 systemImage: "hourglass.badge.exclamationmark",
-                actionTitle: NSLocalizedString("Select First", comment: ""),
+                actionTitle: String(localized: "Select First", table: "Common"),
                 action: .selectGroups([first.id])
             )
         )
@@ -249,8 +249,8 @@ func macroEditorGuidanceItems(
             MacroEditorGuidanceItem(
                 kind: .ready,
                 priority: .done,
-                title: NSLocalizedString("Ready to test", comment: ""),
-                detail: NSLocalizedString("Text targets are set and no long waits or fixed clicks need immediate review.", comment: ""),
+                title: String(localized: "Ready to test", table: "Common"),
+                detail: String(localized: "Text targets are set and no long waits or fixed clicks need immediate review.", table: "EditorUX"),
                 systemImage: "checkmark.seal",
                 actionTitle: nil,
                 action: .none
@@ -269,33 +269,33 @@ func macroEditorGuidanceItems(
 func macroEditorHealthTitle(_ summary: MacroEditorHealthSummary) -> String {
     switch summary.state {
     case .empty:
-        return NSLocalizedString("No actions", comment: "")
+        return String(localized: "No actions", table: "EditorUX")
     case .needsTargets:
-        return NSLocalizedString("Needs targets", comment: "")
+        return String(localized: "Needs targets", table: "Common")
     case .reviewReliability:
-        return NSLocalizedString("Review reliability", comment: "")
+        return String(localized: "Review reliability", table: "Common")
     case .ready:
-        return NSLocalizedString("Ready to test", comment: "")
+        return String(localized: "Ready to test", table: "Common")
     }
 }
 
 func macroEditorHealthDetail(_ summary: MacroEditorHealthSummary) -> String {
     switch summary.state {
     case .empty:
-        return NSLocalizedString("Record or insert the first action.", comment: "")
+        return String(localized: "Record or insert the first action.", table: "Recording")
     case .needsTargets:
         return String(
-            format: NSLocalizedString("Text targets need attention before reliable playback: %d.", comment: ""),
+            format: String(localized: "Text targets need attention before reliable playback: %d.", table: "EditorUX"),
             summary.missingTextTargetCount
         )
     case .reviewReliability:
         return String(
-            format: NSLocalizedString("%d fixed clicks and %d long waits may need cleanup.", comment: ""),
+            format: String(localized: "%d fixed clicks and %d long waits may need cleanup.", table: "EditorUX"),
             summary.fixedCoordinateClickCount,
             summary.longWaitCount
         )
     case .ready:
-        return NSLocalizedString("The macro is ready for a playback test.", comment: "")
+        return String(localized: "The macro is ready for a playback test.", table: "EditorUX")
     }
 }
 

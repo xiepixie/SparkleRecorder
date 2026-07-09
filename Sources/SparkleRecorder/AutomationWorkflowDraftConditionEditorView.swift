@@ -36,7 +36,7 @@ struct AutomationWorkflowDraftConditionEditorView: View {
         if !conditionTasks.isEmpty {
             VStack(alignment: .leading, spacing: 8) {
                 AutomationSectionHeader(
-                    title: NSLocalizedString("DRAFT CONDITION EDIT", comment: ""),
+                    title: String(localized: "DRAFT CONDITION EDIT", table: "Common"),
                     count: conditionTasks.count
                 )
 
@@ -54,23 +54,23 @@ struct AutomationWorkflowDraftConditionEditorView: View {
                 conditionFields
 
                 HStack(spacing: 8) {
-                    Label(NSLocalizedString("Timeout", comment: ""), systemImage: "timer")
+                    Label(String(localized: "Timeout", table: "Common"), systemImage: "timer")
                         .font(.caption)
                         .foregroundStyle(.secondary)
-                    TextField(NSLocalizedString("Timeout", comment: ""), value: $timeoutSeconds, format: .number.precision(.fractionLength(1)))
+                    TextField(String(localized: "Timeout", table: "Common"), value: $timeoutSeconds, format: .number.precision(.fractionLength(1)))
                         .textFieldStyle(.roundedBorder)
                         .frame(width: 86)
 
-                    Label(NSLocalizedString("Polling", comment: ""), systemImage: "arrow.triangle.2.circlepath")
+                    Label(String(localized: "Polling", table: "Common"), systemImage: "arrow.triangle.2.circlepath")
                         .font(.caption)
                         .foregroundStyle(.secondary)
-                    TextField(NSLocalizedString("Polling", comment: ""), value: $pollingSeconds, format: .number.precision(.fractionLength(2)))
+                    TextField(String(localized: "Polling", table: "Common"), value: $pollingSeconds, format: .number.precision(.fractionLength(2)))
                         .textFieldStyle(.roundedBorder)
                         .frame(width: 86)
 
                     Spacer(minLength: 0)
 
-                    Button(NSLocalizedString("Apply Draft Edit", comment: ""), systemImage: "checkmark", action: applyEdit)
+                    Button(String(localized: "Apply Draft Edit", table: "Common"), systemImage: "checkmark", action: applyEdit)
                         .buttonStyle(.bordered)
                         .disabled(!canApplyEdit)
                 }
@@ -85,7 +85,7 @@ struct AutomationWorkflowDraftConditionEditorView: View {
     }
 
     private var taskPicker: some View {
-        Picker(NSLocalizedString("Task", comment: ""), selection: $selectedTaskKey) {
+        Picker(String(localized: "Task", table: "Automation"), selection: $selectedTaskKey) {
             ForEach(conditionTasks, id: \.key) { task in
                 Text(task.name ?? task.key).tag(task.key)
             }
@@ -97,7 +97,7 @@ struct AutomationWorkflowDraftConditionEditorView: View {
     }
 
     private var conditionKindPicker: some View {
-        Picker(NSLocalizedString("Condition", comment: ""), selection: $conditionKind) {
+        Picker(String(localized: "Condition", table: "Automation"), selection: $conditionKind) {
             ForEach(DraftConditionKind.allCases) { kind in
                 Label(kind.title, systemImage: kind.systemImage).tag(kind)
             }
@@ -119,19 +119,19 @@ struct AutomationWorkflowDraftConditionEditorView: View {
     private var ocrFields: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 8) {
-                Picker(NSLocalizedString("Match", comment: ""), selection: $matchMode) {
-                    Text(NSLocalizedString("Contains", comment: "")).tag(TextMatchMode.contains)
-                    Text(NSLocalizedString("Exact", comment: "")).tag(TextMatchMode.exact)
+                Picker(String(localized: "Match", table: "Common"), selection: $matchMode) {
+                    Text("Contains", tableName: "Common").tag(TextMatchMode.contains)
+                    Text("Exact", tableName: "Common").tag(TextMatchMode.exact)
                 }
                 .pickerStyle(.segmented)
                 .frame(width: 150)
 
-                Toggle(NSLocalizedString("Require visible text", comment: ""), isOn: $requireVisible)
+                Toggle(String(localized: "Require visible text", table: "EditorUX"), isOn: $requireVisible)
                     .font(.caption)
                     .toggleStyle(.checkbox)
             }
 
-            TextField(NSLocalizedString("Text", comment: ""), text: $text, axis: .vertical)
+            TextField(String(localized: "Text", table: "EditorUX"), text: $text, axis: .vertical)
                 .lineLimit(1...3)
                 .textFieldStyle(.roundedBorder)
         }
@@ -139,8 +139,8 @@ struct AutomationWorkflowDraftConditionEditorView: View {
 
     private var visualFields: some View {
         AutomationVisualConditionEditorView(
-            regionStatusTitle: NSLocalizedString("Referenced bounds", comment: ""),
-            regionStatusDetail: NSLocalizedString("Draft visual bounds are resolved later from regionRef or app-side picker data.", comment: ""),
+            regionStatusTitle: String(localized: "Referenced bounds", table: "Common"),
+            regionStatusDetail: String(localized: "Draft visual bounds are resolved later from regionRef or app-side picker data.", table: "Common"),
             regionStatusImage: "viewfinder.rectangular",
             regionStatusTint: Brand.libraryBlue,
             referenceSize: nil,
@@ -203,7 +203,7 @@ struct AutomationWorkflowDraftConditionEditorView: View {
         AutomationWorkflowDraftBaselineCapturePresenter.captureBaseline(
             packageDirectory: sourceDirectory,
             preferredKey: "",
-            preferredLabel: NSLocalizedString("Captured Reference", comment: ""),
+            preferredLabel: String(localized: "Captured Reference", table: "Common"),
             onCaptured: { result in
                 let kind = conditionKind.visualType?.usesImageReference == true ? "image" : "baseline"
                 onRegisterAsset?(kind, result.asset)
@@ -329,7 +329,7 @@ struct AutomationWorkflowDraftConditionEditorView: View {
 
     private func visualRegionDetail(_ region: AutomationWorkflowDraftVisualRegion) -> String {
         String(
-            format: NSLocalizedString("%@ bounds %@, %@, %@ x %@", comment: ""),
+            format: String(localized: "%@ bounds %@, %@, %@ x %@", table: "Common"),
             region.space.titleForVisualCondition,
             formattedRegionValue(Double(region.bounds.x)),
             formattedRegionValue(Double(region.bounds.y)),
@@ -341,7 +341,7 @@ struct AutomationWorkflowDraftConditionEditorView: View {
     private func visualImageAssetDetail(_ asset: AutomationWorkflowDraftVisualImageAsset) -> String? {
         let path = asset.path?.trimmedForDraftConditionEdit.nilIfEmptyForDraftConditionEdit
         let checksum = asset.sha256?.trimmedForDraftConditionEdit.nilIfEmptyForDraftConditionEdit.map { sha in
-            String(format: NSLocalizedString("SHA %@", comment: ""), String(sha.prefix(8)))
+            String(format: String(localized: "SHA %@", table: "Common"), String(sha.prefix(8)))
         }
         return [path, checksum].compactMap { $0 }.joined(separator: " · ")
             .nilIfEmptyForDraftConditionEdit
@@ -438,7 +438,7 @@ private enum DraftConditionKind: String, CaseIterable, Identifiable {
     var title: String {
         switch self {
         case .ocrText:
-            return NSLocalizedString("Screen text", comment: "")
+            return String(localized: "Screen text", table: "Recording")
         case .regionChanged:
             return AutomationVisualConditionPresentation.title(for: AutomationVisualConditionType.regionChanged)
         case .imageAppeared:

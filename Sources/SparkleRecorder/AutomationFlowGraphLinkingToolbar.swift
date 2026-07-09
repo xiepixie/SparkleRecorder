@@ -8,7 +8,7 @@ struct AutomationFlowGraphLinkingToolbar: View {
 
     var body: some View {
         HStack(spacing: 6) {
-            Label(NSLocalizedString("Linking", comment: ""), systemImage: "link")
+            Label(String(localized: "Linking", table: "Common"), systemImage: "link")
                 .labelStyle(.titleAndIcon)
 
             Divider()
@@ -21,7 +21,7 @@ struct AutomationFlowGraphLinkingToolbar: View {
                 }
             } label: {
                 Label(
-                    String(format: NSLocalizedString("Trigger %@", comment: ""), trigger.title),
+                    String(format: String(localized: "Trigger %@", table: "Automation"), trigger.title),
                     systemImage: "arrow.triangle.branch"
                 )
                 .labelStyle(.titleAndIcon)
@@ -32,8 +32,8 @@ struct AutomationFlowGraphLinkingToolbar: View {
             Button("Cancel link", systemImage: "xmark", action: onCancel)
                 .labelStyle(.iconOnly)
                 .buttonStyle(.plain)
-                .help(NSLocalizedString("Cancel link", comment: ""))
-                .accessibilityLabel(NSLocalizedString("Cancel link", comment: ""))
+                .help(String(localized: "Cancel link", table: "Common"))
+                .accessibilityLabel(String(localized: "Cancel link", table: "Common"))
         }
         .font(.caption)
         .foregroundStyle(Brand.sigAmber)

@@ -60,47 +60,47 @@ struct SettingsPanel: View {
                 VStack(alignment: .leading, spacing: 14) {
                     settingsHeader
 
-                    settingsGroup(NSLocalizedString("Hotkeys", comment: ""), systemImage: "keyboard") {
-                        hotkeyRow(title: NSLocalizedString("Record / Stop", comment: ""), binding: Binding(
+                    settingsGroup(String(localized: "Hotkeys", table: "Common"), systemImage: "keyboard") {
+                        hotkeyRow(title: String(localized: "Record / Stop", table: "Recording"), binding: Binding(
                             get: { state.recordHotkey },
                             set: { state.recordHotkey = $0; controller.reapplyHotkeys() }
                         ))
-                        hotkeyRow(title: NSLocalizedString("Stop everything", comment: ""), binding: Binding(
+                        hotkeyRow(title: String(localized: "Stop everything", table: "Common"), binding: Binding(
                             get: { state.stopHotkey },
                             set: { state.stopHotkey = $0; controller.reapplyHotkeys() }
                         ))
-                        hotkeyRow(title: NSLocalizedString("Play", comment: ""), binding: Binding(
+                        hotkeyRow(title: String(localized: "Play", table: "Common"), binding: Binding(
                             get: { state.playHotkey },
                             set: { state.playHotkey = $0; controller.reapplyHotkeys() }
                         ))
                     }
 
-                    settingsGroup(NSLocalizedString("General", comment: ""), systemImage: "macwindow") {
+                    settingsGroup(String(localized: "General", table: "Common"), systemImage: "macwindow") {
                         HStack {
-                            Text(NSLocalizedString("Show as", comment: "")).font(.system(size: 11.5))
+                            Text("Show as", tableName: "Common").font(.system(size: 11.5))
                             Spacer()
                             Picker("", selection: Binding(
                                 get: { state.menuBarOnly },
                                 set: { controller.setMenuBarOnly($0) }
                             )) {
-                                Text(NSLocalizedString("Dock app", comment: "")).tag(false)
-                                Text(NSLocalizedString("Menu bar only", comment: "")).tag(true)
+                                Text("Dock app", tableName: "Common").tag(false)
+                                Text("Menu bar only", tableName: "Common").tag(true)
                             }
                             .labelsHidden()
                             .frame(width: 140)
                         }
-                        Text(NSLocalizedString("Menu bar only hides the Dock icon. Use the menu-bar icon to reopen SparkleRecorder.", comment: ""))
+                        Text("Menu bar only hides the Dock icon. Use the menu-bar icon to reopen SparkleRecorder.", tableName: "Recording")
                             .font(.system(size: 10))
                             .foregroundStyle(.tertiary)
                             .fixedSize(horizontal: false, vertical: true)
                     }
 
-                    settingsGroup(NSLocalizedString("Recording", comment: ""), systemImage: "record.circle") {
+                    settingsGroup(String(localized: "Recording", table: "Recording"), systemImage: "record.circle") {
                         HStack {
-                            Text(NSLocalizedString("Countdown", comment: "")).font(.system(size: 11.5))
+                            Text("Countdown", tableName: "Common").font(.system(size: 11.5))
                             Spacer()
                             Picker("", selection: $state.countdownSeconds) {
-                                Text(NSLocalizedString("Off", comment: "")).tag(0)
+                                Text("Off", tableName: "Common").tag(0)
                                 Text("1s").tag(1)
                                 Text("3s").tag(3)
                                 Text("5s").tag(5)
@@ -109,7 +109,7 @@ struct SettingsPanel: View {
                             .frame(width: 110)
                         }
                         HStack {
-                            Text(NSLocalizedString("Status UI", comment: "")).font(.system(size: 11.5))
+                            Text("Status UI", tableName: "Common").font(.system(size: 11.5))
                             Spacer()
                             Picker("", selection: $state.recordingHUDMode) {
                                 ForEach(RecordingHUDMode.allCases) { mode in
@@ -121,23 +121,23 @@ struct SettingsPanel: View {
                             .frame(width: 210)
                         }
                         Toggle(isOn: $state.soundEnabled) {
-                            Text(NSLocalizedString("Sound effects", comment: "")).font(.system(size: 11.5))
+                            Text("Sound effects", tableName: "Common").font(.system(size: 11.5))
                         }
                         .toggleStyle(.switch)
                         .controlSize(.mini)
                         Toggle(isOn: $state.recordMouseMoves) {
-                            Text(NSLocalizedString("Record mouse moves", comment: "")).font(.system(size: 11.5))
+                            Text("Record mouse moves", tableName: "Recording").font(.system(size: 11.5))
                         }
                         .toggleStyle(.switch)
                         .controlSize(.mini)
                     }
 
-                    settingsGroup(NSLocalizedString("Visual Evidence", comment: ""), systemImage: "film.stack") {
+                    settingsGroup(String(localized: "Visual Evidence", table: "Automation"), systemImage: "film.stack") {
                         Toggle(isOn: semanticRecordingEnabledBinding) {
                             VStack(alignment: .leading, spacing: 2) {
-                                Text(NSLocalizedString("Record visual evidence", comment: ""))
+                                Text("Record visual evidence", tableName: "Automation")
                                     .font(.system(size: 11.5))
-                                Text(NSLocalizedString("Frames, OCR, and privacy exclusions stay separate from playable macro events.", comment: ""))
+                                Text("Frames, OCR, and privacy exclusions stay separate from playable macro events.", tableName: "EditorUX")
                                     .font(.system(size: 10))
                                     .foregroundStyle(.tertiary)
                                     .fixedSize(horizontal: false, vertical: true)
@@ -155,33 +155,33 @@ struct SettingsPanel: View {
                         }
                     }
 
-                    settingsGroup(NSLocalizedString("Replay Defaults", comment: ""), systemImage: "play.circle") {
+                    settingsGroup(String(localized: "Replay Defaults", table: "Common"), systemImage: "play.circle") {
                         HStack {
-                            Text(NSLocalizedString("Repeat", comment: "")).font(.system(size: 11.5))
+                            Text("Repeat", tableName: "Common").font(.system(size: 11.5))
                             Spacer()
                             Menu {
-                                Button(NSLocalizedString("Once", comment: "")) { state.loops = 1 }
+                                Button(String(localized: "Once", table: "Common")) { state.loops = 1 }
                                 Button("2×") { state.loops = 2 }
                                 Button("5×") { state.loops = 5 }
                                 Button("10×") { state.loops = 10 }
                                 Button("25×") { state.loops = 25 }
                                 Button("100×") { state.loops = 100 }
                                 Divider()
-                                Button { state.loops = 0 } label: { Label(NSLocalizedString("Continuous", comment: ""), systemImage: "infinity") }
+                                Button { state.loops = 0 } label: { Label(String(localized: "Continuous", table: "Common"), systemImage: "infinity") }
                                 Divider()
-                                Button(NSLocalizedString("Custom…", comment: "")) {
+                                Button(String(localized: "Custom…", table: "Common")) {
                                     customLoopText = state.loops > 0 ? "\(state.loops)" : ""
                                     showCustomLoop = true
                                 }
                             } label: {
-                                Text(state.loops <= 0 ? NSLocalizedString("Continuous", comment: "") : "\(state.loops)×")
+                                Text(state.loops <= 0 ? String(localized: "Continuous", table: "Common") : "\(state.loops)×")
                                     .font(.system(size: 11.5, weight: .semibold, design: .monospaced))
                             }
                             .menuStyle(.borderlessButton)
                             .frame(width: 120)
                         }
                         HStack {
-                            Text(NSLocalizedString("Speed", comment: "")).font(.system(size: 11.5))
+                            Text("Speed", tableName: "Common").font(.system(size: 11.5))
                             Spacer()
                             Picker("", selection: $state.speed) {
                                 Text("0.5×").tag(0.5)
@@ -194,27 +194,27 @@ struct SettingsPanel: View {
                         }
                     }
 
-                    settingsGroup(NSLocalizedString("Permissions", comment: ""), systemImage: "lock.shield") {
-                        permissionRow(title: NSLocalizedString("Accessibility", comment: ""),
+                    settingsGroup(String(localized: "Permissions", table: "Settings"), systemImage: "lock.shield") {
+                        permissionRow(title: String(localized: "Accessibility", table: "Settings"),
                                       granted: state.accessibilityGranted,
                                       action: controller.openAccessibilityPrefs)
-                        permissionRow(title: NSLocalizedString("Input Monitoring", comment: ""),
+                        permissionRow(title: String(localized: "Input Monitoring", table: "Common"),
                                       granted: state.inputMonitoringGranted,
                                       action: controller.openInputMonitoringPrefs)
-                        permissionRow(title: NSLocalizedString("Screen Recording", comment: ""),
+                        permissionRow(title: String(localized: "Screen Recording", table: "Recording"),
                                       granted: state.screenCaptureGranted,
                                       action: controller.openScreenCapturePrefs)
                     }
 
                     HStack {
-                        Button(NSLocalizedString("Replay welcome", comment: "")) { controller.showWelcome() }
+                        Button(String(localized: "Replay welcome", table: "Common")) { controller.showWelcome() }
                             .buttonStyle(.borderless)
                             .controlSize(.small)
                         Spacer()
                         Text(appVersion)
                             .font(.system(size: 10))
                             .foregroundStyle(.secondary)
-                        Button(NSLocalizedString("Quit", comment: "")) { controller.quit() }
+                        Button(String(localized: "Quit", table: "Common")) { controller.quit() }
                             .buttonStyle(.borderless)
                             .controlSize(.small)
                     }
@@ -229,20 +229,20 @@ struct SettingsPanel: View {
                 controller.refreshSemanticRecordingPreflightPresentation()
             }
         }
-        .alert(NSLocalizedString("Custom repeat count", comment: ""), isPresented: $showCustomLoop) {
-            TextField(NSLocalizedString("e.g. 42", comment: ""), text: $customLoopText)
-            Button(NSLocalizedString("Cancel", comment: ""), role: .cancel) {}
-            Button(NSLocalizedString("Set", comment: "")) {
+        .alert(String(localized: "Custom repeat count", table: "Common"), isPresented: $showCustomLoop) {
+            TextField(String(localized: "e.g. 42", table: "Common"), text: $customLoopText)
+            Button(String(localized: "Cancel", table: "Common"), role: .cancel) {}
+            Button(String(localized: "Set", table: "Common")) {
                 let trimmed = customLoopText.trimmingCharacters(in: .whitespaces)
                 if trimmed.isEmpty || trimmed == "∞" { state.loops = 0 }
                 else if let n = Int(trimmed) { state.loops = max(0, n) }
             }
         } message: {
-            Text(NSLocalizedString("Enter a number, or 0 (or leave blank) for continuous.", comment: ""))
+            Text("Enter a number, or 0 (or leave blank) for continuous.", tableName: "Automation")
         }
-        .alert(NSLocalizedString("Clean up visual evidence?", comment: ""), isPresented: $showSemanticRetentionCleanupConfirmation) {
-            Button(NSLocalizedString("Cancel", comment: ""), role: .cancel) {}
-            Button(NSLocalizedString("Delete", comment: ""), role: .destructive) {
+        .alert(String(localized: "Clean up visual evidence?", table: "Common"), isPresented: $showSemanticRetentionCleanupConfirmation) {
+            Button(String(localized: "Cancel", table: "Common"), role: .cancel) {}
+            Button(String(localized: "Delete", table: "Common"), role: .destructive) {
                 Task {
                     await confirmSemanticRecordingRetentionCleanup()
                 }
@@ -259,7 +259,7 @@ struct SettingsPanel: View {
                 .foregroundStyle(.secondary)
 
             VStack(alignment: .leading, spacing: 3) {
-                Text(NSLocalizedString("Settings", comment: ""))
+                Text("Settings", tableName: "Settings")
                     .font(.system(size: 15, weight: .semibold))
                 Text(settingsSummaryText)
                     .font(.system(size: 10.5))
@@ -270,15 +270,15 @@ struct SettingsPanel: View {
 
             settingsStatusBadge(
                 title: permissionsReady
-                    ? NSLocalizedString("Ready", comment: "")
-                    : NSLocalizedString("Needs access", comment: ""),
+                    ? String(localized: "Ready", table: "Common")
+                    : String(localized: "Needs access", table: "Settings"),
                 systemImage: permissionsReady ? "checkmark.circle.fill" : "exclamationmark.triangle.fill",
                 tint: permissionsReady ? .green : .orange
             )
             settingsStatusBadge(
                 title: state.semanticRecordingEnabled
-                    ? NSLocalizedString("Evidence on", comment: "")
-                    : NSLocalizedString("Evidence off", comment: ""),
+                    ? String(localized: "Evidence on", table: "Automation")
+                    : String(localized: "Evidence off", table: "Automation"),
                 systemImage: state.semanticRecordingEnabled ? "film.stack.fill" : "film.stack",
                 tint: Brand.libraryBlue
             )
@@ -300,10 +300,10 @@ struct SettingsPanel: View {
 
     private var settingsSummaryText: String {
         let repeatText = state.loops <= 0
-            ? NSLocalizedString("continuous replay", comment: "")
-            : String(format: NSLocalizedString("%d× replay", comment: ""), state.loops)
+            ? String(localized: "continuous replay", table: "Common")
+            : String(format: String(localized: "%d× replay", table: "Common"), state.loops)
         return String(
-            format: NSLocalizedString("%@ · %@ status UI", comment: ""),
+            format: String(localized: "%@ · %@ status UI", table: "Common"),
             repeatText,
             state.recordingHUDMode.title
         )
@@ -372,12 +372,12 @@ struct SettingsPanel: View {
             if granted {
                 HStack(spacing: 4) {
                     Image(systemName: "checkmark.circle.fill")
-                    Text(NSLocalizedString("Granted", comment: ""))
+                    Text("Granted", tableName: "Settings")
                 }
                 .font(.system(size: 11, weight: .semibold))
                 .foregroundStyle(.green)
             } else {
-                Button(NSLocalizedString("Grant…", comment: "")) { action() }
+                Button(String(localized: "Grant…", table: "Settings")) { action() }
                     .buttonStyle(PillButtonStyle(tint: .blue))
             }
         }
@@ -399,10 +399,10 @@ struct SettingsPanel: View {
                     Button {
                         controller.refreshSemanticRecordingPreflightPresentation()
                     } label: {
-                        Label(NSLocalizedString("Check", comment: ""), systemImage: "arrow.clockwise")
+                        Label(String(localized: "Check", table: "Common"), systemImage: "arrow.clockwise")
                     }
                     .buttonStyle(PillButtonStyle(tint: .blue))
-                    .help(NSLocalizedString("Check semantic recording permissions again", comment: ""))
+                    .help(String(localized: "Check semantic recording permissions again", table: "Common"))
                 }
 
                 Text(NSLocalizedString(presentation.summary, comment: ""))
@@ -426,7 +426,7 @@ struct SettingsPanel: View {
                 HStack(spacing: 7) {
                     Image(systemName: "questionmark.circle")
                         .foregroundStyle(.secondary)
-                    Text(NSLocalizedString("Visual evidence status has not been checked.", comment: ""))
+                    Text("Visual evidence status has not been checked.", tableName: "Common")
                         .font(.system(size: 10.5))
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
@@ -434,7 +434,7 @@ struct SettingsPanel: View {
                     Button {
                         controller.refreshSemanticRecordingPreflightPresentation()
                     } label: {
-                        Label(NSLocalizedString("Check", comment: ""), systemImage: "arrow.clockwise")
+                        Label(String(localized: "Check", table: "Common"), systemImage: "arrow.clockwise")
                     }
                     .buttonStyle(PillButtonStyle(tint: .blue))
                 }
@@ -446,7 +446,7 @@ struct SettingsPanel: View {
     func semanticRecordingRetentionPanel() -> some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
-                Text(NSLocalizedString("Keep visual evidence", comment: "")).font(.system(size: 11.5))
+                Text("Keep visual evidence", tableName: "Common").font(.system(size: 11.5))
                 Spacer()
                 Picker("", selection: $state.semanticRecordingRetentionMaximumArtifactAgeDays) {
                     ForEach(semanticRecordingRetentionDayOptions, id: \.self) { days in
@@ -460,12 +460,12 @@ struct SettingsPanel: View {
 
             if state.semanticRecordingRetentionMaximumArtifactAgeDays > 0 {
                 HStack {
-                    Text(NSLocalizedString("When expired", comment: "")).font(.system(size: 11.5))
+                    Text("When expired", tableName: "Common").font(.system(size: 11.5))
                     Spacer()
                     Picker("", selection: $state.semanticRecordingExpiredDisposition) {
-                        Text(NSLocalizedString("Delete evidence", comment: ""))
+                        Text("Delete evidence", tableName: "Common")
                             .tag(SemanticRecordingRetentionDisposition.pruneArtifacts)
-                        Text(NSLocalizedString("Delete bundle", comment: ""))
+                        Text("Delete bundle", tableName: "Common")
                             .tag(SemanticRecordingRetentionDisposition.deleteBundle)
                     }
                     .labelsHidden()
@@ -480,7 +480,7 @@ struct SettingsPanel: View {
                         await reviewSemanticRecordingRetentionCleanup()
                     }
                 } label: {
-                    Label(NSLocalizedString("Review cleanup", comment: ""), systemImage: "trash")
+                    Label(String(localized: "Review cleanup", table: "Common"), systemImage: "trash")
                 }
                 .buttonStyle(PillButtonStyle(tint: .orange))
                 .disabled(
@@ -494,39 +494,39 @@ struct SettingsPanel: View {
     func semanticRecordingRetentionDayLabel(_ days: Int) -> String {
         switch days {
         case 0:
-            return NSLocalizedString("Until I delete", comment: "")
+            return String(localized: "Until I delete", table: "Common")
         case 1:
-            return NSLocalizedString("1 day", comment: "")
+            return String(localized: "1 day", table: "Common")
         default:
-            return String(format: NSLocalizedString("%d days", comment: ""), days)
+            return String(format: String(localized: "%d days", table: "Common"), days)
         }
     }
 
     @ViewBuilder
     func semanticRecordingSuppressionPanel() -> some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text(NSLocalizedString("Privacy exclusions", comment: ""))
+            Text("Privacy exclusions", tableName: "Common")
                 .font(.system(size: 10.5, weight: .semibold))
                 .foregroundStyle(.secondary)
 
             semanticRecordingTextSettingRow(
-                title: NSLocalizedString("Apps", comment: ""),
+                title: String(localized: "Apps", table: "Common"),
                 placeholder: "com.example.Bank",
                 text: $state.semanticRecordingExcludedApplicationBundleIDsText
             )
             semanticRecordingTextSettingRow(
-                title: NSLocalizedString("Windows", comment: ""),
-                placeholder: NSLocalizedString("Private Checkout", comment: ""),
+                title: String(localized: "Windows", table: "Common"),
+                placeholder: String(localized: "Private Checkout", table: "Common"),
                 text: $state.semanticRecordingExcludedWindowTitleFragmentsText
             )
             semanticRecordingTextSettingRow(
-                title: NSLocalizedString("Domains", comment: ""),
+                title: String(localized: "Domains", table: "Common"),
                 placeholder: "bank.example.com",
                 text: $state.semanticRecordingExcludedDomainsText
             )
 
             HStack {
-                Text(NSLocalizedString("Max artifact", comment: ""))
+                Text("Max artifact", tableName: "Common")
                     .font(.system(size: 11.5))
                 Spacer()
                 Picker("", selection: $state.semanticRecordingMaximumArtifactMegabytes) {
@@ -559,11 +559,11 @@ struct SettingsPanel: View {
     func semanticRecordingArtifactLimitLabel(_ megabytes: Int) -> String {
         switch megabytes {
         case 0:
-            return NSLocalizedString("No limit", comment: "")
+            return String(localized: "No limit", table: "Common")
         case 1024:
-            return NSLocalizedString("1 GB", comment: "")
+            return String(localized: "1 GB", table: "Common")
         default:
-            return String(format: NSLocalizedString("%d MB", comment: ""), megabytes)
+            return String(format: String(localized: "%d MB", table: "Common"), megabytes)
         }
     }
 
@@ -602,18 +602,18 @@ struct SettingsPanel: View {
             let preview = try await controller.semanticRecordingRetentionCleanupPreview()
             if preview.isEmpty {
                 semanticRetentionCleanupPreview = nil
-                state.statusMessage = NSLocalizedString("No expired visual evidence to clean up.", comment: "")
+                state.statusMessage = String(localized: "No expired visual evidence to clean up.", table: "Common")
                 return
             }
             semanticRetentionCleanupPreview = preview
             showSemanticRetentionCleanupConfirmation = true
             state.statusMessage = String(
-                format: NSLocalizedString("Found %d recording(s) with expired visual evidence.", comment: ""),
+                format: String(localized: "Found %d recording(s) with expired visual evidence.", table: "Common"),
                 preview.items.count
             )
         } catch {
             state.statusMessage = String(
-                format: NSLocalizedString("Visual evidence cleanup check failed: %@", comment: ""),
+                format: String(localized: "Visual evidence cleanup check failed: %@", table: "Common"),
                 error.localizedDescription
             )
         }
@@ -634,13 +634,13 @@ struct SettingsPanel: View {
             let deletedBundles = results.filter(\.deletedBundleDirectory).count
             semanticRetentionCleanupPreview = nil
             state.statusMessage = String(
-                format: NSLocalizedString("Cleaned up %d artifact(s) and %d bundle(s).", comment: ""),
+                format: String(localized: "Cleaned up %d artifact(s) and %d bundle(s).", table: "Common"),
                 deletedArtifacts,
                 deletedBundles
             )
         } catch {
             state.statusMessage = String(
-                format: NSLocalizedString("Visual evidence cleanup failed: %@", comment: ""),
+                format: String(localized: "Visual evidence cleanup failed: %@", table: "Common"),
                 error.localizedDescription
             )
         }
@@ -726,7 +726,7 @@ struct SettingsPanel: View {
             Button {
                 performSemanticRecordingPreflightAction(issue.action)
             } label: {
-                Label(NSLocalizedString("Open", comment: ""), systemImage: "arrow.up.forward.app")
+                Label(String(localized: "Open", table: "Common"), systemImage: "arrow.up.forward.app")
             }
             .buttonStyle(PillButtonStyle(tint: issue.severity == .blocking ? .red : .orange))
             .help(NSLocalizedString(issue.action.label, comment: ""))
@@ -791,14 +791,14 @@ struct SettingsPanel: View {
                 get: { binding.wrappedValue },
                 set: { newValue in
                     guard !taken.contains(newValue.keyCode) else {
-                        state.statusMessage = NSLocalizedString("That key is already assigned.", comment: "")
+                        state.statusMessage = String(localized: "That key is already assigned.", table: "Automation")
                         return
                     }
                     binding.wrappedValue = newValue
                 }
             )) {
                 ForEach(localOptions, id: \.self) { option in
-                    Text(taken.contains(option.keyCode) ? String(format: NSLocalizedString("%@ (in use)", comment: ""), option.name) : option.name)
+                    Text(taken.contains(option.keyCode) ? String(format: String(localized: "%@ (in use)", table: "Common"), option.name) : option.name)
                         .tag(option)
                 }
             }

@@ -48,7 +48,7 @@ enum AutomationOCRRegionPicker {
         onPicked: @escaping (AutomationOCRCondition, AutomationRegionCapturePreview?) -> Void
     ) {
         AutomationScreenRegionPicker.pickRegion(
-            instructionTitle: NSLocalizedString("Drag to select OCR region", comment: ""),
+            instructionTitle: String(localized: "Drag to select OCR region", table: "EditorUX"),
             onPicked: { selection in
                 let resolvedSpace = selection.resolvedSpace(for: searchRegionSpace)
                 guard let region = selection.searchRegion(in: resolvedSpace) else {

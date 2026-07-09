@@ -12,13 +12,13 @@ enum AutomationVisualConditionPresentation {
     static func title(for type: AutomationVisualConditionType) -> String {
         switch type {
         case .regionChanged:
-            return NSLocalizedString("Region changed", comment: "")
+            return String(localized: "Region changed", table: "EditorUX")
         case .imageAppeared:
-            return NSLocalizedString("Image appeared", comment: "")
+            return String(localized: "Image appeared", table: "Common")
         case .imageDisappeared:
-            return NSLocalizedString("Image disappeared", comment: "")
+            return String(localized: "Image disappeared", table: "Common")
         case .pixelMatched:
-            return NSLocalizedString("Pixel matched", comment: "")
+            return String(localized: "Pixel matched", table: "Common")
         }
     }
 
@@ -38,45 +38,45 @@ enum AutomationVisualConditionPresentation {
     static func detectorTitle(for type: AutomationVisualConditionType) -> String {
         switch type {
         case .regionChanged:
-            return NSLocalizedString("Detector: baseline diff", comment: "")
+            return String(localized: "Detector: baseline diff", table: "Common")
         case .imageAppeared, .imageDisappeared:
-            return NSLocalizedString("Detector: image template", comment: "")
+            return String(localized: "Detector: image template", table: "Common")
         case .pixelMatched:
-            return NSLocalizedString("Detector: pixel color", comment: "")
+            return String(localized: "Detector: pixel color", table: "Common")
         }
     }
 
     static func detectorDetail(for type: AutomationVisualConditionType) -> String {
         switch type {
         case .regionChanged:
-            return NSLocalizedString("Compares the watched area with a saved baseline image.", comment: "")
+            return String(localized: "Compares the watched area with a saved baseline image.", table: "Common")
         case .imageAppeared:
-            return NSLocalizedString("Looks for a saved image crop, such as an icon or button, inside the watched area.", comment: "")
+            return String(localized: "Looks for a saved image crop, such as an icon or button, inside the watched area.", table: "Common")
         case .imageDisappeared:
-            return NSLocalizedString("Continues when the saved image crop is absent from the watched area.", comment: "")
+            return String(localized: "Continues when the saved image crop is absent from the watched area.", table: "Common")
         case .pixelMatched:
-            return NSLocalizedString("Checks a target color at a pixel or small sampled area.", comment: "")
+            return String(localized: "Checks a target color at a pixel or small sampled area.", table: "Common")
         }
     }
 
     static func title(for progressKind: AutomationConditionProgressKind) -> String {
         switch progressKind {
         case .ocrText:
-            return NSLocalizedString("Screen text", comment: "")
+            return String(localized: "Screen text", table: "Recording")
         case .regionChanged:
-            return NSLocalizedString("Region changed", comment: "")
+            return String(localized: "Region changed", table: "EditorUX")
         case .imageAppeared:
-            return NSLocalizedString("Image appeared", comment: "")
+            return String(localized: "Image appeared", table: "Common")
         case .imageDisappeared:
-            return NSLocalizedString("Image disappeared", comment: "")
+            return String(localized: "Image disappeared", table: "Common")
         case .pixelMatched:
-            return NSLocalizedString("Pixel matched", comment: "")
+            return String(localized: "Pixel matched", table: "Common")
         case .previousOutcome:
-            return NSLocalizedString("Previous outcome", comment: "")
+            return String(localized: "Previous outcome", table: "Common")
         case .externalSignal:
-            return NSLocalizedString("External signal", comment: "")
+            return String(localized: "External signal", table: "Common")
         case .manualApproval:
-            return NSLocalizedString("Manual approval", comment: "")
+            return String(localized: "Manual approval", table: "Common")
         }
     }
 
@@ -104,29 +104,29 @@ enum AutomationVisualConditionPresentation {
 
 enum AutomationConditionObservationPresentation {
     static func ocrDetectorTitle() -> String {
-        NSLocalizedString("Detector: OCR text", comment: "")
+        String(localized: "Detector: OCR text", table: "Common")
     }
 
     static func ocrDetectorDetail() -> String {
-        NSLocalizedString("Recognizes visible text only; icons and drawings need a visual condition.", comment: "")
+        String(localized: "Recognizes visible text only; icons and drawings need a visual condition.", table: "Common")
     }
 
     static func scopeTitle(hasRegion: Bool) -> String {
         hasRegion
-            ? NSLocalizedString("Scope: selected region", comment: "")
-            : NSLocalizedString("Scope: full display", comment: "")
+            ? String(localized: "Scope: selected region", table: "Common")
+            : String(localized: "Scope: full display", table: "Common")
     }
 
     static func ocrScopeDetail(hasRegion: Bool) -> String {
         hasRegion
-            ? NSLocalizedString("Only text detected inside the selected region can match.", comment: "")
-            : NSLocalizedString("All detected text on the captured display can match.", comment: "")
+            ? String(localized: "Only text detected inside the selected region can match.", table: "Common")
+            : String(localized: "All detected text on the captured display can match.", table: "Common")
     }
 
     static func visualScopeDetail(hasRegion: Bool) -> String {
         hasRegion
-            ? NSLocalizedString("Only pixels inside the selected bounds are evaluated.", comment: "")
-            : NSLocalizedString("The visual check scans the whole captured display.", comment: "")
+            ? String(localized: "Only pixels inside the selected bounds are evaluated.", table: "Common")
+            : String(localized: "The visual check scans the whole captured display.", table: "Common")
     }
 }
 

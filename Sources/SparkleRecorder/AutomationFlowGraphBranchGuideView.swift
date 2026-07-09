@@ -8,7 +8,7 @@ struct AutomationFlowGraphBranchGuideView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Label(NSLocalizedString("Branch", comment: ""), systemImage: "arrow.triangle.branch")
+            Label(String(localized: "Branch", table: "Common"), systemImage: "arrow.triangle.branch")
                 .font(.caption)
                 .bold()
                 .foregroundStyle(.secondary)
@@ -52,23 +52,23 @@ struct AutomationFlowGraphBranchGuideView: View {
     }
 
     private func targetTitle(for edge: AutomationDependencyEdgeProjection) -> String {
-        targetTitles[edge.toTaskID] ?? NSLocalizedString("Missing task", comment: "")
+        targetTitles[edge.toTaskID] ?? String(localized: "Missing task", table: "Automation")
     }
 
     private func branchTitle(for triggerLabel: String) -> String {
         if isThenTrigger(triggerLabel) {
-            return NSLocalizedString("Then", comment: "")
+            return String(localized: "Then", table: "Common")
         }
         if isElseTrigger(triggerLabel) {
-            return NSLocalizedString("Else", comment: "")
+            return String(localized: "Else", table: "Common")
         }
         if isTimeoutTrigger(triggerLabel) {
-            return NSLocalizedString("Timeout", comment: "")
+            return String(localized: "Timeout", table: "Common")
         }
         if isCancelTrigger(triggerLabel) {
-            return NSLocalizedString("Cancel", comment: "")
+            return String(localized: "Cancel", table: "Common")
         }
-        return NSLocalizedString("Always", comment: "")
+        return String(localized: "Always", table: "Common")
     }
 
     private func triggerDetail(for edge: AutomationDependencyEdgeProjection) -> String? {
@@ -77,9 +77,9 @@ struct AutomationFlowGraphBranchGuideView: View {
             return decision.detail
         }
 
-        let noDelay = NSLocalizedString("No delay", comment: "")
+        let noDelay = String(localized: "No delay", table: "EditorUX")
         guard edge.delayLabel != noDelay else {
-            return branchTitle(for: edge.triggerLabel) == NSLocalizedString("Always", comment: "") ?
+            return branchTitle(for: edge.triggerLabel) == String(localized: "Always", table: "Common") ?
                 edge.triggerLabel :
                 nil
         }
@@ -87,38 +87,38 @@ struct AutomationFlowGraphBranchGuideView: View {
     }
 
     private func isThenTrigger(_ label: String) -> Bool {
-        label == NSLocalizedString("On success", comment: "") ||
-            label == NSLocalizedString("Success", comment: "") ||
-            label == NSLocalizedString("Condition matched", comment: "")
+        label == String(localized: "On success", table: "Common") ||
+            label == String(localized: "Success", table: "Common") ||
+            label == String(localized: "Condition matched", table: "Automation")
     }
 
     private func isElseTrigger(_ label: String) -> Bool {
-        label == NSLocalizedString("On failure", comment: "") ||
-            label == NSLocalizedString("Failure", comment: "") ||
-            label == NSLocalizedString("Condition not matched", comment: "")
+        label == String(localized: "On failure", table: "Common") ||
+            label == String(localized: "Failure", table: "Common") ||
+            label == String(localized: "Condition not matched", table: "Automation")
     }
 
     private func isTimeoutTrigger(_ label: String) -> Bool {
-        label == NSLocalizedString("On timeout", comment: "") ||
-            label == NSLocalizedString("Timeout", comment: "")
+        label == String(localized: "On timeout", table: "Common") ||
+            label == String(localized: "Timeout", table: "Common")
     }
 
     private func isCancelTrigger(_ label: String) -> Bool {
-        label == NSLocalizedString("On cancel", comment: "") ||
-            label == NSLocalizedString("Cancelled", comment: "")
+        label == String(localized: "On cancel", table: "Common") ||
+            label == String(localized: "Cancelled", table: "Common")
     }
 
     private var accessibilitySummary: String {
         let rows = edges.map { edge in
             String(
-                format: NSLocalizedString("%@ to %@", comment: ""),
+                format: String(localized: "%@ to %@", table: "Common"),
                 branchTitle(for: edge.triggerLabel),
                 targetTitle(for: edge)
             )
         }
         .joined(separator: ", ")
         return String(
-            format: NSLocalizedString("Branches from %@: %@", comment: ""),
+            format: String(localized: "Branches from %@: %@", table: "Common"),
             sourceTitle,
             rows
         )

@@ -8,7 +8,7 @@ struct AutomationRefreshStatusView: View {
         if refreshState.isLoading {
             ProgressView()
                 .controlSize(.small)
-                .accessibilityLabel(NSLocalizedString("Refreshing automation projection", comment: ""))
+                .accessibilityLabel(String(localized: "Refreshing automation projection", table: "Automation"))
         } else if let failure = refreshState.failure {
             Label(failure.message, systemImage: "exclamationmark.triangle.fill")
                 .font(.caption)

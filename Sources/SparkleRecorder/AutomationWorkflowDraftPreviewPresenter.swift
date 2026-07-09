@@ -10,7 +10,7 @@ enum AutomationWorkflowDraftPreviewPresenter {
         onPreview: @escaping (AutomationWorkflowDraftPreviewState) -> Void
     ) {
         let panel = NSOpenPanel()
-        panel.title = NSLocalizedString("Open Workflow Draft", comment: "")
+        panel.title = String(localized: "Open Workflow Draft", table: "Automation")
         panel.allowsMultipleSelection = false
         panel.canChooseDirectories = false
         panel.allowedContentTypes = [.json]
@@ -26,7 +26,7 @@ enum AutomationWorkflowDraftPreviewPresenter {
                 onPreview(state)
             } catch {
                 showError(
-                    title: NSLocalizedString("Draft preview failed", comment: ""),
+                    title: String(localized: "Draft preview failed", table: "Common"),
                     message: String(describing: error)
                 )
             }
@@ -39,7 +39,7 @@ enum AutomationWorkflowDraftPreviewPresenter {
         onApply: @escaping (Result<AutomationWorkflowDraftEditResult, Error>) -> Void
     ) {
         let panel = NSOpenPanel()
-        panel.title = NSLocalizedString("Apply Workflow Draft Patch", comment: "")
+        panel.title = String(localized: "Apply Workflow Draft Patch", table: "Automation")
         panel.allowsMultipleSelection = false
         panel.canChooseDirectories = false
         panel.allowedContentTypes = [.json]

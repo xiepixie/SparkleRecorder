@@ -38,7 +38,7 @@ struct AutomationFlowGraphEdgeLabelView: View {
     }
 
     private var showsDelay: Bool {
-        edge.delayLabel != NSLocalizedString("No delay", comment: "")
+        edge.delayLabel != String(localized: "No delay", table: "EditorUX")
     }
 
     private var decisionLabel: String? {

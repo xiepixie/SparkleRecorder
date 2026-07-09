@@ -176,11 +176,11 @@ struct AutomationMainContentView: View {
             recordedTaskReviewDraft ?? AutomationRecordedTaskReviewDraft(
                 workflowID: selectedRawWorkflow?.id ?? UUID(),
                 task: AutomationTask(
-                    name: NSLocalizedString("Recorded task", comment: ""),
+                    name: String(localized: "Recorded task", table: "Automation"),
                     kind: .delay(0)
                 ),
                 macroID: currentMacroID ?? UUID(),
-                nameDraft: NSLocalizedString("Recorded task", comment: ""),
+                nameDraft: String(localized: "Recorded task", table: "Automation"),
                 loopsDraft: 1
             )
         } set: { draft in
@@ -257,7 +257,7 @@ struct AutomationMainContentView: View {
                     if let workflow {
                         VStack(spacing: 0) {
                             HStack {
-                                Button(NSLocalizedString("Toggle Left Sidebar", comment: ""), systemImage: "sidebar.left", action: { withAnimation { isLeftSidebarVisible.toggle() } })
+                                Button(String(localized: "Toggle Left Sidebar", table: "Common"), systemImage: "sidebar.left", action: { withAnimation { isLeftSidebarVisible.toggle() } })
                                 .labelStyle(.iconOnly)
                                 .buttonStyle(.plain)
                                 .padding(.horizontal, 8)
@@ -266,21 +266,21 @@ struct AutomationMainContentView: View {
                                 Spacer()
 
                                 Picker("", selection: $centralTab) {
-                                    Text(NSLocalizedString("Canvas", comment: "")).tag(AutomationCentralTab.editor)
-                                    Text(NSLocalizedString("Workflow", comment: "")).tag(AutomationCentralTab.settings)
+                                    Text("Canvas", tableName: "Common").tag(AutomationCentralTab.editor)
+                                    Text("Workflow", tableName: "Automation").tag(AutomationCentralTab.settings)
                                 }
                                 .pickerStyle(.segmented)
                                 .frame(width: 250)
 
                                 Spacer()
 
-                                Button(NSLocalizedString("Toggle Right Sidebar", comment: ""), systemImage: "sidebar.right", action: { withAnimation { isRightSidebarVisible.toggle() } })
+                                Button(String(localized: "Toggle Right Sidebar", table: "Common"), systemImage: "sidebar.right", action: { withAnimation { isRightSidebarVisible.toggle() } })
                                 .labelStyle(.iconOnly)
                                 .buttonStyle(.plain)
                                 .padding(.horizontal, 8)
                                 .opacity(isRightSidebarVisible ? 1.0 : 0.6)
 
-                                Button(NSLocalizedString("Auto Arrange", comment: ""), systemImage: "wand.and.stars") {
+                                Button(String(localized: "Auto Arrange", table: "Common"), systemImage: "wand.and.stars") {
                                     autoArrangeTasks()
                                 }
                                 .labelStyle(.iconOnly)
@@ -370,8 +370,8 @@ struct AutomationMainContentView: View {
                                 } else {
                                     AutomationEmptyState(
                                         systemImage: "gearshape",
-                                        title: NSLocalizedString("No workflow selected", comment: ""),
-                                        subtitle: NSLocalizedString("Create a workflow to view workflow details.", comment: "")
+                                        title: String(localized: "No workflow selected", table: "Automation"),
+                                        subtitle: String(localized: "Create a workflow to view workflow details.", table: "Automation")
                                     )
                                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                                 }
@@ -412,8 +412,8 @@ struct AutomationMainContentView: View {
                     } else {
                         AutomationEmptyState(
                             systemImage: "point.topleft.down.curvedto.point.bottomright.up",
-                            title: NSLocalizedString("No workflows", comment: ""),
-                            subtitle: NSLocalizedString("Create a workflow to start arranging macros and conditions.", comment: "")
+                            title: String(localized: "No workflows", table: "Automation"),
+                            subtitle: String(localized: "Create a workflow to start arranging macros and conditions.", table: "Automation")
                         )
                             .frame(maxWidth: .infinity, maxHeight: .infinity)
                     }
@@ -481,7 +481,7 @@ struct AutomationMainContentView: View {
     private func createWorkflow() {
         let date = Date()
         let workflow = AutomationWorkflow(
-            name: NSLocalizedString("New Workflow", comment: ""),
+            name: String(localized: "New Workflow", table: "Automation"),
             createdAt: date,
             modifiedAt: date
         )
@@ -538,7 +538,7 @@ struct AutomationMainContentView: View {
     private func exportWorkflowPackage() {
         AutomationWorkflowPackagePresenter.export(
             workflows: state.workflows,
-            defaultName: NSLocalizedString("Workflows", comment: "")
+            defaultName: String(localized: "Workflows", table: "Automation")
         )
     }
 
@@ -549,7 +549,7 @@ struct AutomationMainContentView: View {
     private func shareWorkflowPackage() {
         AutomationWorkflowPackagePresenter.share(
             workflows: state.workflows,
-            defaultName: NSLocalizedString("Workflows", comment: "")
+            defaultName: String(localized: "Workflows", table: "Automation")
         )
     }
 
@@ -825,7 +825,7 @@ struct AutomationMainContentView: View {
             return AutomationInsertedMacroTask(workflowID: workflow.id, task: task)
         } else {
             let workflow = AutomationWorkflow(
-                name: NSLocalizedString("New Workflow", comment: ""),
+                name: String(localized: "New Workflow", table: "Automation"),
                 tasks: [task],
                 createdAt: date,
                 modifiedAt: date
@@ -906,15 +906,15 @@ struct AutomationMainContentView: View {
         let name: String
         switch kind {
         case .manualApproval:
-            name = NSLocalizedString("Manual approval", comment: "")
+            name = String(localized: "Manual approval", table: "Common")
         case .externalSignal(let signalName):
-            name = signalName.isEmpty ? NSLocalizedString("External signal", comment: "") : signalName
+            name = signalName.isEmpty ? String(localized: "External signal", table: "Common") : signalName
         case .ocrText:
-            name = NSLocalizedString("Text condition", comment: "")
+            name = String(localized: "Text condition", table: "Automation")
         case .visual(let condition):
             name = visualConditionName(for: condition)
         case .previousOutcome:
-            name = NSLocalizedString("Previous outcome", comment: "")
+            name = String(localized: "Previous outcome", table: "Common")
         }
 
         let task = AutomationTask(
@@ -941,13 +941,13 @@ struct AutomationMainContentView: View {
     private func visualConditionName(for condition: AutomationVisualCondition) -> String {
         switch condition.type {
         case .regionChanged:
-            return NSLocalizedString("Region changed", comment: "")
+            return String(localized: "Region changed", table: "EditorUX")
         case .imageAppeared:
-            return NSLocalizedString("Image appeared", comment: "")
+            return String(localized: "Image appeared", table: "Common")
         case .imageDisappeared:
-            return NSLocalizedString("Image disappeared", comment: "")
+            return String(localized: "Image disappeared", table: "Common")
         case .pixelMatched:
-            return NSLocalizedString("Pixel matched", comment: "")
+            return String(localized: "Pixel matched", table: "Common")
         }
     }
 
@@ -1190,13 +1190,13 @@ private struct AutomationRecordedTaskReviewBar: View {
     private var statusLabel: some View {
         Label {
             VStack(alignment: .leading, spacing: 1) {
-                Text(NSLocalizedString("Recorded task", comment: ""))
+                Text("Recorded task", tableName: "Automation")
                     .font(.caption)
                     .fontWeight(.semibold)
                     .foregroundStyle(.primary)
                     .lineLimit(1)
 
-                Text(NSLocalizedString("Saved as source macro", comment: ""))
+                Text("Saved as source macro", tableName: "EditorUX")
                     .font(.caption2)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
@@ -1209,14 +1209,14 @@ private struct AutomationRecordedTaskReviewBar: View {
     }
 
     private var nameField: some View {
-        TextField(NSLocalizedString("Task name", comment: ""), text: nameBinding)
+        TextField(String(localized: "Task name", table: "Automation"), text: nameBinding)
             .textFieldStyle(.roundedBorder)
             .onSubmit(onApply)
     }
 
     private var repeatControls: some View {
         HStack(spacing: 6) {
-            Picker(NSLocalizedString("Source repeat", comment: ""), selection: loopsBinding) {
+            Picker(String(localized: "Source repeat", table: "Common"), selection: loopsBinding) {
                 ForEach(loopPresets, id: \.self) { loops in
                     Text(loopPresetTitle(loops)).tag(loops)
                 }
@@ -1236,7 +1236,7 @@ private struct AutomationRecordedTaskReviewBar: View {
             Button {
                 onApply()
             } label: {
-                Label(NSLocalizedString("Apply", comment: ""), systemImage: "checkmark")
+                Label(String(localized: "Apply", table: "Common"), systemImage: "checkmark")
             }
             .buttonStyle(AutomationQuietButtonStyle())
             .disabled(!canApply)
@@ -1248,18 +1248,18 @@ private struct AutomationRecordedTaskReviewBar: View {
             }
             .buttonStyle(.plain)
             .foregroundStyle(.secondary)
-            .accessibilityLabel(NSLocalizedString("Dismiss", comment: ""))
+            .accessibilityLabel(String(localized: "Dismiss", table: "Common"))
         }
     }
 
     private func loopPresetTitle(_ loops: Int) -> String {
         switch loops {
         case 0:
-            return NSLocalizedString("Continuous", comment: "")
+            return String(localized: "Continuous", table: "Common")
         case 1:
-            return NSLocalizedString("Once", comment: "")
+            return String(localized: "Once", table: "Common")
         default:
-            return String(format: NSLocalizedString("%d×", comment: ""), loops)
+            return String(format: String(localized: "%d×", table: "Common"), loops)
         }
     }
 }

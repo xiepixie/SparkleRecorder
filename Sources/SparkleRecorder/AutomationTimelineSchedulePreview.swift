@@ -21,9 +21,9 @@ enum AutomationTimelineScheduleMode: String, CaseIterable, Identifiable {
     var title: String {
         switch self {
         case .once:
-            return NSLocalizedString("Once", comment: "")
+            return String(localized: "Once", table: "Common")
         case .repeating:
-            return NSLocalizedString("Repeat", comment: "")
+            return String(localized: "Repeat", table: "Common")
         }
     }
 }
@@ -39,13 +39,13 @@ enum AutomationTimelineRepeatUnit: String, CaseIterable, Identifiable {
     var title: String {
         switch self {
         case .minutes:
-            return NSLocalizedString("Minutes", comment: "")
+            return String(localized: "Minutes", table: "Common")
         case .hours:
-            return NSLocalizedString("Hours", comment: "")
+            return String(localized: "Hours", table: "Common")
         case .days:
-            return NSLocalizedString("Days", comment: "")
+            return String(localized: "Days", table: "Common")
         case .weeks:
-            return NSLocalizedString("Weeks", comment: "")
+            return String(localized: "Weeks", table: "Common")
         }
     }
 
@@ -53,20 +53,20 @@ enum AutomationTimelineRepeatUnit: String, CaseIterable, Identifiable {
         switch self {
         case .minutes:
             return count == 1
-                ? NSLocalizedString("minute", comment: "")
-                : NSLocalizedString("minutes", comment: "")
+                ? String(localized: "minute", table: "Common")
+                : String(localized: "minutes", table: "Common")
         case .hours:
             return count == 1
-                ? NSLocalizedString("hour", comment: "")
-                : NSLocalizedString("hours", comment: "")
+                ? String(localized: "hour", table: "Common")
+                : String(localized: "hours", table: "Common")
         case .days:
             return count == 1
-                ? NSLocalizedString("day", comment: "")
-                : NSLocalizedString("days", comment: "")
+                ? String(localized: "day", table: "Common")
+                : String(localized: "days", table: "Common")
         case .weeks:
             return count == 1
-                ? NSLocalizedString("week", comment: "")
-                : NSLocalizedString("weeks", comment: "")
+                ? String(localized: "week", table: "Common")
+                : String(localized: "weeks", table: "Common")
         }
     }
 
@@ -177,7 +177,7 @@ struct AutomationTimelineSchedulePreview: View {
     }
 
     private var modePicker: some View {
-        Picker(NSLocalizedString("Schedule", comment: ""), selection: $scheduleMode) {
+        Picker(String(localized: "Schedule", table: "Common"), selection: $scheduleMode) {
             ForEach(AutomationTimelineScheduleMode.allCases) { mode in
                 Text(mode.title).tag(mode)
             }
@@ -190,7 +190,7 @@ struct AutomationTimelineSchedulePreview: View {
 
     private var datePicker: some View {
         DatePicker(
-            NSLocalizedString("Start", comment: ""),
+            String(localized: "Start", table: "Common"),
             selection: $selectedDate,
             displayedComponents: [.date, .hourAndMinute]
         )
@@ -203,16 +203,16 @@ struct AutomationTimelineSchedulePreview: View {
     private var repeatControls: some View {
         if scheduleMode == .repeating {
             HStack(spacing: 6) {
-                Text(NSLocalizedString("Every", comment: ""))
+                Text("Every", tableName: "Common")
                     .font(.caption)
                     .foregroundStyle(.secondary)
 
-                TextField(NSLocalizedString("Count", comment: ""), value: $repeatEveryDraft, format: .number)
+                TextField(String(localized: "Count", table: "Common"), value: $repeatEveryDraft, format: .number)
                     .textFieldStyle(.roundedBorder)
                     .font(.caption.monospacedDigit())
                     .frame(width: 48)
 
-                Picker(NSLocalizedString("Unit", comment: ""), selection: $repeatUnitDraft) {
+                Picker(String(localized: "Unit", table: "Common"), selection: $repeatUnitDraft) {
                     ForEach(AutomationTimelineRepeatUnit.allCases) { unit in
                         Text(unit.title).tag(unit)
                     }
@@ -231,7 +231,7 @@ struct AutomationTimelineSchedulePreview: View {
     private var repeatPreviewRow: some View {
         if scheduleMode == .repeating {
             HStack(spacing: 6) {
-                Text(NSLocalizedString("Next", comment: ""))
+                Text("Next", tableName: "Common")
                     .font(.system(size: 10.5, weight: .semibold))
                     .foregroundStyle(.secondary)
 
@@ -266,11 +266,11 @@ struct AutomationTimelineSchedulePreview: View {
 
     private var title: String {
         if scheduleMode == .repeating {
-            return NSLocalizedString("Repeating start", comment: "")
+            return String(localized: "Repeating start", table: "Common")
         }
         return date == nil
-            ? NSLocalizedString("Workflow start", comment: "")
-            : NSLocalizedString("Next start", comment: "")
+            ? String(localized: "Workflow start", table: "Automation")
+            : String(localized: "Next start", table: "Common")
     }
 
     private var titleIcon: String {
@@ -282,9 +282,9 @@ struct AutomationTimelineSchedulePreview: View {
 
     private var scheduleDetail: String {
         let time = selectedDate.formatted(date: .abbreviated, time: .shortened)
-        let subject = taskName?.isEmpty == false ? taskName! : NSLocalizedString("Workflow", comment: "")
+        let subject = taskName?.isEmpty == false ? taskName! : String(localized: "Workflow", table: "Automation")
         if scheduleMode == .repeating {
-            let format = NSLocalizedString("%@ · %@ · Every %d %@", comment: "")
+            let format = String(localized: "%@ · %@ · Every %d %@", table: "Common")
             let count = max(1, repeatEveryDraft)
             return String(format: format, subject, time, count, repeatUnitDraft.detailTitle(count: count))
         }
@@ -307,8 +307,8 @@ struct AutomationTimelineSchedulePreview: View {
 
     private var applyTitle: String {
         schedule == nil || schedule == .manual
-            ? NSLocalizedString("Schedule", comment: "")
-            : NSLocalizedString("Apply", comment: "")
+            ? String(localized: "Schedule", table: "Common")
+            : String(localized: "Apply", table: "Common")
     }
 
     private func syncDraft() {

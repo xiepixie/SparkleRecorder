@@ -12,13 +12,13 @@ struct LibrarySidebar: View {
         VStack(alignment: .leading, spacing: 0) {
             ScrollView {
                 VStack(alignment: .leading, spacing: 4) {
-                    sectionHeader(NSLocalizedString("Library", comment: ""))
+                    sectionHeader(String(localized: "Library", table: "Common"))
                     ForEach(filterItems, id: \.self) { item in
                         sidebarRow(item)
                     }
 
                     if !library.allAccents.isEmpty {
-                        sectionHeader(NSLocalizedString("Colors", comment: ""))
+                        sectionHeader(String(localized: "Colors", table: "Common"))
                             .padding(.top, 14)
                         ForEach(library.allAccents, id: \.self) { name in
                             sidebarRow(.accent(name))
@@ -26,14 +26,14 @@ struct LibrarySidebar: View {
                     }
 
                     if !library.allTags.isEmpty {
-                        sectionHeader(NSLocalizedString("Tags", comment: ""))
+                        sectionHeader(String(localized: "Tags", table: "Common"))
                             .padding(.top, 14)
                         ForEach(library.allTags, id: \.self) { t in
                             sidebarRow(.tag(t))
                         }
                     }
 
-	                    sectionHeader(NSLocalizedString("Stats", comment: ""))
+	                    sectionHeader(String(localized: "Stats", table: "Common"))
 	                        .padding(.top, 14)
 	                    StatsSummary()
                 }

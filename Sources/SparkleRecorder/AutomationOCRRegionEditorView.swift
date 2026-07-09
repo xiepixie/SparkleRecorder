@@ -52,7 +52,7 @@ struct AutomationOCRRegionEditorView: View {
                 regionFields
 
                 Button(action: onClear) {
-                    Label(NSLocalizedString("Clear Region", comment: ""), systemImage: "xmark.circle")
+                    Label(String(localized: "Clear Region", table: "EditorUX"), systemImage: "xmark.circle")
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
                 .buttonStyle(.bordered)
@@ -61,14 +61,14 @@ struct AutomationOCRRegionEditorView: View {
 
             HStack(spacing: 8) {
                 Button(action: onPickText) {
-                    Label(NSLocalizedString("Pick Text Region", comment: ""), systemImage: "text.viewfinder")
+                    Label(String(localized: "Pick Text Region", table: "EditorUX"), systemImage: "text.viewfinder")
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
                 .buttonStyle(.bordered)
                 .tint(Brand.sigAmber)
 
                 Button(action: onDraw) {
-                    Label(NSLocalizedString("Draw Region", comment: ""), systemImage: "viewfinder.rectangular")
+                    Label(String(localized: "Draw Region", table: "EditorUX"), systemImage: "viewfinder.rectangular")
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
                 .buttonStyle(.bordered)
@@ -96,7 +96,7 @@ struct AutomationOCRRegionEditorView: View {
                         .frame(width: previewRect.width, height: previewRect.height)
                         .offset(x: previewRect.minX, y: previewRect.minY)
                 } else {
-                    Label(NSLocalizedString("No region selected", comment: ""), systemImage: "viewfinder")
+                    Label(String(localized: "No region selected", table: "EditorUX"), systemImage: "viewfinder")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -109,18 +109,18 @@ struct AutomationOCRRegionEditorView: View {
 
     private var regionFields: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text(NSLocalizedString("Region bounds", comment: ""))
+            Text("Region bounds", tableName: "EditorUX")
                 .font(.caption)
                 .foregroundStyle(.secondary)
 
             HStack(spacing: 8) {
-                numericField(NSLocalizedString("X", comment: ""), value: $regionX)
-                numericField(NSLocalizedString("Y", comment: ""), value: $regionY)
+                numericField(String(localized: "X", table: "Common"), value: $regionX)
+                numericField(String(localized: "Y", table: "Common"), value: $regionY)
             }
 
             HStack(spacing: 8) {
-                numericField(NSLocalizedString("W", comment: ""), value: $regionWidth)
-                numericField(NSLocalizedString("H", comment: ""), value: $regionHeight)
+                numericField(String(localized: "W", table: "Common"), value: $regionWidth)
+                numericField(String(localized: "H", table: "Common"), value: $regionHeight)
             }
         }
     }
@@ -175,11 +175,11 @@ struct AutomationOCRRegionEditorView: View {
 
     private var previewAccessibilityLabel: String {
         guard hasRegion else {
-            return NSLocalizedString("No region selected", comment: "")
+            return String(localized: "No region selected", table: "EditorUX")
         }
 
         return String(
-            format: NSLocalizedString("%@ region: x %@, y %@, width %@, height %@", comment: ""),
+            format: String(localized: "%@ region: x %@, y %@, width %@, height %@", table: "EditorUX"),
             spaceTitle,
             formatted(regionX),
             formatted(regionY),

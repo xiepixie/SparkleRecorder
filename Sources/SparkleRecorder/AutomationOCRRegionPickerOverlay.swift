@@ -121,7 +121,7 @@ private struct OCRRegionPickerInstructionView: View {
                     .font(.caption)
                     .bold()
                     .foregroundStyle(.white)
-                Text(NSLocalizedString("Press ESC to cancel", comment: ""))
+                Text("Press ESC to cancel", tableName: "Common")
                     .font(.caption)
                     .foregroundStyle(.white.opacity(0.7))
             }
@@ -152,7 +152,7 @@ final class AutomationOCRRegionPickerOverlay {
     var onCancelled: (() -> Void)?
 
     func start(
-        instructionTitle: String = NSLocalizedString("Drag to select OCR region", comment: "")
+        instructionTitle: String = String(localized: "Drag to select OCR region", table: "EditorUX")
     ) {
         stop()
 

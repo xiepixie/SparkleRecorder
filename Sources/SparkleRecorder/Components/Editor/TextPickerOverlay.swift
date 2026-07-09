@@ -34,15 +34,15 @@ private struct TextPickerView: View {
     
     private var statusText: String {
         if isProcessing {
-            return NSLocalizedString("Scanning for text...", comment: "")
+            return String(localized: "Scanning for text...", table: "EditorUX")
         }
         if !isArmed {
-            return String(format: NSLocalizedString("Ready in %ds. Move to the target text.", comment: ""), max(1, armSecondsRemaining))
+            return String(format: String(localized: "Ready in %ds. Move to the target text.", table: "EditorUX"), max(1, armSecondsRemaining))
         }
         if mappedDetections.isEmpty {
-            return NSLocalizedString("No readable text found. Press ESC to cancel.", comment: "")
+            return String(localized: "No readable text found. Press ESC to cancel.", table: "EditorUX")
         }
-        return NSLocalizedString("Point near the text to select. Click to confirm.", comment: "")
+        return String(localized: "Point near the text to select. Click to confirm.", table: "EditorUX")
     }
     
     private func nearestDetectionIndex(to location: CGPoint?) -> Int? {
@@ -311,7 +311,7 @@ private struct DetectionBoxView: View {
                 VStack(alignment: .leading, spacing: 3) {
                     Text(det.text)
                         .font(.system(size: 12, weight: .semibold))
-                    Text(String(format: NSLocalizedString("Text box %d×%d · search %d×%d", comment: ""), Int(rect.width), Int(rect.height), Int(searchLocalRect.width), Int(searchLocalRect.height)))
+                    Text(String(format: String(localized: "Text box %d×%d · search %d×%d", table: "EditorUX"), Int(rect.width), Int(rect.height), Int(searchLocalRect.width), Int(searchLocalRect.height)))
                         .font(.system(size: 10, design: .monospaced))
                         .foregroundStyle(.secondary)
                 }
