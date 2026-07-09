@@ -28,11 +28,23 @@ struct EditorSidebar: View {
     let onAddClickPoint: () -> Void
     let onPickText: () -> Void
     let onRefreshRows: () -> [ActionRow]
-    let onCreateRepeatUntilDraft: () -> Void
+    let onCreateRepeatUntilDraft: (Int, TimeInterval, TimeInterval, String) -> Void
 
     @State private var insertWaitMs: Double = 1000
     @State private var confirmClearAll = false
+    @State private var loopMaxAttempts: Int = 10
+    @State private var loopTimeoutSeconds: Double = 30.0
+    @State private var loopPollingSeconds: Double = 1.0
+    @State private var loopFailurePolicy: String = "failRun"
     @Environment(\.undoManager) private var undoManager
+
+    enum SidebarTab: String, CaseIterable, Identifiable {
+        case inspector = "Inspector"
+        case orchestrate = "Orchestrate"
+        case insert = "Insert"
+        var id: String { rawValue }
+    }
+    @State private var currentTab: SidebarTab = .inspector
 
     struct ActionInsertionPlacement {
         var eventIndex: Int
@@ -40,586 +52,918 @@ struct EditorSidebar: View {
     }
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 14) {
-		                // Section 1: Action setup (target, playback strategy, and position)
-		                section(NSLocalizedString("Selected action", comment: ""), icon: "slider.horizontal.3") {
-	                    if selection.count == 1, let id = selection.first,
-	                       let row = rows.first(where: { $0.id == id }) {
-	                        let grp = row.group
-	                        let firstEvent = firstEvent(for: grp)
-	                        HStack {
-                            Image(systemName: actionKindIcon(grp.kind))
-                                .foregroundStyle(actionKindColor(grp.kind))
-                                .font(.system(size: 12))
-                            VStack(alignment: .leading, spacing: 0) {
-                                let actionNumber = (rows.firstIndex(where: { $0.id == id }) ?? 0) + 1
-                                Text(String(format: NSLocalizedString("Action #%d", comment: ""), actionNumber))
-                                    .font(.system(size: 11, weight: .semibold))
-                                Text(humanActionKindName(grp.kind))
-                                    .font(.system(size: 10))
-                                    .foregroundStyle(.secondary)
-	                            }
-	                        }
-                            workflowHint(for: grp, event: firstEvent)
-                            let inspectorWarning = actionInspectorInputWarning(
-                                for: grp,
-                                timeText: inspTime,
-                                xText: inspX,
-                                yText: inspY,
-                                endXText: inspEndX,
-                                endYText: inspEndY,
-                                keyText: inspKey,
-                                strategy: inspStrategy,
-                                timeout: inspTimeout
-                            )
-	 
-		                        inspectorGrid {
-			                            labeledField(grp.kind.isPassiveWait ? NSLocalizedString("Wait Duration (s)", comment: "") : NSLocalizedString("Time (s)", comment: ""), text: $inspTime)
-		                        
-		                            if grp.kind == .waitForText || grp.kind == .waitForTextGone {
-		                                labeledDoubleField(NSLocalizedString("Timeout (s)", comment: ""), value: $inspTimeout)
-		                            }
-		                        
-			                            if grp.kind.canUseLocatorStrategy {
-		                                gridField(NSLocalizedString("Strategy", comment: "")) {
-		                                    Picker("", selection: Binding(
-		                                        get: { inspStrategy },
-		                                        set: { inspStrategy = $0; applyInspector() }
-		                                    )) {
-		                                        Text(NSLocalizedString("Offset", comment: "")).tag(CoordinateStrategy.windowLocalPreferred)
-		                                        Text(NSLocalizedString("Proportional", comment: "")).tag(CoordinateStrategy.normalizedPreferred)
-		                                        Text(NSLocalizedString("Absolute", comment: "")).tag(CoordinateStrategy.absoluteOnly)
-		                                        Text(NSLocalizedString("Text (OCR)", comment: "")).tag(CoordinateStrategy.locatorOnly)
-		                                    }
-		                                    .pickerStyle(.segmented)
-		                                    .labelsHidden()
-		                                    .controlSize(.small)
-		                                }
-		                                
-		                                if inspStrategy == .locatorOnly {
-		                                    labeledDoubleField(NSLocalizedString("Timeout (s)", comment: ""), value: $inspTimeout)
-		                                    gridField(NSLocalizedString("Target Text", comment: "")) {
-		                                        TargetTextEditorInnerView(text: Binding(get: { inspOCRText }, set: { inspOCRText = $0; applyInspector() }), onPick: onPickText)
-		                                    }
-		                                    gridField(NSLocalizedString("Fallback", comment: "")) {
-		                                        locatorPlaybackPolicyView()
-		                                    }
-		                                } else {
-		                                    labeledField("X", text: $inspX)
-		                                    labeledField("Y", text: $inspY)
-		                                }
-			                            } else if grp.kind.editsPathTarget {
-		                                gridField(NSLocalizedString("Start", comment: "")) { Text("") }
-		                                labeledField("X", text: $inspX)
-		                                labeledField("Y", text: $inspY)
-		                                gridField(NSLocalizedString("End", comment: "")) { Text("") }
-		                                labeledField("X", text: $inspEndX)
-		                                labeledField("Y", text: $inspEndY)
-		                            }
-		                        
-			                            if grp.kind.editsKeyboardInput {
-		                                gridField(NSLocalizedString("Key code", comment: "")) {
-		                                    ShortcutRecorderField(
-		                                        currentBinding: keyboardShortcutBinding(for: grp),
-		                                        allHotkeys: [],
-		                                        allowsClear: false,
-		                                        recordingPrompt: NSLocalizedString("Press any key…", comment: ""),
-		                                        emptyPrompt: NSLocalizedString("Click to record shortcut", comment: ""),
-		                                        onRecord: applyRecordedShortcut
-		                                    )
-		                                }
-		                                labeledField(NSLocalizedString("Raw Code", comment: ""), text: $inspKey)
-			                            } else if grp.kind.editsSemanticTextTarget {
-			                                gridField(NSLocalizedString("Target Text", comment: "")) {
-			                                    TargetTextEditorInnerView(text: Binding(get: { inspOCRText }, set: { inspOCRText = $0; applyInspector() }), onPick: onPickText)
-			                                }
-                                if grp.kind == .waitForText || grp.kind == .waitForTextGone || grp.kind == .verifyText {
-			                                    gridField(NSLocalizedString("Must Exist", comment: "")) {
-			                                    Toggle("", isOn: Binding(
-			                                        get: { inspVerifyMustExist },
-			                                        set: { inspVerifyMustExist = $0; applyInspector() }
-			                                    ))
-			                                    .labelsHidden()
-			                                    .controlSize(.small)
-			                                    }
-			                                }
-			                            }
-			                        }
-
-                                if inspectorWarning.isWarning {
-                                    HStack(alignment: .top, spacing: 6) {
-                                        Image(systemName: "exclamationmark.triangle")
-                                            .font(.system(size: 10, weight: .semibold))
-                                            .foregroundStyle(Brand.sigAmber)
-                                            .frame(width: 14)
-                                        Text(actionInspectorInputWarningHelp(inspectorWarning))
-                                            .font(.system(size: 10))
-                                            .foregroundStyle(.secondary)
-                                            .fixedSize(horizontal: false, vertical: true)
-                                    }
-                                    .padding(.vertical, 2)
-                                }
-
-                                if grp.kind == .multiPointClick {
-                                    multiPointClickEditor(for: grp)
-                                }
-
-                                if grp.kind.canConvertClickType {
-                                    VStack(alignment: .leading, spacing: 6) {
-                                        Text(NSLocalizedString("Action Type", comment: ""))
-                                            .font(.system(size: 9.5, weight: .semibold))
-                                            .foregroundStyle(.secondary)
-                                        Picker("", selection: Binding(
-                                            get: { grp.kind },
-                                            set: { convertClickType(grp: grp, newKind: $0) }
-                                        )) {
-                                            Text(NSLocalizedString("Click", comment: "")).tag(ActionGroupKind.click)
-                                            Text(NSLocalizedString("Double", comment: "")).tag(ActionGroupKind.doubleClick)
-                                            Text(NSLocalizedString("Triple+", comment: "")).tag(ActionGroupKind.repeatedClick)
-                                            Text(NSLocalizedString("Long Press", comment: "")).tag(ActionGroupKind.longPress)
-                                        }
-                                        .pickerStyle(.segmented)
-                                        .labelsHidden()
-                                        .controlSize(.small)
-                                    }
-                                }
-
-                                if grp.kind.canRetargetCoordinate && inspStrategy != .locatorOnly {
-                                    Button(action: { onPickCoordinate(false) }) {
-                                        Label(NSLocalizedString("Retarget Coordinate", comment: ""), systemImage: "scope")
-                                            .frame(maxWidth: .infinity)
-                                    }
-                                    .buttonStyle(.bordered)
-                                    .controlSize(.small)
-                                }
-
-		                        if grp.kind.editsSemanticTextTarget || (grp.kind.canUseLocatorStrategy && inspStrategy == .locatorOnly) {
-                                    let textReadiness = ActionGroupProjection.textTargetReadiness(for: grp, events: recorder.events)
-                                    let anchor = ActionGroupProjection.firstTextAnchor(for: grp, events: recorder.events)
-		                            if textReadiness.isReady, let anchor {
-		                                AnchorPositionCard(anchor: anchor, fallbackPolicy: firstEvent?.locatorFallbackPolicy ?? .fail)
-		                            } else {
-		                                visionEmptyState(readiness: textReadiness)
-		                            }
-                                }
-
-                                if grp.kind == .waitForText {
-                                    let conversionReadiness = textClickConversionReadiness(for: grp)
-                                    Button {
-                                        insertClickTextAfterSelectedWait(grp)
-                                    } label: {
-                                        Label(NSLocalizedString("Add Click Text", comment: ""), systemImage: "cursorarrow.click")
-                                            .frame(maxWidth: .infinity)
-                                    }
-                                    .buttonStyle(.bordered)
-                                    .controlSize(.small)
-                                    .disabled(!conversionReadiness.canConvert)
-                                    .help(textClickFollowUpInsertionReadinessHelp(conversionReadiness))
-
-                                    Button {
-                                        convertWaitToClickText(grp)
-                                    } label: {
-                                        Label(NSLocalizedString("Convert to Click Text", comment: ""), systemImage: "cursorarrow.click")
-                                            .frame(maxWidth: .infinity)
-                                    }
-                                    .buttonStyle(.bordered)
-                                    .controlSize(.small)
-                                    .disabled(!conversionReadiness.canConvert)
-                                    .help(textClickConversionReadinessHelp(conversionReadiness))
-
-                                    if !conversionReadiness.canConvert {
-                                        Text(textClickFollowUpInsertionReadinessHelp(conversionReadiness))
-                                            .font(.system(size: 10))
-                                            .foregroundStyle(.secondary)
-                                            .fixedSize(horizontal: false, vertical: true)
-                                    }
-                                }
-                    } else if selection.count > 1 {
-                        VStack(alignment: .leading, spacing: 14) {
-                            Text(String(format: NSLocalizedString("Batch edit %d actions", comment: ""), selection.count))
-                                .font(.system(size: 11, weight: .semibold))
-                                .foregroundStyle(Brand.sigBlue)
-
-                            let textTargetGroups = selectedTextTargetGroups()
-                            if !textTargetGroups.isEmpty {
-                                VStack(alignment: .leading, spacing: 6) {
-                                    Text(NSLocalizedString("Shared Text Target", comment: ""))
-                                        .font(.system(size: 9.5, weight: .semibold))
-                                        .foregroundStyle(.secondary)
-                                    let textTargetReadiness = batchTextTargetReadiness(for: textTargetGroups, targetText: inspOCRText)
-                                    TargetTextEditorInnerView(
-                                        text: Binding(
-                                            get: { inspOCRText },
-                                            set: { inspOCRText = $0 }
-                                        ),
-                                        onPick: onPickText
-                                    )
-                                    HStack(spacing: 6) {
-                                        labeledInlineDoubleField(NSLocalizedString("Timeout", comment: ""), value: $inspTimeout)
-                                        Button(NSLocalizedString("Apply to Selected", comment: "")) { applyBatchTextTarget() }
-                                            .buttonStyle(.borderedProminent)
-                                            .controlSize(.small)
-                                            .disabled(!textTargetReadiness.canApply)
-                                            .help(batchTextTargetReadinessHelp(textTargetReadiness))
-                                    }
-                                    if !textTargetReadiness.canApply {
-                                        Text(batchTextTargetReadinessHelp(textTargetReadiness))
-                                            .font(.system(size: 10))
-                                            .foregroundStyle(.secondary)
-                                    }
-                                }
-                            }
-                            
-                            VStack(alignment: .leading, spacing: 6) {
-                                Text(NSLocalizedString("Align Coordinates", comment: ""))
-                                     .font(.system(size: 9.5, weight: .semibold))
-                                     .foregroundStyle(.secondary)
-                                let alignXReadiness = coordinateAlignmentReadiness(axis: .x)
-                                let alignYReadiness = coordinateAlignmentReadiness(axis: .y)
-                                HStack {
-                                     Button(NSLocalizedString("Align X to First", comment: "")) { alignSelectedCoordinates(axis: .x) }
-                                        .disabled(!alignXReadiness.canAlign)
-                                        .help(batchCoordinateAlignmentReadinessHelp(alignXReadiness))
-                                     Button(NSLocalizedString("Align Y to First", comment: "")) { alignSelectedCoordinates(axis: .y) }
-                                        .disabled(!alignYReadiness.canAlign)
-                                        .help(batchCoordinateAlignmentReadinessHelp(alignYReadiness))
-                                }
-                                .buttonStyle(.bordered)
-                                .controlSize(.small)
-                                if !alignXReadiness.canAlign && !alignYReadiness.canAlign {
-                                    let message = batchCoordinateAlignmentReadinessHelp(alignXReadiness)
-                                    Text(message)
-                                        .font(.system(size: 10))
-                                        .foregroundStyle(.secondary)
-                                        .fixedSize(horizontal: false, vertical: true)
-                                }
-                            }
-                            
-                            VStack(alignment: .leading, spacing: 6) {
-                                Text(NSLocalizedString("Standardize Timeout", comment: ""))
-                                     .font(.system(size: 9.5, weight: .semibold))
-                                     .foregroundStyle(.secondary)
-                                let timeoutReadiness = batchTimeoutReadiness(
-                                    for: selectedGroups(),
-                                    events: recorder.events,
-                                    timeout: inspTimeout
-                                )
-                                HStack {
-                                     TextField("s", text: Binding(
-                                         get: { String(format: "%.2f", inspTimeout) },
-                                         set: { if let v = Double($0) { inspTimeout = v } }
-                                     ))
-                                     .textFieldStyle(.roundedBorder)
-                                     .font(.system(.callout, design: .monospaced))
-                                     .controlSize(.small)
-                                     .frame(width: 60)
-                                     
-                                     Button(NSLocalizedString("Apply to Selected", comment: "")) { applyBatchTimeout() }
-                                        .buttonStyle(.bordered)
-                                        .controlSize(.small)
-                                        .disabled(!timeoutReadiness.canApply)
-                                        .help(batchTimeoutReadinessHelp(timeoutReadiness))
-                                }
-                                if !timeoutReadiness.canApply {
-                                    Text(batchTimeoutReadinessHelp(timeoutReadiness))
-                                        .font(.system(size: 10))
-                                        .foregroundStyle(.secondary)
-                                        .fixedSize(horizontal: false, vertical: true)
-                                }
-                            }
-                        }
-                        .padding(.vertical, 8)
-                    } else {
-                        emptyInspector(
-                            icon: "hand.tap",
-                            title: NSLocalizedString("No selection", comment: ""),
-                            subtitle: NSLocalizedString("Click a row to inspect or edit", comment: "")
-                        )
-                    }
-                }
-
-                // Section 2: Behavior composition
-                behaviorSection()
-
-                // Section 3: Selection / Edit Actions
-                section(NSLocalizedString("Selection", comment: ""), icon: "checklist") {
-                    let selectionGroups = selectedGroups()
-                    let deletionReadiness = actionSelectionDeletionReadiness(
-                        for: selectionGroups,
-                        events: recorder.events,
-                        liveDuration: recorder.liveDuration
-                    )
-                    let duplicationReadiness = actionSelectionDuplicationReadiness(
-                        for: selectionGroups,
-                        events: recorder.events,
-                        liveDuration: recorder.liveDuration
-                    )
-
-                    HStack(spacing: 6) {
-                        Button(action: deleteSelected) {
-                            Label(NSLocalizedString("Delete", comment: ""), systemImage: "trash")
-                                .frame(maxWidth: .infinity)
-                        }
-                        .keyboardShortcut(.delete, modifiers: [])
-                        .disabled(!deletionReadiness.canDelete)
-                        .help(actionSelectionDeletionReadinessHelp(deletionReadiness))
-
-                        Button(action: duplicateSelected) {
-                            Label(
-                                selectionSnapshot.containsBehavior
-                                    ? NSLocalizedString("Duplicate Behavior", comment: "")
-                                    : NSLocalizedString("Duplicate", comment: ""),
-                                systemImage: "plus.square.on.square"
-                            )
-                                .frame(maxWidth: .infinity)
-                        }
-                        .keyboardShortcut("d", modifiers: .command)
-                        .disabled(!duplicationReadiness.canDuplicate)
-                        .help(actionSelectionDuplicationReadinessHelp(duplicationReadiness))
-                    }
-                    .buttonStyle(.bordered)
-                    .controlSize(.small)
-
-                    HStack(spacing: 6) {
-                        let trimBeforeReadiness = actionTrimReadiness(
-                            for: selectionGroups,
-                            events: recorder.events,
-                            liveDuration: recorder.liveDuration,
-                            direction: .before
-                        )
-                        let trimAfterReadiness = actionTrimReadiness(
-                            for: selectionGroups,
-                            events: recorder.events,
-                            liveDuration: recorder.liveDuration,
-                            direction: .after
-                        )
-                        Button(action: trimBefore) {
-                            Label(NSLocalizedString("Trim before", comment: ""), systemImage: "arrow.left.to.line")
-                        }
-                        .frame(maxWidth: .infinity)
-                        .disabled(!trimBeforeReadiness.canTrim)
-                        .help(actionTrimReadinessHelp(trimBeforeReadiness, direction: .before))
-
-                        Button(action: trimAfter) {
-                            Label(NSLocalizedString("Trim after", comment: ""), systemImage: "arrow.right.to.line")
-                        }
-                        .frame(maxWidth: .infinity)
-                        .disabled(!trimAfterReadiness.canTrim)
-                        .help(actionTrimReadinessHelp(trimAfterReadiness, direction: .after))
-                    }
-                    .controlSize(.small)
-
-                    Button(role: .destructive) {
-                        confirmClearAll = true
-                    } label: {
-                        Label(NSLocalizedString("Clear all", comment: ""), systemImage: "trash.slash")
-                            .frame(maxWidth: .infinity)
-                    }
-                    .buttonStyle(.bordered)
-                    .controlSize(.small)
-                    .disabled(rows.isEmpty)
-                    .confirmationDialog(
-                        NSLocalizedString("Remove all events from this macro?", comment: ""),
-                        isPresented: $confirmClearAll,
-                        titleVisibility: .visible
-                    ) {
-                        Button(NSLocalizedString("Clear All Events", comment: ""), role: .destructive) { clearAll() }
-                        Button(NSLocalizedString("Cancel", comment: ""), role: .cancel) {}
-                    } message: {
-                        Text(NSLocalizedString("You can undo this with ⌘Z while the editor is open.", comment: ""))
-                    }
-                }
-
-                // Section 3: Insert Action
-                section(NSLocalizedString("Insert action", comment: ""), icon: "plus.square") {
-                    insertionTargetView()
-                    
-                    HStack(spacing: 6) {
-                        Stepper(value: $insertWaitMs, in: 50...60000, step: 100) {
-                            Text("\(Int(insertWaitMs)) ms")
-                                .font(.system(size: 10, design: .monospaced).weight(.semibold))
-                        }
-                        .controlSize(.small)
-                    }
-                    LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
-                        // Row 1: Basic Input
-                        insertActionButton(
-                            title: NSLocalizedString("Click", comment: ""),
-                            subtitle: NSLocalizedString("Fixed point", comment: ""),
-                            icon: "hand.point.up.left",
-                            tint: Brand.sigGreen
-                        ) { insertAction(.click) }
-                        
-                        insertActionButton(
-                            title: NSLocalizedString("Key", comment: ""),
-                            subtitle: NSLocalizedString("Keyboard", comment: ""),
-                            icon: "keyboard",
-                            tint: Brand.sigBlue
-                        ) { insertAction(.keyPress) }
-
-                        // Row 2: Extended Mouse
-                        insertActionButton(
-                            title: NSLocalizedString("Double Click", comment: ""),
-                            subtitle: NSLocalizedString("Fixed point", comment: ""),
-                            icon: "cursorarrow.click.2",
-                            tint: Brand.sigGreen
-                        ) { insertAction(.doubleClick) }
-
-                        insertActionButton(
-                            title: NSLocalizedString("Drag", comment: ""),
-                            subtitle: NSLocalizedString("Path", comment: ""),
-                            icon: "hand.draw",
-                            tint: Brand.sigBlue
-                        ) { insertAction(.drag) }
-
-                        // Row 3: Navigation & Timing
-                        insertActionButton(
-                            title: NSLocalizedString("Scroll", comment: ""),
-                            subtitle: NSLocalizedString("Wheel", comment: ""),
-                            icon: "arrow.up.and.down",
-                            tint: Brand.sigBlue
-                        ) { insertAction(.scroll) }
-
-                        insertActionButton(
-                            title: NSLocalizedString("Wait", comment: ""),
-                            subtitle: NSLocalizedString("Delay", comment: ""),
-                            icon: "hourglass",
-                            tint: .secondary
-                        ) { insertAction(.wait) }
-
-                        // Row 4: Vision & OCR Clicks
-                        insertActionButton(
-                            title: NSLocalizedString("Click Text", comment: ""),
-                            subtitle: NSLocalizedString("Wait then click", comment: ""),
-                            icon: "text.cursor",
-                            tint: Brand.sigTeal
-                        ) { insertTextClick() }
-
-                        insertActionButton(
-                            title: NSLocalizedString("Reveal & Click", comment: ""),
-                            subtitle: NSLocalizedString("Vision flow", comment: ""),
-                            icon: "sparkles.rectangle.stack",
-                            tint: Brand.sigTeal
-                        ) { insertRevealAndClickTextFlow() }
-
-                        // Row 5: Vision Waits
-                        insertActionButton(
-                            title: NSLocalizedString("Wait Text", comment: ""),
-                            subtitle: NSLocalizedString("Wait to appear", comment: ""),
-                            icon: "text.magnifyingglass",
-                            tint: Brand.sigViolet
-                        ) { insertAction(.waitForText) }
-
-                        insertActionButton(
-                            title: NSLocalizedString("Wait Text Gone", comment: ""),
-                            subtitle: NSLocalizedString("Wait to disappear", comment: ""),
-                            icon: "text.badge.minus",
-                            tint: Brand.sigAmber
-                        ) { insertAction(.waitForTextGone) }
-
-                        // Row 6: Verification & Misc
-                        insertActionButton(
-                            title: NSLocalizedString("Verify Text", comment: ""),
-                            subtitle: NSLocalizedString("Checkpoint", comment: ""),
-                            icon: "checkmark.seal",
-                            tint: Brand.sigAmber
-                        ) { insertAction(.verifyText) }
-
-                        insertActionButton(
-                            title: NSLocalizedString("Multi Click", comment: ""),
-                            subtitle: NSLocalizedString("Several points", comment: ""),
-                            icon: "point.3.connected.trianglepath.dotted",
-                            tint: Brand.sigPink
-                        ) { insertAction(.multiPointClick) }
-                    }
-                }
-
-                // Section 4: Time Adjustments (Merged Shift & Stretch)
-                section(NSLocalizedString("Time Adjustments", comment: ""), icon: "timer") {
-                    let shiftGroups = selectedGroups()
-                    let shiftEarlierReadiness = actionShiftReadiness(for: shiftGroups, direction: .earlier)
-                    let shiftLaterReadiness = actionShiftReadiness(for: shiftGroups, direction: .later)
-
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text(NSLocalizedString("Shift Selected", comment: ""))
-                            .font(.system(size: 9.5, weight: .semibold))
-                            .foregroundStyle(.secondary)
-                        HStack {
-                            Stepper(value: $shiftMs, in: 10...5000, step: 50) {
-                                Text("\(Int(shiftMs)) ms")
-                                    .font(.system(size: 10, design: .monospaced).weight(.semibold))
-                            }
-                            .controlSize(.small)
-                            Spacer()
-                            ControlGroup {
-                                Button(action: { shiftSelection(by: -shiftMs / 1000.0) }) {
-                                    Image(systemName: "gobackward")
-                                        .font(.system(size: 10, weight: .bold))
-                                }
-                                .disabled(!shiftEarlierReadiness.canShift)
-                                .help(actionShiftReadinessHelp(shiftEarlierReadiness, direction: .earlier))
-
-                                Button(action: { shiftSelection(by: shiftMs / 1000.0) }) {
-                                    Image(systemName: "goforward")
-                                        .font(.system(size: 10, weight: .bold))
-                                }
-                                .disabled(!shiftLaterReadiness.canShift)
-                                .help(actionShiftReadinessHelp(shiftLaterReadiness, direction: .later))
-                            }
-                            .controlGroupStyle(.navigation)
-                            .controlSize(.small)
-                        }
-
-                        if !shiftEarlierReadiness.canShift && !shiftLaterReadiness.canShift {
-                            Text(actionShiftReadinessHelp(shiftEarlierReadiness, direction: .earlier))
-                                .font(.system(size: 9.5))
-                                .foregroundStyle(.secondary)
-                                .fixedSize(horizontal: false, vertical: true)
-                        }
-                    }
-                    
-                    Divider().padding(.vertical, 4)
-                    
-                    VStack(alignment: .leading, spacing: 6) {
-                        let stretchReadiness = actionTimeStretchReadiness(
-                            hasActions: !rows.isEmpty,
-                            factor: stretchFactor
-                        )
-                        HStack {
-                            Text(NSLocalizedString("Time Stretch", comment: ""))
-                                .font(.system(size: 9.5, weight: .semibold))
-                                .foregroundStyle(.secondary)
-                            Spacer()
-                            Text(String(format: "%.2f×", stretchFactor))
-                                .font(.system(size: 10, design: .monospaced).weight(.semibold))
-                        }
-                        Slider(value: $stretchFactor, in: 0.25...4.0, step: 0.05)
-                            .controlSize(.small)
-                        HStack {
-                            Button(NSLocalizedString("Reset", comment: "")) { stretchFactor = 1.0 }
-                                .buttonStyle(.borderless)
-                                .controlSize(.small)
-                            Spacer()
-                            Button(NSLocalizedString("Apply", comment: "")) { applyStretch() }
-                                .buttonStyle(.borderedProminent)
-                                .controlSize(.small)
-                                .disabled(!stretchReadiness.canApply)
-                                .help(actionTimeStretchReadinessHelp(stretchReadiness))
-                        }
-                        if !stretchReadiness.canApply {
-                            Text(actionTimeStretchReadinessHelp(stretchReadiness))
-                                .font(.system(size: 9.5))
-                                .foregroundStyle(.secondary)
-                                .fixedSize(horizontal: false, vertical: true)
-                        }
-                    }
+        VStack(spacing: 0) {
+            Picker("", selection: $currentTab) {
+                ForEach(SidebarTab.allCases) { tab in
+                    Text(NSLocalizedString(tab.rawValue, comment: "")).tag(tab)
                 }
             }
-            .padding(14)
+            .pickerStyle(.segmented)
+            .padding(.horizontal, 14)
+            .padding(.top, 14)
+            .padding(.bottom, 8)
+            
+            ScrollView {
+                VStack(alignment: .leading, spacing: 14) {
+                    switch currentTab {
+                    case .inspector:
+                        inspectorTabContent()
+                    case .orchestrate:
+                        orchestrateTabContent()
+                    case .insert:
+                        insertTabContent()
+                    }
+                }
+                .padding(14)
+            }
         }
         .background(VisualEffectBackground(material: .sidebar, blendingMode: .behindWindow))
     }
+
+    @ViewBuilder
+    func inspectorTabContent() -> some View {
+        Group {
+            if selection.count == 1 {
+                section(NSLocalizedString("Selected action", comment: ""), icon: "slider.horizontal.3") {
+                    selectedActionInspector()
+                }
+            } else if selection.count > 1 {
+                section(NSLocalizedString("Batch edit", comment: ""), icon: "slider.horizontal.3") {
+                    batchEditInspector()
+                }
+            }
+            
+            editorReviewSection()
+        }
+    }
+
+    @ViewBuilder
+    func orchestrateTabContent() -> some View {
+        if selection.isEmpty {
+            section(NSLocalizedString("Global actions", comment: ""), icon: "globe") {
+                clearAllButton()
+            }
+        } else {
+            section(NSLocalizedString("Selection", comment: ""), icon: "checklist") {
+                selectionActionsContent()
+            }
+            
+            if selectedBehaviorGroup() != nil || selection.count > 1 {
+                behaviorSection()
+            }
+            
+            repeatUntilSection()
+            
+            section(NSLocalizedString("Time Adjustments", comment: ""), icon: "timer") {
+                timeAdjustmentsContent()
+            }
+        }
+    }
+
+    @ViewBuilder
+    func insertTabContent() -> some View {
+        section(NSLocalizedString("Insert action", comment: ""), icon: "plus.square") {
+            insertActionContent()
+        }
+        
+        let behaviors = boundBehaviors
+        if !behaviors.isEmpty {
+            section(NSLocalizedString("Reusable Behaviors", comment: ""), icon: "rectangle.stack") {
+                VStack(spacing: 6) {
+                    ForEach(behaviors, id: \.id) { behavior in
+                        Button {
+                            insertBehaviorCopy(behavior)
+                        } label: {
+                            HStack(spacing: 8) {
+                                Image(systemName: "square.stack.3d.down.right")
+                                    .font(.system(size: 10))
+                                    .foregroundStyle(Brand.sigAmber)
+                                
+                                VStack(alignment: .leading, spacing: 1) {
+                                    Text(behavior.behaviorGroupName ?? NSLocalizedString("Behavior", comment: ""))
+                                        .font(.system(size: 11, weight: .semibold))
+                                        .foregroundStyle(.primary)
+                                    Text(String(format: NSLocalizedString("%d actions", comment: ""), behavior.containedActionCount ?? 1))
+                                        .font(.system(size: 9))
+                                        .foregroundStyle(.secondary)
+                                }
+                                Spacer()
+                                Image(systemName: "arrow.down.to.line.compact")
+                                    .font(.system(size: 9))
+                                    .foregroundStyle(.tertiary)
+                            }
+                            .padding(.horizontal, 4)
+                            .padding(.vertical, 2)
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                        .padding(6)
+                        .background(Color.primary.opacity(0.03))
+                        .clipShape(RoundedRectangle(cornerRadius: 6))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 6)
+                                .stroke(Color.primary.opacity(0.06), lineWidth: 0.5)
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    func selectedActionInspector() -> some View {
+        if let id = selection.first, let row = rows.first(where: { $0.id == id }) {
+            let grp = row.group
+            let firstEvent = firstEvent(for: grp)
+            	                        HStack {
+                                        Image(systemName: actionKindIcon(grp.kind))
+                                            .foregroundStyle(actionKindColor(grp.kind))
+                                            .font(.system(size: 12))
+                                        VStack(alignment: .leading, spacing: 0) {
+                                            let actionNumber = (rows.firstIndex(where: { $0.id == id }) ?? 0) + 1
+                                            Text(String(format: NSLocalizedString("Action #%d", comment: ""), actionNumber))
+                                                .font(.system(size: 11, weight: .semibold))
+                                            Text(humanActionKindName(grp.kind))
+                                                .font(.system(size: 10))
+                                                .foregroundStyle(.secondary)
+            	                            }
+            	                        }
+                                        workflowHint(for: grp, event: firstEvent)
+                                        let inspectorWarning = actionInspectorInputWarning(
+                                            for: grp,
+                                            timeText: inspTime,
+                                            xText: inspX,
+                                            yText: inspY,
+                                            endXText: inspEndX,
+                                            endYText: inspEndY,
+                                            keyText: inspKey,
+                                            strategy: inspStrategy,
+                                            timeout: inspTimeout
+                                        )
+
+            		                        inspectorGrid {
+            			                            labeledField(grp.kind.isPassiveWait ? NSLocalizedString("Wait Duration (s)", comment: "") : NSLocalizedString("Time (s)", comment: ""), text: $inspTime)
+
+            		                            if grp.kind == .waitForText || grp.kind == .waitForTextGone {
+            		                                labeledDoubleField(NSLocalizedString("Timeout (s)", comment: ""), value: $inspTimeout)
+            		                            }
+
+            			                            if grp.kind.canUseLocatorStrategy {
+            		                                gridField(NSLocalizedString("Strategy", comment: "")) {
+            		                                    Picker("", selection: Binding(
+            		                                        get: { inspStrategy },
+            		                                        set: { inspStrategy = $0; applyInspector() }
+            		                                    )) {
+            		                                        Text(NSLocalizedString("Offset", comment: "")).tag(CoordinateStrategy.windowLocalPreferred)
+            		                                        Text(NSLocalizedString("Proportional", comment: "")).tag(CoordinateStrategy.normalizedPreferred)
+            		                                        Text(NSLocalizedString("Absolute", comment: "")).tag(CoordinateStrategy.absoluteOnly)
+            		                                        Text(NSLocalizedString("Text (OCR)", comment: "")).tag(CoordinateStrategy.locatorOnly)
+            		                                    }
+            		                                    .pickerStyle(.segmented)
+            		                                    .labelsHidden()
+            		                                    .controlSize(.small)
+            		                                }
+
+            		                                if inspStrategy == .locatorOnly {
+            		                                    labeledDoubleField(NSLocalizedString("Timeout (s)", comment: ""), value: $inspTimeout)
+            		                                    gridField(NSLocalizedString("Target Text", comment: "")) {
+            		                                        TargetTextEditorInnerView(text: Binding(get: { inspOCRText }, set: { inspOCRText = $0; applyInspector() }), onPick: onPickText)
+            		                                    }
+            		                                    gridField(NSLocalizedString("Fallback", comment: "")) {
+            		                                        locatorPlaybackPolicyView()
+            		                                    }
+            		                                } else {
+            		                                    labeledField("X", text: $inspX)
+            		                                    labeledField("Y", text: $inspY)
+            		                                }
+            			                            } else if grp.kind.editsPathTarget {
+            		                                gridField(NSLocalizedString("Start", comment: "")) { Text("") }
+            		                                labeledField("X", text: $inspX)
+            		                                labeledField("Y", text: $inspY)
+            		                                gridField(NSLocalizedString("End", comment: "")) { Text("") }
+            		                                labeledField("X", text: $inspEndX)
+            		                                labeledField("Y", text: $inspEndY)
+            		                            }
+
+            			                            if grp.kind.editsKeyboardInput {
+            		                                gridField(NSLocalizedString("Key code", comment: "")) {
+            		                                    ShortcutRecorderField(
+            		                                        currentBinding: keyboardShortcutBinding(for: grp),
+            		                                        allHotkeys: [],
+            		                                        allowsClear: false,
+            		                                        recordingPrompt: NSLocalizedString("Press any key…", comment: ""),
+            		                                        emptyPrompt: NSLocalizedString("Click to record shortcut", comment: ""),
+            		                                        onRecord: applyRecordedShortcut
+            		                                    )
+            		                                }
+            		                                labeledField(NSLocalizedString("Raw Code", comment: ""), text: $inspKey)
+            			                            } else if grp.kind.editsSemanticTextTarget {
+            			                                gridField(NSLocalizedString("Target Text", comment: "")) {
+            			                                    TargetTextEditorInnerView(text: Binding(get: { inspOCRText }, set: { inspOCRText = $0; applyInspector() }), onPick: onPickText)
+            			                                }
+                                            if grp.kind == .waitForText || grp.kind == .waitForTextGone || grp.kind == .verifyText {
+            			                                    gridField(NSLocalizedString("Must Exist", comment: "")) {
+            			                                    Toggle("", isOn: Binding(
+            			                                        get: { inspVerifyMustExist },
+            			                                        set: { inspVerifyMustExist = $0; applyInspector() }
+            			                                    ))
+            			                                    .labelsHidden()
+            			                                    .controlSize(.small)
+            			                                    }
+            			                                }
+            			                            }
+            			                        }
+
+                                            if inspectorWarning.isWarning {
+                                                HStack(alignment: .top, spacing: 6) {
+                                                    Image(systemName: "exclamationmark.triangle")
+                                                        .font(.system(size: 10, weight: .semibold))
+                                                        .foregroundStyle(Brand.sigAmber)
+                                                        .frame(width: 14)
+                                                    Text(actionInspectorInputWarningHelp(inspectorWarning))
+                                                        .font(.system(size: 10))
+                                                        .foregroundStyle(.secondary)
+                                                        .fixedSize(horizontal: false, vertical: true)
+                                                }
+                                                .padding(.vertical, 2)
+                                            }
+
+                                            if grp.kind == .multiPointClick {
+                                                multiPointClickEditor(for: grp)
+                                            }
+
+                                            if grp.kind.canConvertClickType {
+                                                VStack(alignment: .leading, spacing: 6) {
+                                                    Text(NSLocalizedString("Action Type", comment: ""))
+                                                        .font(.system(size: 9.5, weight: .semibold))
+                                                        .foregroundStyle(.secondary)
+                                                    Picker("", selection: Binding(
+                                                        get: { grp.kind },
+                                                        set: { convertClickType(grp: grp, newKind: $0) }
+                                                    )) {
+                                                        Text(NSLocalizedString("Click", comment: "")).tag(ActionGroupKind.click)
+                                                        Text(NSLocalizedString("Double", comment: "")).tag(ActionGroupKind.doubleClick)
+                                                        Text(NSLocalizedString("Triple+", comment: "")).tag(ActionGroupKind.repeatedClick)
+                                                        Text(NSLocalizedString("Long Press", comment: "")).tag(ActionGroupKind.longPress)
+                                                    }
+                                                    .pickerStyle(.segmented)
+                                                    .labelsHidden()
+                                                    .controlSize(.small)
+                                                }
+                                            }
+
+                                            if grp.kind.canRetargetCoordinate && inspStrategy != .locatorOnly {
+                                                Button(action: { onPickCoordinate(false) }) {
+                                                    Label(NSLocalizedString("Retarget Coordinate", comment: ""), systemImage: "scope")
+                                                        .frame(maxWidth: .infinity)
+                                                }
+                                                .buttonStyle(.bordered)
+                                                .controlSize(.small)
+                                            }
+
+            		                        if grp.kind.editsSemanticTextTarget || (grp.kind.canUseLocatorStrategy && inspStrategy == .locatorOnly) {
+                                                let textReadiness = ActionGroupProjection.textTargetReadiness(for: grp, events: recorder.events)
+                                                let anchor = ActionGroupProjection.firstTextAnchor(for: grp, events: recorder.events)
+            		                            if textReadiness.isReady, let anchor {
+            		                                AnchorPositionCard(anchor: anchor, fallbackPolicy: firstEvent?.locatorFallbackPolicy ?? .fail)
+            		                            } else {
+            		                                visionEmptyState(readiness: textReadiness)
+            		                            }
+                                            }
+
+                                            if grp.kind == .waitForText {
+                                                let conversionReadiness = textClickConversionReadiness(for: grp)
+                                                Button {
+                                                    insertClickTextAfterSelectedWait(grp)
+                                                } label: {
+                                                    Label(NSLocalizedString("Add Click Text", comment: ""), systemImage: "cursorarrow.click")
+                                                        .frame(maxWidth: .infinity)
+                                                }
+                                                .buttonStyle(.bordered)
+                                                .controlSize(.small)
+                                                .disabled(!conversionReadiness.canConvert)
+                                                .help(textClickFollowUpInsertionReadinessHelp(conversionReadiness))
+
+                                                Button {
+                                                    convertWaitToClickText(grp)
+                                                } label: {
+                                                    Label(NSLocalizedString("Convert to Click Text", comment: ""), systemImage: "cursorarrow.click")
+                                                        .frame(maxWidth: .infinity)
+                                                }
+                                                .buttonStyle(.bordered)
+                                                .controlSize(.small)
+                                                .disabled(!conversionReadiness.canConvert)
+                                                .help(textClickConversionReadinessHelp(conversionReadiness))
+
+                                                if !conversionReadiness.canConvert {
+                                                    Text(textClickFollowUpInsertionReadinessHelp(conversionReadiness))
+                                                        .font(.system(size: 10))
+                                                        .foregroundStyle(.secondary)
+                                                        .fixedSize(horizontal: false, vertical: true)
+                                                }
+                                            }
+
+        }
+    }
+
+    @ViewBuilder
+    func batchEditInspector() -> some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Text(String(format: NSLocalizedString("Batch edit %d actions", comment: ""), selection.count))
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(Brand.sigBlue)
+
+            let textTargetGroups = selectedTextTargetGroups()
+            if !textTargetGroups.isEmpty {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(NSLocalizedString("Shared Text Target", comment: ""))
+                        .font(.system(size: 9.5, weight: .semibold))
+                        .foregroundStyle(.secondary)
+                    let textTargetReadiness = batchTextTargetReadiness(for: textTargetGroups, targetText: inspOCRText)
+                    TargetTextEditorInnerView(
+                        text: Binding(
+                            get: { inspOCRText },
+                            set: { inspOCRText = $0 }
+                        ),
+                        onPick: onPickText
+                    )
+                    HStack(spacing: 6) {
+                        labeledInlineDoubleField(NSLocalizedString("Timeout", comment: ""), value: $inspTimeout)
+                        Button(NSLocalizedString("Apply to Selected", comment: "")) { applyBatchTextTarget() }
+                            .buttonStyle(.borderedProminent)
+                            .controlSize(.small)
+                            .disabled(!textTargetReadiness.canApply)
+                            .help(batchTextTargetReadinessHelp(textTargetReadiness))
+                    }
+                    if !textTargetReadiness.canApply {
+                        Text(batchTextTargetReadinessHelp(textTargetReadiness))
+                            .font(.system(size: 10))
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
+
+            VStack(alignment: .leading, spacing: 6) {
+                Text(NSLocalizedString("Align Coordinates", comment: ""))
+                     .font(.system(size: 9.5, weight: .semibold))
+                     .foregroundStyle(.secondary)
+                let alignXReadiness = coordinateAlignmentReadiness(axis: .x)
+                let alignYReadiness = coordinateAlignmentReadiness(axis: .y)
+                HStack {
+                     Button(NSLocalizedString("Align X to First", comment: "")) { alignSelectedCoordinates(axis: .x) }
+                        .disabled(!alignXReadiness.canAlign)
+                        .help(batchCoordinateAlignmentReadinessHelp(alignXReadiness))
+                     Button(NSLocalizedString("Align Y to First", comment: "")) { alignSelectedCoordinates(axis: .y) }
+                        .disabled(!alignYReadiness.canAlign)
+                        .help(batchCoordinateAlignmentReadinessHelp(alignYReadiness))
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+                if !alignXReadiness.canAlign && !alignYReadiness.canAlign {
+                    let message = batchCoordinateAlignmentReadinessHelp(alignXReadiness)
+                    Text(message)
+                        .font(.system(size: 10))
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+
+            VStack(alignment: .leading, spacing: 6) {
+                Text(NSLocalizedString("Standardize Timeout", comment: ""))
+                     .font(.system(size: 9.5, weight: .semibold))
+                     .foregroundStyle(.secondary)
+                let timeoutReadiness = batchTimeoutReadiness(
+                    for: selectedGroups(),
+                    events: recorder.events,
+                    timeout: inspTimeout
+                )
+                HStack {
+                     TextField("s", text: Binding(
+                         get: { String(format: "%.2f", inspTimeout) },
+                         set: { if let v = Double($0) { inspTimeout = v } }
+                     ))
+                     .textFieldStyle(.roundedBorder)
+                     .font(.system(.callout, design: .monospaced))
+                     .controlSize(.small)
+                     .frame(width: 60)
+
+                     Button(NSLocalizedString("Apply to Selected", comment: "")) { applyBatchTimeout() }
+                        .buttonStyle(.bordered)
+                        .controlSize(.small)
+                        .disabled(!timeoutReadiness.canApply)
+                        .help(batchTimeoutReadinessHelp(timeoutReadiness))
+                }
+                if !timeoutReadiness.canApply {
+                    Text(batchTimeoutReadinessHelp(timeoutReadiness))
+                        .font(.system(size: 10))
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+        }
+        .padding(.vertical, 8)
+
+    }
+
+    @ViewBuilder
+    func selectionActionsContent() -> some View {
+        let selectionGroups = selectedGroups()
+        let deletionReadiness = actionSelectionDeletionReadiness(
+            for: selectionGroups,
+            events: recorder.events,
+            liveDuration: recorder.liveDuration
+        )
+        let duplicationReadiness = actionSelectionDuplicationReadiness(
+            for: selectionGroups,
+            events: recorder.events,
+            liveDuration: recorder.liveDuration
+        )
+
+        HStack(spacing: 6) {
+            Button(action: deleteSelected) {
+                Label(NSLocalizedString("Delete", comment: ""), systemImage: "trash")
+                    .frame(maxWidth: .infinity)
+            }
+            .keyboardShortcut(.delete, modifiers: [])
+            .disabled(!deletionReadiness.canDelete)
+            .help(actionSelectionDeletionReadinessHelp(deletionReadiness))
+
+            Button(action: duplicateSelected) {
+                Label(
+                    selectionSnapshot.containsBehavior
+                        ? NSLocalizedString("Duplicate Behavior", comment: "")
+                        : NSLocalizedString("Duplicate", comment: ""),
+                    systemImage: "plus.square.on.square"
+                )
+                    .frame(maxWidth: .infinity)
+            }
+            .keyboardShortcut("d", modifiers: .command)
+            .disabled(!duplicationReadiness.canDuplicate)
+            .help(actionSelectionDuplicationReadinessHelp(duplicationReadiness))
+        }
+        .buttonStyle(.bordered)
+        .controlSize(.small)
+
+        HStack(spacing: 6) {
+            let trimBeforeReadiness = actionTrimReadiness(
+                for: selectionGroups,
+                events: recorder.events,
+                liveDuration: recorder.liveDuration,
+                direction: .before
+            )
+            let trimAfterReadiness = actionTrimReadiness(
+                for: selectionGroups,
+                events: recorder.events,
+                liveDuration: recorder.liveDuration,
+                direction: .after
+            )
+            Button(action: trimBefore) {
+                Label(NSLocalizedString("Trim before", comment: ""), systemImage: "arrow.left.to.line")
+                    .frame(maxWidth: .infinity)
+            }
+            .disabled(!trimBeforeReadiness.canTrim)
+            .help(actionTrimReadinessHelp(trimBeforeReadiness, direction: .before))
+
+            Button(action: trimAfter) {
+                Label(NSLocalizedString("Trim after", comment: ""), systemImage: "arrow.right.to.line")
+                    .frame(maxWidth: .infinity)
+            }
+            .disabled(!trimAfterReadiness.canTrim)
+            .help(actionTrimReadinessHelp(trimAfterReadiness, direction: .after))
+        }
+        .buttonStyle(.bordered)
+        .controlSize(.small)
+
+
+    }
+
+    @ViewBuilder
+    func clearAllButton() -> some View {
+        Button(role: .destructive) {
+            confirmClearAll = true
+        } label: {
+            Label(NSLocalizedString("Clear all", comment: ""), systemImage: "trash.slash")
+                .frame(maxWidth: .infinity)
+        }
+        .buttonStyle(.bordered)
+        .controlSize(.small)
+        .disabled(rows.isEmpty)
+        .confirmationDialog(
+            NSLocalizedString("Remove all events from this macro?", comment: ""),
+            isPresented: $confirmClearAll,
+            titleVisibility: .visible
+        ) {
+            Button(NSLocalizedString("Clear All Events", comment: ""), role: .destructive) { clearAll() }
+            Button(NSLocalizedString("Cancel", comment: ""), role: .cancel) {}
+        } message: {
+            Text(NSLocalizedString("You can undo this with ⌘Z while the editor is open.", comment: ""))
+        }
+
+    }
+
+    @ViewBuilder
+    func insertActionContent() -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            insertionTargetView()
+            
+            Divider().opacity(0.3)
+            
+            HStack {
+                Text(NSLocalizedString("Default Delay", comment: ""))
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+                
+                Spacer()
+                
+                HStack(spacing: 6) {
+                    TextField("", value: $insertWaitMs, format: .number)
+                        .textFieldStyle(.roundedBorder)
+                        .font(.system(size: 11, design: .monospaced))
+                        .frame(width: 55)
+                        .multilineTextAlignment(.trailing)
+                    
+                    Text(NSLocalizedString("ms", comment: ""))
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
+                    
+                    Stepper("", value: $insertWaitMs, in: 50...60000, step: 100)
+                        .labelsHidden()
+                        .controlSize(.small)
+                }
+            }
+        }
+        .padding(10)
+        .background(Color.primary.opacity(0.03))
+        .clipShape(.rect(cornerRadius: 8))
+        .overlay(
+            RoundedRectangle(cornerRadius: 8)
+                .stroke(Color.primary.opacity(0.06), lineWidth: 1)
+        )
+        .padding(.bottom, 6)
+
+        LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
+            // Row 1: Basic Input
+            insertActionButton(
+                title: NSLocalizedString("Click", comment: ""),
+                subtitle: NSLocalizedString("Fixed point", comment: ""),
+                icon: "hand.point.up.left",
+                tint: Brand.sigGreen
+            ) { insertAction(.click) }
+
+            insertActionButton(
+                title: NSLocalizedString("Key", comment: ""),
+                subtitle: NSLocalizedString("Keyboard", comment: ""),
+                icon: "keyboard",
+                tint: Brand.sigBlue
+            ) { insertAction(.keyPress) }
+
+            // Row 2: Extended Mouse
+            insertActionButton(
+                title: NSLocalizedString("Double Click", comment: ""),
+                subtitle: NSLocalizedString("Fixed point", comment: ""),
+                icon: "cursorarrow.click.2",
+                tint: Brand.sigGreen
+            ) { insertAction(.doubleClick) }
+
+            insertActionButton(
+                title: NSLocalizedString("Drag", comment: ""),
+                subtitle: NSLocalizedString("Path", comment: ""),
+                icon: "hand.draw",
+                tint: Brand.sigBlue
+            ) { insertAction(.drag) }
+
+            // Row 3: Navigation & Timing
+            insertActionButton(
+                title: NSLocalizedString("Scroll", comment: ""),
+                subtitle: NSLocalizedString("Wheel", comment: ""),
+                icon: "arrow.up.and.down",
+                tint: Brand.sigBlue
+            ) { insertAction(.scroll) }
+
+            insertActionButton(
+                title: NSLocalizedString("Wait", comment: ""),
+                subtitle: NSLocalizedString("Delay", comment: ""),
+                icon: "hourglass",
+                tint: .secondary
+            ) { insertAction(.wait) }
+
+            // Row 4: Vision & OCR Clicks
+            insertActionButton(
+                title: NSLocalizedString("Click Text", comment: ""),
+                subtitle: NSLocalizedString("Wait then click", comment: ""),
+                icon: "text.cursor",
+                tint: Brand.sigTeal
+            ) { insertTextClick() }
+
+            insertActionButton(
+                title: NSLocalizedString("Reveal & Click", comment: ""),
+                subtitle: NSLocalizedString("Vision flow", comment: ""),
+                icon: "sparkles.rectangle.stack",
+                tint: Brand.sigTeal
+            ) { insertRevealAndClickTextFlow() }
+
+            // Row 5: Vision Waits
+            insertActionButton(
+                title: NSLocalizedString("Wait Text", comment: ""),
+                subtitle: NSLocalizedString("Wait to appear", comment: ""),
+                icon: "text.magnifyingglass",
+                tint: Brand.sigViolet
+            ) { insertAction(.waitForText) }
+
+            insertActionButton(
+                title: NSLocalizedString("Wait Text Gone", comment: ""),
+                subtitle: NSLocalizedString("Wait to disappear", comment: ""),
+                icon: "text.badge.minus",
+                tint: Brand.sigAmber
+            ) { insertAction(.waitForTextGone) }
+
+            // Row 6: Verification & Misc
+            insertActionButton(
+                title: NSLocalizedString("Verify Text", comment: ""),
+                subtitle: NSLocalizedString("Checkpoint", comment: ""),
+                icon: "checkmark.seal",
+                tint: Brand.sigAmber
+            ) { insertAction(.verifyText) }
+
+            insertActionButton(
+                title: NSLocalizedString("Multi Click", comment: ""),
+                subtitle: NSLocalizedString("Several points", comment: ""),
+                icon: "point.3.connected.trianglepath.dotted",
+                tint: Brand.sigPink
+            ) { insertAction(.multiPointClick) }
+        }
+
+    }
+
+    @ViewBuilder
+    func timeAdjustmentsContent() -> some View {
+        let shiftGroups = selectedGroups()
+        let shiftEarlierReadiness = actionShiftReadiness(for: shiftGroups, direction: .earlier)
+        let shiftLaterReadiness = actionShiftReadiness(for: shiftGroups, direction: .later)
+
+        VStack(alignment: .leading, spacing: 6) {
+            Text(NSLocalizedString("Shift Selected", comment: ""))
+                .font(.system(size: 9.5, weight: .semibold))
+                .foregroundStyle(.secondary)
+            HStack {
+                Stepper(value: $shiftMs, in: 10...5000, step: 50) {
+                    Text("\(Int(shiftMs)) ms")
+                        .font(.system(size: 10, design: .monospaced).weight(.semibold))
+                }
+                .controlSize(.small)
+                Spacer()
+                ControlGroup {
+                    Button(action: { shiftSelection(by: -shiftMs / 1000.0) }) {
+                        Image(systemName: "gobackward")
+                            .font(.system(size: 10, weight: .bold))
+                    }
+                    .disabled(!shiftEarlierReadiness.canShift)
+                    .help(actionShiftReadinessHelp(shiftEarlierReadiness, direction: .earlier))
+
+                    Button(action: { shiftSelection(by: shiftMs / 1000.0) }) {
+                        Image(systemName: "goforward")
+                            .font(.system(size: 10, weight: .bold))
+                    }
+                    .disabled(!shiftLaterReadiness.canShift)
+                    .help(actionShiftReadinessHelp(shiftLaterReadiness, direction: .later))
+                }
+                .controlGroupStyle(.navigation)
+                .controlSize(.small)
+            }
+
+            if !shiftEarlierReadiness.canShift && !shiftLaterReadiness.canShift {
+                Text(actionShiftReadinessHelp(shiftEarlierReadiness, direction: .earlier))
+                    .font(.system(size: 9.5))
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+
+        Divider().padding(.vertical, 4)
+
+        VStack(alignment: .leading, spacing: 6) {
+            let stretchReadiness = actionTimeStretchReadiness(
+                hasActions: !rows.isEmpty,
+                factor: stretchFactor
+            )
+            HStack {
+                Text(NSLocalizedString("Time Stretch", comment: ""))
+                    .font(.system(size: 9.5, weight: .semibold))
+                    .foregroundStyle(.secondary)
+                Spacer()
+                Text(String(format: "%.2f×", stretchFactor))
+                    .font(.system(size: 10, design: .monospaced).weight(.semibold))
+            }
+            Slider(value: $stretchFactor, in: 0.25...4.0, step: 0.05)
+                .controlSize(.small)
+            HStack {
+                Button(NSLocalizedString("Reset", comment: "")) { stretchFactor = 1.0 }
+                    .buttonStyle(.borderless)
+                    .controlSize(.small)
+                Spacer()
+                Button(NSLocalizedString("Apply", comment: "")) { applyStretch() }
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.small)
+                    .disabled(!stretchReadiness.canApply)
+                    .help(actionTimeStretchReadinessHelp(stretchReadiness))
+            }
+            if !stretchReadiness.canApply {
+                Text(actionTimeStretchReadinessHelp(stretchReadiness))
+                    .font(.system(size: 9.5))
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+
+    }
+
+    @ViewBuilder
+    func editorReviewSection() -> some View {
+        let groups = rows.map(\.group)
+        let health = macroEditorHealthSummary(for: groups, events: recorder.events)
+        let repeatUntilReadiness = MacroEditorRepeatUntilDraftBuilder.readiness(
+            events: recorder.events,
+            groups: groups,
+            selectedGroupIDs: selection
+        )
+        let guidanceItems = macroEditorGuidanceItems(
+            for: groups,
+            events: recorder.events,
+            selectedGroupIDs: selection,
+            repeatUntilReadiness: repeatUntilReadiness
+        )
+
+        section(NSLocalizedString("Review", comment: ""), icon: "checklist.checked") {
+            VStack(alignment: .leading, spacing: 9) {
+                HStack(spacing: 8) {
+                    Image(systemName: macroEditorSidebarHealthIcon(health))
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(macroEditorSidebarHealthTint(health))
+                        .frame(width: 18)
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text(macroEditorHealthTitle(health))
+                            .font(.system(size: 11.5, weight: .semibold))
+                            .foregroundStyle(.primary)
+                        Text(macroEditorHealthDetail(health))
+                            .font(.system(size: 9.8))
+                            .foregroundStyle(.secondary)
+                            .lineLimit(2)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+
+                HStack(spacing: 6) {
+                    reviewMetric(
+                        value: health.recordedActionCount,
+                        label: NSLocalizedString("actions", comment: ""),
+                        tint: Brand.sigBlue
+                    )
+                    reviewMetric(
+                        value: health.textTargetCount,
+                        label: NSLocalizedString("targets", comment: ""),
+                        tint: Brand.sigAmber
+                    )
+                    reviewMetric(
+                        value: health.behaviorCount,
+                        label: NSLocalizedString("blocks", comment: ""),
+                        tint: Brand.sigViolet
+                    )
+                }
+
+                VStack(spacing: 6) {
+                    ForEach(guidanceItems.prefix(3)) { item in
+                        guidanceRow(item)
+                    }
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    func reviewMetric(value: Int, label: String, tint: Color) -> some View {
+        HStack(spacing: 4) {
+            Text("\(value)")
+                .font(.system(size: 11, weight: .bold, design: .monospaced))
+            Text(label)
+                .font(.system(size: 10, weight: .medium))
+        }
+        .foregroundStyle(tint)
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 5)
+        .background(tint.opacity(0.12))
+        .clipShape(Capsule())
+    }
+
+    @ViewBuilder
+    func guidanceRow(_ item: MacroEditorGuidanceItem) -> some View {
+        HStack(alignment: .top, spacing: 8) {
+            Image(systemName: item.systemImage)
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(guidanceTint(item.priority))
+                .frame(width: 20)
+                .padding(.top, 3)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(item.title)
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(.primary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+                Text(LocalizedStringKey(item.detail))
+                    .font(.system(size: 10))
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            Spacer(minLength: 4)
+
+            if let actionTitle = item.actionTitle {
+                Button(actionTitle) {
+                    applyGuidanceAction(item.action)
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.mini)
+                .buttonBorderShape(.capsule)
+                .help(item.detail)
+            }
+        }
+        .padding(8)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.primary.opacity(0.04))
+        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+    }
+
+    func applyGuidanceAction(_ action: MacroEditorGuidanceAction) {
+        switch action {
+        case .none:
+            break
+        case .selectGroups(let ids):
+            selectGuidanceGroups(ids)
+        case .pickText(let ids):
+            selectGuidanceGroups(ids)
+            DispatchQueue.main.async {
+                onPickText()
+            }
+        case .createBehavior:
+            bindSelectedBehavior()
+        case .createRepeatUntil:
+            onCreateRepeatUntilDraft(
+                loopMaxAttempts,
+                loopTimeoutSeconds,
+                loopPollingSeconds,
+                loopFailurePolicy
+            )
+        }
+    }
+
+    func selectGuidanceGroups(_ ids: [UUID]) {
+        guard !ids.isEmpty else { return }
+        selection = Set(ids)
+        DispatchQueue.main.async {
+            onLoadInspector()
+            onUpdatePreview()
+        }
+    }
+
+    func macroEditorSidebarHealthIcon(_ summary: MacroEditorHealthSummary) -> String {
+        switch summary.state {
+        case .empty:
+            return "record.circle"
+        case .needsTargets:
+            return "text.viewfinder"
+        case .reviewReliability:
+            return "wrench.and.screwdriver"
+        case .ready:
+            return "checkmark.seal"
+        }
+    }
+
+    func macroEditorSidebarHealthTint(_ summary: MacroEditorHealthSummary) -> Color {
+        switch summary.state {
+        case .empty:
+            return .secondary
+        case .needsTargets:
+            return Brand.sigAmber
+        case .reviewReliability:
+            return Brand.sigTeal
+        case .ready:
+            return Brand.libraryGreen
+        }
+    }
+
+    func guidanceTint(_ priority: MacroEditorGuidancePriority) -> Color {
+        switch priority {
+        case .blocking:
+            return Brand.sigAmber
+        case .next:
+            return Brand.sigBlue
+        case .improve:
+            return Brand.sigTeal
+        case .done:
+            return Brand.libraryGreen
+        }
+    }
+
 
     func keyboardShortcutBinding(for group: ActionGroup) -> Binding<HotkeyBinding?> {
         Binding(
@@ -667,11 +1011,6 @@ struct EditorSidebar: View {
         section(NSLocalizedString("Behavior", comment: ""), icon: "square.stack.3d.down.right") {
             VStack(alignment: .leading, spacing: 8) {
                 let bindReadiness = selectionSnapshot.behaviorBindReadiness
-                let repeatUntilReadiness = MacroEditorRepeatUntilDraftBuilder.readiness(
-                    events: recorder.events,
-                    groups: rows.map(\.group),
-                    selectedGroupIDs: selection
-                )
                 let selectedBehavior = selectedBehaviorGroup()
                 if let selectedBehavior {
                     let renameReadiness = behaviorRenameReadiness(
@@ -768,30 +1107,111 @@ struct EditorSidebar: View {
                             .fixedSize(horizontal: false, vertical: true)
                     }
                 }
+            }
+        }
+    }
 
-                Divider().padding(.vertical, 2)
+    @ViewBuilder
+    func repeatUntilSection() -> some View {
+        let repeatUntilReadiness = MacroEditorRepeatUntilDraftBuilder.readiness(
+            events: recorder.events,
+            groups: rows.map(\.group),
+            selectedGroupIDs: selection
+        )
+        
+        if selection.count > 1 {
+            section(NSLocalizedString("Repeat Until Loop", comment: ""), icon: "arrow.triangle.2.circlepath") {
+                VStack(alignment: .leading, spacing: 8) {
+                    // Loop Configuration Form
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack(spacing: 6) {
+                            Text(NSLocalizedString("Max Attempts", comment: ""))
+                                .font(.system(size: 11, weight: .medium))
+                            Spacer()
+                            Text("\(loopMaxAttempts) " + NSLocalizedString("times", comment: ""))
+                                .font(.system(.callout, design: .monospaced))
+                                .foregroundStyle(.secondary)
+                            Stepper("", value: $loopMaxAttempts, in: 1...100)
+                                .labelsHidden()
+                                .controlSize(.small)
+                        }
 
-                Button {
-                    onCreateRepeatUntilDraft()
-                } label: {
-                    Label(NSLocalizedString("Preview Repeat Until", comment: ""), systemImage: "arrow.triangle.2.circlepath")
-                        .frame(maxWidth: .infinity)
-                }
-                .buttonStyle(.bordered)
-                .controlSize(.small)
-                .disabled(!repeatUntilReadiness.canCreate)
-                .help(repeatUntilReadinessHelp(repeatUntilReadiness))
+                        Divider().opacity(0.3)
 
-                Text(NSLocalizedString("Save the selected body as a behavior macro, then open a draft-only Repeat-Until preview.", comment: ""))
-                    .font(.system(size: 10))
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
+                        HStack(spacing: 6) {
+                            Text(NSLocalizedString("Timeout", comment: ""))
+                                .font(.system(size: 11, weight: .medium))
+                            Spacer()
+                            Text("\(Int(loopTimeoutSeconds))s")
+                                .font(.system(.callout, design: .monospaced))
+                                .foregroundStyle(.secondary)
+                            Stepper("", value: $loopTimeoutSeconds, in: 5...300, step: 5)
+                                .labelsHidden()
+                                .controlSize(.small)
+                        }
 
-                if !repeatUntilReadiness.canCreate {
-                    Text(repeatUntilReadinessHelp(repeatUntilReadiness))
+                        Divider().opacity(0.3)
+
+                        HStack(spacing: 6) {
+                            Text(NSLocalizedString("Polling Interval", comment: ""))
+                                .font(.system(size: 11, weight: .medium))
+                            Spacer()
+                            Text(String(format: "%.1fs", loopPollingSeconds))
+                                .font(.system(.callout, design: .monospaced))
+                                .foregroundStyle(.secondary)
+                            Stepper("", value: $loopPollingSeconds, in: 0.5...10.0, step: 0.5)
+                                .labelsHidden()
+                                .controlSize(.small)
+                        }
+
+                        Divider().opacity(0.3)
+
+                        HStack(spacing: 6) {
+                            Text(NSLocalizedString("On Failure", comment: ""))
+                                .font(.system(size: 11, weight: .medium))
+                            Spacer()
+                            Picker("", selection: $loopFailurePolicy) {
+                                Text(NSLocalizedString("Abort Macro", comment: "")).tag("failRun")
+                                Text(NSLocalizedString("Pause & Approve", comment: "")).tag("requireManualApproval")
+                                Text(NSLocalizedString("Continue next", comment: "")).tag("continueWorkflow")
+                            }
+                            .labelsHidden()
+                            .pickerStyle(.menu)
+                            .controlSize(.small)
+                            .frame(width: 125)
+                        }
+                    }
+                    .padding(8)
+                    .background(Color(.controlBackgroundColor).opacity(0.4))
+                    .cornerRadius(6)
+
+                    Button {
+                        onCreateRepeatUntilDraft(
+                            loopMaxAttempts,
+                            loopTimeoutSeconds,
+                            loopPollingSeconds,
+                            loopFailurePolicy
+                        )
+                    } label: {
+                        Label(NSLocalizedString("Preview Repeat Until", comment: ""), systemImage: "arrow.triangle.2.circlepath")
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.small)
+                    .disabled(!repeatUntilReadiness.canCreate)
+                    .help(repeatUntilReadinessHelp(repeatUntilReadiness))
+                    
+                    Text(NSLocalizedString("Save the selected body as a behavior macro, then open a draft-only Repeat-Until preview.", comment: ""))
                         .font(.system(size: 10))
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
+                    
+                    if !repeatUntilReadiness.canCreate {
+                        Text(repeatUntilReadinessHelp(repeatUntilReadiness))
+                            .font(.system(size: 9.5, weight: .semibold))
+                            .foregroundStyle(Brand.sigAmber)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
                 }
             }
         }
@@ -1055,56 +1475,65 @@ struct EditorSidebar: View {
         }
     }
     
-    @ViewBuilder
-    func insertionTargetView() -> some View {
-        Menu {
-            Button {
-                selection.removeAll()
-            } label: {
-                Text(NSLocalizedString("Append at end", comment: ""))
-            }
-
-            if !rows.isEmpty {
-                Divider()
-                ForEach(Array(rows.enumerated()), id: \.element.id) { index, row in
-                    Button {
-                        selection = [row.id]
-                    } label: {
-                        Text(String(format: NSLocalizedString("Insert after #%d: %@", comment: ""), index + 1, humanActionKindName(row.group.kind)))
+    private var insertionIndexBinding: Binding<Int> {
+        Binding<Int>(
+            get: {
+                if let anchor = insertionAnchor() {
+                    return anchor.order + 1
+                }
+                return rows.count + 1
+            },
+            set: { newValue in
+                let clamped = max(1, min(newValue, rows.count + 1))
+                if clamped > rows.count {
+                    selection.removeAll()
+                } else {
+                    let index = clamped - 1
+                    if rows.indices.contains(index) {
+                        selection = [rows[index].id]
                     }
                 }
             }
-        } label: {
-            HStack(spacing: 7) {
-                Image(systemName: "arrow.down.to.line.compact")
-                    .font(.system(size: 10, weight: .semibold))
-                    .foregroundStyle(Brand.sigGreen)
-                Text(insertionTargetLabel())
-                    .font(.system(size: 10, weight: .medium))
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.8)
-                Spacer(minLength: 0)
-                Image(systemName: "chevron.up.chevron.down")
-                    .font(.system(size: 9, weight: .semibold))
-                    .foregroundStyle(.tertiary)
-            }
-            .padding(.horizontal, 8)
-            .padding(.vertical, 6)
-            .background(Color.primary.opacity(0.04))
-            .clipShape(.rect(cornerRadius: 7))
-        }
-        .buttonStyle(.plain)
+        )
     }
-    
-    func insertionTargetLabel() -> String {
-        guard let anchor = insertionAnchor() else {
-            return NSLocalizedString("Append at end", comment: "")
+
+    @ViewBuilder
+    func insertionTargetView() -> some View {
+        HStack(spacing: 8) {
+            Text(NSLocalizedString("Insert Position", comment: ""))
+                .font(.system(size: 11))
+                .foregroundStyle(.secondary)
+            
+            Spacer()
+            
+            if rows.isEmpty {
+                Text(NSLocalizedString("Empty Timeline", comment: ""))
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+            } else {
+                HStack(spacing: 6) {
+                    let val = insertionIndexBinding.wrappedValue
+                    if val > rows.count {
+                        Text(NSLocalizedString("Append at end", comment: ""))
+                            .font(.system(size: 11))
+                            .foregroundStyle(.secondary)
+                    } else {
+                        Text(NSLocalizedString("After Action #", comment: ""))
+                            .font(.system(size: 11))
+                        
+                        TextField("", value: insertionIndexBinding, format: .number)
+                            .textFieldStyle(.roundedBorder)
+                            .font(.system(size: 11, design: .monospaced))
+                            .frame(width: 45)
+                            .multilineTextAlignment(.trailing)
+                    }
+                    
+                    Stepper("", value: insertionIndexBinding, in: 1...(rows.count + 1))
+                        .labelsHidden()
+                        .controlSize(.small)
+                }
+            }
         }
-        if selection.count > 1 {
-            return String(format: NSLocalizedString("Insert after selection, ending at #%d", comment: ""), anchor.order + 1)
-        }
-        return String(format: NSLocalizedString("Insert after #%d", comment: ""), anchor.order + 1)
     }
     
     func insertionAnchor() -> (order: Int, row: ActionRow)? {
@@ -1699,6 +2128,77 @@ struct EditorSidebar: View {
         }
         
         selectInsertedEvents(matching: insertedEvents, fallback: clampedIndex..<(clampedIndex + 2))
+    }
+
+    func insertBehaviorCopy(_ group: ActionGroup) {
+        guard let behaviorID = group.behaviorGroupID else { return }
+        
+        let placement = insertionPlacementAfterSelection()
+        let insertIndex = placement.eventIndex
+        let clampedIndex = max(0, min(insertIndex, recorder.events.count))
+        
+        let behaviorEvents = recorder.events.filter { $0.behaviorGroupID == behaviorID }
+        guard !behaviorEvents.isEmpty else { return }
+        
+        let sortedEvents = behaviorEvents.sorted { $0.time < $1.time }
+        let srcBaseTime = sortedEvents[0].time
+        let srcDuration = (sortedEvents.last!.time - srcBaseTime) + 0.1
+        
+        let previousLiveDuration = recorder.liveDuration
+        let previousLastEventTime = recorder.events.last?.time
+        
+        let newBehaviorID = BehaviorGroupID()
+        let newBehaviorName = String(
+            format: NSLocalizedString("Copy of %@", comment: ""),
+            group.behaviorGroupName ?? NSLocalizedString("Behavior", comment: "")
+        )
+        
+        let insertionTime: TimeInterval = {
+            if let explicit = placement.explicitStartTime {
+                return explicit
+            }
+            if clampedIndex > 0 {
+                return recorder.events[clampedIndex - 1].time + 0.1
+            }
+            return 0
+        }()
+        
+        var copies: [RecordedEvent] = []
+        for ev in sortedEvents {
+            var copy = ev
+            copy.time = insertionTime + (ev.time - srcBaseTime)
+            copy.behaviorGroupID = newBehaviorID
+            copy.behaviorGroupName = newBehaviorName
+            copies.append(copy)
+        }
+        
+        withUndo(String(format: NSLocalizedString("Insert Behavior: %@", comment: ""), newBehaviorName)) {
+            for i in clampedIndex..<recorder.events.count {
+                recorder.events[i].time += srcDuration
+            }
+            recorder.events.insert(contentsOf: copies, at: clampedIndex)
+            recorder.liveDuration = recorder.events.liveDurationPreservingTrailingWait(
+                previousLiveDuration: previousLiveDuration + srcDuration,
+                previousLastEventTime: previousLastEventTime
+            )
+            if let lastTime = recorder.events.last?.time {
+                recorder.liveDuration = max(recorder.liveDuration, lastTime)
+            }
+        }
+        
+        selectInsertedEvents(matching: copies, fallback: clampedIndex..<(clampedIndex + copies.count))
+    }
+
+    private var boundBehaviors: [ActionGroup] {
+        var seen = Set<BehaviorGroupID>()
+        var list = [ActionGroup]()
+        for row in rows {
+            if let bid = row.group.behaviorGroupID, !seen.contains(bid) {
+                seen.insert(bid)
+                list.append(row.group)
+            }
+        }
+        return list
     }
 
     func insertClickTextAfterSelectedWait(_ group: ActionGroup) {

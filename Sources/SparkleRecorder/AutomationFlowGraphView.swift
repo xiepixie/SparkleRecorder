@@ -23,6 +23,7 @@ struct AutomationFlowGraphView: View {
 
     @State private var draggedNode: DraggedNode?
     @State private var isGraphDropTargeted = false
+    @State private var graphDropLocation: CGPoint?
 
     private let dragThreshold = 3.0
     private let graphInset = 32.0
@@ -69,8 +70,11 @@ struct AutomationFlowGraphView: View {
                 .overlay(graphDropOverlay)
                 .onDrop(
                     of: [UTType.text],
-                    isTargeted: $isGraphDropTargeted,
-                    perform: handleGraphDrop(providers:location:)
+                    delegate: AutomationFlowGraphDropDelegate(
+                        isTargeted: $isGraphDropTargeted,
+                        dropLocation: $graphDropLocation,
+                        onDrop: handleGraphDrop(providers:location:)
+                    )
                 )
                 .coordinateSpace(name: "AutomationFlowGraphCanvas")
             }
@@ -79,13 +83,19 @@ struct AutomationFlowGraphView: View {
             // Header Overlay
             HStack(alignment: .top) {
                 VStack(alignment: .leading, spacing: 4) {
-                    HStack(spacing: 8) {
+                    VStack(alignment: .leading, spacing: 5) {
                         Text(workflow.name)
                             .font(.headline)
+                            .lineLimit(1)
 
-                        Text(String(format: NSLocalizedString("%d tasks", comment: ""), workflow.nodes.count))
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
+                        HStack(spacing: 8) {
+                            Label(String(format: NSLocalizedString("%d tasks", comment: ""), workflow.nodes.count), systemImage: "circle.grid.cross")
+                            Label(String(format: NSLocalizedString("%d links", comment: ""), workflow.edges.count), systemImage: "arrow.triangle.branch")
+                            Label(workflow.status.label, systemImage: workflow.status.systemImage)
+                                .foregroundStyle(workflow.status.tint)
+                        }
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                     }
 
                     if pendingDependencySourceID != nil {
@@ -192,17 +202,30 @@ struct AutomationFlowGraphView: View {
     }
 
     private var graphDropOverlay: some View {
-        RoundedRectangle(cornerRadius: 12, style: .continuous)
-            .strokeBorder(
-                isGraphDropTargeted ? Brand.libraryGreen.opacity(0.72) : Color.clear,
-                style: StrokeStyle(lineWidth: 1.2, dash: [7, 5])
-            )
-            .background(
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .fill(isGraphDropTargeted ? Brand.libraryGreen.opacity(0.045) : Color.clear)
-            )
-            .allowsHitTesting(false)
-            .accessibilityHidden(true)
+        ZStack(alignment: .topLeading) {
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .strokeBorder(
+                    isGraphDropTargeted ? Brand.libraryGreen.opacity(0.72) : Color.clear,
+                    style: StrokeStyle(lineWidth: 1.2, dash: [7, 5])
+                )
+                .background(
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .fill(isGraphDropTargeted ? Brand.libraryGreen.opacity(0.045) : Color.clear)
+                )
+
+            if workflow.nodes.isEmpty {
+                AutomationFlowGraphEmptyCanvasView(isActive: isGraphDropTargeted)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
+
+            if isGraphDropTargeted, let graphDropLocation {
+                let position = graphDropPosition(for: graphDropLocation)
+                AutomationFlowGraphDropPreview(size: workflow.nodeSize)
+                    .offset(x: CGFloat(position.x), y: CGFloat(position.y))
+            }
+        }
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
     }
 
     private func dragGesture(for node: AutomationTaskNodeProjection) -> some Gesture {
@@ -363,6 +386,89 @@ struct AutomationFlowGraphView: View {
                 return nil
             }
         }
+    }
+}
+
+private struct AutomationFlowGraphDropDelegate: DropDelegate {
+    @Binding var isTargeted: Bool
+    @Binding var dropLocation: CGPoint?
+    let onDrop: ([NSItemProvider], CGPoint) -> Bool
+
+    func validateDrop(info: DropInfo) -> Bool {
+        !info.itemProviders(for: [UTType.text]).isEmpty
+    }
+
+    func dropEntered(info: DropInfo) {
+        updateDropState(info)
+    }
+
+    func dropUpdated(info: DropInfo) -> DropProposal? {
+        updateDropState(info)
+        return DropProposal(operation: .copy)
+    }
+
+    func dropExited(info: DropInfo) {
+        isTargeted = false
+        dropLocation = nil
+    }
+
+    func performDrop(info: DropInfo) -> Bool {
+        let providers = info.itemProviders(for: [UTType.text])
+        let location = info.location
+        isTargeted = false
+        dropLocation = nil
+        return onDrop(providers, location)
+    }
+
+    private func updateDropState(_ info: DropInfo) {
+        isTargeted = true
+        dropLocation = info.location
+    }
+}
+
+private struct AutomationFlowGraphDropPreview: View {
+    let size: AutomationGraphSize
+
+    var body: some View {
+        RoundedRectangle(cornerRadius: 10, style: .continuous)
+            .fill(Brand.libraryGreen.opacity(0.08))
+            .overlay(
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .strokeBorder(
+                        Brand.libraryGreen.opacity(0.68),
+                        style: StrokeStyle(lineWidth: 1.2, dash: [6, 5])
+                    )
+            )
+            .overlay {
+                Image(systemName: "plus")
+                    .font(.system(size: 17, weight: .semibold))
+                    .foregroundStyle(Brand.libraryGreen)
+                    .padding(7)
+                    .background(.thinMaterial, in: Circle())
+            }
+            .frame(width: CGFloat(size.width), height: CGFloat(size.height))
+    }
+}
+
+private struct AutomationFlowGraphEmptyCanvasView: View {
+    let isActive: Bool
+
+    var body: some View {
+        VStack(spacing: 10) {
+            Image(systemName: "circle.grid.cross")
+                .font(.system(size: 26, weight: .light))
+                .foregroundStyle(isActive ? Brand.libraryGreen : Color.secondary.opacity(0.6))
+                .accessibilityHidden(true)
+
+            Text(NSLocalizedString("No task nodes", comment: ""))
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(isActive ? Brand.libraryGreen : Color.secondary)
+
+            Text(NSLocalizedString("Workflow structure appears here.", comment: ""))
+                .font(.caption)
+                .foregroundStyle(.tertiary)
+        }
+        .padding(20)
     }
 }
 

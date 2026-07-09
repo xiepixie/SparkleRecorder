@@ -96,6 +96,7 @@ public struct AutomationWorkflowDraftTask: Codable, Equatable, Sendable {
 
 public struct AutomationWorkflowDraftLoop: Codable, Equatable, Sendable {
     public static let maxFixedCount = 50
+    public static let maxRepeatUntilAttempts = 50
 
     public var kind: String?
     public var count: Int
@@ -451,8 +452,7 @@ public enum AutomationWorkflowDraftLoopExpander {
         for task in document.workflow.tasks {
             guard task.type.trimmedForDraftLoopExpansion == "loop",
                   let loop = task.loop,
-                  loop.isFixedCount,
-                  loop.count > 0,
+                  loop.isExpandableForDraftImport,
                   !loop.tasks.isEmpty
             else {
                 expandedTasks.append(task)
@@ -462,14 +462,14 @@ public enum AutomationWorkflowDraftLoopExpander {
             let loopKey = task.key.trimmedForDraftLoopExpansion
             let copies = expandedLoopTasks(for: task, loop: loop)
             guard let entry = copies.first?.key,
-                  let exit = copies.last?.key,
-                  let exitBodyTask = loop.tasks.last else {
+                  let exit = expandedLoopExitKey(for: task, loop: loop),
+                  let exitTrigger = expandedLoopExitTrigger(for: loop) else {
                 continue
             }
             loopPorts[loopKey] = (
                 entry: entry,
                 exit: exit,
-                exitTrigger: defaultCompletionTrigger(for: exitBodyTask)
+                exitTrigger: exitTrigger
             )
             expandedTasks.append(contentsOf: copies)
         }
@@ -515,6 +515,17 @@ public enum AutomationWorkflowDraftLoopExpander {
         for task: AutomationWorkflowDraftTask,
         loop: AutomationWorkflowDraftLoop
     ) -> [AutomationWorkflowDraftTask] {
+        if loop.isRepeatUntil {
+            return expandedRepeatUntilTasks(for: task, loop: loop)
+        }
+
+        return expandedFixedLoopTasks(for: task, loop: loop)
+    }
+
+    private static func expandedFixedLoopTasks(
+        for task: AutomationWorkflowDraftTask,
+        loop: AutomationWorkflowDraftLoop
+    ) -> [AutomationWorkflowDraftTask] {
         let loopKey = task.key.trimmedForDraftLoopExpansion
         let loopName = task.name?.trimmedForDraftLoopExpansion.nilIfEmptyForDraftLoopExpansion ?? loopKey
         let enabled = task.enabled ?? true
@@ -536,6 +547,48 @@ public enum AutomationWorkflowDraftLoopExpander {
         }
     }
 
+    private static func expandedRepeatUntilTasks(
+        for task: AutomationWorkflowDraftTask,
+        loop: AutomationWorkflowDraftLoop
+    ) -> [AutomationWorkflowDraftTask] {
+        let loopKey = task.key.trimmedForDraftLoopExpansion
+        let loopName = task.name?.trimmedForDraftLoopExpansion.nilIfEmptyForDraftLoopExpansion ?? loopKey
+        let attempts = repeatUntilAttemptCount(loop)
+        let enabled = task.enabled ?? true
+        var tasks: [AutomationWorkflowDraftTask] = []
+
+        for iteration in 1...attempts {
+            for (bodyIndex, bodyTask) in loop.tasks.enumerated() {
+                var copy = bodyTask
+                let bodyKey = bodyTask.key.trimmedForDraftLoopExpansion
+                copy.key = expandedKey(loopKey: loopKey, iteration: iteration, bodyKey: bodyKey)
+                copy.name = expandedName(
+                    loopName: loopName,
+                    iteration: iteration,
+                    bodyTask: bodyTask
+                )
+                copy.schedule = iteration == 1 && bodyIndex == 0 ? task.schedule : nil
+                copy.enabled = enabled && (bodyTask.enabled ?? true)
+                tasks.append(copy)
+            }
+
+            tasks.append(repeatUntilConditionTask(
+                loopKey: loopKey,
+                loopName: loopName,
+                iteration: iteration,
+                loop: loop,
+                enabled: enabled
+            ))
+        }
+
+        if repeatUntilNeedsManualApproval(loop) {
+            tasks.append(repeatUntilManualApprovalTask(loopKey: loopKey, loopName: loopName, enabled: enabled))
+        }
+
+        tasks.append(repeatUntilCompleteTask(loopKey: loopKey, loopName: loopName, enabled: enabled))
+        return tasks
+    }
+
     private static func generatedLoopDependencies(
         for tasks: [AutomationWorkflowDraftTask]
     ) -> [AutomationWorkflowDraftDependency] {
@@ -544,10 +597,14 @@ public enum AutomationWorkflowDraftLoopExpander {
         for task in tasks {
             guard task.type.trimmedForDraftLoopExpansion == "loop",
                   let loop = task.loop,
-                  loop.isFixedCount,
-                  loop.count > 0,
+                  loop.isExpandableForDraftImport,
                   !loop.tasks.isEmpty
             else {
+                continue
+            }
+
+            if loop.isRepeatUntil {
+                dependencies.append(contentsOf: generatedRepeatUntilDependencies(for: task, loop: loop))
                 continue
             }
 
@@ -586,8 +643,118 @@ public enum AutomationWorkflowDraftLoopExpander {
         return dependencies
     }
 
+    private static func generatedRepeatUntilDependencies(
+        for task: AutomationWorkflowDraftTask,
+        loop: AutomationWorkflowDraftLoop
+    ) -> [AutomationWorkflowDraftDependency] {
+        let loopKey = task.key.trimmedForDraftLoopExpansion
+        let attempts = repeatUntilAttemptCount(loop)
+        let bodyKeys = loop.tasks.map { $0.key.trimmedForDraftLoopExpansion }
+        guard let firstBodyKey = bodyKeys.first,
+              let lastBodyKey = bodyKeys.last else {
+            return []
+        }
+
+        var dependencies: [AutomationWorkflowDraftDependency] = []
+        for iteration in 1...attempts {
+            for pairIndex in bodyKeys.indices.dropLast() {
+                let from = expandedKey(loopKey: loopKey, iteration: iteration, bodyKey: bodyKeys[pairIndex])
+                let to = expandedKey(loopKey: loopKey, iteration: iteration, bodyKey: bodyKeys[pairIndex + 1])
+                let trigger = defaultCompletionTrigger(for: loop.tasks[pairIndex])
+                dependencies.append(AutomationWorkflowDraftDependency(
+                    key: "\(from)->\(to):\(trigger)",
+                    from: from,
+                    to: to,
+                    trigger: trigger
+                ))
+            }
+
+            let lastBody = expandedKey(loopKey: loopKey, iteration: iteration, bodyKey: lastBodyKey)
+            let until = repeatUntilConditionKey(loopKey: loopKey, iteration: iteration)
+            let bodyTrigger = loop.tasks.last.map(defaultCompletionTrigger(for:)) ?? "success"
+            dependencies.append(AutomationWorkflowDraftDependency(
+                key: "\(lastBody)->\(until):\(bodyTrigger)",
+                from: lastBody,
+                to: until,
+                trigger: bodyTrigger
+            ))
+
+            let complete = repeatUntilCompleteKey(loopKey)
+            dependencies.append(AutomationWorkflowDraftDependency(
+                key: "\(until)->\(complete):conditionMatched",
+                from: until,
+                to: complete,
+                trigger: "conditionMatched"
+            ))
+
+            if iteration < attempts {
+                let nextFirst = expandedKey(loopKey: loopKey, iteration: iteration + 1, bodyKey: firstBodyKey)
+                dependencies.append(AutomationWorkflowDraftDependency(
+                    key: "\(until)->\(nextFirst):conditionNotMatched",
+                    from: until,
+                    to: nextFirst,
+                    trigger: "conditionNotMatched"
+                ))
+            } else {
+                dependencies.append(contentsOf: repeatUntilExhaustedDependencies(loopKey: loopKey, loop: loop, from: until))
+            }
+        }
+
+        return dependencies
+    }
+
+    private static func repeatUntilExhaustedDependencies(
+        loopKey: String,
+        loop: AutomationWorkflowDraftLoop,
+        from until: String
+    ) -> [AutomationWorkflowDraftDependency] {
+        switch loop.normalizedFailurePolicyForDraftExpansion {
+        case AutomationWorkflowDraftLoopFailurePolicy.continue:
+            let complete = repeatUntilCompleteKey(loopKey)
+            return [
+                AutomationWorkflowDraftDependency(
+                    key: "\(until)->\(complete):conditionNotMatched",
+                    from: until,
+                    to: complete,
+                    trigger: "conditionNotMatched"
+                )
+            ]
+        case AutomationWorkflowDraftLoopFailurePolicy.requireManualApproval:
+            let approval = repeatUntilManualApprovalKey(loopKey)
+            let complete = repeatUntilCompleteKey(loopKey)
+            return [
+                AutomationWorkflowDraftDependency(
+                    key: "\(until)->\(approval):conditionNotMatched",
+                    from: until,
+                    to: approval,
+                    trigger: "conditionNotMatched"
+                ),
+                AutomationWorkflowDraftDependency(
+                    key: "\(approval)->\(complete):conditionMatched",
+                    from: approval,
+                    to: complete,
+                    trigger: "conditionMatched"
+                )
+            ]
+        default:
+            return []
+        }
+    }
+
     private static func expandedKey(loopKey: String, iteration: Int, bodyKey: String) -> String {
         "\(loopKey)__\(iteration)__\(bodyKey)"
+    }
+
+    private static func repeatUntilConditionKey(loopKey: String, iteration: Int) -> String {
+        "\(loopKey)__\(iteration)__until"
+    }
+
+    private static func repeatUntilCompleteKey(_ loopKey: String) -> String {
+        "\(loopKey)__complete"
+    }
+
+    private static func repeatUntilManualApprovalKey(_ loopKey: String) -> String {
+        "\(loopKey)__on_failure_approval"
     }
 
     private static func expandedName(
@@ -598,6 +765,86 @@ public enum AutomationWorkflowDraftLoopExpander {
         let bodyName = bodyTask.name?.trimmedForDraftLoopExpansion.nilIfEmptyForDraftLoopExpansion ??
             bodyTask.key.trimmedForDraftLoopExpansion
         return "\(loopName) \(iteration): \(bodyName)"
+    }
+
+    private static func repeatUntilConditionTask(
+        loopKey: String,
+        loopName: String,
+        iteration: Int,
+        loop: AutomationWorkflowDraftLoop,
+        enabled: Bool
+    ) -> AutomationWorkflowDraftTask {
+        AutomationWorkflowDraftTask(
+            key: repeatUntilConditionKey(loopKey: loopKey, iteration: iteration),
+            type: "condition",
+            name: "\(loopName) \(iteration): Until",
+            condition: loop.until,
+            timeoutSeconds: loop.timeoutSeconds,
+            pollingSeconds: loop.pollingSeconds,
+            enabled: enabled
+        )
+    }
+
+    private static func repeatUntilManualApprovalTask(
+        loopKey: String,
+        loopName: String,
+        enabled: Bool
+    ) -> AutomationWorkflowDraftTask {
+        AutomationWorkflowDraftTask(
+            key: repeatUntilManualApprovalKey(loopKey),
+            type: "manualApproval",
+            name: "\(loopName): Review after max attempts",
+            joinPolicy: AutomationJoinPolicy.firstMatched.rawValue,
+            enabled: enabled
+        )
+    }
+
+    private static func repeatUntilCompleteTask(
+        loopKey: String,
+        loopName: String,
+        enabled: Bool
+    ) -> AutomationWorkflowDraftTask {
+        AutomationWorkflowDraftTask(
+            key: repeatUntilCompleteKey(loopKey),
+            type: "delay",
+            name: "\(loopName): Complete",
+            delaySeconds: 0,
+            joinPolicy: AutomationJoinPolicy.firstMatched.rawValue,
+            enabled: enabled
+        )
+    }
+
+    private static func expandedLoopExitKey(
+        for task: AutomationWorkflowDraftTask,
+        loop: AutomationWorkflowDraftLoop
+    ) -> String? {
+        let loopKey = task.key.trimmedForDraftLoopExpansion
+        if loop.isRepeatUntil {
+            return repeatUntilCompleteKey(loopKey)
+        }
+        guard let last = loop.tasks.last else {
+            return nil
+        }
+        return expandedKey(
+            loopKey: loopKey,
+            iteration: loop.count,
+            bodyKey: last.key.trimmedForDraftLoopExpansion
+        )
+    }
+
+    private static func expandedLoopExitTrigger(for loop: AutomationWorkflowDraftLoop) -> String? {
+        if loop.isRepeatUntil {
+            return "success"
+        }
+        return loop.tasks.last.map(defaultCompletionTrigger(for:))
+    }
+
+    private static func repeatUntilAttemptCount(_ loop: AutomationWorkflowDraftLoop) -> Int {
+        max(1, min(loop.maxAttempts ?? 1, AutomationWorkflowDraftLoop.maxRepeatUntilAttempts))
+    }
+
+    private static func repeatUntilNeedsManualApproval(_ loop: AutomationWorkflowDraftLoop) -> Bool {
+        loop.normalizedFailurePolicyForDraftExpansion == AutomationWorkflowDraftLoopFailurePolicy.requireManualApproval
     }
 
     private static func defaultCompletionTrigger(for task: AutomationWorkflowDraftTask) -> String {
@@ -1339,14 +1586,6 @@ private struct Validator {
         path: String,
         key: String
     ) {
-        add(
-            .error,
-            .invalidLoop,
-            "Repeat-until loop '\(key)' is draft-only until structured runtime loop support lands.",
-            "\(path).loop.kind",
-            taskKey: key
-        )
-
         validateLoopBody(loop, path: path, key: key)
 
         if let until = loop.until {
@@ -1361,11 +1600,21 @@ private struct Validator {
             )
         }
 
-        if let maxAttempts = loop.maxAttempts, maxAttempts < 1 {
+        guard let maxAttempts = loop.maxAttempts else {
             add(
                 .error,
                 .invalidLoop,
-                "Repeat-until loop '\(key)' maxAttempts must be at least 1.",
+                "Repeat-until loop '\(key)' needs maxAttempts before it can be expanded for import.",
+                "\(path).loop.maxAttempts",
+                taskKey: key
+            )
+            return
+        }
+        if !(1...AutomationWorkflowDraftLoop.maxRepeatUntilAttempts).contains(maxAttempts) {
+            add(
+                .error,
+                .invalidLoop,
+                "Repeat-until loop '\(key)' maxAttempts must be between 1 and \(AutomationWorkflowDraftLoop.maxRepeatUntilAttempts).",
                 "\(path).loop.maxAttempts",
                 taskKey: key
             )
@@ -1587,5 +1836,22 @@ private extension String {
 
     var nilIfEmptyForDraftLoopExpansion: String? {
         isEmpty ? nil : self
+    }
+}
+
+private extension AutomationWorkflowDraftLoop {
+    var isExpandableForDraftImport: Bool {
+        if isFixedCount {
+            return count > 0
+        }
+        if isRepeatUntil {
+            return maxAttempts != nil
+        }
+        return false
+    }
+
+    var normalizedFailurePolicyForDraftExpansion: String {
+        onFailure?.trimmedForDraftLoopExpansion.nilIfEmptyForDraftLoopExpansion ??
+            AutomationWorkflowDraftLoopFailurePolicy.failRun
     }
 }

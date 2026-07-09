@@ -379,8 +379,8 @@ struct AutomationWorkflowDraftPreviewProjectionTests {
         ])
     }
 
-    @Test("Preview projection exposes repeat-until as draft-only loop intent")
-    func previewProjectionExposesRepeatUntilAsDraftOnlyLoopIntent() throws {
+    @Test("Preview projection exposes bounded repeat-until expansion")
+    func previewProjectionExposesBoundedRepeatUntilExpansion() throws {
         let document = AutomationWorkflowDraftDocument(
             workflow: AutomationWorkflowDraft(
                 name: "Repeat Until Preview",
@@ -448,28 +448,39 @@ struct AutomationWorkflowDraftPreviewProjectionTests {
         let loopRow = try #require(projection.loopExpansionRows.first)
         let importPreview = try #require(projection.importPreview)
 
-        #expect(!projection.isValid)
-        #expect(!projection.isReadyForImport)
-        #expect(projection.statusLabel == "Import blocked")
+        #expect(projection.isValid)
+        #expect(projection.isReadyForImport)
+        #expect(projection.statusLabel == "Dry-run passed")
         #expect(taskRow.detail == "Repeat until image disappears, 2 steps")
         #expect(loopRow.key == "repeat_until_spinner")
         #expect(loopRow.modeLabel == "Repeat until")
         #expect(loopRow.repeatCount == 5)
         #expect(loopRow.bodyStepCount == 2)
-        #expect(loopRow.expandedTaskCount == 0)
+        #expect(loopRow.expandedTaskCount == 17)
         #expect(loopRow.repeatMetricTitle == "max attempts")
-        #expect(loopRow.expandedMetricTitle == "runtime steps")
+        #expect(loopRow.expandedMetricTitle == "imported steps")
         #expect(loopRow.untilLabel == "image disappears")
         #expect(loopRow.guardrailLabel == "max 5 attempts, 30.0s timeout, 0.5s polling, on failure: requireManualApproval")
-        #expect(loopRow.summary == "Repeats body until image disappears")
-        #expect(loopRow.importBoundaryLabel == "Draft-only repeat-until; import waits for structured runtime loop support")
-        #expect(loopRow.capabilityLabel == "Review can preserve the loop intent; runtime attempt evidence is not active yet")
-        #expect(projection.simulationRows.isEmpty)
-        #expect(importPreview.isImportable == false)
-        #expect(importPreview.issueRows.contains {
-            $0.severity == .error &&
-                $0.code == AutomationWorkflowDraftIssueCode.invalidLoop.rawValue &&
-                $0.message.contains("draft-only")
-        })
+        #expect(loopRow.summary == "Expands to up to 17 imported steps; exits when image disappears matches")
+        #expect(loopRow.importBoundaryLabel == "Bounded repeat-until expands to an acyclic workflow at import")
+        #expect(loopRow.capabilityLabel == "Runtime receives ordinary tasks; structured attempt evidence remains future work")
+        #expect(projection.simulationRows.map(\.taskKey) == [
+            "repeat_until_spinner__1__tap_refresh",
+            "repeat_until_spinner__1__cooldown",
+            "repeat_until_spinner__1__until",
+            "repeat_until_spinner__complete"
+        ])
+        #expect(importPreview.isImportable)
+        #expect(importPreview.taskCount == 17)
+        let importedTaskKeys = Set(importPreview.taskIDRows.map(\.key))
+        #expect(importedTaskKeys.contains("repeat_until_spinner__1__tap_refresh"))
+        #expect(importedTaskKeys.contains("repeat_until_spinner__1__cooldown"))
+        #expect(importedTaskKeys.contains("repeat_until_spinner__1__until"))
+        #expect(importedTaskKeys.contains("repeat_until_spinner__5__until"))
+        #expect(importedTaskKeys.contains("repeat_until_spinner__on_failure_approval"))
+        #expect(importedTaskKeys.contains("repeat_until_spinner__complete"))
+        let importedDependencyKeys = Set(importPreview.dependencyIDRows.map(\.key))
+        #expect(importedDependencyKeys.contains("repeat_until_spinner__5__until->repeat_until_spinner__on_failure_approval:conditionNotMatched"))
+        #expect(importedDependencyKeys.contains("repeat_until_spinner__on_failure_approval->repeat_until_spinner__complete:conditionMatched"))
     }
 }

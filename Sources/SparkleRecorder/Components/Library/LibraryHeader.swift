@@ -40,7 +40,7 @@ struct LibraryHeader: View {
                         } else {
                             RecDot(size: 8, glassWhite: false)
                         }
-                        Text(state.isRecording ? NSLocalizedString("Stop recording", comment: "") : NSLocalizedString("Start recording", comment: ""))
+                        Text(state.isRecording ? NSLocalizedString("Stop recording", comment: "") : NSLocalizedString("Record macro", comment: ""))
                             .font(.system(size: 13, weight: .semibold))
                             .foregroundStyle(state.isRecording ? .white : .primary)
                         Spacer(minLength: 0)
@@ -62,7 +62,7 @@ struct LibraryHeader: View {
                     .shadow(color: state.isRecording ? Brand.red500.opacity(0.3) : .clear, radius: 8, x: 0, y: 4)
                 }
                 .buttonStyle(HoverPressButtonStyle(hoverScale: 1.012))
-                .accessibilityLabel(state.isRecording ? NSLocalizedString("Stop recording", comment: "") : NSLocalizedString("Start recording", comment: ""))
+                .accessibilityLabel(state.isRecording ? NSLocalizedString("Stop recording", comment: "") : NSLocalizedString("Record macro", comment: ""))
                 
                 // Search Button
                 Button {

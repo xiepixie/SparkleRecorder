@@ -9,9 +9,13 @@ struct ActionListView: View {
     let rows: [ActionRow]
     @Binding var selection: Set<UUID>
     let onRefreshRows: () -> [ActionRow]
+    var toggleDisabledState: ((Set<UUID>) -> Void)?
+    var playFromHere: ((ActionRow) -> Void)?
+    var playThisActionOnly: ((ActionRow) -> Void)?
     @State private var lastAnchor: UUID?
     @State private var dropInsertion: ActionRowInsertion? = nil
     @State private var draggedID: UUID? = nil
+    @State private var dragNonce: UInt = 0
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -93,20 +97,24 @@ struct ActionListView: View {
                                         order: index + 1,
                                         selected: selection.contains(row.id),
                                         isMoving: isMoving(row),
+                                        isDisabled: isRowDisabled(row),
                                         onTap: { mods in handleTap(row.id, mods: mods) },
                                         onDragStarted: { beginDrag(row.id) },
                                         draggedID: $draggedID
                                     )
                                     .overlay(alignment: .top) {
                                         insertionIndicator(isActive: dropInsertion == .before(row.id))
+                                            .offset(y: -3)
                                     }
                                     .overlay(alignment: .bottom) {
                                         insertionIndicator(isActive: dropInsertion == .after(row.id))
+                                            .offset(y: 3)
                                     }
                                     .onDrop(of: [.text], delegate: ActionRowDropDelegate(
                                         rowID: row.id,
                                         dropInsertion: $dropInsertion,
                                         draggedID: $draggedID,
+                                        dragNonce: $dragNonce,
                                         canDrop: canDrop,
                                         onDrop: moveRows
                                     ))
@@ -127,6 +135,7 @@ struct ActionListView: View {
                     .onDrop(of: [.text], delegate: ActionListEndDropDelegate(
                         dropInsertion: $dropInsertion,
                         draggedID: $draggedID,
+                        dragNonce: $dragNonce,
                         canDrop: canDrop,
                         onDrop: moveRows
                     ))
@@ -391,6 +400,8 @@ struct ActionListView: View {
 
         case .end:
             return .end
+        case .passthrough:
+            return nil
         }
     }
 
@@ -411,6 +422,8 @@ struct ActionListView: View {
             insertIndex = idx + 1
         case .end:
             insertIndex = order.count
+        case .passthrough:
+            return nil
         }
 
         order.insert(contentsOf: movingInOrder, at: insertIndex)
@@ -430,7 +443,7 @@ struct ActionListView: View {
             return rows.dropFirst(targetRowIndex + 1)
                 .first { $0.group.kind.isReorderableAction && !movingGroupIDs.contains($0.id) }?
                 .group.eventIndices.first
-        case .end:
+        case .end, .passthrough:
             return nil
         }
     }
@@ -495,6 +508,7 @@ struct ActionListView: View {
     }
 
 	    func handleTap(_ id: UUID, mods: NSEvent.ModifierFlags) {
+            draggedID = nil
 	        if mods.contains(.command) {
 	            if selection.contains(id) { selection.remove(id) } else { selection.insert(id) }
 	            lastAnchor = id
@@ -519,6 +533,36 @@ struct ActionListView: View {
             lastAnchor = row.id
         } label: {
             Label(NSLocalizedString("Select Action", comment: ""), systemImage: "checkmark.circle")
+        }
+        
+        Divider()
+        
+        if let playFromHere = playFromHere {
+            Button {
+                playFromHere(row)
+            } label: {
+                Label(NSLocalizedString("Play From Here", comment: ""), systemImage: "play.fill")
+            }
+        }
+        
+        if let playThisActionOnly = playThisActionOnly {
+            Button {
+                playThisActionOnly(row)
+            } label: {
+                Label(NSLocalizedString("Play This Action Only", comment: ""), systemImage: "play.circle")
+            }
+        }
+        
+        if let toggleDisabledState = toggleDisabledState {
+            let isCurrentlyDisabled = isRowDisabled(row)
+            Button {
+                toggleDisabledState(Set(contextSnapshot(anchor: row).groupIDs))
+            } label: {
+                Label(
+                    isCurrentlyDisabled ? NSLocalizedString("Enable Action", comment: "") : NSLocalizedString("Disable Action", comment: ""),
+                    systemImage: isCurrentlyDisabled ? "play.slash.fill" : "nosign"
+                )
+            }
         }
         
         Divider()
@@ -585,6 +629,14 @@ struct ActionListView: View {
         return rows.filter { selectedIDs.contains($0.id) }
     }
     
+    private func isRowDisabled(_ row: ActionRow) -> Bool {
+        let eventIndices = row.group.eventIndices
+        guard !eventIndices.isEmpty else { return false }
+        return eventIndices.allSatisfy { idx in
+            guard idx < recorder.events.count else { return false }
+            return recorder.events[idx].isDisabled == true
+        }
+    }
     func contextEventIndices(anchor row: ActionRow) -> [Int] {
         contextSnapshot(anchor: row).eventIndices
     }

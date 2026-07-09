@@ -512,7 +512,9 @@ struct SparkleRecorderTests {
     @Test("Point Resolver Fail-Safe (Out of Bounds)")
     func pointResolverOutOfBounds() {
         let resolver = PointResolver()
-        let event = RecordedEvent.make(.mouseMoved, time: 0.1, x: 1500, y: 1500)
+        var event = RecordedEvent.make(.mouseMoved, time: 0.1, x: 1500, y: 1500)
+        event.coordinateBinding = .targetWindow
+        event.coordinateStrategy = .absoluteOnly
         
         let surface = PlaybackSurface(recordedFrame: RectValue(x: 100, y: 100, width: 800, height: 600))
         let currentFrame = RectValue(x: 250, y: 150, width: 800, height: 600)

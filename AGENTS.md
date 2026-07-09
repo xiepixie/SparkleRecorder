@@ -68,3 +68,10 @@ AI commits MUST include:
 ```text
 Co-Authored-By: (agent model name) <noreply@example.com>
 ```
+
+## Localization Strategy (String Catalogs)
+- **String Catalogs Only**: Use `.xcstrings` exclusively. Do not use `.strings` or `.stringsdict`.
+- **API Usage**: Use implicit `Text("...")` in SwiftUI and explicit `String(localized: "...")` in Swift. Avoid `NSLocalizedString`.
+- **Modularization**: Never place all strings in a single `Localizable.xcstrings`. Use domain-specific tables (e.g., `tableName: "Automation"`, `tableName: "Recording"`, `tableName: "Settings"`, `tableName: "EditorUX"`, `tableName: "Common"`).
+- **Pluralization**: Handled natively within the `.xcstrings` UI/JSON. Do not handle pluralization logic in code.
+- **Translation Workflow**: Do not manually translate massive files in Xcode. Export/Import via `xcodebuild -exportLocalizations`.

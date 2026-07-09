@@ -853,8 +853,13 @@ extension Array where Element == RecordedEvent {
         
         var newTimes = [Int: TimeInterval]()
         var current_time = start_delay
+        // Minimum gap between groups to prevent event interleaving after
+        // stable sort and to avoid post-processor mis-merging (e.g.
+        // multiPointClickGap = 0.12s).  Must stay below waitThreshold
+        // (0.200s) so an unwanted Wait row is never synthesised.
+        let minimumReorderGap: TimeInterval = 0.15
         
-        for idx in newOrder {
+        for (position, idx) in newOrder.enumerated() {
             let g = nonWaitGroups[idx]
             let g_startTime = g.startTime
             let g_endTime = g.endTime
@@ -865,7 +870,16 @@ extension Array where Element == RecordedEvent {
                 newTimes[evIdx] = current_time + offset
             }
             
-            let post_wait = (idx == n - 1) ? end_delay : intervals[idx]
+            let post_wait: TimeInterval
+            if position == newOrder.count - 1 {
+                post_wait = end_delay
+            } else {
+                // Use the interval that belonged to this *position* in the
+                // original sequence, not the interval that was after the
+                // original group.  This keeps gaps anchored to their slots
+                // rather than following groups around.
+                post_wait = Swift.max(intervals[position], minimumReorderGap)
+            }
             current_time = current_time + g_duration + post_wait
         }
         

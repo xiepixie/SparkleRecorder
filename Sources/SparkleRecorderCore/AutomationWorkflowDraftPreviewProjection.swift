@@ -313,27 +313,33 @@ public struct AutomationWorkflowDraftPreviewProjection: Codable, Equatable, Send
 
             if task.loop?.isRepeatUntil == true {
                 let loop = task.loop
+                let attempts = loop?.maxAttempts ?? 0
+                let approvalStepCount = loop?.onFailure?.nilIfBlankForDraftPreview ==
+                    AutomationWorkflowDraftLoopFailurePolicy.requireManualApproval ? 1 : 0
                 modeLabel = NSLocalizedString("Repeat until", comment: "")
-                repeatCount = loop?.maxAttempts ?? 0
-                expandedTaskCount = 0
+                repeatCount = attempts
+                expandedTaskCount = attempts > 0 ? attempts * (bodyStepCount + 1) + 1 + approvalStepCount : 0
                 repeatMetricTitle = NSLocalizedString("max attempts", comment: "")
-                expandedMetricTitle = NSLocalizedString("runtime steps", comment: "")
+                expandedMetricTitle = NSLocalizedString("imported steps", comment: "")
                 untilLabel = Self.conditionSummary(loop?.until)
                 guardrailLabel = Self.guardrailSummary(for: loop)
-                if let untilLabel {
+                if attempts <= 0 {
+                    summary = NSLocalizedString("Repeat-until needs max attempts before import", comment: "")
+                } else if let untilLabel {
                     summary = String(
-                        format: NSLocalizedString("Repeats body until %@", comment: ""),
+                        format: NSLocalizedString("Expands to up to %d imported steps; exits when %@ matches", comment: ""),
+                        expandedTaskCount,
                         untilLabel
                     )
                 } else {
-                    summary = NSLocalizedString("Repeat-until needs an until condition before runtime wiring", comment: "")
+                    summary = NSLocalizedString("Repeat-until needs an until condition before import", comment: "")
                 }
                 importBoundaryLabel = NSLocalizedString(
-                    "Draft-only repeat-until; import waits for structured runtime loop support",
+                    "Bounded repeat-until expands to an acyclic workflow at import",
                     comment: ""
                 )
                 capabilityLabel = NSLocalizedString(
-                    "Review can preserve the loop intent; runtime attempt evidence is not active yet",
+                    "Runtime receives ordinary tasks; structured attempt evidence remains future work",
                     comment: ""
                 )
             } else {

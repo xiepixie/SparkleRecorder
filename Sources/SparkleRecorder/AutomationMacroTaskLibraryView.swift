@@ -4,33 +4,19 @@ import SparkleRecorderCore
 struct AutomationMacroTaskLibraryView: View {
     let macros: [SavedMacro]
     let selectedWorkflow: AutomationWorkflow?
+    let isRecordingMacro: Bool
+    let recordsMacroIntoWorkflow: Bool
+    let isRecordingIntoWorkflow: Bool
+    let recordHotkeyName: String?
+    let onRecordMacro: (() -> Void)?
     let onAddMacroTask: (SavedMacro) -> Void
     let onAddConditionTask: (AutomationConditionKind) -> Void
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-
+        VStack(alignment: .leading, spacing: 14) {
             VStack(alignment: .leading, spacing: 8) {
-                AutomationSectionHeader(title: NSLocalizedString("ADD CONDITION", comment: ""))
-
-                VStack(alignment: .leading, spacing: 6) {
-                    HStack(spacing: 6) {
-                        manualApprovalButton
-                        externalSignalButton
-                    }
-                    HStack(spacing: 6) {
-                        screenTextButton
-                        regionChangedButton
-                    }
-                    HStack(spacing: 6) {
-                        imageAppearedButton
-                        imageDisappearedButton
-                    }
-                    HStack(spacing: 6) {
-                        pixelMatchedButton
-                    }
-                }
-                .disabled(selectedWorkflow == nil)
+                AutomationSectionHeader(title: NSLocalizedString("SOURCE", comment: ""))
+                recordMacroButton
             }
 
             VStack(alignment: .leading, spacing: 8) {
@@ -58,73 +44,200 @@ struct AutomationMacroTaskLibraryView: View {
                     }
                 }
             }
+
+            VStack(alignment: .leading, spacing: 8) {
+                AutomationSectionHeader(title: NSLocalizedString("CONDITION BLOCKS", comment: ""))
+
+                VStack(alignment: .leading, spacing: 6) {
+                    manualApprovalButton
+                    externalSignalButton
+                    screenTextButton
+                    regionChangedButton
+                    imageAppearedButton
+                    imageDisappearedButton
+                    pixelMatchedButton
+                }
+                .disabled(selectedWorkflow == nil)
+                .opacity(selectedWorkflow == nil ? 0.55 : 1)
+            }
         }
+    }
+
+    private var recordMacroButton: some View {
+        Button {
+            onRecordMacro?()
+        } label: {
+            HStack(spacing: 8) {
+                ZStack {
+                    Circle()
+                        .fill((isRecordingMacro ? Brand.red500 : Color.primary).opacity(isRecordingMacro ? 0.18 : 0.055))
+                        .frame(width: 24, height: 24)
+
+                    Image(systemName: isRecordingMacro ? "stop.fill" : "record.circle")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(isRecordingMacro ? Brand.red500 : .secondary)
+                }
+                .accessibilityHidden(true)
+
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(isRecordingMacro
+                         ? NSLocalizedString("Stop recording", comment: "")
+                         : NSLocalizedString("Record macro", comment: ""))
+                        .font(.caption)
+                        .fontWeight(.semibold)
+                        .foregroundStyle(.primary)
+                        .lineLimit(1)
+
+                    Text(recordMacroDetail)
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
+
+                Spacer(minLength: 0)
+
+                if let recordHotkeyName, !recordHotkeyName.isEmpty {
+                    Text(recordHotkeyName)
+                        .font(.system(size: 10, weight: .semibold, design: .rounded))
+                        .foregroundStyle(.secondary)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(
+                            Capsule(style: .continuous)
+                                .fill(Color.primary.opacity(0.055))
+                        )
+                }
+            }
+            .padding(.horizontal, 8)
+            .padding(.vertical, 7)
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .buttonStyle(AutomationQuietButtonStyle())
+        .disabled(onRecordMacro == nil)
+        .accessibilityLabel(isRecordingMacro
+                            ? NSLocalizedString("Stop recording", comment: "")
+                            : NSLocalizedString("Record macro", comment: ""))
+    }
+
+    private var recordMacroDetail: String {
+        if isRecordingMacro {
+            return isRecordingIntoWorkflow
+                ? NSLocalizedString("Capturing workflow task", comment: "")
+                : NSLocalizedString("Capturing source", comment: "")
+        }
+        return recordsMacroIntoWorkflow
+            ? NSLocalizedString("New source task", comment: "")
+            : NSLocalizedString("New source macro", comment: "")
     }
 
     private var manualApprovalButton: some View {
-        Button(action: { onAddConditionTask(.manualApproval) }) {
-            Label(NSLocalizedString("Manual approval", comment: ""), systemImage: "hand.raised.fill")
-                .frame(maxWidth: .infinity, alignment: .leading)
-        }
-        .buttonStyle(AutomationQuietButtonStyle())
+        conditionButton(
+            title: NSLocalizedString("Manual approval", comment: ""),
+            detail: NSLocalizedString("Human decision", comment: ""),
+            systemImage: "hand.raised.fill",
+            tint: Brand.libraryBlue,
+            action: { onAddConditionTask(.manualApproval) }
+        )
     }
 
     private var externalSignalButton: some View {
-        Button(action: { onAddConditionTask(.externalSignal(NSLocalizedString("Ready", comment: ""))) }) {
-            Label(NSLocalizedString("External signal", comment: ""), systemImage: "antenna.radiowaves.left.and.right")
-                .frame(maxWidth: .infinity, alignment: .leading)
-        }
-        .buttonStyle(AutomationQuietButtonStyle())
+        conditionButton(
+            title: NSLocalizedString("External signal", comment: ""),
+            detail: NSLocalizedString("Named app signal", comment: ""),
+            systemImage: "antenna.radiowaves.left.and.right",
+            tint: Brand.sigTeal,
+            action: { onAddConditionTask(.externalSignal(NSLocalizedString("Ready", comment: ""))) }
+        )
     }
 
     private var screenTextButton: some View {
-        Button(action: { onAddConditionTask(.ocrText(AutomationOCRCondition(text: ""))) }) {
-            Label(NSLocalizedString("Screen text", comment: ""), systemImage: "text.viewfinder")
-                .frame(maxWidth: .infinity, alignment: .leading)
-        }
-        .buttonStyle(AutomationQuietButtonStyle())
+        conditionButton(
+            title: NSLocalizedString("Screen text", comment: ""),
+            detail: NSLocalizedString("OCR text target", comment: ""),
+            systemImage: "text.viewfinder",
+            tint: Brand.sigAmber,
+            action: { onAddConditionTask(.ocrText(AutomationOCRCondition(text: ""))) }
+        )
     }
 
     private var regionChangedButton: some View {
-        Button(action: { onAddConditionTask(.visual(AutomationVisualCondition(type: .regionChanged))) }) {
-            Label(
-                AutomationVisualConditionPresentation.title(for: AutomationVisualConditionType.regionChanged),
-                systemImage: "viewfinder.rectangular"
-            )
-                .frame(maxWidth: .infinity, alignment: .leading)
-        }
-        .buttonStyle(AutomationQuietButtonStyle())
+        conditionButton(
+            title: AutomationVisualConditionPresentation.title(for: AutomationVisualConditionType.regionChanged),
+            detail: NSLocalizedString("Watched area + baseline", comment: ""),
+            systemImage: "viewfinder.rectangular",
+            tint: Brand.sigViolet,
+            action: { onAddConditionTask(.visual(AutomationVisualCondition(type: .regionChanged))) }
+        )
     }
 
     private var imageAppearedButton: some View {
-        Button(action: { onAddConditionTask(.visual(AutomationVisualCondition(type: .imageAppeared))) }) {
-            Label(
-                AutomationVisualConditionPresentation.title(for: AutomationVisualConditionType.imageAppeared),
-                systemImage: "photo"
-            )
-                .frame(maxWidth: .infinity, alignment: .leading)
-        }
-        .buttonStyle(AutomationQuietButtonStyle())
+        conditionButton(
+            title: AutomationVisualConditionPresentation.title(for: AutomationVisualConditionType.imageAppeared),
+            detail: NSLocalizedString("Watched area + image", comment: ""),
+            systemImage: "photo",
+            tint: Brand.libraryGreen,
+            action: { onAddConditionTask(.visual(AutomationVisualCondition(type: .imageAppeared))) }
+        )
     }
 
     private var imageDisappearedButton: some View {
-        Button(action: { onAddConditionTask(.visual(AutomationVisualCondition(type: .imageDisappeared))) }) {
-            Label(
-                AutomationVisualConditionPresentation.title(for: AutomationVisualConditionType.imageDisappeared),
-                systemImage: "photo.on.rectangle"
-            )
-                .frame(maxWidth: .infinity, alignment: .leading)
-        }
-        .buttonStyle(AutomationQuietButtonStyle())
+        conditionButton(
+            title: AutomationVisualConditionPresentation.title(for: AutomationVisualConditionType.imageDisappeared),
+            detail: NSLocalizedString("Watched area + image", comment: ""),
+            systemImage: "photo.on.rectangle",
+            tint: Brand.libraryGreen,
+            action: { onAddConditionTask(.visual(AutomationVisualCondition(type: .imageDisappeared))) }
+        )
     }
 
     private var pixelMatchedButton: some View {
-        Button(action: { onAddConditionTask(.visual(AutomationVisualCondition(type: .pixelMatched))) }) {
-            Label(
-                AutomationVisualConditionPresentation.title(for: AutomationVisualConditionType.pixelMatched),
-                systemImage: "paintpalette"
-            )
-                .frame(maxWidth: .infinity, alignment: .leading)
+        conditionButton(
+            title: AutomationVisualConditionPresentation.title(for: AutomationVisualConditionType.pixelMatched),
+            detail: NSLocalizedString("Pixel + color", comment: ""),
+            systemImage: "paintpalette",
+            tint: Brand.sigPink,
+            action: { onAddConditionTask(.visual(AutomationVisualCondition(type: .pixelMatched))) }
+        )
+    }
+
+    private func conditionButton(
+        title: String,
+        detail: String,
+        systemImage: String,
+        tint: Color,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            HStack(spacing: 8) {
+                Image(systemName: systemImage)
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(tint)
+                    .frame(width: 18, height: 18)
+                    .accessibilityHidden(true)
+
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(title)
+                        .font(.caption)
+                        .fontWeight(.semibold)
+                        .foregroundStyle(.primary)
+                        .lineLimit(1)
+
+                    Text(detail)
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
+
+                Spacer(minLength: 0)
+
+                Image(systemName: "plus")
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(.tertiary)
+                    .accessibilityHidden(true)
+            }
+            .padding(.horizontal, 8)
+            .padding(.vertical, 7)
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
         .buttonStyle(AutomationQuietButtonStyle())
     }

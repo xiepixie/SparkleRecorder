@@ -214,7 +214,7 @@ final class MenuBarController: NSObject, NSPopoverDelegate {
         guard let button = statusItem.button else { return }
         popover.animates = !recorder.isRecording
         popover.contentSize = recorder.isRecording
-            ? NSSize(width: 320, height: 236)
+            ? NSSize(width: 320, height: 276)
             : NSSize(width: 400, height: 540)
         popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
         if !recorder.isRecording {
@@ -1111,7 +1111,7 @@ final class MenuBarController: NSObject, NSPopoverDelegate {
         }
     }
 
-    private func preparePlaybackContext(for macro: SavedMacro?, completion: @escaping (PlaybackContext) -> Void) {
+    func preparePlaybackContext(for macro: SavedMacro?, completion: @escaping (PlaybackContext) -> Void) {
         guard let macro = macro else {
             completion(PlaybackContext())
             return
@@ -1462,6 +1462,12 @@ final class MenuBarController: NSObject, NSPopoverDelegate {
     /// can show it after an appearance switch).
     var showMainWindowHandler: (() -> Void)?
     func showMainWindow() { showMainWindowHandler?() }
+
+    func showAutomationWorkspace() {
+        state.workspace = .automation
+        if popover.isShown { popover.performClose(nil) }
+        showMainWindow()
+    }
 
     // MARK: - Settings window
 

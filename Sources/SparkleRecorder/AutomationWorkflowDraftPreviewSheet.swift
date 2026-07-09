@@ -236,7 +236,9 @@ struct AutomationWorkflowDraftPreviewSheet: View {
             )
             AutomationWorkflowDraftConditionEditorView(
                 document: previewState.document,
-                onApply: applyConditionEdit
+                sourceDirectory: previewState.sourceDirectory,
+                onApply: applyConditionEdit,
+                onRegisterAsset: applyVisualAssetEdit
             )
             AutomationWorkflowDraftScheduleEditorView(
                 document: previewState.document,

@@ -1,0 +1,748 @@
+{
+  "schema": "sparkle.workflow.draft.v1",
+  "workflow": {
+    "name": "CRK Arena Rough Draft",
+    "tasks": [
+      {
+        "key": "enter_arena",
+        "name": "进入竞技场",
+        "type": "macro",
+        "macroRef": {
+          "name": "CRK - 进入竞技场"
+        },
+        "resource": "foregroundInput",
+        "timeoutSeconds": 30,
+        "graphPosition": {
+          "x": 0,
+          "y": 0
+        }
+      },
+      {
+        "key": "arena_list_ready",
+        "name": "等待竞技场列表",
+        "type": "condition",
+        "condition": {
+          "type": "imageAppeared",
+          "regionRef": "arena_header_region",
+          "imageRef": "arena_list_anchor",
+          "threshold": 0.82
+        },
+        "resource": "screenCapture",
+        "timeoutSeconds": 20,
+        "pollingSeconds": 1,
+        "graphPosition": {
+          "x": 260,
+          "y": 0
+        }
+      },
+      {
+        "key": "p1_slot1_blocked",
+        "name": "第1页槽位1是否已打",
+        "type": "condition",
+        "condition": {
+          "type": "imageAppeared",
+          "regionRef": "slot1_blocked_region",
+          "imageRef": "slot_blocked_badge",
+          "threshold": 0.82
+        },
+        "resource": "screenCapture",
+        "timeoutSeconds": 1.5,
+        "pollingSeconds": 0.5,
+        "graphPosition": {
+          "x": 520,
+          "y": -160
+        }
+      },
+      {
+        "key": "p1_slot1_available",
+        "name": "第1页槽位1可挑战",
+        "type": "condition",
+        "condition": {
+          "type": "imageAppeared",
+          "regionRef": "slot1_fight_region",
+          "imageRef": "fight_button_available",
+          "threshold": 0.82
+        },
+        "resource": "screenCapture",
+        "timeoutSeconds": 2,
+        "pollingSeconds": 0.5,
+        "graphPosition": {
+          "x": 780,
+          "y": -160
+        }
+      },
+      {
+        "key": "fight_slot1",
+        "name": "挑战槽位1",
+        "type": "macro",
+        "macroRef": {
+          "name": "CRK - 竞技场挑战槽位 1"
+        },
+        "resource": "foregroundInput",
+        "timeoutSeconds": 25,
+        "graphPosition": {
+          "x": 1040,
+          "y": -160
+        }
+      },
+      {
+        "key": "p1_slot2_blocked",
+        "name": "第1页槽位2是否已打",
+        "type": "condition",
+        "condition": {
+          "type": "imageAppeared",
+          "regionRef": "slot2_blocked_region",
+          "imageRef": "slot_blocked_badge",
+          "threshold": 0.82
+        },
+        "resource": "screenCapture",
+        "timeoutSeconds": 1.5,
+        "pollingSeconds": 0.5,
+        "graphPosition": {
+          "x": 520,
+          "y": 0
+        }
+      },
+      {
+        "key": "p1_slot2_available",
+        "name": "第1页槽位2可挑战",
+        "type": "condition",
+        "condition": {
+          "type": "imageAppeared",
+          "regionRef": "slot2_fight_region",
+          "imageRef": "fight_button_available",
+          "threshold": 0.82
+        },
+        "resource": "screenCapture",
+        "timeoutSeconds": 2,
+        "pollingSeconds": 0.5,
+        "graphPosition": {
+          "x": 780,
+          "y": 0
+        }
+      },
+      {
+        "key": "fight_slot2",
+        "name": "挑战槽位2",
+        "type": "macro",
+        "macroRef": {
+          "name": "CRK - 竞技场挑战槽位 2"
+        },
+        "resource": "foregroundInput",
+        "timeoutSeconds": 25,
+        "graphPosition": {
+          "x": 1040,
+          "y": 0
+        }
+      },
+      {
+        "key": "p1_slot3_blocked",
+        "name": "第1页槽位3是否已打",
+        "type": "condition",
+        "condition": {
+          "type": "imageAppeared",
+          "regionRef": "slot3_blocked_region",
+          "imageRef": "slot_blocked_badge",
+          "threshold": 0.82
+        },
+        "resource": "screenCapture",
+        "timeoutSeconds": 1.5,
+        "pollingSeconds": 0.5,
+        "graphPosition": {
+          "x": 520,
+          "y": 160
+        }
+      },
+      {
+        "key": "p1_slot3_available",
+        "name": "第1页槽位3可挑战",
+        "type": "condition",
+        "condition": {
+          "type": "imageAppeared",
+          "regionRef": "slot3_fight_region",
+          "imageRef": "fight_button_available",
+          "threshold": 0.82
+        },
+        "resource": "screenCapture",
+        "timeoutSeconds": 2,
+        "pollingSeconds": 0.5,
+        "graphPosition": {
+          "x": 780,
+          "y": 160
+        }
+      },
+      {
+        "key": "fight_slot3",
+        "name": "挑战槽位3",
+        "type": "macro",
+        "macroRef": {
+          "name": "CRK - 竞技场挑战槽位 3"
+        },
+        "resource": "foregroundInput",
+        "timeoutSeconds": 25,
+        "graphPosition": {
+          "x": 1040,
+          "y": 160
+        }
+      },
+      {
+        "key": "swipe_next_page",
+        "name": "竞技场横向翻页",
+        "type": "macro",
+        "macroRef": {
+          "name": "CRK - 竞技场横向翻页"
+        },
+        "resource": "foregroundInput",
+        "timeoutSeconds": 10,
+        "graphPosition": {
+          "x": 1040,
+          "y": 320
+        }
+      },
+      {
+        "key": "page_changed",
+        "name": "确认列表已翻页",
+        "type": "condition",
+        "condition": {
+          "type": "regionChanged",
+          "regionRef": "arena_slots_strip",
+          "baselineRef": "arena_page_baseline",
+          "threshold": 0.18
+        },
+        "resource": "screenCapture",
+        "timeoutSeconds": 8,
+        "pollingSeconds": 1,
+        "graphPosition": {
+          "x": 1300,
+          "y": 320
+        }
+      },
+      {
+        "key": "p2_slot1_blocked",
+        "name": "第2页槽位1是否已打",
+        "type": "condition",
+        "condition": {
+          "type": "imageAppeared",
+          "regionRef": "slot1_blocked_region",
+          "imageRef": "slot_blocked_badge",
+          "threshold": 0.82
+        },
+        "resource": "screenCapture",
+        "timeoutSeconds": 1.5,
+        "pollingSeconds": 0.5,
+        "graphPosition": {
+          "x": 1560,
+          "y": -160
+        }
+      },
+      {
+        "key": "p2_slot1_available",
+        "name": "第2页槽位1可挑战",
+        "type": "condition",
+        "condition": {
+          "type": "imageAppeared",
+          "regionRef": "slot1_fight_region",
+          "imageRef": "fight_button_available",
+          "threshold": 0.82
+        },
+        "resource": "screenCapture",
+        "timeoutSeconds": 2,
+        "pollingSeconds": 0.5,
+        "graphPosition": {
+          "x": 1820,
+          "y": -160
+        }
+      },
+      {
+        "key": "p2_slot2_blocked",
+        "name": "第2页槽位2是否已打",
+        "type": "condition",
+        "condition": {
+          "type": "imageAppeared",
+          "regionRef": "slot2_blocked_region",
+          "imageRef": "slot_blocked_badge",
+          "threshold": 0.82
+        },
+        "resource": "screenCapture",
+        "timeoutSeconds": 1.5,
+        "pollingSeconds": 0.5,
+        "graphPosition": {
+          "x": 1560,
+          "y": 0
+        }
+      },
+      {
+        "key": "p2_slot2_available",
+        "name": "第2页槽位2可挑战",
+        "type": "condition",
+        "condition": {
+          "type": "imageAppeared",
+          "regionRef": "slot2_fight_region",
+          "imageRef": "fight_button_available",
+          "threshold": 0.82
+        },
+        "resource": "screenCapture",
+        "timeoutSeconds": 2,
+        "pollingSeconds": 0.5,
+        "graphPosition": {
+          "x": 1820,
+          "y": 0
+        }
+      },
+      {
+        "key": "p2_slot3_blocked",
+        "name": "第2页槽位3是否已打",
+        "type": "condition",
+        "condition": {
+          "type": "imageAppeared",
+          "regionRef": "slot3_blocked_region",
+          "imageRef": "slot_blocked_badge",
+          "threshold": 0.82
+        },
+        "resource": "screenCapture",
+        "timeoutSeconds": 1.5,
+        "pollingSeconds": 0.5,
+        "graphPosition": {
+          "x": 1560,
+          "y": 160
+        }
+      },
+      {
+        "key": "p2_slot3_available",
+        "name": "第2页槽位3可挑战",
+        "type": "condition",
+        "condition": {
+          "type": "imageAppeared",
+          "regionRef": "slot3_fight_region",
+          "imageRef": "fight_button_available",
+          "threshold": 0.82
+        },
+        "resource": "screenCapture",
+        "timeoutSeconds": 2,
+        "pollingSeconds": 0.5,
+        "graphPosition": {
+          "x": 1820,
+          "y": 160
+        }
+      },
+      {
+        "key": "battle_result_ready",
+        "name": "等待竞技场结算",
+        "type": "condition",
+        "condition": {
+          "type": "imageAppeared",
+          "regionRef": "result_region",
+          "imageRef": "battle_result_anchor",
+          "threshold": 0.82
+        },
+        "resource": "screenCapture",
+        "timeoutSeconds": 150,
+        "pollingSeconds": 1,
+        "joinPolicy": "any",
+        "graphPosition": {
+          "x": 1300,
+          "y": 0
+        }
+      },
+      {
+        "key": "claim_reward",
+        "name": "领取竞技场结算奖励",
+        "type": "macro",
+        "macroRef": {
+          "name": "CRK - 竞技场领取结算奖励"
+        },
+        "resource": "foregroundInput",
+        "timeoutSeconds": 20,
+        "graphPosition": {
+          "x": 1560,
+          "y": 360
+        }
+      },
+      {
+        "key": "return_arena_list",
+        "name": "回到竞技场列表",
+        "type": "macro",
+        "macroRef": {
+          "name": "CRK - 竞技场返回列表"
+        },
+        "resource": "foregroundInput",
+        "timeoutSeconds": 20,
+        "graphPosition": {
+          "x": 1820,
+          "y": 360
+        }
+      },
+      {
+        "key": "arena_done",
+        "name": "竞技场流程完成",
+        "type": "notification",
+        "notification": {
+          "title": "竞技场流程完成",
+          "body": "已完成一次可挑战对手的战斗与领奖。",
+          "severity": "info"
+        },
+        "graphPosition": {
+          "x": 2080,
+          "y": 360
+        }
+      },
+      {
+        "key": "no_target_found",
+        "name": "未找到可挑战对手",
+        "type": "notification",
+        "notification": {
+          "title": "未找到可挑战对手",
+          "body": "两页扫描内没有发现可挑战按钮，请人工检查竞技场列表或刷新对手。",
+          "severity": "warning"
+        },
+        "graphPosition": {
+          "x": 2080,
+          "y": 0
+        }
+      },
+      {
+        "key": "arena_attention",
+        "name": "竞技场需要人工检查",
+        "type": "notification",
+        "notification": {
+          "title": "竞技场需要人工检查",
+          "body": "竞技场列表、翻页或战斗结算没有按预期出现。",
+          "severity": "warning"
+        },
+        "graphPosition": {
+          "x": 1560,
+          "y": 520
+        }
+      }
+    ],
+    "dependencies": [
+      {
+        "from": "enter_arena",
+        "to": "arena_list_ready",
+        "trigger": "success"
+      },
+      {
+        "from": "arena_list_ready",
+        "to": "p1_slot1_blocked",
+        "trigger": "conditionMatched"
+      },
+      {
+        "from": "arena_list_ready",
+        "to": "arena_attention",
+        "trigger": "timeout"
+      },
+      {
+        "from": "arena_list_ready",
+        "to": "arena_attention",
+        "trigger": "conditionNotMatched"
+      },
+      {
+        "from": "p1_slot1_blocked",
+        "to": "p1_slot2_blocked",
+        "trigger": "conditionMatched"
+      },
+      {
+        "from": "p1_slot1_blocked",
+        "to": "p1_slot1_available",
+        "trigger": "conditionNotMatched"
+      },
+      {
+        "from": "p1_slot1_available",
+        "to": "fight_slot1",
+        "trigger": "conditionMatched"
+      },
+      {
+        "from": "p1_slot1_available",
+        "to": "p1_slot2_blocked",
+        "trigger": "conditionNotMatched"
+      },
+      {
+        "from": "p1_slot2_blocked",
+        "to": "p1_slot3_blocked",
+        "trigger": "conditionMatched"
+      },
+      {
+        "from": "p1_slot2_blocked",
+        "to": "p1_slot2_available",
+        "trigger": "conditionNotMatched"
+      },
+      {
+        "from": "p1_slot2_available",
+        "to": "fight_slot2",
+        "trigger": "conditionMatched"
+      },
+      {
+        "from": "p1_slot2_available",
+        "to": "p1_slot3_blocked",
+        "trigger": "conditionNotMatched"
+      },
+      {
+        "from": "p1_slot3_blocked",
+        "to": "swipe_next_page",
+        "trigger": "conditionMatched"
+      },
+      {
+        "from": "p1_slot3_blocked",
+        "to": "p1_slot3_available",
+        "trigger": "conditionNotMatched"
+      },
+      {
+        "from": "p1_slot3_available",
+        "to": "fight_slot3",
+        "trigger": "conditionMatched"
+      },
+      {
+        "from": "p1_slot3_available",
+        "to": "swipe_next_page",
+        "trigger": "conditionNotMatched"
+      },
+      {
+        "from": "swipe_next_page",
+        "to": "page_changed",
+        "trigger": "success"
+      },
+      {
+        "from": "page_changed",
+        "to": "p2_slot1_blocked",
+        "trigger": "conditionMatched"
+      },
+      {
+        "from": "page_changed",
+        "to": "arena_attention",
+        "trigger": "conditionNotMatched"
+      },
+      {
+        "from": "page_changed",
+        "to": "arena_attention",
+        "trigger": "timeout"
+      },
+      {
+        "from": "p2_slot1_blocked",
+        "to": "p2_slot2_blocked",
+        "trigger": "conditionMatched"
+      },
+      {
+        "from": "p2_slot1_blocked",
+        "to": "p2_slot1_available",
+        "trigger": "conditionNotMatched"
+      },
+      {
+        "from": "p2_slot1_available",
+        "to": "fight_slot1",
+        "trigger": "conditionMatched"
+      },
+      {
+        "from": "p2_slot1_available",
+        "to": "p2_slot2_blocked",
+        "trigger": "conditionNotMatched"
+      },
+      {
+        "from": "p2_slot2_blocked",
+        "to": "p2_slot3_blocked",
+        "trigger": "conditionMatched"
+      },
+      {
+        "from": "p2_slot2_blocked",
+        "to": "p2_slot2_available",
+        "trigger": "conditionNotMatched"
+      },
+      {
+        "from": "p2_slot2_available",
+        "to": "fight_slot2",
+        "trigger": "conditionMatched"
+      },
+      {
+        "from": "p2_slot2_available",
+        "to": "p2_slot3_blocked",
+        "trigger": "conditionNotMatched"
+      },
+      {
+        "from": "p2_slot3_blocked",
+        "to": "no_target_found",
+        "trigger": "conditionMatched"
+      },
+      {
+        "from": "p2_slot3_blocked",
+        "to": "p2_slot3_available",
+        "trigger": "conditionNotMatched"
+      },
+      {
+        "from": "p2_slot3_available",
+        "to": "fight_slot3",
+        "trigger": "conditionMatched"
+      },
+      {
+        "from": "p2_slot3_available",
+        "to": "no_target_found",
+        "trigger": "conditionNotMatched"
+      },
+      {
+        "from": "fight_slot1",
+        "to": "battle_result_ready",
+        "trigger": "success"
+      },
+      {
+        "from": "fight_slot2",
+        "to": "battle_result_ready",
+        "trigger": "success"
+      },
+      {
+        "from": "fight_slot3",
+        "to": "battle_result_ready",
+        "trigger": "success"
+      },
+      {
+        "from": "battle_result_ready",
+        "to": "claim_reward",
+        "trigger": "conditionMatched"
+      },
+      {
+        "from": "battle_result_ready",
+        "to": "arena_attention",
+        "trigger": "conditionNotMatched"
+      },
+      {
+        "from": "battle_result_ready",
+        "to": "arena_attention",
+        "trigger": "timeout"
+      },
+      {
+        "from": "claim_reward",
+        "to": "return_arena_list",
+        "trigger": "success"
+      },
+      {
+        "from": "return_arena_list",
+        "to": "arena_done",
+        "trigger": "success"
+      }
+    ]
+  },
+  "visualAssets": {
+    "regions": [
+      {
+        "key": "arena_header_region",
+        "label": "竞技场列表标题/顶部锚点",
+        "bounds": {
+          "x": 0.3,
+          "y": 0.02,
+          "width": 0.4,
+          "height": 0.14
+        },
+        "space": "windowNormalized"
+      },
+      {
+        "key": "arena_slots_strip",
+        "label": "竞技场横向对手列表区域",
+        "bounds": {
+          "x": 0.04,
+          "y": 0.18,
+          "width": 0.92,
+          "height": 0.62
+        },
+        "space": "windowNormalized"
+      },
+      {
+        "key": "slot1_blocked_region",
+        "label": "槽位1已打/不可挑战标记区域",
+        "bounds": {
+          "x": 0.06,
+          "y": 0.2,
+          "width": 0.27,
+          "height": 0.24
+        },
+        "space": "windowNormalized"
+      },
+      {
+        "key": "slot1_fight_region",
+        "label": "槽位1挑战按钮区域",
+        "bounds": {
+          "x": 0.08,
+          "y": 0.66,
+          "width": 0.23,
+          "height": 0.14
+        },
+        "space": "windowNormalized"
+      },
+      {
+        "key": "slot2_blocked_region",
+        "label": "槽位2已打/不可挑战标记区域",
+        "bounds": {
+          "x": 0.365,
+          "y": 0.2,
+          "width": 0.27,
+          "height": 0.24
+        },
+        "space": "windowNormalized"
+      },
+      {
+        "key": "slot2_fight_region",
+        "label": "槽位2挑战按钮区域",
+        "bounds": {
+          "x": 0.39,
+          "y": 0.66,
+          "width": 0.23,
+          "height": 0.14
+        },
+        "space": "windowNormalized"
+      },
+      {
+        "key": "slot3_blocked_region",
+        "label": "槽位3已打/不可挑战标记区域",
+        "bounds": {
+          "x": 0.67,
+          "y": 0.2,
+          "width": 0.27,
+          "height": 0.24
+        },
+        "space": "windowNormalized"
+      },
+      {
+        "key": "slot3_fight_region",
+        "label": "槽位3挑战按钮区域",
+        "bounds": {
+          "x": 0.7,
+          "y": 0.66,
+          "width": 0.23,
+          "height": 0.14
+        },
+        "space": "windowNormalized"
+      },
+      {
+        "key": "result_region",
+        "label": "竞技场胜利/失败/结算区域",
+        "bounds": {
+          "x": 0.2,
+          "y": 0.12,
+          "width": 0.6,
+          "height": 0.64
+        },
+        "space": "windowNormalized"
+      }
+    ],
+    "images": [
+      {
+        "key": "arena_list_anchor",
+        "label": "竞技场列表已打开锚点"
+      },
+      {
+        "key": "fight_button_available",
+        "label": "可挑战按钮图像"
+      },
+      {
+        "key": "slot_blocked_badge",
+        "label": "已打/不可挑战标记图像"
+      },
+      {
+        "key": "battle_result_anchor",
+        "label": "战斗结算画面锚点"
+      }
+    ],
+    "baselines": [
+      {
+        "key": "arena_page_baseline",
+        "label": "翻页前对手列表基线"
+      }
+    ]
+  }
+}

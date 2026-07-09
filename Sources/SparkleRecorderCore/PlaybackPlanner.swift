@@ -97,25 +97,31 @@ public enum PlaybackPlanner {
         var previousEventTime: TimeInterval = 0
         var scheduledOffset: TimeInterval = 0
 
-        return events.enumerated().map { index, event in
-            let delta = max(0, event.time - previousEventTime) / sanitizedSpeed
-            scheduledOffset += delta
-            previousEventTime = event.time
+        return events.enumerated()
+            .compactMap { index, event in
+                let delta = max(0, event.time - previousEventTime) / sanitizedSpeed
+                previousEventTime = event.time
+                
+                guard event.isDisabled != true else {
+                    return nil
+                }
+                
+                scheduledOffset += delta
 
-            let progress: Double
-            if rawDuration > 0 {
-                progress = min(1.0, max(0, event.time / rawDuration))
-            } else {
-                progress = 1.0
-            }
+                let progress: Double
+                if rawDuration > 0 {
+                    progress = min(1.0, max(0, event.time / rawDuration))
+                } else {
+                    progress = 1.0
+                }
 
-            return PlaybackStep(
-                eventIndex: index,
-                event: event,
-                deltaFromPrevious: delta,
-                scheduledOffset: scheduledOffset,
-                progress: progress
-            )
+                return PlaybackStep(
+                    eventIndex: index,
+                    event: event,
+                    deltaFromPrevious: delta,
+                    scheduledOffset: scheduledOffset,
+                    progress: progress
+                )
         }
     }
 

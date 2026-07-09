@@ -6,16 +6,41 @@ enum AutomationCentralTab: String, CaseIterable {
     case settings
 }
 
+private struct AutomationWorkflowRecordingIntent: Equatable {
+    var targetWorkflowID: UUID?
+    var existingMacroIDs: Set<UUID>
+    var didStartRecording = false
+}
+
+private struct AutomationInsertedMacroTask {
+    var workflowID: UUID
+    var task: AutomationTask
+}
+
+private struct AutomationRecordedTaskReviewDraft: Equatable {
+    var workflowID: UUID
+    var task: AutomationTask
+    var macroID: UUID
+    var nameDraft: String
+    var loopsDraft: Int
+}
+
 struct AutomationMainContentView: View {
     let state: AutomationRunState
     let projection: AutomationOverviewProjection
     let macros: [SavedMacro]
+    let currentMacroID: UUID?
     let refreshState: AutomationRepositoryRefreshState
+    let isRecordingMacro: Bool
+    let recordHotkeyName: String?
     let initialSelectedRunID: UUID?
     let initialFlowGraphLinkPreview: AutomationFlowGraphLinkPreviewState?
     let initialTaskListPreviewState: AutomationWorkflowTaskListPreviewState?
     let onRefresh: () -> Void
     let onAction: (AutomationAction) -> Void
+    let onRecordMacro: (() -> Void)?
+    let onRenameMacro: ((UUID, String) -> Void)?
+    let onSetMacroLoops: ((UUID, Int) -> Void)?
 
     @State private var selectedWorkflowID: UUID?
     @State private var selection: AutomationAuthoringSelection = .workflow
@@ -23,6 +48,9 @@ struct AutomationMainContentView: View {
     @State private var pendingDependencyTrigger: AutomationDependencyTriggerDraft = .onSuccess
     @State private var draftPreviewState: AutomationWorkflowDraftPreviewState?
     @State private var importNoticeState: AutomationWorkflowImportNoticeState?
+    @State private var selectedInspectorRunID: UUID?
+    @State private var workflowRecordingIntent: AutomationWorkflowRecordingIntent?
+    @State private var recordedTaskReviewDraft: AutomationRecordedTaskReviewDraft?
 
     @State private var centralTab: AutomationCentralTab = .editor
     @State private var isLeftSidebarVisible: Bool = true
@@ -32,7 +60,10 @@ struct AutomationMainContentView: View {
         state: AutomationRunState,
         projection: AutomationOverviewProjection,
         macros: [SavedMacro],
+        currentMacroID: UUID? = nil,
         refreshState: AutomationRepositoryRefreshState,
+        isRecordingMacro: Bool = false,
+        recordHotkeyName: String? = nil,
         initialSelectedWorkflowID: UUID? = nil,
         initialSelection: AutomationAuthoringSelection = .workflow,
         initialSelectedRunID: UUID? = nil,
@@ -41,21 +72,31 @@ struct AutomationMainContentView: View {
         initialFlowGraphLinkPreview: AutomationFlowGraphLinkPreviewState? = nil,
         initialTaskListPreviewState: AutomationWorkflowTaskListPreviewState? = nil,
         onRefresh: @escaping () -> Void,
-        onAction: @escaping (AutomationAction) -> Void
+        onAction: @escaping (AutomationAction) -> Void,
+        onRecordMacro: (() -> Void)? = nil,
+        onRenameMacro: ((UUID, String) -> Void)? = nil,
+        onSetMacroLoops: ((UUID, Int) -> Void)? = nil
     ) {
         self.state = state
         self.projection = projection
         self.macros = macros
+        self.currentMacroID = currentMacroID
         self.refreshState = refreshState
+        self.isRecordingMacro = isRecordingMacro
+        self.recordHotkeyName = recordHotkeyName
         self.initialSelectedRunID = initialSelectedRunID
         self.initialFlowGraphLinkPreview = initialFlowGraphLinkPreview
         self.initialTaskListPreviewState = initialTaskListPreviewState
         self.onRefresh = onRefresh
         self.onAction = onAction
+        self.onRecordMacro = onRecordMacro
+        self.onRenameMacro = onRenameMacro
+        self.onSetMacroLoops = onSetMacroLoops
         _selectedWorkflowID = State(initialValue: initialSelectedWorkflowID)
         _selection = State(initialValue: initialSelection)
         _pendingDependencySourceID = State(initialValue: initialPendingDependencySourceID)
         _pendingDependencyTrigger = State(initialValue: initialPendingDependencyTrigger)
+        _selectedInspectorRunID = State(initialValue: initialSelectedRunID)
     }
 
     private var selectedWorkflow: AutomationWorkflowProjection? {
@@ -94,11 +135,64 @@ struct AutomationMainContentView: View {
         return selectedWorkflow?.nodes.first { $0.taskID == taskID }
     }
 
+    private var selectedNextScheduledTaskID: UUID? {
+        selectedWorkflow?.nextScheduledTaskID
+            ?? selectedRawWorkflow.flatMap { workflowStartTaskID(in: $0) }
+    }
+
     private var selectedNextScheduledTaskName: String? {
-        guard let taskID = selectedWorkflow?.nextScheduledTaskID else {
+        let taskID = selectedNextScheduledTaskID
+        guard let taskID else {
             return nil
         }
         return selectedWorkflow?.nodes.first { $0.taskID == taskID }?.title
+            ?? selectedRawWorkflow?.task(id: taskID)?.name
+    }
+
+    private var selectedNextSchedule: AutomationSchedule? {
+        guard let taskID = selectedNextScheduledTaskID else {
+            return nil
+        }
+        return selectedRawWorkflow?.task(id: taskID)?.schedule
+    }
+
+    private var recordsMacroIntoWorkflow: Bool {
+        onRecordMacro != nil
+    }
+
+    private var isRecordingIntoWorkflow: Bool {
+        workflowRecordingIntent?.didStartRecording == true
+    }
+
+    private var recordMacroAction: (() -> Void)? {
+        guard onRecordMacro != nil else {
+            return nil
+        }
+        return recordMacroFromWorkflow
+    }
+
+    private var recordedTaskReviewBinding: Binding<AutomationRecordedTaskReviewDraft> {
+        Binding {
+            recordedTaskReviewDraft ?? AutomationRecordedTaskReviewDraft(
+                workflowID: selectedRawWorkflow?.id ?? UUID(),
+                task: AutomationTask(
+                    name: NSLocalizedString("Recorded task", comment: ""),
+                    kind: .delay(0)
+                ),
+                macroID: currentMacroID ?? UUID(),
+                nameDraft: NSLocalizedString("Recorded task", comment: ""),
+                loopsDraft: 1
+            )
+        } set: { draft in
+            recordedTaskReviewDraft = draft
+        }
+    }
+
+    private var canApplyRecordedTaskReview: Bool {
+        guard let draft = recordedTaskReviewDraft else {
+            return false
+        }
+        return !draft.nameDraft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
     var body: some View {
@@ -147,7 +241,12 @@ struct AutomationMainContentView: View {
                             onExportWorkflowPackage: exportWorkflowPackage,
                             onShareWorkflowPackage: shareWorkflowPackage,
                             onAddMacroTask: addMacroTask,
-                            onAddConditionTask: addConditionTask
+                            onAddConditionTask: addConditionTask,
+                            isRecordingMacro: isRecordingMacro,
+                            recordsMacroIntoWorkflow: recordsMacroIntoWorkflow,
+                            isRecordingIntoWorkflow: isRecordingIntoWorkflow,
+                            recordHotkeyName: recordHotkeyName,
+                            onRecordMacro: recordMacroAction
                         )
                         .frame(width: 250)
                         .transition(.move(edge: .leading))
@@ -167,8 +266,8 @@ struct AutomationMainContentView: View {
                                 Spacer()
 
                                 Picker("", selection: $centralTab) {
-                                    Text(NSLocalizedString("Editor", comment: "")).tag(AutomationCentralTab.editor)
-                                    Text(NSLocalizedString("Settings", comment: "")).tag(AutomationCentralTab.settings)
+                                    Text(NSLocalizedString("Canvas", comment: "")).tag(AutomationCentralTab.editor)
+                                    Text(NSLocalizedString("Workflow", comment: "")).tag(AutomationCentralTab.settings)
                                 }
                                 .pickerStyle(.segmented)
                                 .frame(width: 250)
@@ -192,6 +291,20 @@ struct AutomationMainContentView: View {
                             .background(Material.bar)
 
                             Divider().opacity(0.5)
+
+                            if recordedTaskReviewDraft != nil {
+                                AutomationRecordedTaskReviewBar(
+                                    draft: recordedTaskReviewBinding,
+                                    canApply: canApplyRecordedTaskReview,
+                                    onApply: applyRecordedTaskReview,
+                                    onDismiss: dismissRecordedTaskReview
+                                )
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 8)
+                                .background(Color.primary.opacity(0.018))
+
+                                Divider().opacity(0.35)
+                            }
 
                             switch centralTab {
                             case .editor:
@@ -220,10 +333,13 @@ struct AutomationMainContentView: View {
                                     AutomationResourceTimelineView(
                                         items: timelineItems,
                                         nextScheduledOccurrence: workflow.nextScheduledOccurrence,
+                                        nextSchedule: selectedNextSchedule,
                                         nextScheduledTaskName: selectedNextScheduledTaskName,
-                                        onUpdateNextSchedule: updateNextSchedule
+                                        selectedRunID: selectedInspectorRunID,
+                                        onUpdateNextSchedule: updateNextSchedule,
+                                        onSelectItem: selectTimelineItem
                                     )
-                                    .frame(minHeight: 176, idealHeight: 222, maxHeight: 260)
+                                    .frame(minHeight: 188, idealHeight: 232, maxHeight: 286)
                                     .frame(maxWidth: .infinity)
                                 }
                             case .settings:
@@ -255,7 +371,7 @@ struct AutomationMainContentView: View {
                                     AutomationEmptyState(
                                         systemImage: "gearshape",
                                         title: NSLocalizedString("No workflow selected", comment: ""),
-                                        subtitle: NSLocalizedString("Create a workflow to view settings.", comment: "")
+                                        subtitle: NSLocalizedString("Create a workflow to view workflow details.", comment: "")
                                     )
                                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                                 }
@@ -275,7 +391,7 @@ struct AutomationMainContentView: View {
                                 pendingDependencySourceID: pendingDependencySourceID,
                                 macros: macros,
                                 runs: state.runs,
-                                initialSelectedRunID: initialSelectedRunID,
+                                initialSelectedRunID: selectedInspectorRunID,
                                 taskListPreviewState: initialTaskListPreviewState,
                                 onSelectTask: selectTask,
                                 onSelectDependency: selectDependency,
@@ -308,6 +424,12 @@ struct AutomationMainContentView: View {
             repairSelection()
             repairImportNotice()
         }
+        .onChange(of: isRecordingMacro) {
+            handleWorkflowRecordingStateChange()
+        }
+        .onChange(of: macros.map(\.id)) {
+            completeWorkflowRecordingIntent(clearIfMissing: false)
+        }
         .sheet(item: $draftPreviewState) { state in
             AutomationWorkflowDraftPreviewSheet(
                 state: state,
@@ -335,15 +457,25 @@ struct AutomationMainContentView: View {
         selectedWorkflowID = workflowID
         selection = .workflow
         pendingDependencySourceID = nil
+        selectedInspectorRunID = nil
     }
 
     private func selectTask(_ taskID: UUID) {
         selection = .task(taskID)
+        selectedInspectorRunID = nil
     }
 
     private func selectDependency(_ dependencyID: UUID) {
         selection = .dependency(dependencyID)
         pendingDependencySourceID = nil
+        selectedInspectorRunID = nil
+    }
+
+    private func selectTimelineItem(_ item: AutomationResourceTimelineItem) {
+        selectedWorkflowID = item.workflowID
+        selection = .task(item.taskID)
+        pendingDependencySourceID = nil
+        selectedInspectorRunID = item.runID
     }
 
     private func createWorkflow() {
@@ -356,6 +488,7 @@ struct AutomationMainContentView: View {
         selectedWorkflowID = workflow.id
         selection = .workflow
         pendingDependencySourceID = nil
+        selectedInspectorRunID = nil
         onAction(.upsertWorkflow(workflow, at: date))
     }
 
@@ -372,6 +505,7 @@ struct AutomationMainContentView: View {
             selectedWorkflowID = workflows.first?.id
             selection = .workflow
             pendingDependencySourceID = nil
+            selectedInspectorRunID = nil
             for workflow in workflows {
                 onAction(.upsertWorkflow(workflow, at: date))
             }
@@ -389,6 +523,7 @@ struct AutomationMainContentView: View {
         }
         pendingDependencySourceID = nil
         pendingDependencyTrigger = .onSuccess
+        selectedInspectorRunID = nil
         onAction(.deleteWorkflow(workflowID: workflowID, at: date))
     }
 
@@ -445,6 +580,7 @@ struct AutomationMainContentView: View {
         selection = .workflow
         pendingDependencySourceID = nil
         pendingDependencyTrigger = .onSuccess
+        selectedInspectorRunID = nil
         importNoticeState = AutomationWorkflowImportNoticeState(
             workflowID: workflowToImport.id,
             workflowName: workflowToImport.name,
@@ -494,25 +630,38 @@ struct AutomationMainContentView: View {
         }
     }
 
-    private func updateNextSchedule(to newDate: Date) {
+    private func updateNextSchedule(to edit: AutomationTimelineScheduleEdit) {
         guard let workflow = selectedRawWorkflow,
-              let taskID = selectedWorkflow?.nextScheduledTaskID,
-              var task = workflow.tasks.first(where: { $0.id == taskID }),
-              let currentSchedule = task.schedule else {
+              let taskID = selectedWorkflow?.nextScheduledTaskID ?? workflowStartTaskID(in: workflow),
+              var task = workflow.tasks.first(where: { $0.id == taskID }) else {
             return
         }
 
-        switch currentSchedule {
+        switch edit.mode {
         case .once:
-            task.schedule = .once(newDate)
-        case .repeating(var rule):
-            rule.anchor = newDate
-            task.schedule = .repeating(rule)
-        case .manual:
-            break
+            task.schedule = .once(edit.startAt)
+        case .repeating:
+            if case .repeating(var rule) = task.schedule {
+                rule.anchor = edit.startAt
+                rule.interval = edit.repeatInterval
+                task.schedule = .repeating(rule)
+            } else {
+                task.schedule = .repeating(
+                    AutomationRepeatRule(
+                        anchor: edit.startAt,
+                        interval: edit.repeatInterval
+                    )
+                )
+            }
         }
 
         onAction(.upsertTask(workflowID: workflow.id, task: task, at: Date()))
+    }
+
+    private func workflowStartTaskID(in workflow: AutomationWorkflow) -> UUID? {
+        let dependentTaskIDs = Set(workflow.dependencies.filter(\.isEnabled).map(\.toTaskID))
+        return workflow.tasks.first { !dependentTaskIDs.contains($0.id) }?.id
+            ?? workflow.tasks.first?.id
     }
 
     private func undoWorkflowDraftImport() {
@@ -527,6 +676,7 @@ struct AutomationMainContentView: View {
             selection = .workflow
             pendingDependencySourceID = nil
             pendingDependencyTrigger = .onSuccess
+            selectedInspectorRunID = nil
             onAction(.upsertWorkflow(previousWorkflow, at: date))
         } else {
             deleteWorkflow(notice.workflowID)
@@ -537,8 +687,79 @@ struct AutomationMainContentView: View {
         importNoticeState = nil
     }
 
+    private func recordMacroFromWorkflow() {
+        guard let onRecordMacro else {
+            return
+        }
+
+        if !isRecordingMacro {
+            recordedTaskReviewDraft = nil
+            workflowRecordingIntent = AutomationWorkflowRecordingIntent(
+                targetWorkflowID: selectedRawWorkflow?.id ?? selectedWorkflowID,
+                existingMacroIDs: Set(macros.map(\.id))
+            )
+        }
+        onRecordMacro()
+    }
+
+    private func handleWorkflowRecordingStateChange() {
+        if isRecordingMacro {
+            guard var intent = workflowRecordingIntent else {
+                return
+            }
+            intent.didStartRecording = true
+            workflowRecordingIntent = intent
+        } else {
+            scheduleWorkflowRecordingCompletionCheck()
+        }
+    }
+
+    private func scheduleWorkflowRecordingCompletionCheck() {
+        Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 250_000_000)
+            completeWorkflowRecordingIntent(clearIfMissing: true)
+        }
+    }
+
+    private func completeWorkflowRecordingIntent(clearIfMissing: Bool) {
+        guard let intent = workflowRecordingIntent,
+              intent.didStartRecording,
+              !isRecordingMacro else {
+            return
+        }
+
+        let currentRecordedMacro = currentMacroID.flatMap { macroID in
+            macros.first { $0.id == macroID && !intent.existingMacroIDs.contains($0.id) }
+        }
+        let newestRecordedMacro = macros
+            .filter { !intent.existingMacroIDs.contains($0.id) }
+            .max { $0.createdAt < $1.createdAt }
+        let recordedMacro = currentRecordedMacro ?? newestRecordedMacro
+
+        guard let recordedMacro else {
+            if clearIfMissing {
+                workflowRecordingIntent = nil
+            }
+            return
+        }
+
+        if let workflowID = intent.targetWorkflowID {
+            selectedWorkflowID = workflowID
+        }
+        workflowRecordingIntent = nil
+        if let insertion = commitMacroTask(recordedMacro, position: nil, insertionIndex: nil) {
+            recordedTaskReviewDraft = AutomationRecordedTaskReviewDraft(
+                workflowID: insertion.workflowID,
+                task: insertion.task,
+                macroID: recordedMacro.id,
+                nameDraft: insertion.task.name,
+                loopsDraft: recordedMacro.loops
+            )
+        }
+    }
+
     private func addMacroTask(_ macro: SavedMacro) {
-        addMacroTask(macro, position: nil)
+        _ = commitMacroTask(macro, position: nil, insertionIndex: nil)
     }
 
     private func addMacroTask(macroID: UUID, position: AutomationGraphPoint) {
@@ -557,7 +778,7 @@ struct AutomationMainContentView: View {
         let position = selectedRawWorkflow.flatMap {
             graphPositionForListInsertion(in: $0, insertionIndex: insertionIndex)
         }
-        addMacroTask(macro, position: position, insertionIndex: insertionIndex)
+        _ = commitMacroTask(macro, position: position, insertionIndex: insertionIndex)
     }
 
     private func addMacroTask(macroID: UUID, position: AutomationGraphPoint?) {
@@ -568,14 +789,14 @@ struct AutomationMainContentView: View {
     }
 
     private func addMacroTask(_ macro: SavedMacro, position: AutomationGraphPoint?) {
-        addMacroTask(macro, position: position, insertionIndex: nil)
+        _ = commitMacroTask(macro, position: position, insertionIndex: nil)
     }
 
-    private func addMacroTask(
+    private func commitMacroTask(
         _ macro: SavedMacro,
         position: AutomationGraphPoint?,
         insertionIndex: Int?
-    ) {
+    ) -> AutomationInsertedMacroTask? {
         let date = Date()
         var finalPosition = position
         if finalPosition == nil && insertionIndex == nil {
@@ -592,6 +813,7 @@ struct AutomationMainContentView: View {
 
         if let workflow = selectedRawWorkflow {
             selection = .task(task.id)
+            selectedInspectorRunID = nil
             if let insertionIndex {
                 var updatedWorkflow = workflow
                 let index = min(max(0, insertionIndex), updatedWorkflow.tasks.count)
@@ -600,6 +822,7 @@ struct AutomationMainContentView: View {
             } else {
                 onAction(.upsertTask(workflowID: workflow.id, task: task, at: date))
             }
+            return AutomationInsertedMacroTask(workflowID: workflow.id, task: task)
         } else {
             let workflow = AutomationWorkflow(
                 name: NSLocalizedString("New Workflow", comment: ""),
@@ -609,8 +832,39 @@ struct AutomationMainContentView: View {
             )
             selectedWorkflowID = workflow.id
             selection = .task(task.id)
+            selectedInspectorRunID = nil
             onAction(.upsertWorkflow(workflow, at: date))
+            return AutomationInsertedMacroTask(workflowID: workflow.id, task: task)
         }
+    }
+
+    private func applyRecordedTaskReview() {
+        guard let draft = recordedTaskReviewDraft else {
+            return
+        }
+
+        let trimmedName = draft.nameDraft.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedName.isEmpty else {
+            return
+        }
+
+        var updatedTask = state.workflows
+            .first { $0.id == draft.workflowID }?
+            .task(id: draft.task.id)
+            ?? draft.task
+        updatedTask.name = trimmedName
+
+        selection = .task(updatedTask.id)
+        selectedWorkflowID = draft.workflowID
+        selectedInspectorRunID = nil
+        onAction(.upsertTask(workflowID: draft.workflowID, task: updatedTask, at: Date()))
+        onRenameMacro?(draft.macroID, trimmedName)
+        onSetMacroLoops?(draft.macroID, max(0, draft.loopsDraft))
+        recordedTaskReviewDraft = nil
+    }
+
+    private func dismissRecordedTaskReview() {
+        recordedTaskReviewDraft = nil
     }
 
     private func graphPositionForListInsertion(
@@ -671,6 +925,7 @@ struct AutomationMainContentView: View {
             graphPosition: defaultGraphPosition()
         )
         selection = .task(task.id)
+        selectedInspectorRunID = nil
         onAction(.upsertTask(workflowID: workflow.id, task: task, at: Date()))
     }
 
@@ -853,6 +1108,158 @@ struct AutomationMainContentView: View {
         }
         if !projection.workflows.contains(where: { $0.id == notice.workflowID }) {
             importNoticeState = nil
+        }
+    }
+}
+
+private struct AutomationRecordedTaskReviewBar: View {
+    @Binding var draft: AutomationRecordedTaskReviewDraft
+    let canApply: Bool
+    let onApply: () -> Void
+    let onDismiss: () -> Void
+
+    private var nameBinding: Binding<String> {
+        Binding {
+            draft.nameDraft
+        } set: { value in
+            draft.nameDraft = value
+        }
+    }
+
+    private var loopsBinding: Binding<Int> {
+        Binding {
+            max(0, draft.loopsDraft)
+        } set: { value in
+            draft.loopsDraft = max(0, value)
+        }
+    }
+
+    private var loopPresets: [Int] {
+        var presets = [1, 2, 5, 10, 0]
+        if !presets.contains(max(0, draft.loopsDraft)) {
+            presets.insert(max(0, draft.loopsDraft), at: 0)
+        }
+        return presets
+    }
+
+    var body: some View {
+        ViewThatFits(in: .horizontal) {
+            horizontalContent
+            verticalContent
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 6)
+        .background(
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .fill(Brand.libraryGreen.opacity(0.055))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .strokeBorder(Brand.libraryGreen.opacity(0.18), lineWidth: 0.7)
+        )
+    }
+
+    private var horizontalContent: some View {
+        HStack(spacing: 10) {
+            statusLabel
+                .frame(width: 168, alignment: .leading)
+
+            nameField
+                .frame(minWidth: 180)
+
+            repeatControls
+            actionButtons
+        }
+    }
+
+    private var verticalContent: some View {
+        VStack(alignment: .leading, spacing: 7) {
+            HStack(spacing: 8) {
+                statusLabel
+                Spacer(minLength: 0)
+                actionButtons
+            }
+
+            HStack(spacing: 8) {
+                nameField
+                repeatControls
+            }
+        }
+    }
+
+    private var statusLabel: some View {
+        Label {
+            VStack(alignment: .leading, spacing: 1) {
+                Text(NSLocalizedString("Recorded task", comment: ""))
+                    .font(.caption)
+                    .fontWeight(.semibold)
+                    .foregroundStyle(.primary)
+                    .lineLimit(1)
+
+                Text(NSLocalizedString("Saved as source macro", comment: ""))
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
+        } icon: {
+            Image(systemName: "checkmark.circle.fill")
+                .foregroundStyle(Brand.libraryGreen)
+        }
+        .labelStyle(.titleAndIcon)
+    }
+
+    private var nameField: some View {
+        TextField(NSLocalizedString("Task name", comment: ""), text: nameBinding)
+            .textFieldStyle(.roundedBorder)
+            .onSubmit(onApply)
+    }
+
+    private var repeatControls: some View {
+        HStack(spacing: 6) {
+            Picker(NSLocalizedString("Source repeat", comment: ""), selection: loopsBinding) {
+                ForEach(loopPresets, id: \.self) { loops in
+                    Text(loopPresetTitle(loops)).tag(loops)
+                }
+            }
+            .labelsHidden()
+            .pickerStyle(.menu)
+            .frame(width: 112)
+
+            Stepper("", value: loopsBinding, in: 0...100)
+                .labelsHidden()
+                .frame(width: 52)
+        }
+    }
+
+    private var actionButtons: some View {
+        HStack(spacing: 8) {
+            Button {
+                onApply()
+            } label: {
+                Label(NSLocalizedString("Apply", comment: ""), systemImage: "checkmark")
+            }
+            .buttonStyle(AutomationQuietButtonStyle())
+            .disabled(!canApply)
+
+            Button(action: onDismiss) {
+                Image(systemName: "xmark")
+                    .font(.system(size: 11, weight: .semibold))
+                    .frame(width: 18, height: 18)
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(.secondary)
+            .accessibilityLabel(NSLocalizedString("Dismiss", comment: ""))
+        }
+    }
+
+    private func loopPresetTitle(_ loops: Int) -> String {
+        switch loops {
+        case 0:
+            return NSLocalizedString("Continuous", comment: "")
+        case 1:
+            return NSLocalizedString("Once", comment: "")
+        default:
+            return String(format: NSLocalizedString("%d×", comment: ""), loops)
         }
     }
 }

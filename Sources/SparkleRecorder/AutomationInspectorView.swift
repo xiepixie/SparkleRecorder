@@ -59,12 +59,11 @@ struct AutomationInspectorView: View {
                 ScrollView {
                     switch selection {
                     case .workflow:
-                        AutomationEmptyState(
-                            systemImage: "cursorarrow.rays",
-                            title: NSLocalizedString("No Selection", comment: ""),
-                            subtitle: NSLocalizedString("Select a task or dependency to inspect its properties. Use the Settings tab for workflow configurations.", comment: "")
+                        AutomationWorkflowInspectorSummaryView(
+                            workflow: workflow,
+                            projection: workflowProjection,
+                            nextScheduledTaskName: nextScheduledTaskName
                         )
-                        .padding(.top, 40)
                     case .task(let taskID):
                         if let task = workflow.task(id: taskID) {
                             AutomationTaskInspectorView(
@@ -86,7 +85,7 @@ struct AutomationInspectorView: View {
                             AutomationEmptyState(
                                 systemImage: "cursorarrow.rays",
                                 title: NSLocalizedString("No Selection", comment: ""),
-                                subtitle: NSLocalizedString("Select a task or dependency to inspect its properties. Use the Settings tab for workflow configurations.", comment: "")
+                                subtitle: NSLocalizedString("Select a task or dependency to inspect its properties. Use the Workflow tab for workflow configurations.", comment: "")
                             )
                             .padding(.top, 40)
                         }
@@ -102,7 +101,7 @@ struct AutomationInspectorView: View {
                             AutomationEmptyState(
                                 systemImage: "cursorarrow.rays",
                                 title: NSLocalizedString("No Selection", comment: ""),
-                                subtitle: NSLocalizedString("Select a task or dependency to inspect its properties. Use the Settings tab for workflow configurations.", comment: "")
+                                subtitle: NSLocalizedString("Select a task or dependency to inspect its properties. Use the Workflow tab for workflow configurations.", comment: "")
                             )
                             .padding(.top, 40)
                         }
@@ -114,7 +113,7 @@ struct AutomationInspectorView: View {
                 AutomationEmptyState(
                     systemImage: "slider.horizontal.3",
                     title: NSLocalizedString("No workflow selected", comment: ""),
-                    subtitle: NSLocalizedString("Create a workflow to edit automation settings.", comment: "")
+                    subtitle: NSLocalizedString("Create a workflow to edit workflow details.", comment: "")
                 )
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
@@ -151,5 +150,106 @@ struct AutomationInspectorView: View {
 
     private func latestActivityDate(for run: AutomationTaskRun) -> Date {
         run.actualStartTime ?? run.earliestStartTime ?? run.scheduledStartTime ?? run.createdAt
+    }
+}
+
+private struct AutomationWorkflowInspectorSummaryView: View {
+    let workflow: AutomationWorkflow
+    let projection: AutomationWorkflowProjection?
+    let nextScheduledTaskName: String?
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(spacing: 8) {
+                    Image(systemName: "square.stack.3d.up")
+                        .foregroundStyle(.secondary)
+                        .accessibilityHidden(true)
+
+                    Text(workflow.name)
+                        .font(.headline)
+                        .lineLimit(2)
+                }
+
+                if let projection {
+                    Label(projection.statusDetail, systemImage: projection.status.systemImage)
+                        .font(.caption)
+                        .foregroundStyle(projection.status.tint)
+                        .lineLimit(2)
+                }
+            }
+
+            VStack(alignment: .leading, spacing: 8) {
+                AutomationWorkflowInspectorSummaryRow(
+                    title: NSLocalizedString("Tasks", comment: ""),
+                    value: "\(projection?.nodes.count ?? workflow.tasks.count)",
+                    systemImage: "circle.grid.cross"
+                )
+
+                AutomationWorkflowInspectorSummaryRow(
+                    title: NSLocalizedString("Links", comment: ""),
+                    value: "\(projection?.edges.count ?? workflow.dependencies.count)",
+                    systemImage: "arrow.triangle.branch"
+                )
+
+                if let nextScheduledOccurrence = projection?.nextScheduledOccurrence {
+                    AutomationWorkflowInspectorSummaryRow(
+                        title: NSLocalizedString("Next", comment: ""),
+                        value: nextScheduledOccurrence.formatted(date: .omitted, time: .shortened),
+                        detail: nextScheduledTaskName,
+                        systemImage: "clock"
+                    )
+                }
+
+                AutomationWorkflowInspectorSummaryRow(
+                    title: NSLocalizedString("Modified", comment: ""),
+                    value: workflow.modifiedAt.formatted(date: .abbreviated, time: .shortened),
+                    systemImage: "calendar"
+                )
+            }
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .sectionSurface(cornerRadius: 10)
+    }
+}
+
+private struct AutomationWorkflowInspectorSummaryRow: View {
+    let title: String
+    let value: String
+    var detail: String?
+    let systemImage: String
+
+    var body: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 8) {
+            Image(systemName: systemImage)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .frame(width: 16)
+                .accessibilityHidden(true)
+
+            Text(title)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+            Spacer(minLength: 8)
+
+            VStack(alignment: .trailing, spacing: 2) {
+                Text(value)
+                    .font(.caption)
+                    .fontWeight(.semibold)
+                    .foregroundStyle(.primary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+
+                if let detail, !detail.isEmpty {
+                    Text(detail)
+                        .font(.caption2)
+                        .foregroundStyle(.tertiary)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
+                }
+            }
+        }
     }
 }

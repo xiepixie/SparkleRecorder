@@ -88,7 +88,7 @@ struct AutomationRegionCapturePreviewView<Placeholder: View>: View {
         if let preview {
             VStack(alignment: .leading, spacing: 7) {
                 previewCanvas(preview)
-                .frame(height: 140)
+                .frame(maxWidth: .infinity, minHeight: 140)
                 .overlay(
                     RoundedRectangle(cornerRadius: 8)
                         .strokeBorder(tint.opacity(0.35), lineWidth: 1)
@@ -117,8 +117,8 @@ struct AutomationRegionCapturePreviewView<Placeholder: View>: View {
 
             Image(nsImage: preview.image)
                 .resizable()
-                .interpolation(.high)
                 .scaledToFit()
+                .frame(maxWidth: preview.image.size.width, maxHeight: preview.image.size.height)
                 .clipShape(RoundedRectangle(cornerRadius: 7))
                 .padding(6)
 
@@ -202,8 +202,10 @@ struct AutomationRegionCapturePreviewView<Placeholder: View>: View {
         in size: CGSize,
         preview: AutomationRegionCapturePreview
     ) -> CGRect? {
-        guard preview.pixelWidth > 0,
-              preview.pixelHeight > 0 else {
+        let logicalWidth = preview.image.size.width
+        let logicalHeight = preview.image.size.height
+        
+        guard logicalWidth > 0, logicalHeight > 0 else {
             return nil
         }
 
@@ -211,11 +213,12 @@ struct AutomationRegionCapturePreviewView<Placeholder: View>: View {
         let availableWidth = max(1, size.width - inset * 2)
         let availableHeight = max(1, size.height - inset * 2)
         let scale = min(
-            availableWidth / CGFloat(preview.pixelWidth),
-            availableHeight / CGFloat(preview.pixelHeight)
+            availableWidth / logicalWidth,
+            availableHeight / logicalHeight,
+            1.0
         )
-        let renderedWidth = CGFloat(preview.pixelWidth) * scale
-        let renderedHeight = CGFloat(preview.pixelHeight) * scale
+        let renderedWidth = logicalWidth * scale
+        let renderedHeight = logicalHeight * scale
         return CGRect(
             x: (size.width - renderedWidth) / 2,
             y: (size.height - renderedHeight) / 2,

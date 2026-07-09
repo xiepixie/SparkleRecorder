@@ -196,7 +196,9 @@ public struct RecordedEvent: Codable, Equatable, Sendable {
     // Editor-only semantic binding. Raw playback still uses the underlying events.
     public var behaviorGroupID: BehaviorGroupID?
     public var behaviorGroupName: String?
-
+    
+    // Feature: Disable specific events during playback
+    public var isDisabled: Bool?
 
     public init(
         kind: Kind, time: TimeInterval, x: CGFloat, y: CGFloat, keyCode: UInt16,
@@ -214,7 +216,8 @@ public struct RecordedEvent: Codable, Equatable, Sendable {
         textTimeout: TimeInterval? = nil,
         verifyMustExist: Bool? = nil,
         behaviorGroupID: BehaviorGroupID? = nil,
-        behaviorGroupName: String? = nil
+        behaviorGroupName: String? = nil,
+        isDisabled: Bool? = nil
     ) {
         self.kind = kind
         self.time = time
@@ -247,6 +250,7 @@ public struct RecordedEvent: Codable, Equatable, Sendable {
         self.verifyMustExist = verifyMustExist
         self.behaviorGroupID = behaviorGroupID
         self.behaviorGroupName = behaviorGroupName
+        self.isDisabled = isDisabled
     }
 
     public var location: CGPoint {

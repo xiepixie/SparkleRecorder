@@ -590,6 +590,168 @@ struct EditorHelperTests {
         #expect(actionRowReorderDisabledSummary(up: .noRecordedActions, down: .noRecordedActions) == "Wait gaps are edited with Wait Duration instead of row reordering.")
     }
 
+    @Test("Macro editor health summarizes cleanup needs")
+    func macroEditorHealthSummarizesCleanupNeeds() {
+        var waitEvent = RecordedEvent.make(.waitForText, time: 0.5)
+        waitEvent.textAnchor = TextAnchor(
+            text: "",
+            observedFrame: RectValue(x: 20, y: 20, width: 80, height: 20)
+        )
+        let events = [
+            RecordedEvent.make(.leftMouseDown, time: 0.0, x: 10, y: 20),
+            RecordedEvent.make(.leftMouseUp, time: 0.1, x: 10, y: 20),
+            waitEvent
+        ]
+        let click = ActionGroup(
+            kind: .click,
+            eventIndices: [0, 1],
+            startTime: 0.0,
+            endTime: 0.1,
+            startPoint: CGPoint(x: 10, y: 20),
+            summary: "Click"
+        )
+        let waitText = ActionGroup(
+            kind: .waitForText,
+            eventIndices: [2],
+            startTime: 0.5,
+            endTime: 0.5,
+            summary: "Wait Text",
+            textAnchor: waitEvent.textAnchor
+        )
+        let longWait = ActionGroup(
+            kind: .wait,
+            eventIndices: [],
+            startTime: 0.6,
+            endTime: 3.2,
+            summary: "Wait 2.60s"
+        )
+
+        let summary = macroEditorHealthSummary(
+            for: [click, waitText, longWait],
+            events: events
+        )
+
+        #expect(summary.state == .needsTargets)
+        #expect(summary.actionCount == 3)
+        #expect(summary.recordedActionCount == 2)
+        #expect(summary.textTargetCount == 1)
+        #expect(summary.missingTextTargetCount == 1)
+        #expect(summary.fixedCoordinateClickCount == 1)
+        #expect(summary.longWaitCount == 1)
+        #expect(macroEditorHealthTitle(summary) == "Needs targets")
+    }
+
+    @Test("Macro editor guidance prioritizes missing targets before cleanup")
+    func macroEditorGuidancePrioritizesMissingTargetsBeforeCleanup() throws {
+        var waitEvent = RecordedEvent.make(.waitForText, time: 0.5)
+        waitEvent.textAnchor = TextAnchor(
+            text: "",
+            observedFrame: RectValue(x: 20, y: 20, width: 80, height: 20)
+        )
+        let events = [
+            RecordedEvent.make(.leftMouseDown, time: 0.0, x: 10, y: 20),
+            RecordedEvent.make(.leftMouseUp, time: 0.1, x: 10, y: 20),
+            waitEvent
+        ]
+        let click = ActionGroup(
+            kind: .click,
+            eventIndices: [0, 1],
+            startTime: 0.0,
+            endTime: 0.1,
+            startPoint: CGPoint(x: 10, y: 20),
+            summary: "Click"
+        )
+        let waitText = ActionGroup(
+            kind: .waitForText,
+            eventIndices: [2],
+            startTime: 0.5,
+            endTime: 0.5,
+            summary: "Wait Text",
+            textAnchor: waitEvent.textAnchor
+        )
+
+        let items = macroEditorGuidanceItems(
+            for: [click, waitText],
+            events: events,
+            selectedGroupIDs: [],
+            repeatUntilReadiness: .noSelection
+        )
+
+        let first = try #require(items.first)
+        #expect(first.kind == .missingTextTarget)
+        #expect(first.priority == .blocking)
+        #expect(first.action == .pickText([waitText.id]))
+        #expect(items.contains { $0.kind == .fixedCoordinateClicks })
+    }
+
+    @Test("Macro editor guidance promotes selected behavior and repeat until paths")
+    func macroEditorGuidancePromotesSelectedBehaviorAndRepeatUntilPaths() throws {
+        let keyA = ActionGroup(
+            kind: .keyPress,
+            eventIndices: [0],
+            startTime: 0.0,
+            endTime: 0.0,
+            summary: "Press A"
+        )
+        let keyB = ActionGroup(
+            kind: .keyPress,
+            eventIndices: [1],
+            startTime: 0.2,
+            endTime: 0.2,
+            summary: "Press B"
+        )
+        let behaviorItems = macroEditorGuidanceItems(
+            for: [keyA, keyB],
+            events: [
+                RecordedEvent.make(.keyDown, time: 0.0, keyCode: 0),
+                RecordedEvent.make(.keyDown, time: 0.2, keyCode: 11)
+            ],
+            selectedGroupIDs: [keyA.id, keyB.id],
+            repeatUntilReadiness: .missingUntilCondition
+        )
+
+        let behaviorItem = try #require(behaviorItems.first)
+        #expect(behaviorItem.kind == .behaviorReady)
+        #expect(behaviorItem.action == .createBehavior)
+
+        var wait = RecordedEvent.make(.waitForText, time: 1.0)
+        wait.textAnchor = TextAnchor(
+            text: "Done",
+            observedFrame: RectValue(x: 100, y: 100, width: 60, height: 20)
+        )
+        let clickEvents = [
+            RecordedEvent.make(.leftMouseDown, time: 0.0, x: 10, y: 20),
+            RecordedEvent.make(.leftMouseUp, time: 0.1, x: 10, y: 20),
+            wait
+        ]
+        let click = ActionGroup(
+            kind: .click,
+            eventIndices: [0, 1],
+            startTime: 0.0,
+            endTime: 0.1,
+            startPoint: CGPoint(x: 10, y: 20),
+            summary: "Click"
+        )
+        let waitText = ActionGroup(
+            kind: .waitForText,
+            eventIndices: [2],
+            startTime: 1.0,
+            endTime: 1.0,
+            summary: "Wait Text",
+            textAnchor: wait.textAnchor
+        )
+        let repeatItems = macroEditorGuidanceItems(
+            for: [click, waitText],
+            events: clickEvents,
+            selectedGroupIDs: [click.id, waitText.id],
+            repeatUntilReadiness: .ready
+        )
+
+        let repeatItem = try #require(repeatItems.first)
+        #expect(repeatItem.kind == .repeatUntilReady)
+        #expect(repeatItem.action == .createRepeatUntil)
+    }
+
     @Test("Observation presentation distinguishes OCR scope from visual detectors")
     func observationPresentationDistinguishesOCRScopeFromVisualDetectors() {
         #expect(AutomationConditionObservationPresentation.ocrDetectorTitle() == "Detector: OCR text")

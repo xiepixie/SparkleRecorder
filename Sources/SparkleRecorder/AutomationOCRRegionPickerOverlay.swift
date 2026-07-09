@@ -446,7 +446,7 @@ final class AutomationOCRRegionPickerOverlay {
         return AutomationRegionCapturePreview(
             image: NSImage(
                 cgImage: cropped,
-                size: NSSize(width: cropped.width, height: cropped.height)
+                size: NSSize(width: CGFloat(cropped.width) / scaleX, height: CGFloat(cropped.height) / scaleY)
             ),
             pixelWidth: cropped.width,
             pixelHeight: cropped.height,

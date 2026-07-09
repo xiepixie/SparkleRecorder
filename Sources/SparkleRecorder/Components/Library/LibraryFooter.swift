@@ -5,6 +5,7 @@ import SparkleRecorderCore
 struct LibraryFooter: View {
     let controller: MenuBarController
     @ObservedObject var state: AppState
+    let isWindow: Bool
     @Binding var workspace: WorkspaceMode
 
     var body: some View {
@@ -20,7 +21,13 @@ struct LibraryFooter: View {
                     icon: "plus.diamond",
                     label: NSLocalizedString("New workflow", comment: ""),
                     rightAccessory: nil,
-                    action: { workspace = .automation }
+                    action: {
+                        if isWindow {
+                            workspace = .automation
+                        } else {
+                            controller.showAutomationWorkspace()
+                        }
+                    }
                 )
             } else {
                 FooterRow(

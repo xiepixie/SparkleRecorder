@@ -48,6 +48,8 @@ final class AppState: ObservableObject {
     @Published var statusMessage: String = ""
     @Published var isRecording: Bool = false
     @Published var isPlaying: Bool = false
+    /// The product surface currently shown in the main window.
+    @Published var workspace: WorkspaceMode = .library
     @Published var accessibilityGranted: Bool = AXIsProcessTrusted()
     /// Input Monitoring is a separate TCC permission from Accessibility; both are
     /// required to record. Polled live alongside Accessibility so the UI reflects

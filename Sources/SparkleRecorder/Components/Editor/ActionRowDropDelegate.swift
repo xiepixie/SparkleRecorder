@@ -12,12 +12,13 @@ enum ActionRowInsertion: Equatable {
     case before(UUID)
     case after(UUID)
     case end
+    case passthrough
 
     func isAttached(to rowID: UUID) -> Bool {
         switch self {
         case .before(let id), .after(let id):
             return id == rowID
-        case .end:
+        case .end, .passthrough:
             return false
         }
     }
@@ -27,6 +28,7 @@ struct ActionRowDropDelegate: DropDelegate {
     let rowID: UUID
     @Binding var dropInsertion: ActionRowInsertion?
     @Binding var draggedID: UUID?
+    @Binding var dragNonce: UInt
     var canDrop: (UUID, ActionRowInsertion) -> Bool
     var onDrop: (UUID, ActionRowInsertion) -> Void
 
@@ -42,12 +44,13 @@ struct ActionRowDropDelegate: DropDelegate {
             return
         }
         let proposed = insertion(for: info)
-        dropInsertion = canDrop(sourceID, proposed) ? proposed : nil
+        dropInsertion = canDrop(sourceID, proposed) ? proposed : .passthrough
     }
 
     private func clearDragIfOutsideTargets() {
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
-            if dropInsertion == nil {
+        let captured = dragNonce
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+            if dragNonce == captured && dropInsertion == nil {
                 draggedID = nil
             }
         }
@@ -66,6 +69,7 @@ struct ActionRowDropDelegate: DropDelegate {
     }
     
     func dropEntered(info: DropInfo) {
+        dragNonce &+= 1
         updateInsertion(info: info)
     }
 
@@ -89,10 +93,13 @@ struct ActionRowDropDelegate: DropDelegate {
 struct ActionListEndDropDelegate: DropDelegate {
     @Binding var dropInsertion: ActionRowInsertion?
     @Binding var draggedID: UUID?
+    @Binding var dragNonce: UInt
     var canDrop: (UUID, ActionRowInsertion) -> Bool
     var onDrop: (UUID, ActionRowInsertion) -> Void
 
     func performDrop(info: DropInfo) -> Bool {
+        guard dropInsertion == .end else { return false }
+        
         defer {
             dropInsertion = nil
             draggedID = nil
@@ -103,14 +110,21 @@ struct ActionListEndDropDelegate: DropDelegate {
     }
 
     func dropEntered(info: DropInfo) {
+        dragNonce &+= 1
+        if let current = dropInsertion, current != .end, current != .passthrough {
+            return
+        }
         guard let sourceID = draggedID else {
             dropInsertion = nil
             return
         }
-        dropInsertion = canDrop(sourceID, .end) ? .end : nil
+        dropInsertion = canDrop(sourceID, .end) ? .end : .passthrough
     }
 
     func dropUpdated(info: DropInfo) -> DropProposal? {
+        if let current = dropInsertion, current != .end, current != .passthrough {
+            return DropProposal(operation: .move)
+        }
         dropEntered(info: info)
         return DropProposal(operation: .move)
     }
@@ -127,8 +141,9 @@ struct ActionListEndDropDelegate: DropDelegate {
     }
 
     private func clearDragIfOutsideTargets() {
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
-            if dropInsertion == nil {
+        let captured = dragNonce
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+            if dragNonce == captured && dropInsertion == nil {
                 draggedID = nil
             }
         }

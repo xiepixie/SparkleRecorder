@@ -3,7 +3,9 @@ import SparkleRecorderCore
 
 struct AutomationWorkflowDraftConditionEditorView: View {
     let document: AutomationWorkflowDraftDocument
+    let sourceDirectory: URL?
     let onApply: (AutomationWorkflowDraftConditionEdit) -> Void
+    var onRegisterAsset: ((String, AutomationWorkflowDraftVisualImageAsset) -> Void)? = nil
 
     @State private var selectedTaskKey = ""
     @State private var conditionKind: DraftConditionKind = .ocrText
@@ -167,8 +169,47 @@ struct AutomationWorkflowDraftConditionEditorView: View {
             threshold: $visualThreshold,
             requiresVisible: $visualRequiresVisible,
             onDrawRegion: {},
-            onClearRegion: {},
+            onClearRegion: clearVisualRegion,
+            onCaptureImage: captureVisualImageRef,
+            onCaptureBaseline: captureVisualBaselineRef,
             onPickPixel: nil
+        )
+    }
+
+    private func clearVisualRegion() {
+        visualRegionWidth = 0
+        visualRegionHeight = 0
+        visualSearchRegionSpace = .automatic
+        hasVisualRegion = false
+    }
+
+    private func captureVisualImageRef() {
+        captureVisualAssetRef { newKey in
+            self.visualImageRef = newKey
+        }
+    }
+
+    private func captureVisualBaselineRef() {
+        captureVisualAssetRef { newKey in
+            self.visualBaselineRef = newKey
+        }
+    }
+
+    private func captureVisualAssetRef(onSuccess: @escaping (String) -> Void) {
+        guard let sourceDirectory else {
+            return
+        }
+
+        AutomationWorkflowDraftBaselineCapturePresenter.captureBaseline(
+            packageDirectory: sourceDirectory,
+            preferredKey: "",
+            preferredLabel: NSLocalizedString("Captured Reference", comment: ""),
+            onCaptured: { result in
+                let kind = conditionKind.visualType?.usesImageReference == true ? "image" : "baseline"
+                onRegisterAsset?(kind, result.asset)
+                onSuccess(result.asset.key)
+            },
+            onError: { _ in }
         )
     }
 

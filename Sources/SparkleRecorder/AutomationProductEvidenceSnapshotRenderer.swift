@@ -1095,6 +1095,8 @@ enum AutomationProductEvidenceSnapshotRenderer {
             projection: projection,
             macros: fixtureMacros(now: now, scenario: scenario),
             refreshState: .loaded(snapshot),
+            isRecordingMacro: false,
+            recordHotkeyName: "⌥R",
             initialSelectedWorkflowID: selectedWorkflowID,
             initialSelection: selection,
             initialSelectedRunID: scenario.selectedRunID,
@@ -1103,7 +1105,8 @@ enum AutomationProductEvidenceSnapshotRenderer {
             initialFlowGraphLinkPreview: scenario.linkPreview(in: selectedWorkflow),
             initialTaskListPreviewState: scenario.taskListPreviewState,
             onRefresh: {},
-            onAction: { _ in }
+            onAction: { _ in },
+            onRecordMacro: {}
         )
         .frame(width: width, height: height)
         .environment(\.colorScheme, .dark)

@@ -4,8 +4,11 @@ import SparkleRecorderCore
 struct AutomationResourceTimelineView: View {
     let items: [AutomationResourceTimelineItem]
     let nextScheduledOccurrence: Date?
+    let nextSchedule: AutomationSchedule?
     let nextScheduledTaskName: String?
-    let onUpdateNextSchedule: ((Date) -> Void)?
+    var selectedRunID: UUID?
+    let onUpdateNextSchedule: ((AutomationTimelineScheduleEdit) -> Void)?
+    let onSelectItem: (AutomationResourceTimelineItem) -> Void
 
     private let cardWidth = 268.0
     private let nodeDiameter = 16.0
@@ -13,13 +16,14 @@ struct AutomationResourceTimelineView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            if nextScheduledOccurrence != nil {
+            if nextScheduledOccurrence != nil || nextScheduledTaskName != nil {
                 AutomationTimelineSchedulePreview(
                     date: nextScheduledOccurrence,
+                    schedule: nextSchedule,
                     taskName: nextScheduledTaskName,
                     onApplySchedule: onUpdateNextSchedule
                 )
-                .frame(width: 280)
+                .frame(maxWidth: 780, alignment: .leading)
                 .padding(.horizontal, 12)
                 .padding(.top, 10)
             }
@@ -43,9 +47,13 @@ struct AutomationResourceTimelineView: View {
                                 isFirst: index == 0,
                                 isLast: index == displayItems.count - 1,
                                 hasConflict: conflictIDs.contains(item.id),
+                                isSelected: selectedRunID == item.runID,
                                 cardWidth: cardWidth,
                                 nodeDiameter: nodeDiameter,
-                                connectorHeight: connectorHeight
+                                connectorHeight: connectorHeight,
+                                onSelect: {
+                                    onSelectItem(item)
+                                }
                             )
                         }
                     }
@@ -126,9 +134,11 @@ private struct AutomationTimelineColumn: View {
     let isFirst: Bool
     let isLast: Bool
     let hasConflict: Bool
+    let isSelected: Bool
     let cardWidth: CGFloat
     let nodeDiameter: CGFloat
     let connectorHeight: CGFloat
+    let onSelect: () -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -171,8 +181,16 @@ private struct AutomationTimelineColumn: View {
             }
             .frame(width: cardWidth, height: 24)
 
-            AutomationTimelineItemView(item: item, hasConflict: hasConflict)
-                .frame(width: cardWidth)
+            Button(action: onSelect) {
+                AutomationTimelineItemView(
+                    item: item,
+                    hasConflict: hasConflict,
+                    isSelected: isSelected
+                )
+            }
+            .buttonStyle(.plain)
+            .frame(width: cardWidth)
+            .accessibilityHint(NSLocalizedString("Shows the task and run details in the inspector", comment: ""))
         }
         .frame(width: cardWidth + 16, alignment: .leading)
     }

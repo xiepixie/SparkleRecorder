@@ -56,166 +56,173 @@ struct SettingsPanel: View {
     var body: some View {
         ZStack {
             VisualEffectBackground(material: inWindow ? .windowBackground : .popover)
-            VStack(alignment: .leading, spacing: 16) {
-                HStack {
-                    Image(systemName: "gearshape.fill")
-                        .foregroundStyle(.secondary)
-                    Text(NSLocalizedString("Settings", comment: ""))
-                        .font(.system(size: 13, weight: .semibold))
-                }
+            ScrollView {
+                VStack(alignment: .leading, spacing: 14) {
+                    settingsHeader
 
-                settingsGroup(NSLocalizedString("Hotkeys", comment: ""), systemImage: "keyboard") {
-                    hotkeyRow(title: NSLocalizedString("Record / Stop", comment: ""), binding: Binding(
-                        get: { state.recordHotkey },
-                        set: { state.recordHotkey = $0; controller.reapplyHotkeys() }
-                    ))
-                    hotkeyRow(title: NSLocalizedString("Stop everything", comment: ""), binding: Binding(
-                        get: { state.stopHotkey },
-                        set: { state.stopHotkey = $0; controller.reapplyHotkeys() }
-                    ))
-                    hotkeyRow(title: NSLocalizedString("Play", comment: ""), binding: Binding(
-                        get: { state.playHotkey },
-                        set: { state.playHotkey = $0; controller.reapplyHotkeys() }
-                    ))
-                }
-
-                settingsGroup(NSLocalizedString("General", comment: ""), systemImage: "macwindow") {
-                    HStack {
-                        Text(NSLocalizedString("Show as", comment: "")).font(.system(size: 11.5))
-                        Spacer()
-                        Picker("", selection: Binding(
-                            get: { state.menuBarOnly },
-                            set: { controller.setMenuBarOnly($0) }
-                        )) {
-                            Text(NSLocalizedString("Dock app", comment: "")).tag(false)
-                            Text(NSLocalizedString("Menu bar only", comment: "")).tag(true)
-                        }
-                        .labelsHidden()
-                        .frame(width: 140)
+                    settingsGroup(NSLocalizedString("Hotkeys", comment: ""), systemImage: "keyboard") {
+                        hotkeyRow(title: NSLocalizedString("Record / Stop", comment: ""), binding: Binding(
+                            get: { state.recordHotkey },
+                            set: { state.recordHotkey = $0; controller.reapplyHotkeys() }
+                        ))
+                        hotkeyRow(title: NSLocalizedString("Stop everything", comment: ""), binding: Binding(
+                            get: { state.stopHotkey },
+                            set: { state.stopHotkey = $0; controller.reapplyHotkeys() }
+                        ))
+                        hotkeyRow(title: NSLocalizedString("Play", comment: ""), binding: Binding(
+                            get: { state.playHotkey },
+                            set: { state.playHotkey = $0; controller.reapplyHotkeys() }
+                        ))
                     }
-                    Text(NSLocalizedString("Menu bar only hides the Dock icon — open SparkleRecorder from the menu-bar icon.", comment: ""))
-                        .font(.system(size: 10))
-                        .foregroundStyle(.tertiary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
 
-                settingsGroup(NSLocalizedString("Recording", comment: ""), systemImage: "record.circle") {
-                    HStack {
-                        Text(NSLocalizedString("Countdown", comment: "")).font(.system(size: 11.5))
-                        Spacer()
-                        Picker("", selection: $state.countdownSeconds) {
-                            Text(NSLocalizedString("Off", comment: "")).tag(0)
-                            Text("1s").tag(1)
-                            Text("3s").tag(3)
-                            Text("5s").tag(5)
+                    settingsGroup(NSLocalizedString("General", comment: ""), systemImage: "macwindow") {
+                        HStack {
+                            Text(NSLocalizedString("Show as", comment: "")).font(.system(size: 11.5))
+                            Spacer()
+                            Picker("", selection: Binding(
+                                get: { state.menuBarOnly },
+                                set: { controller.setMenuBarOnly($0) }
+                            )) {
+                                Text(NSLocalizedString("Dock app", comment: "")).tag(false)
+                                Text(NSLocalizedString("Menu bar only", comment: "")).tag(true)
+                            }
+                            .labelsHidden()
+                            .frame(width: 140)
                         }
-                        .labelsHidden()
-                        .frame(width: 110)
+                        Text(NSLocalizedString("Menu bar only hides the Dock icon. Use the menu-bar icon to reopen SparkleRecorder.", comment: ""))
+                            .font(.system(size: 10))
+                            .foregroundStyle(.tertiary)
+                            .fixedSize(horizontal: false, vertical: true)
                     }
-                    HStack {
-                        Text(NSLocalizedString("Status UI", comment: "")).font(.system(size: 11.5))
-                        Spacer()
-                        Picker("", selection: $state.recordingHUDMode) {
-                            ForEach(RecordingHUDMode.allCases) { mode in
-                                Text(mode.title).tag(mode)
+
+                    settingsGroup(NSLocalizedString("Recording", comment: ""), systemImage: "record.circle") {
+                        HStack {
+                            Text(NSLocalizedString("Countdown", comment: "")).font(.system(size: 11.5))
+                            Spacer()
+                            Picker("", selection: $state.countdownSeconds) {
+                                Text(NSLocalizedString("Off", comment: "")).tag(0)
+                                Text("1s").tag(1)
+                                Text("3s").tag(3)
+                                Text("5s").tag(5)
+                            }
+                            .labelsHidden()
+                            .frame(width: 110)
+                        }
+                        HStack {
+                            Text(NSLocalizedString("Status UI", comment: "")).font(.system(size: 11.5))
+                            Spacer()
+                            Picker("", selection: $state.recordingHUDMode) {
+                                ForEach(RecordingHUDMode.allCases) { mode in
+                                    Text(mode.title).tag(mode)
+                                }
+                            }
+                            .labelsHidden()
+                            .pickerStyle(.segmented)
+                            .frame(width: 210)
+                        }
+                        Toggle(isOn: $state.soundEnabled) {
+                            Text(NSLocalizedString("Sound effects", comment: "")).font(.system(size: 11.5))
+                        }
+                        .toggleStyle(.switch)
+                        .controlSize(.mini)
+                        Toggle(isOn: $state.recordMouseMoves) {
+                            Text(NSLocalizedString("Record mouse moves", comment: "")).font(.system(size: 11.5))
+                        }
+                        .toggleStyle(.switch)
+                        .controlSize(.mini)
+                    }
+
+                    settingsGroup(NSLocalizedString("Visual Evidence", comment: ""), systemImage: "film.stack") {
+                        Toggle(isOn: semanticRecordingEnabledBinding) {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(NSLocalizedString("Record visual evidence", comment: ""))
+                                    .font(.system(size: 11.5))
+                                Text(NSLocalizedString("Frames, OCR, and privacy exclusions stay separate from playable macro events.", comment: ""))
+                                    .font(.system(size: 10))
+                                    .foregroundStyle(.tertiary)
+                                    .fixedSize(horizontal: false, vertical: true)
                             }
                         }
-                        .labelsHidden()
-                        .pickerStyle(.segmented)
-                        .frame(width: 210)
+                        .toggleStyle(.switch)
+                        .controlSize(.mini)
+                        if state.semanticRecordingEnabled {
+                            Divider()
+                            semanticRecordingPreflightPanel(state.semanticRecordingPreflightPresentation)
+                            Divider()
+                            semanticRecordingRetentionPanel()
+                            Divider()
+                            semanticRecordingSuppressionPanel()
+                        }
                     }
-                    Toggle(isOn: $state.soundEnabled) {
-                        Text(NSLocalizedString("Sound effects", comment: "")).font(.system(size: 11.5))
-                    }
-                    .toggleStyle(.switch)
-                    .controlSize(.mini)
-                    Toggle(isOn: $state.recordMouseMoves) {
-                        Text(NSLocalizedString("Record mouse moves", comment: "")).font(.system(size: 11.5))
-                    }
-                    .toggleStyle(.switch)
-                    .controlSize(.mini)
-                    Toggle(isOn: semanticRecordingEnabledBinding) {
-                        Text(NSLocalizedString("Record visual evidence", comment: "")).font(.system(size: 11.5))
-                    }
-                    .toggleStyle(.switch)
-                    .controlSize(.mini)
-                    if state.semanticRecordingEnabled {
-                        Divider()
-                        semanticRecordingPreflightPanel(state.semanticRecordingPreflightPresentation)
-                        Divider()
-                        semanticRecordingRetentionPanel()
-                        Divider()
-                        semanticRecordingSuppressionPanel()
-                    }
-                }
 
-                settingsGroup(NSLocalizedString("Default playback", comment: ""), systemImage: "play.circle") {
-                    HStack {
-                        Text(NSLocalizedString("Repeat", comment: "")).font(.system(size: 11.5))
-                        Spacer()
-                        Menu {
-                            Button(NSLocalizedString("Once", comment: "")) { state.loops = 1 }
-                            Button("2×") { state.loops = 2 }
-                            Button("5×") { state.loops = 5 }
-                            Button("10×") { state.loops = 10 }
-                            Button("25×") { state.loops = 25 }
-                            Button("100×") { state.loops = 100 }
-                            Divider()
-                            Button { state.loops = 0 } label: { Label(NSLocalizedString("Continuous", comment: ""), systemImage: "infinity") }
-                            Divider()
-                            Button(NSLocalizedString("Custom…", comment: "")) {
-                                customLoopText = state.loops > 0 ? "\(state.loops)" : ""
-                                showCustomLoop = true
+                    settingsGroup(NSLocalizedString("Replay Defaults", comment: ""), systemImage: "play.circle") {
+                        HStack {
+                            Text(NSLocalizedString("Repeat", comment: "")).font(.system(size: 11.5))
+                            Spacer()
+                            Menu {
+                                Button(NSLocalizedString("Once", comment: "")) { state.loops = 1 }
+                                Button("2×") { state.loops = 2 }
+                                Button("5×") { state.loops = 5 }
+                                Button("10×") { state.loops = 10 }
+                                Button("25×") { state.loops = 25 }
+                                Button("100×") { state.loops = 100 }
+                                Divider()
+                                Button { state.loops = 0 } label: { Label(NSLocalizedString("Continuous", comment: ""), systemImage: "infinity") }
+                                Divider()
+                                Button(NSLocalizedString("Custom…", comment: "")) {
+                                    customLoopText = state.loops > 0 ? "\(state.loops)" : ""
+                                    showCustomLoop = true
+                                }
+                            } label: {
+                                Text(state.loops <= 0 ? NSLocalizedString("Continuous", comment: "") : "\(state.loops)×")
+                                    .font(.system(size: 11.5, weight: .semibold, design: .monospaced))
                             }
-                        } label: {
-                            Text(state.loops <= 0 ? NSLocalizedString("Continuous", comment: "") : "\(state.loops)×")
-                                .font(.system(size: 11.5, weight: .semibold, design: .monospaced))
+                            .menuStyle(.borderlessButton)
+                            .frame(width: 120)
                         }
-                        .menuStyle(.borderlessButton)
-                        .frame(width: 120)
+                        HStack {
+                            Text(NSLocalizedString("Speed", comment: "")).font(.system(size: 11.5))
+                            Spacer()
+                            Picker("", selection: $state.speed) {
+                                Text("0.5×").tag(0.5)
+                                Text("1×").tag(1.0)
+                                Text("2×").tag(2.0)
+                                Text("4×").tag(4.0)
+                            }
+                            .labelsHidden()
+                            .frame(width: 110)
+                        }
                     }
+
+                    settingsGroup(NSLocalizedString("Permissions", comment: ""), systemImage: "lock.shield") {
+                        permissionRow(title: NSLocalizedString("Accessibility", comment: ""),
+                                      granted: state.accessibilityGranted,
+                                      action: controller.openAccessibilityPrefs)
+                        permissionRow(title: NSLocalizedString("Input Monitoring", comment: ""),
+                                      granted: state.inputMonitoringGranted,
+                                      action: controller.openInputMonitoringPrefs)
+                        permissionRow(title: NSLocalizedString("Screen Recording", comment: ""),
+                                      granted: state.screenCaptureGranted,
+                                      action: controller.openScreenCapturePrefs)
+                    }
+
                     HStack {
-                        Text(NSLocalizedString("Speed", comment: "")).font(.system(size: 11.5))
+                        Button(NSLocalizedString("Replay welcome", comment: "")) { controller.showWelcome() }
+                            .buttonStyle(.borderless)
+                            .controlSize(.small)
                         Spacer()
-                        Picker("", selection: $state.speed) {
-                            Text("0.5×").tag(0.5)
-                            Text("1×").tag(1.0)
-                            Text("2×").tag(2.0)
-                            Text("4×").tag(4.0)
-                        }
-                        .labelsHidden()
-                        .frame(width: 110)
+                        Text(appVersion)
+                            .font(.system(size: 10))
+                            .foregroundStyle(.secondary)
+                        Button(NSLocalizedString("Quit", comment: "")) { controller.quit() }
+                            .buttonStyle(.borderless)
+                            .controlSize(.small)
                     }
                 }
-
-                settingsGroup(NSLocalizedString("Permissions", comment: ""), systemImage: "lock.shield") {
-                    permissionRow(title: NSLocalizedString("Accessibility", comment: ""),
-                                  granted: state.accessibilityGranted,
-                                  action: controller.openAccessibilityPrefs)
-                    permissionRow(title: NSLocalizedString("Input Monitoring", comment: ""),
-                                  granted: state.inputMonitoringGranted,
-                                  action: controller.openInputMonitoringPrefs)
-                    permissionRow(title: NSLocalizedString("Screen Recording", comment: ""),
-                                  granted: state.screenCaptureGranted,
-                                  action: controller.openScreenCapturePrefs)
-                }
-
-                HStack {
-                    Button(NSLocalizedString("Replay welcome", comment: "")) { controller.showWelcome() }
-                        .buttonStyle(.borderless)
-                        .controlSize(.small)
-                    Spacer()
-                    Text(appVersion)
-                        .font(.system(size: 10))
-                        .foregroundStyle(.secondary)
-                    Button(NSLocalizedString("Quit", comment: "")) { controller.quit() }
-                        .buttonStyle(.borderless)
-                        .controlSize(.small)
-                }
+                .padding(14)
             }
-            .padding(14)
         }
-        .frame(width: 340)
+        .frame(width: inWindow ? 560 : 340)
         .onAppear {
             if state.semanticRecordingEnabled,
                state.semanticRecordingPreflightPresentation == nil {
@@ -245,6 +252,84 @@ struct SettingsPanel: View {
         }
     }
 
+    private var settingsHeader: some View {
+        HStack(alignment: .center, spacing: 10) {
+            Image(systemName: "gearshape.fill")
+                .font(.system(size: 17, weight: .semibold))
+                .foregroundStyle(.secondary)
+
+            VStack(alignment: .leading, spacing: 3) {
+                Text(NSLocalizedString("Settings", comment: ""))
+                    .font(.system(size: 15, weight: .semibold))
+                Text(settingsSummaryText)
+                    .font(.system(size: 10.5))
+                    .foregroundStyle(.secondary)
+            }
+
+            Spacer()
+
+            settingsStatusBadge(
+                title: permissionsReady
+                    ? NSLocalizedString("Ready", comment: "")
+                    : NSLocalizedString("Needs access", comment: ""),
+                systemImage: permissionsReady ? "checkmark.circle.fill" : "exclamationmark.triangle.fill",
+                tint: permissionsReady ? .green : .orange
+            )
+            settingsStatusBadge(
+                title: state.semanticRecordingEnabled
+                    ? NSLocalizedString("Evidence on", comment: "")
+                    : NSLocalizedString("Evidence off", comment: ""),
+                systemImage: state.semanticRecordingEnabled ? "film.stack.fill" : "film.stack",
+                tint: Brand.libraryBlue
+            )
+        }
+        .padding(12)
+        .background(
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .fill(Color.primary.opacity(0.035))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .strokeBorder(Color.primary.opacity(0.08), lineWidth: 0.5)
+                )
+        )
+    }
+
+    private var permissionsReady: Bool {
+        state.accessibilityGranted && state.inputMonitoringGranted && state.screenCaptureGranted
+    }
+
+    private var settingsSummaryText: String {
+        let repeatText = state.loops <= 0
+            ? NSLocalizedString("continuous replay", comment: "")
+            : String(format: NSLocalizedString("%d× replay", comment: ""), state.loops)
+        return String(
+            format: NSLocalizedString("%@ · %@ status UI", comment: ""),
+            repeatText,
+            state.recordingHUDMode.title
+        )
+    }
+
+    private func settingsStatusBadge(
+        title: String,
+        systemImage: String,
+        tint: Color
+    ) -> some View {
+        HStack(spacing: 4) {
+            Image(systemName: systemImage)
+                .font(.system(size: 10, weight: .semibold))
+            Text(title)
+                .font(.system(size: 10, weight: .semibold))
+        }
+        .foregroundStyle(tint)
+        .padding(.horizontal, 7)
+        .padding(.vertical, 4)
+        .background(
+            Capsule(style: .continuous)
+                .fill(tint.opacity(0.10))
+                .overlay(Capsule(style: .continuous).strokeBorder(tint.opacity(0.18), lineWidth: 0.5))
+        )
+    }
+
     private var semanticRecordingEnabledBinding: Binding<Bool> {
         Binding(
             get: { state.semanticRecordingEnabled },
@@ -272,7 +357,7 @@ struct SettingsPanel: View {
             .foregroundStyle(.secondary)
             VStack(alignment: .leading, spacing: 8) { content() }
                 .padding(10)
-                .cardSurface(cornerRadius: 10)
+                .cardSurface(cornerRadius: 8)
         }
     }
 

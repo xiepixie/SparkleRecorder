@@ -299,11 +299,7 @@ private struct DraftSimulationEngine {
                 let resolution = dependencyResolution(for: target, incoming: incoming[target, default: []], completions: completions)
                 if let resolution {
                     if let existing = pending[target] {
-                        pending[target] = PendingStart(
-                            startAt: max(existing.startAt, resolution.startAt),
-                            upstreamTaskKeys: resolution.upstreamTaskKeys,
-                            dependencyKeys: resolution.dependencyKeys
-                        )
+                        pending[target] = mergedPendingStart(existing, resolution, for: target)
                     } else {
                         pending[target] = resolution
                     }
@@ -374,6 +370,18 @@ private struct DraftSimulationEngine {
             return PendingStart(startAt: options.startAt, upstreamTaskKeys: [], dependencyKeys: [])
         }
 
+        switch joinPolicy(for: target) {
+        case .all:
+            return allDependencyResolution(incoming: incoming, completions: completions)
+        case .any, .firstMatched:
+            return singleDependencyResolution(incoming: incoming, completions: completions)
+        }
+    }
+
+    private func allDependencyResolution(
+        incoming: [AutomationWorkflowDraftDependency],
+        completions: [String: Completion]
+    ) -> PendingStart? {
         var startAt: Date?
         var upstream: [String] = []
         var dependencyKeys: [String] = []
@@ -397,6 +405,57 @@ private struct DraftSimulationEngine {
             upstreamTaskKeys: upstream,
             dependencyKeys: dependencyKeys
         )
+    }
+
+    private func singleDependencyResolution(
+        incoming: [AutomationWorkflowDraftDependency],
+        completions: [String: Completion]
+    ) -> PendingStart? {
+        let matches = incoming.compactMap { dependency -> PendingStart? in
+            let from = dependency.from.trimmedForDraftSimulation
+            guard let completion = completions[from],
+                  trigger(dependency.trigger, matches: completion.step.outcome) else {
+                return nil
+            }
+            return PendingStart(
+                startAt: completion.completedAt.addingTimeInterval(max(0, dependency.delaySeconds ?? 0)),
+                upstreamTaskKeys: [from],
+                dependencyKeys: [key(for: dependency)]
+            )
+        }
+
+        return matches.min { left, right in
+            if left.startAt != right.startAt {
+                return left.startAt < right.startAt
+            }
+            return (left.dependencyKeys.first ?? "") < (right.dependencyKeys.first ?? "")
+        }
+    }
+
+    private func mergedPendingStart(
+        _ existing: PendingStart,
+        _ incoming: PendingStart,
+        for target: String
+    ) -> PendingStart {
+        switch joinPolicy(for: target) {
+        case .all:
+            return PendingStart(
+                startAt: max(existing.startAt, incoming.startAt),
+                upstreamTaskKeys: incoming.upstreamTaskKeys,
+                dependencyKeys: incoming.dependencyKeys
+            )
+        case .any, .firstMatched:
+            return existing.startAt <= incoming.startAt ? existing : incoming
+        }
+    }
+
+    private func joinPolicy(for taskKey: String) -> AutomationJoinPolicy {
+        guard let task = tasksByKey[taskKey],
+              let rawValue = task.joinPolicy?.trimmedForDraftSimulation,
+              !rawValue.isEmpty else {
+            return .all
+        }
+        return AutomationJoinPolicy(rawValue: rawValue) ?? .all
     }
 
     private func outcome(for task: AutomationWorkflowDraftTask) -> AutomationWorkflowDraftSimulationOutcome {

@@ -4,8 +4,8 @@ import Testing
 
 @Suite("Macro Editor Repeat Until Draft Tests")
 struct MacroEditorRepeatUntilDraftTests {
-    @Test("Selected behavior and wait text create draft-only repeat-until preview")
-    func selectedBehaviorAndWaitTextCreateDraftOnlyRepeatUntilPreview() throws {
+    @Test("Selected behavior and wait text create bounded repeat-until preview")
+    func selectedBehaviorAndWaitTextCreateBoundedRepeatUntilPreview() throws {
         let bodyMacroID = UUID(uuidString: "91000000-0000-0000-0000-000000000001")!
         let events = behaviorThenWaitTextEvents()
         let groups = ActionGroupProjection.groups(
@@ -59,21 +59,59 @@ struct MacroEditorRepeatUntilDraftTests {
         #expect(region.space == .contentNormalized)
         #expect(region.bounds == RectValue(x: 0.2, y: 0.3, width: 0.4, height: 0.1))
 
-        let validation = AutomationWorkflowDraftValidator.validate(
-            document,
-            context: AutomationWorkflowDraftValidationContext(macroCatalog: [
-                AutomationWorkflowDraftMacroCatalogEntry(id: bodyMacroID, name: "Checkout - Submit form")
-            ])
-        )
-        let containsDraftOnlyLoopIssue = validation.issues.contains(where: { issue in
-            issue.code == .invalidLoop &&
-            issue.message.contains("draft-only")
-        })
+        let context = AutomationWorkflowDraftValidationContext(macroCatalog: [
+            AutomationWorkflowDraftMacroCatalogEntry(id: bodyMacroID, name: "Checkout - Submit form")
+        ])
+        let validation = AutomationWorkflowDraftValidator.validate(document, context: context)
+        let importResult = AutomationWorkflowDraftImporter.dryRun(document, context: context)
         let containsMissingMacroRef = validation.issues.contains(where: { issue in
             issue.code == .missingMacroRef
         })
-        #expect(containsDraftOnlyLoopIssue)
+        #expect(validation.isValid)
+        #expect(importResult.isImportable)
+        #expect(importResult.taskKeyToID.keys.contains("repeat_until_91000000__1__do_91000000"))
+        #expect(importResult.taskKeyToID.keys.contains("repeat_until_91000000__1__until"))
+        #expect(importResult.taskKeyToID.keys.contains("repeat_until_91000000__complete"))
         #expect(!containsMissingMacroRef)
+    }
+
+    @Test("Selected behavior and wait text create repeat-until preview with custom loop configurations")
+    func selectedBehaviorAndWaitTextCreateRepeatUntilPreviewWithCustomConfigurations() throws {
+        let bodyMacroID = UUID(uuidString: "91000000-0000-0000-0000-000000000009")!
+        let events = behaviorThenWaitTextEvents()
+        let groups = ActionGroupProjection.groups(
+            from: events,
+            liveDuration: 5,
+            hidesMouseMoves: false,
+            smartMergeGestures: true
+        )
+        let clickGroup = try #require(groups.first { $0.kind == .click })
+        let waitGroup = try #require(groups.first { $0.kind == .waitForText })
+
+        let plan = MacroEditorRepeatUntilDraftBuilder.plan(
+            request: MacroEditorRepeatUntilDraftRequest(
+                sourceMacroName: "Checkout",
+                bodyMacroID: bodyMacroID,
+                bodyMacroName: "Checkout - Submit form",
+                events: events,
+                groups: groups,
+                selectedGroupIDs: [clickGroup.id, waitGroup.id],
+                maxAttempts: 5,
+                timeoutSeconds: 60,
+                pollingSeconds: 2,
+                onFailure: "requireManualApproval"
+            )
+        )
+
+        #expect(plan.readiness == .ready)
+        let document = try #require(plan.document)
+        let loopTask = try #require(document.workflow.tasks.first)
+        let loop = try #require(loopTask.loop)
+        #expect(loop.kind == AutomationWorkflowDraftLoopKind.repeatUntil)
+        #expect(loop.maxAttempts == 5)
+        #expect(loop.timeoutSeconds == 60)
+        #expect(loop.pollingSeconds == 2)
+        #expect(loop.onFailure == "requireManualApproval")
     }
 
     @Test("Wait text gone becomes non-visible repeat-until condition")

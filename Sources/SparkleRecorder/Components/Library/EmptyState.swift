@@ -49,7 +49,7 @@ struct EmptyState: View {
         if hasSearch { return NSLocalizedString("Try a different search term.", comment: "") }
         switch filter {
         case .favorites: return NSLocalizedString("Tap the ★ on any card to favorite it.", comment: "")
-        case .all:       return NSLocalizedString("Press Record to capture your first macro. SparkleRecorder will count down 3 seconds before it begins.", comment: "")
+        case .all:       return NSLocalizedString("Record a repeatable task, then review or combine it in a workflow.", comment: "")
         default:         return NSLocalizedString("Try the All filter.", comment: "")
         }
     }

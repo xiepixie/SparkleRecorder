@@ -33,6 +33,8 @@ struct AutomationVisualConditionEditorView: View {
     @Binding var requiresVisible: Bool
     let onDrawRegion: () -> Void
     let onClearRegion: () -> Void
+    var onCaptureImage: (() -> Void)? = nil
+    var onCaptureBaseline: (() -> Void)? = nil
     let onPickPixel: ((AutomationRegionCapturePixelSample) -> Void)?
 
     var body: some View {
@@ -146,7 +148,8 @@ struct AutomationVisualConditionEditorView: View {
                 systemImage: "rectangle.dashed",
                 emptyDetail: NSLocalizedString("No baseline images in this workflow yet.", comment: ""),
                 options: baselineReferenceOptions,
-                reference: $baselineRef
+                reference: $baselineRef,
+                onCapture: onCaptureBaseline
             )
             thresholdFields
         case .imageAppeared, .imageDisappeared:
@@ -156,7 +159,8 @@ struct AutomationVisualConditionEditorView: View {
                 systemImage: "photo",
                 emptyDetail: NSLocalizedString("No reference images in this workflow yet.", comment: ""),
                 options: imageReferenceOptions,
-                reference: $imageRef
+                reference: $imageRef,
+                onCapture: onCaptureImage
             )
             thresholdFields
         case .pixelMatched:

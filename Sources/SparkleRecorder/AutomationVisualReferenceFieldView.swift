@@ -7,6 +7,7 @@ struct AutomationVisualReferenceFieldView: View {
     let emptyDetail: String?
     let options: [AutomationVisualReferenceOption]
     @Binding var reference: String
+    var onCapture: (() -> Void)? = nil
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -26,6 +27,15 @@ struct AutomationVisualReferenceFieldView: View {
             }
 
             HStack(spacing: 8) {
+                if let onCapture {
+                    Button(action: onCapture) {
+                        Image(systemName: "camera.viewfinder")
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(Brand.libraryBlue)
+                    .help(NSLocalizedString("Capture new reference image", comment: ""))
+                }
+
                 TextField(textFieldTitle, text: normalizedReference)
                     .textFieldStyle(.roundedBorder)
                     .font(.caption)

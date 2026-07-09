@@ -255,8 +255,8 @@ struct AutomationWorkflowDraftTests {
         #expect(importResult.dependencyKeyToID.keys.contains("repeat_battle__3__wait->done:conditionMatched"))
     }
 
-    @Test("Repeat-until loop stays draft-only and does not expand")
-    func repeatUntilLoopStaysDraftOnlyAndDoesNotExpand() throws {
+    @Test("Bounded repeat-until loop expands to acyclic simulation and import")
+    func boundedRepeatUntilLoopExpandsToAcyclicSimulationAndImport() throws {
         let document = AutomationWorkflowDraftDocument(
             workflow: AutomationWorkflowDraft(
                 name: "Wait for spinner",
@@ -305,21 +305,65 @@ struct AutomationWorkflowDraftTests {
         )
 
         let validation = AutomationWorkflowDraftValidator.validate(document)
+        let simulation = AutomationWorkflowDraftSimulator.simulate(
+            document,
+            options: AutomationWorkflowDraftSimulationOptions(
+                scenario: AutomationWorkflowDraftSimulationScenario(
+                    taskKey: "repeat_until_spinner_gone__1__until",
+                    outcome: .conditionNotMatched
+                )
+            )
+        )
         let importResult = AutomationWorkflowDraftImporter.dryRun(document)
         let expanded = AutomationWorkflowDraftLoopExpander.expandedDocument(document)
         let normalized = AutomationWorkflowDraftEditor.normalize(document).document
         let normalizedLoop = try #require(normalized.workflow.tasks.first?.loop)
+        let workflow = try #require(importResult.workflow)
 
-        #expect(!validation.isValid)
-        #expect(validation.issues.contains {
-            $0.code == .invalidLoop &&
-                $0.path == "$.workflow.tasks[0].loop.kind" &&
-                $0.message.contains("draft-only")
-        })
-        #expect(!importResult.isImportable)
-        #expect(expanded.workflow.tasks.map(\.key) == ["repeat_until_spinner_gone"])
-        #expect(expanded.workflow.dependencies.isEmpty)
-        #expect(expanded.workflow.tasks.first?.loop?.isRepeatUntil == true)
+        #expect(validation.isValid)
+        #expect(importResult.isImportable)
+        #expect(workflow.validationIssues().isEmpty)
+        #expect(expanded.workflow.tasks.map(\.key) == [
+            "repeat_until_spinner_gone__1__tap_refresh",
+            "repeat_until_spinner_gone__1__until",
+            "repeat_until_spinner_gone__2__tap_refresh",
+            "repeat_until_spinner_gone__2__until",
+            "repeat_until_spinner_gone__3__tap_refresh",
+            "repeat_until_spinner_gone__3__until",
+            "repeat_until_spinner_gone__4__tap_refresh",
+            "repeat_until_spinner_gone__4__until",
+            "repeat_until_spinner_gone__complete"
+        ])
+        #expect(expanded.workflow.dependencies.map { $0.key ?? "" } == [
+            "repeat_until_spinner_gone__1__tap_refresh->repeat_until_spinner_gone__1__until:success",
+            "repeat_until_spinner_gone__1__until->repeat_until_spinner_gone__complete:conditionMatched",
+            "repeat_until_spinner_gone__1__until->repeat_until_spinner_gone__2__tap_refresh:conditionNotMatched",
+            "repeat_until_spinner_gone__2__tap_refresh->repeat_until_spinner_gone__2__until:success",
+            "repeat_until_spinner_gone__2__until->repeat_until_spinner_gone__complete:conditionMatched",
+            "repeat_until_spinner_gone__2__until->repeat_until_spinner_gone__3__tap_refresh:conditionNotMatched",
+            "repeat_until_spinner_gone__3__tap_refresh->repeat_until_spinner_gone__3__until:success",
+            "repeat_until_spinner_gone__3__until->repeat_until_spinner_gone__complete:conditionMatched",
+            "repeat_until_spinner_gone__3__until->repeat_until_spinner_gone__4__tap_refresh:conditionNotMatched",
+            "repeat_until_spinner_gone__4__tap_refresh->repeat_until_spinner_gone__4__until:success",
+            "repeat_until_spinner_gone__4__until->repeat_until_spinner_gone__complete:conditionMatched"
+        ])
+        #expect(expanded.workflow.tasks.first { $0.key == "repeat_until_spinner_gone__complete" }?.joinPolicy == AutomationJoinPolicy.firstMatched.rawValue)
+        #expect(simulation.steps.map(\.taskKey) == [
+            "repeat_until_spinner_gone__1__tap_refresh",
+            "repeat_until_spinner_gone__1__until",
+            "repeat_until_spinner_gone__2__tap_refresh",
+            "repeat_until_spinner_gone__2__until",
+            "repeat_until_spinner_gone__complete"
+        ])
+        #expect(simulation.steps.map(\.outcome) == [
+            .success,
+            .conditionNotMatched,
+            .success,
+            .conditionMatched,
+            .success
+        ])
+        #expect(importResult.taskKeyToID.keys.contains("repeat_until_spinner_gone__complete"))
+        #expect(!importResult.taskKeyToID.keys.contains("repeat_until_spinner_gone"))
         #expect(normalizedLoop.kind == AutomationWorkflowDraftLoopKind.repeatUntil)
         #expect(normalizedLoop.until?.type == "imageDisappeared")
         #expect(normalizedLoop.until?.regionRef == "spinner_area")
@@ -327,6 +371,40 @@ struct AutomationWorkflowDraftTests {
         #expect(normalizedLoop.timeoutSeconds == 20)
         #expect(normalizedLoop.pollingSeconds == 0.5)
         #expect(normalizedLoop.onFailure == AutomationWorkflowDraftLoopFailurePolicy.failRun)
+    }
+
+    @Test("Repeat-until loop requires bounded attempts before import")
+    func repeatUntilLoopRequiresBoundedAttemptsBeforeImport() {
+        let document = AutomationWorkflowDraftDocument(
+            workflow: AutomationWorkflowDraft(
+                name: "Unbounded repeat until",
+                tasks: [
+                    AutomationWorkflowDraftTask(
+                        key: "repeat_wait",
+                        type: "loop",
+                        loop: AutomationWorkflowDraftLoop(
+                            count: 1,
+                            tasks: [
+                                AutomationWorkflowDraftTask(key: "tap", type: "delay", delaySeconds: 1)
+                            ],
+                            kind: AutomationWorkflowDraftLoopKind.repeatUntil,
+                            until: AutomationWorkflowDraftCondition(type: "ocrText", text: "Done")
+                        )
+                    )
+                ]
+            )
+        )
+
+        let validation = AutomationWorkflowDraftValidator.validate(document)
+        let importResult = AutomationWorkflowDraftImporter.dryRun(document)
+
+        #expect(!validation.isValid)
+        #expect(validation.issues.contains {
+            $0.code == .invalidLoop &&
+                $0.path == "$.workflow.tasks[0].loop.maxAttempts" &&
+                $0.message.contains("maxAttempts")
+        })
+        #expect(!importResult.isImportable)
     }
 
     @Test("Repeat-until loop decodes without fixed count")
@@ -715,6 +793,54 @@ struct AutomationWorkflowDraftTests {
             $0.to == "notify_timeout" &&
             $0.trigger == "timeout" &&
             $0.fired
+        })
+    }
+
+    @Test("Draft simulation honors first matched join policy")
+    func draftSimulationHonorsFirstMatchedJoinPolicy() {
+        let document = AutomationWorkflowDraftDocument(workflow: AutomationWorkflowDraft(
+            name: "First matched join",
+            tasks: [
+                AutomationWorkflowDraftTask(
+                    key: "left",
+                    type: "condition",
+                    condition: AutomationWorkflowDraftCondition(type: "ocrText", text: "Ready")
+                ),
+                AutomationWorkflowDraftTask(
+                    key: "joined",
+                    type: "delay",
+                    delaySeconds: 0,
+                    joinPolicy: AutomationJoinPolicy.firstMatched.rawValue
+                ),
+                AutomationWorkflowDraftTask(
+                    key: "slow_root",
+                    type: "delay",
+                    delaySeconds: 5
+                ),
+                AutomationWorkflowDraftTask(
+                    key: "right",
+                    type: "delay",
+                    delaySeconds: 0
+                )
+            ],
+            dependencies: [
+                AutomationWorkflowDraftDependency(from: "left", to: "joined", trigger: "conditionMatched"),
+                AutomationWorkflowDraftDependency(from: "slow_root", to: "right", trigger: "success"),
+                AutomationWorkflowDraftDependency(from: "right", to: "joined", trigger: "success")
+            ]
+        ))
+
+        let result = AutomationWorkflowDraftSimulator.simulate(document)
+
+        #expect(result.isSimulatable)
+        #expect(result.steps.map(\.taskKey) == ["left", "joined", "slow_root", "right"])
+        #expect(result.steps.first { $0.taskKey == "joined" }?.upstreamTaskKeys == ["left"])
+        #expect(result.steps.first { $0.taskKey == "joined" }?.triggeredByDependencyKeys == ["left->joined:conditionMatched"])
+        #expect(result.branchDecisions.contains {
+            $0.from == "left" &&
+                $0.to == "joined" &&
+                $0.trigger == "conditionMatched" &&
+                $0.fired
         })
     }
 

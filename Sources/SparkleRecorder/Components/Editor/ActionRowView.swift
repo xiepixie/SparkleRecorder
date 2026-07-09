@@ -8,6 +8,7 @@ struct ActionRowView: View {
     let order: Int
     let selected: Bool
     let isMoving: Bool
+    let isDisabled: Bool
     let onTap: (NSEvent.ModifierFlags) -> Void
     let onDragStarted: () -> Void
     @Binding var draggedID: UUID?
@@ -146,7 +147,7 @@ struct ActionRowView: View {
 	                }
 	            }
 	        )
-        .opacity(isMoving ? 0.55 : 1.0)
+        .opacity(isDisabled ? 0.4 : (isMoving ? 0.55 : 1.0))
         .contentShape(Rectangle())
         .onHover { hovered = $0 }
         .onTapGesture { onTap(NSApp.currentEvent?.modifierFlags ?? []) }

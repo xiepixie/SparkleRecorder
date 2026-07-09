@@ -141,6 +141,7 @@ struct EditorView: View {
                     macro: library.currentMacro,
                     rowCount: recorder.events.count,
                     duration: recorder.events.last?.time ?? 0,
+                    health: macroEditorHealthSummary(for: rows.map(\.group), events: recorder.events),
                     hideMouseMoves: $hideMouseMoves,
                     showAllPaths: $showAllPaths,
                     showOverlayPreview: $showOverlayPreview,
@@ -181,7 +182,9 @@ struct EditorView: View {
                             self.startPickingText()
                         },
                         onRefreshRows: updateCachedRows,
-                        onCreateRepeatUntilDraft: createRepeatUntilDraftFromSelection
+                        onCreateRepeatUntilDraft: { attempts, timeout, polling, policy in
+                            createRepeatUntilDraftFromSelection(maxAttempts: attempts, timeoutSeconds: timeout, pollingSeconds: polling, failurePolicy: policy)
+                        }
                     )
                     .frame(minWidth: 280, idealWidth: 310, maxWidth: 360)
 
@@ -197,7 +200,10 @@ struct EditorView: View {
                         ActionListView(
                             rows: rows,
                             selection: $selection,
-                            onRefreshRows: updateCachedRows
+                            onRefreshRows: updateCachedRows,
+                            toggleDisabledState: toggleDisabledState(for:),
+                            playFromHere: playFromHere(anchor:),
+                            playThisActionOnly: playThisActionOnly(anchor:)
                         )
                     }
                     .frame(minWidth: 420)
@@ -205,7 +211,8 @@ struct EditorView: View {
 
                 EditorFooter(eventCount: recorder.events.count,
                              selectedCount: selection.count,
-                             duration: recorder.events.last?.time ?? 0)
+                             duration: recorder.events.last?.time ?? 0,
+                             health: macroEditorHealthSummary(for: rows.map(\.group), events: recorder.events))
             }
         }
         .frame(minWidth: 820, minHeight: 580)
@@ -779,7 +786,7 @@ struct EditorView: View {
         return rows.filter { targetIDs.contains($0.id) }
     }
 
-    func createRepeatUntilDraftFromSelection() {
+    func createRepeatUntilDraftFromSelection(maxAttempts: Int, timeoutSeconds: TimeInterval, pollingSeconds: TimeInterval, failurePolicy: String) {
         guard let currentMacro = library.currentMacro else {
             showRepeatUntilDraftAlert(
                 title: NSLocalizedString("No macro selected", comment: ""),
@@ -797,7 +804,11 @@ struct EditorView: View {
                 bodyMacroName: bodyMacroName,
                 events: recorder.events,
                 groups: rows.map(\.group),
-                selectedGroupIDs: selection
+                selectedGroupIDs: selection,
+                maxAttempts: maxAttempts,
+                timeoutSeconds: timeoutSeconds,
+                pollingSeconds: pollingSeconds,
+                onFailure: failurePolicy
             )
         )
 
@@ -874,6 +885,71 @@ struct EditorView: View {
         case .missingUntilText:
             return NSLocalizedString("Pick or type target text before creating Repeat Until.", comment: "")
         }
+    }
+    
+    // MARK: - Context Menu Actions
+    
+    func toggleDisabledState(for groupIDs: Set<UUID>) {
+        let indicesToToggle = rows
+            .filter { groupIDs.contains($0.id) }
+            .flatMap { $0.group.eventIndices }
+        
+        guard !indicesToToggle.isEmpty else { return }
+        
+        let allDisabled = indicesToToggle.allSatisfy { recorder.events[$0].isDisabled == true }
+        let newState = !allDisabled
+        
+        withUndo(newState ? NSLocalizedString("Disable Action", comment: "") : NSLocalizedString("Enable Action", comment: "")) {
+            for idx in indicesToToggle {
+                recorder.events[idx].isDisabled = newState
+            }
+            _ = updateCachedRows()
+            controller.persistEdits()
+        }
+    }
+    
+    private func playPartial(events slice: [RecordedEvent]) {
+        var mutableSlice = slice
+        guard !mutableSlice.isEmpty else { return }
+        
+        let initialTime = mutableSlice.first?.time ?? 0
+        let shift = max(0, initialTime - 0.2)
+        for i in mutableSlice.indices {
+            mutableSlice[i].time = max(0, mutableSlice[i].time - shift)
+        }
+        
+        let macro = library.currentMacro
+        let speed = macro?.speed ?? state.speed
+        
+        controller.preparePlaybackContext(for: macro) { [weak controller] context in
+            guard let controller else { return }
+            controller.state.statusMessage = NSLocalizedString("Playing preview…", comment: "")
+            controller.player.play(
+                macroID: macro?.id,
+                events: mutableSlice,
+                loops: 1,
+                speed: speed,
+                context: context,
+                windowTracker: WindowTracker()
+            ) { _ in
+                controller.state.statusMessage = ""
+            }
+        }
+    }
+
+    func playFromHere(anchor row: ActionRow) {
+        if let firstIdx = row.group.eventIndices.min(), firstIdx < recorder.events.count {
+            playPartial(events: Array(recorder.events[firstIdx...]))
+        }
+    }
+    
+    func playThisActionOnly(anchor row: ActionRow) {
+        let indices = row.group.eventIndices.sorted()
+        let eventsToPlay = indices.compactMap { idx -> RecordedEvent? in
+            guard idx < recorder.events.count else { return nil }
+            return recorder.events[idx]
+        }
+        playPartial(events: eventsToPlay)
     }
 
 }

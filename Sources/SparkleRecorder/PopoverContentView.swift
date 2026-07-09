@@ -26,7 +26,6 @@ struct PopoverContentView: View {
     @State private var newTagText: String = ""
     @State private var notesDraft: String = ""
     @State private var isDroppingFiles = false
-    @State private var workspace: WorkspaceMode = .library
     /// Deterministic anchor for shift-click range selection.
     @State private var lastAnchorID: UUID?
 
@@ -71,7 +70,7 @@ struct PopoverContentView: View {
                     .background(VisualEffectBackground(material: .titlebar, blendingMode: .withinWindow))
                     .overlay(Divider().opacity(0.5), alignment: .bottom)
 
-                    switch workspace {
+                    switch state.workspace {
                     case .library:
                         HStack(spacing: 0) {
                             LibrarySidebar(filter: $filter)
@@ -81,12 +80,15 @@ struct PopoverContentView: View {
                         }
 
                     case .automation:
-                        AutomationMainView(runtimeHost: controller.automationHost())
+                        AutomationMainView(
+                            runtimeHost: controller.automationHost(),
+                            onRecordMacro: { controller.toggleRecording() }
+                        )
                             .frame(maxWidth: .infinity, maxHeight: .infinity)
                     }
 
                     Divider().opacity(0.5)
-                    LibraryFooter(controller: controller, state: state, workspace: $workspace)
+                    LibraryFooter(controller: controller, state: state, isWindow: isWindow, workspace: workspaceBinding)
                         .padding(.horizontal, 8)
                         .padding(.vertical, 6)
                 }
@@ -95,7 +97,7 @@ struct PopoverContentView: View {
                 VStack(spacing: 0) {
                     libraryColumn
                     Divider().opacity(0.5)
-                    LibraryFooter(controller: controller, state: state, workspace: $workspace)
+                    LibraryFooter(controller: controller, state: state, isWindow: isWindow, workspace: workspaceBinding)
                         .padding(.horizontal, 8)
                         .padding(.vertical, 6)
                 }
@@ -134,16 +136,16 @@ struct PopoverContentView: View {
             minWidth: usesRecordingPopover ? 320 : (isWindow ? 600 : 400),
             idealWidth: usesRecordingPopover ? 320 : (isWindow ? 880 : 400),
             maxWidth: usesRecordingPopover ? 320 : (isWindow ? .infinity : 400),
-            minHeight: usesRecordingPopover ? 236 : (isWindow ? 520 : 540),
-            idealHeight: usesRecordingPopover ? 236 : (isWindow ? 620 : 540),
-            maxHeight: usesRecordingPopover ? 236 : (isWindow ? .infinity : 540)
+            minHeight: usesRecordingPopover ? 276 : (isWindow ? 520 : 540),
+            idealHeight: usesRecordingPopover ? 276 : (isWindow ? 620 : 540),
+            maxHeight: usesRecordingPopover ? 276 : (isWindow ? .infinity : 540)
         )
         .animation(.spring(response: 0.35, dampingFraction: 0.85), value: state.accessibilityGranted)
         .animation(.spring(response: 0.35, dampingFraction: 0.85), value: state.inputMonitoringGranted)
         .animation(.spring(response: 0.25, dampingFraction: 0.9), value: usesRecordingPopover)
         .animation(.spring(response: 0.3, dampingFraction: 0.85), value: filteredMacroCountForAnimation)
         .animation(.spring(response: 0.3, dampingFraction: 0.85), value: filter)
-        .animation(.spring(response: 0.3, dampingFraction: 0.85), value: workspace)
+        .animation(.spring(response: 0.3, dampingFraction: 0.85), value: state.workspace)
         .onChange(of: filter) { selection.removeAll() }
         .sheet(item: $showAssignHotkey) { macro in
             HotkeyAssignmentSheet(
@@ -215,6 +217,13 @@ struct PopoverContentView: View {
         ]
         for m in library.macros { if let hk = m.hotkey { s.insert(hk.keyCode) } }
         return s
+    }
+
+    private var workspaceBinding: Binding<WorkspaceMode> {
+        Binding(
+            get: { state.workspace },
+            set: { state.workspace = $0 }
+        )
     }
 
     private var libraryColumn: some View {
@@ -295,7 +304,7 @@ private final class RecordingPopoverSnapshotModel: ObservableObject {
 
 private struct RecordingMenuBarPopoverView: View {
     let controller: MenuBarController
-    private let recorder: Recorder
+    @ObservedObject private var recorder: Recorder
     @ObservedObject private var state: AppState
     @StateObject private var model: RecordingPopoverSnapshotModel
 
@@ -305,7 +314,7 @@ private struct RecordingMenuBarPopoverView: View {
 
     init(controller: MenuBarController, recorder: Recorder, state: AppState) {
         self.controller = controller
-        self.recorder = recorder
+        _recorder = ObservedObject(initialValue: recorder)
         _state = ObservedObject(initialValue: state)
         _model = StateObject(wrappedValue: RecordingPopoverSnapshotModel(recorder: recorder))
     }
@@ -343,6 +352,19 @@ private struct RecordingMenuBarPopoverView: View {
                 RecordingPopoverStat(icon: "keyboard", value: stats.keys, tint: Brand.sigBlue)
                 RecordingPopoverStat(icon: "arrow.up.and.down", value: stats.scrolls, tint: Brand.sigTeal)
                 RecordingPopoverStat(icon: "hand.draw", value: stats.drags, tint: Brand.sigViolet)
+            }
+
+            HStack(spacing: 7) {
+                RecordingPopoverStateBadge(
+                    icon: visualEvidenceIcon,
+                    title: visualEvidenceTitle,
+                    tint: visualEvidenceTint
+                )
+                RecordingPopoverStateBadge(
+                    icon: "tray.and.arrow.down.fill",
+                    title: NSLocalizedString("Stop saves to Library", comment: ""),
+                    tint: Brand.libraryBlue
+                )
             }
 
             HStack(spacing: 8) {
@@ -384,12 +406,68 @@ private struct RecordingMenuBarPopoverView: View {
             }
         }
         .padding(14)
-        .frame(width: 320, height: 236, alignment: .topLeading)
+        .frame(width: 320, height: 276, alignment: .topLeading)
         .transaction { transaction in
             transaction.animation = nil
         }
         .onReceive(recorder.$liveStats.removeDuplicates()) { stats in
             model.updateStats(stats)
+        }
+    }
+
+    private var visualEvidenceTitle: String {
+        guard state.semanticRecordingEnabled else {
+            return NSLocalizedString("Action recording", comment: "")
+        }
+        switch recorder.semanticRecordingStatus {
+        case .starting:
+            return NSLocalizedString("Preparing evidence", comment: "")
+        case .active:
+            return NSLocalizedString("Evidence recording", comment: "")
+        case .finishing:
+            return NSLocalizedString("Saving evidence", comment: "")
+        case .finished:
+            return NSLocalizedString("Evidence saved", comment: "")
+        case .blocked, .failed:
+            return NSLocalizedString("Evidence issue", comment: "")
+        case .suppressed:
+            return NSLocalizedString("Evidence paused", comment: "")
+        case .cancelled:
+            return NSLocalizedString("Evidence cancelled", comment: "")
+        case .idle:
+            return NSLocalizedString("Evidence ready", comment: "")
+        }
+    }
+
+    private var visualEvidenceIcon: String {
+        guard state.semanticRecordingEnabled else {
+            return "record.circle"
+        }
+        switch recorder.semanticRecordingStatus {
+        case .blocked, .failed:
+            return "exclamationmark.triangle.fill"
+        case .suppressed:
+            return "lock.shield.fill"
+        case .finished:
+            return "checkmark.circle.fill"
+        default:
+            return "film.stack.fill"
+        }
+    }
+
+    private var visualEvidenceTint: Color {
+        guard state.semanticRecordingEnabled else {
+            return .secondary
+        }
+        switch recorder.semanticRecordingStatus {
+        case .blocked, .failed:
+            return .orange
+        case .suppressed:
+            return .purple
+        case .finished:
+            return .green
+        default:
+            return Brand.libraryBlue
         }
     }
 }
@@ -420,6 +498,37 @@ private struct RecordingPopoverStat: View {
                         .strokeBorder(Color.primary.opacity(0.08), lineWidth: 0.5)
                 )
         )
+    }
+}
+
+private struct RecordingPopoverStateBadge: View {
+    let icon: String
+    let title: String
+    let tint: Color
+
+    var body: some View {
+        HStack(spacing: 6) {
+            Image(systemName: icon)
+                .font(.system(size: 10.5, weight: .semibold))
+                .foregroundStyle(tint)
+                .frame(width: 13)
+            Text(title)
+                .font(.system(size: 10.5, weight: .semibold))
+                .foregroundStyle(.primary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.78)
+        }
+        .frame(maxWidth: .infinity, minHeight: 28)
+        .padding(.horizontal, 8)
+        .background(
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .fill(tint.opacity(0.075))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .strokeBorder(tint.opacity(0.16), lineWidth: 0.5)
+                )
+        )
+        .accessibilityElement(children: .combine)
     }
 }
 

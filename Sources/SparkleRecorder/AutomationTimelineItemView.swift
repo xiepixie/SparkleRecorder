@@ -4,6 +4,7 @@ import SparkleRecorderCore
 struct AutomationTimelineItemView: View {
     let item: AutomationResourceTimelineItem
     var hasConflict = false
+    var isSelected = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -101,6 +102,11 @@ struct AutomationTimelineItemView: View {
                 .padding(.horizontal, 10)
                 .padding(.top, 4)
         }
+        .overlay(
+            RoundedRectangle(cornerRadius: 8)
+                .strokeBorder(item.status.tint.opacity(isSelected ? 0.45 : 0), lineWidth: 1.1)
+        )
+        .contentShape(RoundedRectangle(cornerRadius: 8))
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(accessibilitySummary)
     }

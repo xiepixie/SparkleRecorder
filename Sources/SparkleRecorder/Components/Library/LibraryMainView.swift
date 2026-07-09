@@ -58,6 +58,20 @@ struct LibraryMainView: View {
                 .transition(.opacity.combined(with: .move(edge: .top)))
             }
 
+            if isWindow {
+                LibraryWorkflowActionStrip(
+                    macroCount: library.macros.count,
+                    hasCurrentMacro: library.currentMacroID != nil,
+                    visualEvidenceEnabled: state.semanticRecordingEnabled,
+                    isRecording: state.isRecording,
+                    onReview: { controller.openEditor() },
+                    onWorkflow: { controller.showAutomationWorkspace() }
+                )
+                .padding(.horizontal, 12)
+                .padding(.bottom, 8)
+                .transition(.opacity.combined(with: .move(edge: .top)))
+            }
+
             if !visibleSelection.isEmpty {
                 SelectionToolbar(
                     selectionCount: visibleSelection.count,
@@ -326,5 +340,112 @@ struct LibraryMainView: View {
                 withAnimation(.easeOut(duration: 0.25)) { state.statusMessage = "" }
             }
         }
+    }
+}
+
+private struct LibraryWorkflowActionStrip: View {
+    let macroCount: Int
+    let hasCurrentMacro: Bool
+    let visualEvidenceEnabled: Bool
+    let isRecording: Bool
+    let onReview: () -> Void
+    let onWorkflow: () -> Void
+
+    private var statusText: String {
+        if isRecording {
+            return NSLocalizedString("Recording active", comment: "")
+        }
+        let format = NSLocalizedString("%d saved", comment: "")
+        return String(format: format, macroCount)
+    }
+
+    private var evidenceText: String {
+        visualEvidenceEnabled
+            ? NSLocalizedString("Visual evidence on", comment: "")
+            : NSLocalizedString("Visual evidence off", comment: "")
+    }
+
+    var body: some View {
+        HStack(spacing: 8) {
+            HStack(spacing: 8) {
+                Image(systemName: "rectangle.stack.fill")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(Brand.libraryBlue)
+                    .frame(width: 20, height: 20)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(statusText)
+                        .font(.system(size: 11.5, weight: .semibold))
+                        .foregroundStyle(.primary)
+                    Text(evidenceText)
+                        .font(.system(size: 10))
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+
+            libraryWorkflowButton(
+                title: NSLocalizedString("Review", comment: ""),
+                detail: NSLocalizedString("Current macro", comment: ""),
+                systemImage: "slider.horizontal.below.rectangle",
+                isEnabled: hasCurrentMacro,
+                action: onReview
+            )
+
+            libraryWorkflowButton(
+                title: NSLocalizedString("Workflow", comment: ""),
+                detail: NSLocalizedString("Schedule / repeat", comment: ""),
+                systemImage: "point.topleft.down.curvedto.point.bottomright.up",
+                isEnabled: macroCount > 0,
+                action: onWorkflow
+            )
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 8)
+        .background(
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .fill(Color.primary.opacity(0.035))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .strokeBorder(Color.primary.opacity(0.08), lineWidth: 0.5)
+                )
+        )
+    }
+
+    private func libraryWorkflowButton(
+        title: String,
+        detail: String,
+        systemImage: String,
+        isEnabled: Bool,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            HStack(spacing: 7) {
+                Image(systemName: systemImage)
+                    .font(.system(size: 11, weight: .semibold))
+                    .frame(width: 14)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(title)
+                        .font(.system(size: 11, weight: .semibold))
+                    Text(detail)
+                        .font(.system(size: 9.5))
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .frame(minWidth: 118, minHeight: 34, alignment: .leading)
+            .padding(.horizontal, 9)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .disabled(!isEnabled)
+        .foregroundStyle(isEnabled ? AnyShapeStyle(.primary) : AnyShapeStyle(.tertiary))
+        .background(
+            RoundedRectangle(cornerRadius: 7, style: .continuous)
+                .fill(Color.primary.opacity(isEnabled ? 0.045 : 0.015))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 7, style: .continuous)
+                .strokeBorder(Color.primary.opacity(isEnabled ? 0.09 : 0.04), lineWidth: 0.5)
+        )
+        .help(isEnabled ? title : NSLocalizedString("Record a macro first", comment: ""))
     }
 }

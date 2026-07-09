@@ -6,6 +6,7 @@ struct EditorFooter: View {
     let eventCount: Int
     let selectedCount: Int
     let duration: TimeInterval
+    let health: MacroEditorHealthSummary
 
     var body: some View {
         VStack(spacing: 0) {
@@ -20,7 +21,11 @@ struct EditorFooter: View {
                         .foregroundStyle(.tint)
                 }
                 Spacer()
-                Text(NSLocalizedString("Edits apply live · use Save to persist", comment: ""))
+                Label(macroEditorHealthTitle(health), systemImage: footerHealthIcon)
+                    .foregroundStyle(footerHealthTint)
+                    .help(macroEditorHealthDetail(health))
+                Text("·").foregroundStyle(.tertiary)
+                Text(NSLocalizedString("Edits apply live", comment: ""))
                     .font(.system(size: 10))
                     .foregroundStyle(.tertiary)
             }
@@ -31,5 +36,31 @@ struct EditorFooter: View {
             .padding(.vertical, 7)
         }
         .background(VisualEffectBackground(material: .titlebar, blendingMode: .withinWindow))
+    }
+
+    private var footerHealthIcon: String {
+        switch health.state {
+        case .empty:
+            return "record.circle"
+        case .needsTargets:
+            return "text.viewfinder"
+        case .reviewReliability:
+            return "wrench.and.screwdriver"
+        case .ready:
+            return "checkmark.seal"
+        }
+    }
+
+    private var footerHealthTint: Color {
+        switch health.state {
+        case .empty:
+            return .secondary
+        case .needsTargets:
+            return Brand.sigAmber
+        case .reviewReliability:
+            return Brand.sigTeal
+        case .ready:
+            return Brand.libraryGreen
+        }
     }
 }

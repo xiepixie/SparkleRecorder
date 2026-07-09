@@ -1,0 +1,86 @@
+[
+  {
+    "id": "A9000000-0000-4000-8000-000000000001",
+    "name": "CRK - 进入竞技场",
+    "tags": ["CRK", "Arena", "Rough"],
+    "notes": "Rough operation macro: tap battle/world entry, tap arena entry, then confirm list. Replace with a real recording after coordinate review.",
+    "durationSeconds": 1.88,
+    "eventCount": 6,
+    "clickCount": 3,
+    "keyCount": 0,
+    "scrollCount": 0,
+    "resourceRequirement": "foregroundInput"
+  },
+  {
+    "id": "A9000000-0000-4000-8000-000000000002",
+    "name": "CRK - 竞技场挑战槽位 1",
+    "tags": ["CRK", "Arena", "Rough"],
+    "notes": "Rough operation macro: tap slot 1 challenge, then tap battle/start on the preparation screen.",
+    "durationSeconds": 1.03,
+    "eventCount": 4,
+    "clickCount": 2,
+    "keyCount": 0,
+    "scrollCount": 0,
+    "resourceRequirement": "foregroundInput"
+  },
+  {
+    "id": "A9000000-0000-4000-8000-000000000003",
+    "name": "CRK - 竞技场挑战槽位 2",
+    "tags": ["CRK", "Arena", "Rough"],
+    "notes": "Rough operation macro: tap slot 2 challenge, then tap battle/start on the preparation screen.",
+    "durationSeconds": 1.03,
+    "eventCount": 4,
+    "clickCount": 2,
+    "keyCount": 0,
+    "scrollCount": 0,
+    "resourceRequirement": "foregroundInput"
+  },
+  {
+    "id": "A9000000-0000-4000-8000-000000000004",
+    "name": "CRK - 竞技场挑战槽位 3",
+    "tags": ["CRK", "Arena", "Rough"],
+    "notes": "Rough operation macro: tap slot 3 challenge, then tap battle/start on the preparation screen.",
+    "durationSeconds": 1.03,
+    "eventCount": 4,
+    "clickCount": 2,
+    "keyCount": 0,
+    "scrollCount": 0,
+    "resourceRequirement": "foregroundInput"
+  },
+  {
+    "id": "A9000000-0000-4000-8000-000000000005",
+    "name": "CRK - 竞技场横向翻页",
+    "tags": ["CRK", "Arena", "Rough"],
+    "notes": "Rough operation macro: horizontal swipe over the arena opponent strip from right to left.",
+    "durationSeconds": 0.58,
+    "eventCount": 5,
+    "clickCount": 1,
+    "keyCount": 0,
+    "scrollCount": 0,
+    "resourceRequirement": "foregroundInput"
+  },
+  {
+    "id": "A9000000-0000-4000-8000-000000000006",
+    "name": "CRK - 竞技场领取结算奖励",
+    "tags": ["CRK", "Arena", "Rough"],
+    "notes": "Rough operation macro: tap through battle result/reward confirmation.",
+    "durationSeconds": 0.88,
+    "eventCount": 4,
+    "clickCount": 2,
+    "keyCount": 0,
+    "scrollCount": 0,
+    "resourceRequirement": "foregroundInput"
+  },
+  {
+    "id": "A9000000-0000-4000-8000-000000000007",
+    "name": "CRK - 竞技场返回列表",
+    "tags": ["CRK", "Arena", "Rough"],
+    "notes": "Rough operation macro: tap back/top-left and acknowledge if a transition overlay appears.",
+    "durationSeconds": 0.88,
+    "eventCount": 4,
+    "clickCount": 2,
+    "keyCount": 0,
+    "scrollCount": 0,
+    "resourceRequirement": "foregroundInput"
+  }
+]

@@ -6,6 +6,7 @@ struct EditorToolbar: View {
     let macro: SavedMacro?
     let rowCount: Int
     let duration: TimeInterval
+    let health: MacroEditorHealthSummary
     @Binding var hideMouseMoves: Bool
     @Binding var showAllPaths: Bool
     @Binding var showOverlayPreview: Bool
@@ -36,6 +37,8 @@ struct EditorToolbar: View {
                 }
 
                 Spacer()
+
+                macroHealthPill
 
 	                HStack(spacing: 6) {
 	                    EditorToolbarToggle(
@@ -81,4 +84,49 @@ struct EditorToolbar: View {
 	        }
 	        .background(VisualEffectBackground(material: .titlebar, blendingMode: .withinWindow))
 	    }
+
+    private var macroHealthPill: some View {
+        HStack(spacing: 6) {
+            Image(systemName: macroHealthIcon)
+                .font(.system(size: 10, weight: .semibold))
+            Text(macroEditorHealthTitle(health))
+                .font(.system(size: 10.5, weight: .semibold))
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+        }
+        .foregroundStyle(macroHealthTint)
+        .padding(.horizontal, 9)
+        .padding(.vertical, 5)
+        .background(
+            Capsule(style: .continuous)
+                .fill(macroHealthTint.opacity(0.11))
+        )
+        .help(macroEditorHealthDetail(health))
+    }
+
+    private var macroHealthIcon: String {
+        switch health.state {
+        case .empty:
+            return "record.circle"
+        case .needsTargets:
+            return "text.viewfinder"
+        case .reviewReliability:
+            return "wrench.and.screwdriver"
+        case .ready:
+            return "checkmark.seal"
+        }
+    }
+
+    private var macroHealthTint: Color {
+        switch health.state {
+        case .empty:
+            return .secondary
+        case .needsTargets:
+            return Brand.sigAmber
+        case .reviewReliability:
+            return Brand.sigTeal
+        case .ready:
+            return Brand.libraryGreen
+        }
+    }
 }

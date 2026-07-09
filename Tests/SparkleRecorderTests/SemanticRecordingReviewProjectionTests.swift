@@ -424,8 +424,8 @@ struct SemanticRecordingReviewProjectionTests {
         #expect(writtenAssets[expectedPath] == croppedData)
     }
 
-    @Test("Review image candidate can create a draft-only repeat-until loop")
-    func reviewImageCandidateCanCreateDraftOnlyRepeatUntilLoop() throws {
+    @Test("Review image candidate can create a bounded repeat-until loop")
+    func reviewImageCandidateCanCreateBoundedRepeatUntilLoop() throws {
         let bundle = SemanticRecordingFixture.checkoutBundle()
         let projection = SemanticRecordingReviewProjection(
             bundle: bundle,
@@ -477,11 +477,16 @@ struct SemanticRecordingReviewProjectionTests {
         let task = try #require(patched.document.workflow.tasks.first)
         let loop = try #require(task.loop)
         let loopUntil = try #require(loop.until)
-        let importResult = AutomationWorkflowDraftImporter.dryRun(patched.document)
+        let macroID = UUID(uuidString: "81000000-0000-0000-0000-0000000000AA")!
+        let context = AutomationWorkflowDraftValidationContext(macroCatalog: [
+            AutomationWorkflowDraftMacroCatalogEntry(id: macroID, name: "Click Checkout")
+        ])
+        let validation = AutomationWorkflowDraftValidator.validate(patched.document, context: context)
+        let importResult = AutomationWorkflowDraftImporter.dryRun(patched.document, context: context)
         let previewProjection = AutomationWorkflowDraftPreviewProjection(
             document: patched.document,
-            validationEnvelope: .workflowDraftValidation(command: "workflow draft validate", result: patched.validation),
-            macroCatalogEnvelope: .workflowMacroCatalog(command: "workflow macros", macros: []),
+            validationEnvelope: .workflowDraftValidation(command: "workflow draft validate", result: validation),
+            macroCatalogEnvelope: .workflowMacroCatalog(command: "workflow macros", macros: context.macroCatalog),
             importEnvelope: .workflowDraftImport(command: "workflow import --dry-run", result: importResult)
         )
         let loopRow = try #require(previewProjection.loopExpansionRows.first)
@@ -509,14 +514,13 @@ struct SemanticRecordingReviewProjectionTests {
         #expect(loop.timeoutSeconds == 20)
         #expect(loop.pollingSeconds == 0.5)
         #expect(loop.onFailure == AutomationWorkflowDraftLoopFailurePolicy.requireManualApproval)
-        #expect(!patched.validation.isValid)
-        #expect(patched.validation.issues.contains {
-            $0.code == .invalidLoop &&
-                $0.path == "$.workflow.tasks[0].loop.kind" &&
-                $0.message.contains("draft-only")
-        })
-        #expect(!importResult.isImportable)
-        #expect(previewProjection.statusLabel == "Import blocked")
+        #expect(validation.isValid)
+        #expect(importResult.isImportable)
+        #expect(importResult.taskKeyToID.keys.contains("repeat_until_checkout_button_gone__1__retry_checkout_click"))
+        #expect(importResult.taskKeyToID.keys.contains("repeat_until_checkout_button_gone__1__until"))
+        #expect(importResult.taskKeyToID.keys.contains("repeat_until_checkout_button_gone__on_failure_approval"))
+        #expect(importResult.taskKeyToID.keys.contains("repeat_until_checkout_button_gone__complete"))
+        #expect(previewProjection.statusLabel == "Dry-run passed")
         #expect(loopRow.modeLabel == "Repeat until")
         #expect(loopRow.untilLabel == "image disappears")
         #expect(loopRow.guardrailLabel == "max 4 attempts, 20.0s timeout, 0.5s polling, on failure: requireManualApproval")
@@ -638,11 +642,13 @@ struct SemanticRecordingReviewProjectionTests {
         )
         let task = try #require(patched.document.workflow.tasks.first)
         let loopTask = try #require(task.loop?.tasks.first)
+        let importResult = AutomationWorkflowDraftImporter.dryRun(patched.document)
 
         #expect(result.createsRepeatUntilLoop)
         #expect(loopTask.type == "macro")
         #expect(loopTask.macroRef == AutomationWorkflowDraftMacroRef(id: macroID, name: "Retry Checkout"))
-        #expect(!patched.validation.isValid)
+        #expect(patched.validation.isValid)
+        #expect(importResult.isImportable)
     }
 
     @Test("Manual frame region selection can override candidate bounds")
