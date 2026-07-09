@@ -158,11 +158,16 @@ struct LibraryMainView: View {
                 
                 if var imported = result.workflow {
                     imported.id = id
-                    // FIXME: AppState has no 'automationSession' property.
-                    // state.automationSession?.createWorkflow(id: id, workflow: imported)
                     
-                    DispatchQueue.main.async {
-                        NSApp.sendAction(Selector(("showAutomationWorkspace:")), to: nil, from: nil)
+                    Task {
+                        do {
+                            _ = try await controller.automationHost().dispatch(.upsertWorkflow(imported, at: Date()))
+                            _ = await MainActor.run {
+                                NSApp.sendAction(Selector(("showAutomationWorkspace:")), to: nil, from: nil)
+                            }
+                        } catch {
+                            print("Failed to save sequence workflow: \(error)")
+                        }
                     }
                 }
             })
