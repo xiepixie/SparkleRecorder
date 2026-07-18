@@ -20,7 +20,7 @@ public extension AutomationSchedule {
             return nil
 
         case .once(let date):
-            guard !excludedStarts.contains(date) else {
+            guard date >= referenceDate, !excludedStarts.contains(date) else {
                 return nil
             }
             return AutomationScheduledOccurrence(occurrenceIndex: 0, scheduledAt: date)
@@ -49,6 +49,26 @@ public extension AutomationSchedule {
 
         case .repeating(let rule):
             return rule.nextDueOccurrence(
+                onOrBefore: referenceDate,
+                excludingScheduledStartTimes: excludedStarts
+            )
+        }
+    }
+
+    func latestDueOccurrence(
+        onOrBefore referenceDate: Date,
+        excludingScheduledStartTimes excludedStarts: Set<Date> = []
+    ) -> AutomationScheduledOccurrence? {
+        switch self {
+        case .manual:
+            return nil
+        case .once(let date):
+            guard date <= referenceDate, !excludedStarts.contains(date) else {
+                return nil
+            }
+            return AutomationScheduledOccurrence(occurrenceIndex: 0, scheduledAt: date)
+        case .repeating(let rule):
+            return rule.latestDueOccurrence(
                 onOrBefore: referenceDate,
                 excludingScheduledStartTimes: excludedStarts
             )
@@ -104,6 +124,25 @@ public extension AutomationRepeatRule {
             }
         }
         return nil
+    }
+
+    func latestDueOccurrence(
+        onOrBefore referenceDate: Date,
+        excludingScheduledStartTimes excludedStarts: Set<Date> = []
+    ) -> AutomationScheduledOccurrence? {
+        let step = interval.timeInterval
+        guard step > 0, referenceDate >= anchor else {
+            return nil
+        }
+        let index = min(lastCandidateIndex(onOrBefore: referenceDate, step: step), lastAllowedIndex())
+        guard index >= 0 else {
+            return nil
+        }
+        let scheduledAt = anchor.addingTimeInterval(Double(index) * step)
+        guard !excludedStarts.contains(scheduledAt) else {
+            return nil
+        }
+        return AutomationScheduledOccurrence(occurrenceIndex: index, scheduledAt: scheduledAt)
     }
 
     private func firstCandidateIndex(onOrAfter referenceDate: Date, step: TimeInterval) -> Int {

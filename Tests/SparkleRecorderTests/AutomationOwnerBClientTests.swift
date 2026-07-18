@@ -704,7 +704,12 @@ struct AutomationOwnerBClientTests {
         let taskID = UUID()
         let macroID = UUID()
         let startedAt = Date(timeIntervalSince1970: 800)
-        let macro = SavedMacro(id: macroID, name: "Playback", events: TestFixtures.clickPair())
+        let macro = SavedMacro(
+            id: macroID,
+            name: "Playback",
+            events: TestFixtures.clickPair(),
+            loops: 5
+        )
         let recorder = PlayerStartRecorder()
         let player = AutomationPlayerClient(
             start: { request in
@@ -725,12 +730,18 @@ struct AutomationOwnerBClientTests {
             runID: runID,
             workflowID: workflowID,
             taskID: taskID,
-            macroID: macroID
+            macroID: macroID,
+            targetApplicationPolicy: .launchIfNeeded,
+            targetApplicationCleanupPolicy: .quitIfLaunched,
+            playbackLoops: 1
         ))
 
         #expect(actions == [.playerStarted(runID: runID, at: startedAt)])
         #expect(await recorder.runIDs == [runID])
         #expect(await recorder.macroIDs == [macroID])
+        #expect(await recorder.targetApplicationPolicies == [.launchIfNeeded])
+        #expect(await recorder.targetApplicationCleanupPolicies == [.quitIfLaunched])
+        #expect(await recorder.playbackLoops == [1])
     }
 
     @Test("Effect runner preserves saved macro playback surface context for workflow playback")
@@ -772,7 +783,8 @@ struct AutomationOwnerBClientTests {
             runID: runID,
             workflowID: workflowID,
             taskID: taskID,
-            macroID: macroID
+            macroID: macroID,
+            targetApplicationPolicy: .launchIfNeeded
         ))
 
         let context = try #require(await recorder.contexts.first)
@@ -781,6 +793,7 @@ struct AutomationOwnerBClientTests {
         #expect(context.currentSurfaceFrames.isEmpty)
         #expect(context.currentContentFrames.isEmpty)
         #expect(context.coordinateMode == .boundWindowOffset)
+        #expect(await recorder.targetApplicationPolicies == [.launchIfNeeded])
     }
 
     @Test("Effect runner cancels player through PlayerClient")
@@ -1235,6 +1248,9 @@ private actor PlayerStartRecorder {
     private var recordedRunIDs: [UUID] = []
     private var recordedMacroIDs: [UUID] = []
     private var recordedContexts: [PlaybackContext] = []
+    private var recordedTargetApplicationPolicies: [AutomationTargetApplicationPolicy] = []
+    private var recordedTargetApplicationCleanupPolicies: [AutomationTargetApplicationCleanupPolicy] = []
+    private var recordedPlaybackLoops: [Int] = []
 
     var runIDs: [UUID] {
         recordedRunIDs
@@ -1248,10 +1264,25 @@ private actor PlayerStartRecorder {
         recordedContexts
     }
 
+    var targetApplicationPolicies: [AutomationTargetApplicationPolicy] {
+        recordedTargetApplicationPolicies
+    }
+
+    var targetApplicationCleanupPolicies: [AutomationTargetApplicationCleanupPolicy] {
+        recordedTargetApplicationCleanupPolicies
+    }
+
+    var playbackLoops: [Int] {
+        recordedPlaybackLoops
+    }
+
     func record(_ request: AutomationPlayerStartRequest) {
         recordedRunIDs.append(request.runID)
         recordedMacroIDs.append(request.macro.id)
         recordedContexts.append(request.context)
+        recordedTargetApplicationPolicies.append(request.targetApplicationPolicy)
+        recordedTargetApplicationCleanupPolicies.append(request.targetApplicationCleanupPolicy)
+        recordedPlaybackLoops.append(request.macro.loops)
     }
 }
 

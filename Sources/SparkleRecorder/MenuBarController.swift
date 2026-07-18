@@ -1141,6 +1141,45 @@ final class MenuBarController: NSObject, NSPopoverDelegate {
         }
     }
 
+    func previewScheduledMacro(_ id: UUID) async throws {
+        guard var macro = library.macros.first(where: { $0.id == id }) else {
+            throw AutomationTargetApplicationPreparationFailure(message: String(
+                localized: "The macro is no longer available.",
+                table: "Automation"
+            ))
+        }
+        guard !recorder.isRecording, !player.isPlaying else {
+            throw AutomationTargetApplicationPreparationFailure(message: String(
+                localized: "Stop recording or playback before previewing.",
+                table: "Automation"
+            ))
+        }
+
+        macro.events = try await library.loadEvents(for: id)
+        macro.loops = 1
+        guard !PlaybackPlanner.plan(events: macro.events, loops: macro.loops, speed: macro.speed).steps.isEmpty else {
+            throw AutomationTargetApplicationPreparationFailure(message: String(
+                localized: "Macro has no playable events.",
+                table: "Automation"
+            ))
+        }
+
+        let runID = UUID()
+        let windowTracker = WindowTracker()
+        let previewPlayer = AutomationPlayerClient.live(
+            player: player,
+            windowTracker: windowTracker
+        )
+        let request = AutomationPlayerStartRequest(
+            runID: runID,
+            macro: macro,
+            targetApplicationPolicy: macro.surfaces.isEmpty ? .doNotActivate : .launchIfNeeded,
+            targetApplicationCleanupPolicy: .quitIfLaunched
+        )
+
+        try await AutomationScheduledMacroPreviewClient(player: previewPlayer).run(request)
+    }
+
     // MARK: - Save / Open / Export
 
     /// Import any supported macro file: legacy Windows `.rec`, plain-text `.txt`/`.trm`,
@@ -1464,6 +1503,17 @@ final class MenuBarController: NSObject, NSPopoverDelegate {
     func showMainWindow() { showMainWindowHandler?() }
 
     func showAutomationWorkspace() {
+        state.automationWorkspaceDestination = nil
+        state.workspace = .automation
+        if popover.isShown { popover.performClose(nil) }
+        showMainWindow()
+    }
+
+    func showAutomationWorkspace(workflowID: UUID, taskID: UUID? = nil) {
+        state.automationWorkspaceDestination = AutomationWorkspaceDestination(
+            workflowID: workflowID,
+            taskID: taskID
+        )
         state.workspace = .automation
         if popover.isShown { popover.performClose(nil) }
         showMainWindow()
@@ -1477,6 +1527,36 @@ final class MenuBarController: NSObject, NSPopoverDelegate {
             settingsWC = SettingsWindowController(controller: self)
         }
         settingsWC?.show()
+    }
+
+    func applyLanguagePreferenceAndRelaunch(_ preference: AppLanguagePreference) {
+        preference.apply()
+
+        let bundleURL = Bundle.main.bundleURL
+        let isApplicationBundle = bundleURL.pathExtension.lowercased() == "app"
+        let applicationURL = isApplicationBundle
+            ? bundleURL
+            : (Bundle.main.executableURL ?? bundleURL)
+        let relauncher = Process()
+        relauncher.executableURL = URL(fileURLWithPath: "/bin/sh")
+        relauncher.arguments = [
+            "-c",
+            isApplicationBundle
+                ? "sleep 0.5; /usr/bin/open \"$1\""
+                : "sleep 0.5; exec \"$1\"",
+            "sparklerecorder-relaunch",
+            applicationURL.path,
+        ]
+
+        do {
+            try relauncher.run()
+            NSApp.terminate(nil)
+        } catch {
+            state.statusMessage = String(
+                format: String(localized: "Could not relaunch SparkleRecorder: %@", table: "Settings"),
+                error.localizedDescription
+            )
+        }
     }
 
     // MARK: - Onboarding

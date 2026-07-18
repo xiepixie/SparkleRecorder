@@ -428,7 +428,9 @@ struct MacroTransformerTimingTests {
         events.duplicateEvents(at: [-1, 0, 1, 1, 99])
 
         #expect(events.map(\.kind) == [.leftMouseDown, .leftMouseUp, .leftMouseDown, .leftMouseUp])
-        #expect(events.map(\.time).map { round($0 * 1000) / 1000 } == [0.0, 0.1, 0.2, 0.3])
+        #expect(events.map(\.time).map { round($0 * 1000) / 1000 } == [0.0, 0.1, 0.6, 0.7])
+        let groups = EventGrouper().group(events)
+        #expect(groups.map(\.kind) == [.click, .wait, .click])
 
         let snapshot = events
         events.duplicateEvents(at: [-3, 42])

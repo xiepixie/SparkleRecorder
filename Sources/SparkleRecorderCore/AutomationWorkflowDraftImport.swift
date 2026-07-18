@@ -287,11 +287,43 @@ private struct DraftImportCompiler {
                 retryPolicy: retryPolicy(for: task.retry),
                 joinPolicy: joinPolicy(for: task.joinPolicy),
                 isEnabled: task.enabled ?? true,
+                targetApplicationPolicy: targetApplicationPolicy(task.targetApplicationPolicy),
+                targetApplicationCleanupPolicy: targetApplicationCleanupPolicy(
+                    task.targetApplicationCleanupPolicy
+                ),
+                playbackLoops: task.playbackLoops,
+                missedRunPolicy: missedRunPolicy(task.missedRunPolicy),
                 graphPosition: task.graphPosition
             ),
             macroResolution: macroResolution,
             issues: issues
         )
+    }
+
+    private func targetApplicationPolicy(_ value: String?) -> AutomationTargetApplicationPolicy {
+        guard let rawValue = value?.trimmedForDraftImport,
+              let policy = AutomationTargetApplicationPolicy(rawValue: rawValue) else {
+            return .activateIfRunning
+        }
+        return policy
+    }
+
+    private func targetApplicationCleanupPolicy(
+        _ value: String?
+    ) -> AutomationTargetApplicationCleanupPolicy {
+        guard let rawValue = value?.trimmedForDraftImport,
+              let policy = AutomationTargetApplicationCleanupPolicy(rawValue: rawValue) else {
+            return .keepOpen
+        }
+        return policy
+    }
+
+    private func missedRunPolicy(_ value: String?) -> AutomationMissedRunPolicy {
+        guard let rawValue = value?.trimmedForDraftImport,
+              let policy = AutomationMissedRunPolicy(rawValue: rawValue) else {
+            return .catchUp
+        }
+        return policy
     }
 
     private struct MacroConversion {

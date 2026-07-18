@@ -70,12 +70,23 @@ struct MacroEditorLocalizationTests {
     }
 
     private func localizationCatalog(root: URL) throws -> [String: Any] {
-        let url = root.appendingPathComponent("Sources/SparkleRecorder/Localizable.xcstrings")
-        let data = try Data(contentsOf: url)
-        let rootObject = try #require(
-            try JSONSerialization.jsonObject(with: data) as? [String: Any]
-        )
-        return try #require(rootObject["strings"] as? [String: Any])
+        let folder = root.appendingPathComponent("Sources/SparkleRecorder")
+        let contents = try FileManager.default.contentsOfDirectory(at: folder, includingPropertiesForKeys: nil)
+        let xcstringsFiles = contents.filter { $0.pathExtension == "xcstrings" }
+
+        var mergedStrings: [String: Any] = [:]
+        for file in xcstringsFiles {
+            let data = try Data(contentsOf: file)
+            let rootObject = try #require(
+                try JSONSerialization.jsonObject(with: data) as? [String: Any]
+            )
+            if let strings = rootObject["strings"] as? [String: Any] {
+                for (key, value) in strings {
+                    mergedStrings[key] = value
+                }
+            }
+        }
+        return mergedStrings
     }
 
     private static func localizedStringKeys(in source: String) -> Set<String> {

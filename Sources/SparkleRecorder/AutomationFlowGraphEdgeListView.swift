@@ -21,7 +21,7 @@ struct AutomationFlowGraphEdgeListView: View {
             .help(accessibilityLabel(for: edge))
             .accessibilityLabel(accessibilityLabel(for: edge))
             .contextMenu {
-                Button("Delete Dependency", systemImage: "trash", role: .destructive) {
+                LocalizedSystemButton("Delete Dependency", tableName: L10nTable.automation, systemImage: "trash", role: .destructive) {
                     onDeleteDependency(edge.id)
                 }
             }

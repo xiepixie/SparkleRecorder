@@ -28,11 +28,11 @@ struct AutomationWorkflowImportNoticeView: View {
                 .buttonStyle(.borderless)
                 .help(undoButtonTitle)
 
-            Button("Refresh", systemImage: "arrow.clockwise", action: onRefresh)
+            LocalizedSystemButton("Refresh", tableName: L10nTable.common, systemImage: "arrow.clockwise", action: onRefresh)
                 .buttonStyle(.borderless)
                 .help(String(localized: "Refresh automation projection", table: "Automation"))
 
-            Button("Dismiss import notice", systemImage: "xmark", action: onDismiss)
+            LocalizedSystemButton("Dismiss import notice", tableName: L10nTable.common, systemImage: "xmark", action: onDismiss)
                 .labelStyle(.iconOnly)
                 .buttonStyle(.borderless)
                 .frame(width: 24, height: 24)

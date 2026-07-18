@@ -33,6 +33,9 @@ struct MacroCard: View {
     let onSetChain: (UUID?) -> Void
     let chainCandidates: [(UUID, String)]
     let chainTargetName: String?
+    let automationSummary: AutomationMacroScheduleSummary?
+    let onSchedule: () -> Void
+    let onShowEvidence: () -> Void
     let onCreateSequence: () -> Void
 
     @State private var hovered = false
@@ -63,6 +66,18 @@ struct MacroCard: View {
 
     private var accentName: String? {
         normalizedAccentName(macro.accent)
+    }
+
+    private var automationActionTitle: String {
+        automationSummary == nil
+            ? String(localized: "Run automatically", table: "Automation")
+            : String(localized: "Edit automatic run", table: "Automation")
+    }
+
+    private var automationActionMenuTitle: String {
+        automationSummary == nil
+            ? String(localized: "Run automatically…", table: "Automation")
+            : String(localized: "Edit automatic run…", table: "Automation")
     }
 
     private var hoverStrokeColor: Color {
@@ -99,6 +114,7 @@ struct MacroCard: View {
             .accessibilityAction { onSelect([]) }
 	            .accessibilityAction(named: String(localized: "Play", table: "Common")) { onPlay() }
 	            .accessibilityAction(named: String(localized: "Edit", table: "Common")) { onEdit() }
+	            .accessibilityAction(named: automationActionTitle) { onSchedule() }
 	            .accessibilityAction(named: macro.favorite ? String(localized: "Remove favorite", table: "Common") : String(localized: "Add favorite", table: "Common")) { onToggleFavorite() }
 	            .accessibilityAction(named: String(localized: "Rename", table: "Common")) { onStartRename() }
 	            .accessibilityAction(named: String(localized: "Delete", table: "Common")) { onDelete() }
@@ -118,9 +134,12 @@ struct MacroCard: View {
 
     }
 
-    private var cardHeight: CGFloat {
+    private var cardMinimumHeight: CGFloat {
         var base: CGFloat = macro.tags.isEmpty ? 102 : 124
         if macro.surfaces.values.first != nil {
+            base += 20
+        }
+        if automationSummary != nil {
             base += 20
         }
         return base
@@ -131,8 +150,7 @@ struct MacroCard: View {
 
         return cardContent
             .padding(11)
-            .frame(height: cardHeight)
-            .animation(stateAnimation, value: cardHeight)
+            .frame(maxWidth: .infinity, minHeight: cardMinimumHeight, alignment: .topLeading)
             .background { cardBackground }
             .overlay(
                 RoundedRectangle(cornerRadius: 12, style: .continuous)
@@ -199,6 +217,8 @@ struct MacroCard: View {
 	            Button { onEdit() } label: { Label(String(localized: "Edit…", table: "Common"), systemImage: "slider.horizontal.below.rectangle") }
 	            Divider()
 	        }
+	        Button { onSchedule() } label: { Label(automationActionMenuTitle, systemImage: automationSummary == nil ? "calendar.badge.clock" : "calendar.badge.checkmark") }
+	        Button { onShowEvidence() } label: { Label(String(localized: "Latest run…", table: "Automation"), systemImage: "photo.on.rectangle.angled") }
 	        Button { onCreateSequence() } label: { Label(String(localized: "Create Sequence…", table: "Common"), systemImage: "arrow.right.circle") }
 	        Divider()
 	        Button { onStartRename() } label: { Label(String(localized: "Rename…", table: "Common"), systemImage: "pencil") }
@@ -368,35 +388,83 @@ struct MacroCard: View {
                 .padding(.vertical, 1)
             }
 
-            // Bottom row: meta + actions. These controls live INSIDE a content
-            // card, so they stay plain (no glass) — glass is reserved for the
-            // floating control layer.
+            if let automationSummary {
+                Button(action: onSchedule) {
+                    HStack(spacing: 5) {
+                        Image(systemName: automationSummary.isEnabled
+                            ? "calendar.badge.checkmark"
+                            : "calendar.badge.exclamationmark")
+                            .font(.system(size: 9.5, weight: .semibold))
+                            .foregroundStyle(automationSummary.isEnabled ? Brand.sigAmber : .secondary)
+                        Text(automationSummary.statusText)
+                            .font(.system(size: 9.5, weight: .medium))
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                            .truncationMode(.tail)
+                        Spacer(minLength: 0)
+                    }
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .help(String(localized: "Edit automatic run…", table: "Automation"))
+                .accessibilityLabel(automationSummary.statusText)
+            }
+
+            cardFooter
+        }
+    }
+
+    /// Keeps every action available without allowing the fixed-width controls
+    /// to make the card wider than its adaptive grid column.
+    @ViewBuilder
+    private var cardFooter: some View {
+        ViewThatFits(in: .horizontal) {
             HStack(spacing: 4) {
                 metaRow
-                Spacer()
-                CardActionButton(systemImage: "play.fill", tint: Brand.libraryGreen, label: String(format: String(localized: "Play %@", table: "Common"), macro.name)) { onPlay() }
-                    .help(String(localized: "Play", table: "Common"))
-                LoopChip(loops: macro.loops, onChange: onSetLoops)
-                CardActionButton(systemImage: "slider.horizontal.below.rectangle", tint: Brand.libraryBlue, label: String(format: String(localized: "Edit %@", table: "Common"), macro.name)) { onEdit() }
-                    .help(String(localized: "Edit", table: "Common"))
-	                Menu {
-	                    cardMenuItems(includePlayEdit: false)
-	                } label: {
-	                    Label(String(localized: "More actions", table: "EditorUX"), systemImage: "ellipsis")
-	                        .labelStyle(.iconOnly)
-	                        .font(.system(size: 10, weight: .bold))
-	                        .foregroundStyle(moreButtonHovered ? AnyShapeStyle(Color.white) : AnyShapeStyle(Color.secondary))
-	                        .frame(width: 30, height: 22)
-	                        .contentShape(Rectangle())
-	                }
-	                .menuStyle(.borderlessButton)
-	                .menuIndicator(.hidden)
-	                .frame(width: 30, height: 22)
-	                .libraryControlSurface(cornerRadius: 8, tint: Brand.libraryBlue, isActive: moreButtonHovered, activeFillOpacity: 0.68)
-	                .animation(hoverAnimation, value: moreButtonHovered)
-	                .onHover { moreButtonHovered = $0 }
-	                .accessibilityLabel(String(localized: "More actions", table: "EditorUX"))
+                Spacer(minLength: 4)
+                cardActionControls
             }
+
+            VStack(alignment: .leading, spacing: 4) {
+                metaRow
+                cardActionControls
+                    .frame(maxWidth: .infinity, alignment: .trailing)
+            }
+        }
+    }
+
+    private var cardActionControls: some View {
+        HStack(spacing: 4) {
+            CardActionButton(systemImage: "play.fill", tint: Brand.libraryGreen, label: String(format: String(localized: "Play %@", table: "Common"), macro.name)) { onPlay() }
+                .help(String(localized: "Play", table: "Common"))
+            CardActionButton(
+                systemImage: automationSummary == nil ? "calendar.badge.clock" : "calendar.badge.checkmark",
+                tint: Brand.sigAmber,
+                label: automationActionTitle
+            ) { onSchedule() }
+                .help(automationActionMenuTitle)
+            CardActionButton(systemImage: "photo.on.rectangle.angled", tint: Brand.libraryBlue, label: String(localized: "Latest run", table: "Automation")) { onShowEvidence() }
+                .help(String(localized: "Latest run…", table: "Automation"))
+            LoopChip(loops: macro.loops, onChange: onSetLoops)
+            CardActionButton(systemImage: "slider.horizontal.below.rectangle", tint: Brand.libraryBlue, label: String(format: String(localized: "Edit %@", table: "Common"), macro.name)) { onEdit() }
+                .help(String(localized: "Edit", table: "Common"))
+            Menu {
+                cardMenuItems(includePlayEdit: false)
+            } label: {
+                Label(String(localized: "More actions", table: "EditorUX"), systemImage: "ellipsis")
+                    .labelStyle(.iconOnly)
+                    .font(.system(size: 10, weight: .bold))
+                    .foregroundStyle(moreButtonHovered ? AnyShapeStyle(Color.white) : AnyShapeStyle(Color.secondary))
+                    .frame(width: 30, height: 22)
+                    .contentShape(Rectangle())
+            }
+            .menuStyle(.borderlessButton)
+            .menuIndicator(.hidden)
+            .frame(width: 30, height: 22)
+            .libraryControlSurface(cornerRadius: 8, tint: Brand.libraryBlue, isActive: moreButtonHovered, activeFillOpacity: 0.68)
+            .animation(hoverAnimation, value: moreButtonHovered)
+            .onHover { moreButtonHovered = $0 }
+            .accessibilityLabel(String(localized: "More actions", table: "EditorUX"))
         }
     }
 
@@ -414,6 +482,9 @@ struct MacroCard: View {
         }
         if macro.favorite {
             parts.append(String(localized: "favorite", table: "Common"))
+        }
+        if let automationSummary {
+            parts.append(automationSummary.statusText)
         }
         return parts.joined(separator: ", ")
     }

@@ -137,6 +137,10 @@ struct AutomationMainContentView: View {
 
     private var selectedNextScheduledTaskID: UUID? {
         selectedWorkflow?.nextScheduledTaskID
+            ?? selectedRawWorkflow?.tasks.first(where: { task in
+                guard let schedule = task.schedule else { return false }
+                return schedule != .manual
+            })?.id
             ?? selectedRawWorkflow.flatMap { workflowStartTaskID(in: $0) }
     }
 
@@ -154,6 +158,30 @@ struct AutomationMainContentView: View {
             return nil
         }
         return selectedRawWorkflow?.task(id: taskID)?.schedule
+    }
+
+    private var isSelectedNextScheduledTaskEnabled: Bool {
+        guard let taskID = selectedNextScheduledTaskID else {
+            return false
+        }
+        return selectedRawWorkflow?.task(id: taskID)?.isEnabled ?? false
+    }
+
+    private var selectedNextScheduledTaskTargetApplicationPolicy: AutomationTargetApplicationPolicy {
+        guard let taskID = selectedNextScheduledTaskID else {
+            return .activateIfRunning
+        }
+        return selectedRawWorkflow?.task(id: taskID)?.targetApplicationPolicy ?? .activateIfRunning
+    }
+
+    private var hasSelectedNextScheduledTaskBoundTargetApplication: Bool {
+        guard let taskID = selectedNextScheduledTaskID,
+              let task = selectedRawWorkflow?.task(id: taskID),
+              case .macro(let macroID) = task.kind,
+              let macro = macros.first(where: { $0.id == macroID }) else {
+            return false
+        }
+        return !macro.surfaces.isEmpty
     }
 
     private var recordsMacroIntoWorkflow: Bool {
@@ -335,8 +363,13 @@ struct AutomationMainContentView: View {
                                         nextScheduledOccurrence: workflow.nextScheduledOccurrence,
                                         nextSchedule: selectedNextSchedule,
                                         nextScheduledTaskName: selectedNextScheduledTaskName,
+                                        isNextScheduledTaskEnabled: isSelectedNextScheduledTaskEnabled,
+                                        hasNextScheduledTaskBoundTargetApplication: hasSelectedNextScheduledTaskBoundTargetApplication,
+                                        nextScheduledTaskTargetApplicationPolicy: selectedNextScheduledTaskTargetApplicationPolicy,
                                         selectedRunID: selectedInspectorRunID,
                                         onUpdateNextSchedule: updateNextSchedule,
+                                        onSetNextScheduledTaskEnabled: setNextScheduledTaskEnabled,
+                                        onSetNextScheduledTaskTargetApplicationPolicy: setNextScheduledTaskTargetApplicationPolicy,
                                         onSelectItem: selectTimelineItem
                                     )
                                     .frame(minHeight: 188, idealHeight: 232, maxHeight: 286)
@@ -644,6 +677,8 @@ struct AutomationMainContentView: View {
         }
 
         switch edit.mode {
+        case .manual:
+            task.schedule = .manual
         case .once:
             task.schedule = .once(edit.startAt)
         case .repeating:
@@ -661,6 +696,28 @@ struct AutomationMainContentView: View {
             }
         }
 
+        onAction(.upsertTask(workflowID: workflow.id, task: task, at: Date()))
+    }
+
+    private func setNextScheduledTaskEnabled(_ isEnabled: Bool) {
+        guard let workflow = selectedRawWorkflow,
+              let taskID = selectedNextScheduledTaskID,
+              var task = workflow.task(id: taskID) else {
+            return
+        }
+        task.isEnabled = isEnabled
+        onAction(.upsertTask(workflowID: workflow.id, task: task, at: Date()))
+    }
+
+    private func setNextScheduledTaskTargetApplicationPolicy(
+        _ policy: AutomationTargetApplicationPolicy
+    ) {
+        guard let workflow = selectedRawWorkflow,
+              let taskID = selectedNextScheduledTaskID,
+              var task = workflow.task(id: taskID) else {
+            return
+        }
+        task.targetApplicationPolicy = policy
         onAction(.upsertTask(workflowID: workflow.id, task: task, at: Date()))
     }
 

@@ -10,8 +10,8 @@ struct AutomationSequentialBuilderSheet: View {
     @State private var sequence: [SavedMacro] = []
     @State private var workflowName: String = ""
     
-    @State private var scheduleType = "manual"
-    @State private var startAt = Date()
+    @State private var scheduleType = "once"
+    @State private var startAt = Date().addingTimeInterval(3_600)
     @State private var every = 1
     @State private var unit = "days"
     
@@ -43,7 +43,7 @@ struct AutomationSequentialBuilderSheet: View {
     
     private var header: some View {
         HStack {
-            Text("Create Scheduled Sequence", tableName: "Common")
+            Text("Create Workflow", tableName: "Automation")
                 .font(.headline)
             Spacer()
             TextField(String(localized: "Workflow Name", table: "Common"), text: $workflowName)
@@ -151,7 +151,7 @@ struct AutomationSequentialBuilderSheet: View {
             
             Spacer()
             
-            Button(String(localized: "Create & Activate", table: "Common")) {
+            Button(String(localized: "Create workflow", table: "Automation")) {
                 generateAndCreate()
             }
             .keyboardShortcut(.defaultAction)

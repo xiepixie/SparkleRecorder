@@ -38,86 +38,50 @@ struct EditorSidebar: View {
     @State private var loopFailurePolicy: String = "failRun"
     @Environment(\.undoManager) private var undoManager
 
-    enum SidebarTab: String, CaseIterable, Identifiable {
-        case inspector = "Inspector"
-        case orchestrate = "Orchestrate"
-        case insert = "Insert"
-        var id: String { rawValue }
-    }
-    @State private var currentTab: SidebarTab = .inspector
-
     struct ActionInsertionPlacement {
         var eventIndex: Int
         var explicitStartTime: TimeInterval?
     }
 
     var body: some View {
-        VStack(spacing: 0) {
-            Picker("", selection: $currentTab) {
-                ForEach(SidebarTab.allCases) { tab in
-                    Text(LocalizedStringKey(tab.rawValue), tableName: "Common").tag(tab)
-                }
-            }
-            .pickerStyle(.segmented)
-            .padding(.horizontal, 14)
-            .padding(.top, 14)
-            .padding(.bottom, 8)
-            
-            ScrollView {
-                VStack(alignment: .leading, spacing: 14) {
-                    switch currentTab {
-                    case .inspector:
-                        inspectorTabContent()
-                    case .orchestrate:
-                        orchestrateTabContent()
-                    case .insert:
-                        insertTabContent()
+        ScrollView {
+            VStack(alignment: .leading, spacing: 14) {
+                if selection.count == 1 {
+                    section(String(localized: "Selected action", table: "EditorUX"), icon: "slider.horizontal.3") {
+                        selectedActionInspector()
+                    }
+                } else if selection.count > 1 {
+                    section(String(localized: "Batch edit", table: "Common"), icon: "slider.horizontal.3") {
+                        batchEditInspector()
                     }
                 }
-                .padding(14)
+
+                if selection.isEmpty {
+                    section(String(localized: "Global actions", table: "EditorUX"), icon: "globe") {
+                        clearAllButton()
+                    }
+                } else {
+                    section(String(localized: "Selection", table: "Common"), icon: "checklist") {
+                        selectionActionsContent()
+                    }
+
+                    section(String(localized: "Time Adjustments", table: "Common"), icon: "timer") {
+                        timeAdjustmentsContent()
+                    }
+
+                    if selectedBehaviorGroup() != nil || selection.count > 1 {
+                        behaviorSection()
+                    }
+
+                    repeatUntilSection()
+                }
+
+                insertTabContent()
+                editorReviewSection()
             }
+            .padding(14)
         }
         .background(VisualEffectBackground(material: .sidebar, blendingMode: .behindWindow))
-    }
-
-    @ViewBuilder
-    func inspectorTabContent() -> some View {
-        Group {
-            if selection.count == 1 {
-                section(String(localized: "Selected action", table: "EditorUX"), icon: "slider.horizontal.3") {
-                    selectedActionInspector()
-                }
-            } else if selection.count > 1 {
-                section(String(localized: "Batch edit", table: "Common"), icon: "slider.horizontal.3") {
-                    batchEditInspector()
-                }
-            }
-            
-            editorReviewSection()
-        }
-    }
-
-    @ViewBuilder
-    func orchestrateTabContent() -> some View {
-        if selection.isEmpty {
-            section(String(localized: "Global actions", table: "EditorUX"), icon: "globe") {
-                clearAllButton()
-            }
-        } else {
-            section(String(localized: "Selection", table: "Common"), icon: "checklist") {
-                selectionActionsContent()
-            }
-            
-            if selectedBehaviorGroup() != nil || selection.count > 1 {
-                behaviorSection()
-            }
-            
-            repeatUntilSection()
-            
-            section(String(localized: "Time Adjustments", table: "Common"), icon: "timer") {
-                timeAdjustmentsContent()
-            }
-        }
     }
 
     @ViewBuilder
@@ -210,14 +174,17 @@ struct EditorSidebar: View {
 
             			                            if grp.kind.canUseLocatorStrategy {
             		                                gridField(String(localized: "Strategy", table: "Common")) {
-            		                                    Picker("", selection: Binding(
-            		                                        get: { inspStrategy },
-            		                                        set: { inspStrategy = $0; applyInspector() }
+                                                        Picker("", selection: Binding(
+                                                            get: { inspStrategy },
+                                                            set: { newStrategy in
+                                                                inspStrategy = newStrategy
+                                                                applyInspector(strategyOverride: newStrategy)
+                                                            }
             		                                    )) {
-            		                                        Text("Offset", tableName: "Common").tag(CoordinateStrategy.windowLocalPreferred)
-            		                                        Text("Proportional", tableName: "Common").tag(CoordinateStrategy.normalizedPreferred)
-            		                                        Text("Absolute", tableName: "Common").tag(CoordinateStrategy.absoluteOnly)
-            		                                        Text("Text (OCR)", tableName: "EditorUX").tag(CoordinateStrategy.locatorOnly)
+                                        Text(NSLocalizedString("Offset", tableName: "Common", comment: "")).tag(CoordinateStrategy.windowLocalPreferred)
+                                        Text(NSLocalizedString("Proportional", tableName: "Common", comment: "")).tag(CoordinateStrategy.normalizedPreferred)
+                                        Text(NSLocalizedString("Absolute", tableName: "Common", comment: "")).tag(CoordinateStrategy.absoluteOnly)
+                                        Text(NSLocalizedString("Text (OCR)", tableName: "EditorUX", comment: "")).tag(CoordinateStrategy.locatorOnly)
             		                                    }
             		                                    .pickerStyle(.segmented)
             		                                    .labelsHidden()
@@ -227,7 +194,13 @@ struct EditorSidebar: View {
             		                                if inspStrategy == .locatorOnly {
             		                                    labeledDoubleField(String(localized: "Timeout (s)", table: "Common"), value: $inspTimeout)
             		                                    gridField(String(localized: "Target Text", table: "EditorUX")) {
-            		                                        TargetTextEditorInnerView(text: Binding(get: { inspOCRText }, set: { inspOCRText = $0; applyInspector() }), onPick: onPickText)
+                                                            TargetTextEditorInnerView(text: Binding(
+                                                                get: { inspOCRText },
+                                                                set: { newText in
+                                                                    inspOCRText = newText
+                                                                    applyInspector(ocrTextOverride: newText)
+                                                                }
+                                                            ), onPick: onPickText)
             		                                    }
             		                                    gridField(String(localized: "Fallback", table: "Common")) {
             		                                        locatorPlaybackPolicyView()
@@ -259,13 +232,22 @@ struct EditorSidebar: View {
             		                                labeledField(String(localized: "Raw Code", table: "Common"), text: $inspKey)
             			                            } else if grp.kind.editsSemanticTextTarget {
             			                                gridField(String(localized: "Target Text", table: "EditorUX")) {
-            			                                    TargetTextEditorInnerView(text: Binding(get: { inspOCRText }, set: { inspOCRText = $0; applyInspector() }), onPick: onPickText)
+                                                        TargetTextEditorInnerView(text: Binding(
+                                                                get: { inspOCRText },
+                                                                set: { newText in
+                                                                    inspOCRText = newText
+                                                                    applyInspector(ocrTextOverride: newText)
+                                                                }
+                                                            ), onPick: onPickText)
             			                                }
                                             if grp.kind == .waitForText || grp.kind == .waitForTextGone || grp.kind == .verifyText {
             			                                    gridField(String(localized: "Must Exist", table: "Common")) {
             			                                    Toggle("", isOn: Binding(
             			                                        get: { inspVerifyMustExist },
-            			                                        set: { inspVerifyMustExist = $0; applyInspector() }
+                                                            set: { newValue in
+                                                                inspVerifyMustExist = newValue
+                                                                applyInspector(verifyMustExistOverride: newValue)
+                                                            }
             			                                    ))
             			                                    .labelsHidden()
             			                                    .controlSize(.small)
@@ -294,18 +276,18 @@ struct EditorSidebar: View {
 
                                             if grp.kind.canConvertClickType {
                                                 VStack(alignment: .leading, spacing: 6) {
-                                                    Text("Action Type", tableName: "EditorUX")
+                                                    Text(NSLocalizedString("Action Type", tableName: "EditorUX", comment: ""))
                                                         .font(.system(size: 9.5, weight: .semibold))
                                                         .foregroundStyle(.secondary)
                                                     Picker("", selection: Binding(
                                                         get: { grp.kind },
                                                         set: { convertClickType(grp: grp, newKind: $0) }
-                                                    )) {
-                                                        Text("Click", tableName: "EditorUX").tag(ActionGroupKind.click)
-                                                        Text("Double", tableName: "Common").tag(ActionGroupKind.doubleClick)
-                                                        Text("Triple+", tableName: "Common").tag(ActionGroupKind.repeatedClick)
-                                                        Text("Long Press", tableName: "Common").tag(ActionGroupKind.longPress)
-                                                    }
+                                                     )) {
+                                                         Text(NSLocalizedString("Click", tableName: "EditorUX", comment: "")).tag(ActionGroupKind.click)
+                                                         Text(NSLocalizedString("Double", tableName: "Common", comment: "")).tag(ActionGroupKind.doubleClick)
+                                                         Text(NSLocalizedString("Triple+", tableName: "Common", comment: "")).tag(ActionGroupKind.repeatedClick)
+                                                         Text(NSLocalizedString("Long Press", tableName: "Common", comment: "")).tag(ActionGroupKind.longPress)
+                                                     }
                                                     .pickerStyle(.segmented)
                                                     .labelsHidden()
                                                     .controlSize(.small)
@@ -376,7 +358,7 @@ struct EditorSidebar: View {
             let textTargetGroups = selectedTextTargetGroups()
             if !textTargetGroups.isEmpty {
                 VStack(alignment: .leading, spacing: 6) {
-                    Text("Shared Text Target", tableName: "EditorUX")
+                    Text(NSLocalizedString("Shared Text Target", tableName: "EditorUX", comment: ""))
                         .font(.system(size: 9.5, weight: .semibold))
                         .foregroundStyle(.secondary)
                     let textTargetReadiness = batchTextTargetReadiness(for: textTargetGroups, targetText: inspOCRText)
@@ -404,7 +386,7 @@ struct EditorSidebar: View {
             }
 
             VStack(alignment: .leading, spacing: 6) {
-                Text("Align Coordinates", tableName: "Common")
+                Text(NSLocalizedString("Align Coordinates", tableName: "Common", comment: ""))
                      .font(.system(size: 9.5, weight: .semibold))
                      .foregroundStyle(.secondary)
                 let alignXReadiness = coordinateAlignmentReadiness(axis: .x)
@@ -429,7 +411,7 @@ struct EditorSidebar: View {
             }
 
             VStack(alignment: .leading, spacing: 6) {
-                Text("Standardize Timeout", tableName: "Common")
+                Text(NSLocalizedString("Standardize Timeout", tableName: "Common", comment: ""))
                      .font(.system(size: 9.5, weight: .semibold))
                      .foregroundStyle(.secondary)
                 let timeoutReadiness = batchTimeoutReadiness(
@@ -556,7 +538,7 @@ struct EditorSidebar: View {
             Button(String(localized: "Clear All Events", table: "EditorUX"), role: .destructive) { clearAll() }
             Button(String(localized: "Cancel", table: "Common"), role: .cancel) {}
         } message: {
-            Text("You can undo this with ⌘Z while the editor is open.", tableName: "EditorUX")
+            Text(NSLocalizedString("You can undo this with ⌘Z while the editor is open.", tableName: "EditorUX", comment: ""))
         }
 
     }
@@ -569,7 +551,7 @@ struct EditorSidebar: View {
             Divider().opacity(0.3)
             
             HStack {
-                Text("Default Delay", tableName: "EditorUX")
+                Text(NSLocalizedString("Default Delay", tableName: "EditorUX", comment: ""))
                     .font(.system(size: 11))
                     .foregroundStyle(.secondary)
                 
@@ -582,7 +564,7 @@ struct EditorSidebar: View {
                         .frame(width: 55)
                         .multilineTextAlignment(.trailing)
                     
-                    Text("ms", tableName: "Common")
+                    Text(NSLocalizedString("ms", tableName: "Common", comment: ""))
                         .font(.system(size: 11))
                         .foregroundStyle(.secondary)
                     
@@ -702,7 +684,7 @@ struct EditorSidebar: View {
         let shiftLaterReadiness = actionShiftReadiness(for: shiftGroups, direction: .later)
 
         VStack(alignment: .leading, spacing: 6) {
-            Text("Shift Selected", tableName: "Common")
+            Text(NSLocalizedString("Shift Selected", tableName: "Common", comment: ""))
                 .font(.system(size: 9.5, weight: .semibold))
                 .foregroundStyle(.secondary)
             HStack {
@@ -747,7 +729,7 @@ struct EditorSidebar: View {
                 factor: stretchFactor
             )
             HStack {
-                Text("Time Stretch", tableName: "Common")
+                Text(NSLocalizedString("Time Stretch", tableName: "Common", comment: ""))
                     .font(.system(size: 9.5, weight: .semibold))
                     .foregroundStyle(.secondary)
                 Spacer()
@@ -1020,7 +1002,7 @@ struct EditorSidebar: View {
                     Label(String(localized: "Selected Behavior", table: "Common"), systemImage: "checkmark.rectangle.stack")
                         .font(.system(size: 10.5, weight: .semibold))
                         .foregroundStyle(Brand.sigAmber)
-                    Text("Rename or split this behavior without changing the actions inside it.", tableName: "EditorUX")
+                    Text(NSLocalizedString("Rename or split this behavior without changing the actions inside it.", tableName: "EditorUX", comment: ""))
                         .font(.system(size: 10))
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
@@ -1069,7 +1051,7 @@ struct EditorSidebar: View {
                     Label(String(localized: "New Behavior", table: "Common"), systemImage: "plus.square.on.square")
                         .font(.system(size: 10.5, weight: .semibold))
                         .foregroundStyle(Brand.sigAmber)
-                    Text("Select a continuous set of recorded actions, name it, then create one behavior block.", tableName: "Recording")
+                    Text(NSLocalizedString("Select a continuous set of recorded actions, name it, then create one behavior block.", tableName: "Recording", comment: ""))
                         .font(.system(size: 10))
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
@@ -1125,7 +1107,7 @@ struct EditorSidebar: View {
                     // Loop Configuration Form
                     VStack(alignment: .leading, spacing: 8) {
                         HStack(spacing: 6) {
-                            Text("Max Attempts", tableName: "Common")
+                            Text(NSLocalizedString("Max Attempts", tableName: "Common", comment: ""))
                                 .font(.system(size: 11, weight: .medium))
                             Spacer()
                             Text("\(loopMaxAttempts) " + String(localized: "times", table: "Common"))
@@ -1139,7 +1121,7 @@ struct EditorSidebar: View {
                         Divider().opacity(0.3)
 
                         HStack(spacing: 6) {
-                            Text("Timeout", tableName: "Common")
+                            Text(NSLocalizedString("Timeout", tableName: "Common", comment: ""))
                                 .font(.system(size: 11, weight: .medium))
                             Spacer()
                             Text("\(Int(loopTimeoutSeconds))s")
@@ -1153,7 +1135,7 @@ struct EditorSidebar: View {
                         Divider().opacity(0.3)
 
                         HStack(spacing: 6) {
-                            Text("Polling Interval", tableName: "Common")
+                            Text(NSLocalizedString("Polling Interval", tableName: "Common", comment: ""))
                                 .font(.system(size: 11, weight: .medium))
                             Spacer()
                             Text(String(format: "%.1fs", loopPollingSeconds))
@@ -1167,13 +1149,13 @@ struct EditorSidebar: View {
                         Divider().opacity(0.3)
 
                         HStack(spacing: 6) {
-                            Text("On Failure", tableName: "Common")
+                            Text(NSLocalizedString("On Failure", tableName: "Common", comment: ""))
                                 .font(.system(size: 11, weight: .medium))
                             Spacer()
                             Picker("", selection: $loopFailurePolicy) {
-                                Text("Abort Macro", tableName: "EditorUX").tag("failRun")
-                                Text("Pause & Approve", tableName: "Common").tag("requireManualApproval")
-                                Text("Continue next", tableName: "Common").tag("continueWorkflow")
+                                Text(NSLocalizedString("Abort Macro", tableName: "EditorUX", comment: "")).tag("failRun")
+                                Text(NSLocalizedString("Pause & Approve", tableName: "Common", comment: "")).tag("requireManualApproval")
+                                Text(NSLocalizedString("Continue next", tableName: "Common", comment: "")).tag("continueWorkflow")
                             }
                             .labelsHidden()
                             .pickerStyle(.menu)
@@ -1201,7 +1183,7 @@ struct EditorSidebar: View {
                     .disabled(!repeatUntilReadiness.canCreate)
                     .help(repeatUntilReadinessHelp(repeatUntilReadiness))
                     
-                    Text("Save the selected body as a behavior macro, then open a draft-only Repeat-Until preview.", tableName: "EditorUX")
+                    Text(NSLocalizedString("Save the selected body as a behavior macro, then open a draft-only Repeat-Until preview.", tableName: "EditorUX", comment: ""))
                         .font(.system(size: 10))
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
@@ -1319,7 +1301,7 @@ struct EditorSidebar: View {
             set: { newValue in
                 if let parsed = finiteInspectorDouble(newValue) {
                     value.wrappedValue = parsed
-                    applyInspector()
+                    applyInspector(timeoutOverride: parsed)
                 }
             }
         ))
@@ -1354,15 +1336,18 @@ struct EditorSidebar: View {
     @ViewBuilder
     func locatorPlaybackPolicyView() -> some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text("Playback if text is missing", tableName: "EditorUX")
+            Text(NSLocalizedString("Playback if text is missing", tableName: "EditorUX", comment: ""))
                 .font(.system(size: 9.5, weight: .medium))
                 .foregroundStyle(.secondary)
             Picker("", selection: Binding(
                 get: { inspFallbackPolicy },
-                set: { inspFallbackPolicy = $0; applyInspector() }
+                set: { newPolicy in
+                    inspFallbackPolicy = newPolicy
+                    applyInspector(fallbackPolicyOverride: newPolicy)
+                }
             )) {
-                Text("Pause", tableName: "Common").tag(LocatorFallbackPolicy.fail)
-                Text("Use fallback point", tableName: "Common").tag(LocatorFallbackPolicy.allowCoordinateFallback)
+                Text(NSLocalizedString("Pause", tableName: "Common", comment: "")).tag(LocatorFallbackPolicy.fail)
+                Text(NSLocalizedString("Use fallback point", tableName: "Common", comment: "")).tag(LocatorFallbackPolicy.allowCoordinateFallback)
             }
             .pickerStyle(.segmented)
             .controlSize(.small)
@@ -1416,7 +1401,7 @@ struct EditorSidebar: View {
     @ViewBuilder
     func multiPointClickEditor(for group: ActionGroup) -> some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("Click Points", tableName: "EditorUX")
+            Text(NSLocalizedString("Click Points", tableName: "EditorUX", comment: ""))
                 .font(.system(size: 9.5, weight: .semibold))
                 .foregroundStyle(.secondary)
 
@@ -1500,25 +1485,25 @@ struct EditorSidebar: View {
     @ViewBuilder
     func insertionTargetView() -> some View {
         HStack(spacing: 8) {
-            Text("Insert Position", tableName: "Common")
+            Text(NSLocalizedString("Insert Position", tableName: "Common", comment: ""))
                 .font(.system(size: 11))
                 .foregroundStyle(.secondary)
             
             Spacer()
             
             if rows.isEmpty {
-                Text("Empty Timeline", tableName: "EditorUX")
+                Text(NSLocalizedString("Empty Timeline", tableName: "EditorUX", comment: ""))
                     .font(.system(size: 11))
                     .foregroundStyle(.secondary)
             } else {
                 HStack(spacing: 6) {
                     let val = insertionIndexBinding.wrappedValue
                     if val > rows.count {
-                        Text("Append at end", tableName: "Common")
+                        Text(NSLocalizedString("Append at end", tableName: "Common", comment: ""))
                             .font(.system(size: 11))
                             .foregroundStyle(.secondary)
                     } else {
-                        Text("After Action #", tableName: "EditorUX")
+                        Text(NSLocalizedString("After Action #", tableName: "EditorUX", comment: ""))
                             .font(.system(size: 11))
                         
                         TextField("", value: insertionIndexBinding, format: .number)
@@ -2422,10 +2407,21 @@ struct EditorSidebar: View {
         }
     }
 
-    func applyInspector() {
+    func applyInspector(
+        strategyOverride: CoordinateStrategy? = nil,
+        ocrTextOverride: String? = nil,
+        fallbackPolicyOverride: LocatorFallbackPolicy? = nil,
+        timeoutOverride: TimeInterval? = nil,
+        verifyMustExistOverride: Bool? = nil
+    ) {
         guard selection.count == 1, let selectId = selection.first,
               let row = rows.first(where: { $0.id == selectId }) else { return }
         let grp = row.group
+        let effectiveStrategy = strategyOverride ?? inspStrategy
+        let effectiveOCRText = ocrTextOverride ?? inspOCRText
+        let effectiveFallbackPolicy = fallbackPolicyOverride ?? inspFallbackPolicy
+        let effectiveTimeout = timeoutOverride ?? inspTimeout
+        let effectiveVerifyMustExist = verifyMustExistOverride ?? inspVerifyMustExist
         var editedWaitTargets: [(start: TimeInterval, end: TimeInterval)] = []
         
         withUndo(String(localized: "Edit Action", table: "EditorUX")) {
@@ -2464,31 +2460,31 @@ struct EditorSidebar: View {
             // Only point-target actions expose playback strategy. Keyboard,
             // wait, path, and behavior rows should not receive coordinate
             // strategy metadata as a side effect of editing their timing.
-            let safeTimeout = nonNegativeInspectorDouble(inspTimeout)
+            let safeTimeout = nonNegativeInspectorDouble(effectiveTimeout)
             if grp.kind.editsSemanticTextTarget {
-                let anchor = updatedAnchor(for: grp, text: inspOCRText)
+                let anchor = updatedAnchor(for: grp, text: effectiveOCRText)
                 recorder.events.updateSemanticAction(
                     at: grp.eventIndices,
                     textAnchor: anchor,
                     timeout: safeTimeout,
-                    verifyMustExist: inspVerifyMustExist,
-                    fallbackPolicy: inspFallbackPolicy
+                    verifyMustExist: effectiveVerifyMustExist,
+                    fallbackPolicy: effectiveFallbackPolicy
                 )
             } else if grp.kind.canUseLocatorStrategy {
-                let anchor = inspStrategy == .locatorOnly && !inspOCRText.isEmpty
-                    ? updatedAnchor(for: grp, text: inspOCRText)
+                let anchor = effectiveStrategy == .locatorOnly && !effectiveOCRText.isEmpty
+                    ? updatedAnchor(for: grp, text: effectiveOCRText)
                     : nil
                 recorder.events.updateCoordinateStrategy(
                     at: grp.eventIndices,
-                    strategy: inspStrategy,
+                    strategy: effectiveStrategy,
                     textAnchor: anchor,
-                    fallbackPolicy: inspFallbackPolicy,
-                    textTimeout: inspStrategy == .locatorOnly ? safeTimeout : nil
+                    fallbackPolicy: effectiveFallbackPolicy,
+                    textTimeout: effectiveStrategy == .locatorOnly ? safeTimeout : nil
                 )
             }
             
             if (grp.kind.editsPointTarget || grp.kind.editsPathTarget), let sp = grp.startPoint {
-                if inspStrategy != .locatorOnly,
+                if effectiveStrategy != .locatorOnly,
                    let newX = finiteInspectorDouble(inspX),
                    let newY = finiteInspectorDouble(inspY) {
                     let deltaStart = CGPoint(x: CGFloat(newX) - sp.x, y: CGFloat(newY) - sp.y)
@@ -2712,7 +2708,7 @@ struct AnchorPositionCard: View {
             Divider()
             
             VStack(alignment: .leading, spacing: 4) {
-                Text("Detected Text", tableName: "EditorUX")
+                Text(NSLocalizedString("Detected Text", tableName: "EditorUX", comment: ""))
                     .font(.system(size: 9.8, weight: .medium))
                     .foregroundStyle(.secondary)
                 Text(anchor.text)

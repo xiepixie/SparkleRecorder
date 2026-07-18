@@ -39,7 +39,7 @@ struct AutomationInspectorView: View {
                             .font(.caption)
                             .lineLimit(1)
                         Spacer(minLength: 0)
-                        Button("Cancel", systemImage: "xmark", action: onCancelLink)
+                        LocalizedSystemButton("Cancel", tableName: L10nTable.common, systemImage: "xmark", action: onCancelLink)
                             .labelStyle(.iconOnly)
                             .buttonStyle(.borderless)
                             .frame(width: 24, height: 24)

@@ -27,6 +27,11 @@ enum RecordingHUDMode: String, CaseIterable, Identifiable {
     }
 }
 
+struct AutomationWorkspaceDestination: Equatable {
+    var workflowID: UUID
+    var taskID: UUID?
+}
+
 /// User-configurable settings persisted in UserDefaults.
 @MainActor
 final class AppState: ObservableObject {
@@ -50,6 +55,8 @@ final class AppState: ObservableObject {
     @Published var isPlaying: Bool = false
     /// The product surface currently shown in the main window.
     @Published var workspace: WorkspaceMode = .library
+    /// One-shot selection used when Library creates or opens a specific automation.
+    @Published var automationWorkspaceDestination: AutomationWorkspaceDestination?
     @Published var accessibilityGranted: Bool = AXIsProcessTrusted()
     /// Input Monitoring is a separate TCC permission from Accessibility; both are
     /// required to record. Polled live alongside Accessibility so the UI reflects
@@ -207,11 +214,12 @@ final class AppState: ObservableObject {
         self.screenCaptureGranted = PermissionCenter.shared.checkScreenCaptureAccess() == .authorized
         refreshPermissions()
 
-        // Poll permission state while the app is alive so the warning banner
-        // disappears shortly after the user grants access in System Settings.
-        let timer = Timer(timeInterval: 1.0, repeats: true) { [weak self] _ in
+        // Poll only while access is missing. AppDelegate also refreshes when the
+        // app becomes active, so fully authorized idle sessions avoid TCC IPC.
+        let timer = Timer(timeInterval: 5.0, repeats: true) { [weak self] _ in
             Task { @MainActor in
-                self?.refreshPermissions()
+                guard let self, self.needsPermissionRefresh else { return }
+                self.refreshPermissions()
             }
         }
         RunLoop.main.add(timer, forMode: .common)
@@ -239,6 +247,10 @@ final class AppState: ObservableObject {
         if screenOK != screenCaptureGranted {
             screenCaptureGranted = screenOK
         }
+    }
+
+    private var needsPermissionRefresh: Bool {
+        !accessibilityGranted || !inputMonitoringGranted || !screenCaptureGranted
     }
 
     var semanticRecordingRetentionSettings: SemanticRecordingRetentionSettings {

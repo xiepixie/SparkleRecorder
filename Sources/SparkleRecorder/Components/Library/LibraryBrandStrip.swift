@@ -28,7 +28,7 @@ struct LibraryBrandStrip: View {
 
             Spacer(minLength: 0)
 
-            Button("Settings", systemImage: "gearshape.fill", action: onSettings)
+            LocalizedSystemButton("Settings", tableName: L10nTable.settings, systemImage: "gearshape.fill", action: onSettings)
                 .labelStyle(.iconOnly)
                 .font(.system(size: 13, weight: .medium))
                 .foregroundStyle(settingsHovered ? AnyShapeStyle(Brand.libraryBlue) : AnyShapeStyle(Color.secondary))

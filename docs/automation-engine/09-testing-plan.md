@@ -38,6 +38,15 @@
 | `engineRefreshesMissingTargetFrameBeforeStep` | step 前缺少目标 surface frame 时只刷新该 surface，并在成功解析后激活 |
 | `engineBuildsFailureEvidenceOnStepFailure` | step runner 失败时由 `PlaybackRunEngine` 构造 `PlaybackFailureEvidence` 并停止后续 loop |
 | `engineAbortsBeforeStepOnConflict` | 冲突监控命中时在执行 step 前中断，不触发真实输入 |
+| `targetApplicationPolicyFlowsFromReducerToPlayerRequest` | task 的目标应用策略经 reducer effect 和 effect runner 原样交给 Player request |
+| `playerRejectsFailedTargetPreparation` | fake target-app client 返回启动/窗口失败时 Player 不开始输入回放并返回 rejected outcome |
+| `targetApplicationCleanupOnlyQuitsAppsLaunchedByRun` | prepare session 只记录本次启动的应用，cleanup 不触碰原本已运行的应用 |
+| `successfulPlayerRunBindsEvidenceAndCleansUpAfterCapture` | 成功报告先保存结束证据，再按 task cleanup policy 清理应用 |
+| `quickScheduleOverridesPlaybackToOneLoop` | 单宏自动任务把 task-level playback loops 设为 1，effect runner 在规划前覆盖宏自身多次/无限循环 |
+| `quickScheduleSummaryRestoresAndDeduplicatesExistingPlan` | Library 投影选择最早下次运行、保留暂停态、恢复现有表单值并识别重复单宏计划 |
+| `latestOnlyScheduleSkipsOlderMissedOccurrences` | Quick Schedule 只创建最近一次到期 run，最近 occurrence 已表示后不继续补建更早遗漏 |
+| `previewCancellationStopsPlayerAndCleanupSelectionIsSessionScoped` | fake preview client 验证取消传给 Player；纯 cleanup selection 只返回本 run session 记录的 bundle identifiers |
+| `pastDailyTimeAnchorsToNextDayAndPastOnceHasNoUpcomingOccurrence` | 保存每天/每周计划使用 UI 显示的下一 occurrence；过期一次性计划不再冒充下次运行 |
 | `synchronousEngineRunsLoopsAndReportsProgress` | CLI 阻塞式播放外层 loop 负责 window refresh、step runner 调用、loop/progress callback |
 | `synchronousEngineBuildsFailureEvidenceOnStepFailure` | CLI step runner 失败时由 `PlaybackSynchronousRunEngine` 构造 evidence 并停止后续 loop |
 | `synchronousEngineAbortsBeforeStepOnConflict` | CLI 冲突监控命中时在执行 step 前中断 |
@@ -102,4 +111,5 @@
 - 测试能覆盖 workflow package codec 和 import validation。
 - 测试能覆盖 App-host handoff payload/status 语义，包括 pending/dispatched/failed/missing、receipt run IDs、repository-backed `runs` snapshots / `workflowStatus` readback，以及旧 status JSON 缺少这些新字段时的兼容解码。
 - 测试能覆盖 bound-window acceptance payload 的 workflow/task/macro/surface context、coordinate mode、activation summary 和 handoff next-action 语义；真实 activation/playback 只由 reviewed live acceptance 执行。
+- 测试能覆盖目标应用策略的旧 JSON 默认值、workflow/draft round-trip、reducer/effect handoff 和 fake preflight failure；单元测试不得启动真实应用或等待真实窗口。
 - 测试能覆盖 `SavedMacro` 与 `AutomationTaskRun` 分离。

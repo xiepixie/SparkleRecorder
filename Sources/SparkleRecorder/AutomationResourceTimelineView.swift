@@ -6,8 +6,13 @@ struct AutomationResourceTimelineView: View {
     let nextScheduledOccurrence: Date?
     let nextSchedule: AutomationSchedule?
     let nextScheduledTaskName: String?
+    let isNextScheduledTaskEnabled: Bool
+    let hasNextScheduledTaskBoundTargetApplication: Bool
+    let nextScheduledTaskTargetApplicationPolicy: AutomationTargetApplicationPolicy
     var selectedRunID: UUID?
     let onUpdateNextSchedule: ((AutomationTimelineScheduleEdit) -> Void)?
+    let onSetNextScheduledTaskEnabled: ((Bool) -> Void)?
+    let onSetNextScheduledTaskTargetApplicationPolicy: ((AutomationTargetApplicationPolicy) -> Void)?
     let onSelectItem: (AutomationResourceTimelineItem) -> Void
 
     private let cardWidth = 268.0
@@ -21,7 +26,12 @@ struct AutomationResourceTimelineView: View {
                     date: nextScheduledOccurrence,
                     schedule: nextSchedule,
                     taskName: nextScheduledTaskName,
-                    onApplySchedule: onUpdateNextSchedule
+                    isTaskEnabled: isNextScheduledTaskEnabled,
+                    hasBoundTargetApplication: hasNextScheduledTaskBoundTargetApplication,
+                    targetApplicationPolicy: nextScheduledTaskTargetApplicationPolicy,
+                    onApplySchedule: onUpdateNextSchedule,
+                    onSetTaskEnabled: onSetNextScheduledTaskEnabled,
+                    onSetTargetApplicationPolicy: onSetNextScheduledTaskTargetApplicationPolicy
                 )
                 .frame(maxWidth: 780, alignment: .leading)
                 .padding(.horizontal, 12)

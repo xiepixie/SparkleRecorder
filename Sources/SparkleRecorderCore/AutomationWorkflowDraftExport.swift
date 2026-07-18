@@ -201,6 +201,16 @@ private struct WorkflowDraftExportBuilder {
                 retry: common.retry,
                 joinPolicy: common.joinPolicy,
                 enabled: common.enabled,
+                targetApplicationPolicy: task.targetApplicationPolicy == .activateIfRunning
+                    ? nil
+                    : task.targetApplicationPolicy.rawValue,
+                targetApplicationCleanupPolicy: task.targetApplicationCleanupPolicy == .keepOpen
+                    ? nil
+                    : task.targetApplicationCleanupPolicy.rawValue,
+                playbackLoops: task.playbackLoops,
+                missedRunPolicy: task.missedRunPolicy == .catchUp
+                    ? nil
+                    : task.missedRunPolicy.rawValue,
                 graphPosition: common.graphPosition
             )
 

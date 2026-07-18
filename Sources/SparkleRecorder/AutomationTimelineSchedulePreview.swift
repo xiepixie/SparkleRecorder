@@ -13,6 +13,7 @@ struct AutomationTimelineScheduleEdit: Equatable {
 }
 
 enum AutomationTimelineScheduleMode: String, CaseIterable, Identifiable {
+    case manual
     case once
     case repeating
 
@@ -20,6 +21,8 @@ enum AutomationTimelineScheduleMode: String, CaseIterable, Identifiable {
 
     var title: String {
         switch self {
+        case .manual:
+            return String(localized: "Off", table: "Common")
         case .once:
             return String(localized: "Once", table: "Common")
         case .repeating:
@@ -102,7 +105,12 @@ struct AutomationTimelineSchedulePreview: View {
     let date: Date?
     let schedule: AutomationSchedule?
     let taskName: String?
+    let isTaskEnabled: Bool
+    let hasBoundTargetApplication: Bool
+    let targetApplicationPolicy: AutomationTargetApplicationPolicy
     let onApplySchedule: ((AutomationTimelineScheduleEdit) -> Void)?
+    let onSetTaskEnabled: ((Bool) -> Void)?
+    let onSetTargetApplicationPolicy: ((AutomationTargetApplicationPolicy) -> Void)?
 
     @State private var selectedDate = Date().addingTimeInterval(3600)
     @State private var scheduleMode: AutomationTimelineScheduleMode = .once
@@ -135,6 +143,40 @@ struct AutomationTimelineSchedulePreview: View {
             }
 
             repeatPreviewRow
+
+            HStack(spacing: 10) {
+                Toggle(isOn: taskEnabledBinding) {
+                    Text("Task enabled", tableName: "Automation")
+                        .font(.caption)
+                }
+                .toggleStyle(.switch)
+                .controlSize(.small)
+                .fixedSize()
+
+                if hasBoundTargetApplication {
+                    Picker(
+                        String(localized: "Target application", table: "Automation"),
+                        selection: targetApplicationPolicyBinding
+                    ) {
+                        ForEach(AutomationTargetApplicationPolicy.allCases, id: \.self) { policy in
+                            Text(policy.title).tag(policy)
+                        }
+                    }
+                    .labelsHidden()
+                    .pickerStyle(.menu)
+                    .controlSize(.small)
+                    .frame(width: 142)
+                }
+
+                Label(
+                    String(localized: "Runs while SparkleRecorder is open", table: "Automation"),
+                    systemImage: "info.circle"
+                )
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+            }
+            .padding(.leading, 30)
         }
         .padding(9)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -184,19 +226,22 @@ struct AutomationTimelineSchedulePreview: View {
         }
         .labelsHidden()
         .pickerStyle(.segmented)
-        .frame(width: 132)
+        .frame(width: 184)
         .controlSize(.small)
     }
 
+    @ViewBuilder
     private var datePicker: some View {
-        DatePicker(
-            String(localized: "Start", table: "Common"),
-            selection: $selectedDate,
-            displayedComponents: [.date, .hourAndMinute]
-        )
-        .labelsHidden()
-        .datePickerStyle(.compact)
-        .controlSize(.small)
+        if scheduleMode != .manual {
+            DatePicker(
+                String(localized: "Start", table: "Common"),
+                selection: $selectedDate,
+                displayedComponents: [.date, .hourAndMinute]
+            )
+            .labelsHidden()
+            .datePickerStyle(.compact)
+            .controlSize(.small)
+        }
     }
 
     @ViewBuilder
@@ -265,6 +310,9 @@ struct AutomationTimelineSchedulePreview: View {
     }
 
     private var title: String {
+        if scheduleMode == .manual {
+            return String(localized: "Manual start only", table: "Common")
+        }
         if scheduleMode == .repeating {
             return String(localized: "Repeating start", table: "Common")
         }
@@ -274,6 +322,9 @@ struct AutomationTimelineSchedulePreview: View {
     }
 
     private var titleIcon: String {
+        if scheduleMode == .manual {
+            return "hand.tap"
+        }
         if scheduleMode == .repeating {
             return "calendar.badge.clock"
         }
@@ -281,6 +332,11 @@ struct AutomationTimelineSchedulePreview: View {
     }
 
     private var scheduleDetail: String {
+        if scheduleMode == .manual {
+            return taskName?.isEmpty == false
+                ? taskName!
+                : String(localized: "Workflow", table: "Automation")
+        }
         let time = selectedDate.formatted(date: .abbreviated, time: .shortened)
         let subject = taskName?.isEmpty == false ? taskName! : String(localized: "Workflow", table: "Automation")
         if scheduleMode == .repeating {
@@ -292,13 +348,12 @@ struct AutomationTimelineSchedulePreview: View {
     }
 
     private var repeatPreviewDates: [Date] {
-        let step = repeatUnitDraft.interval(count: max(1, repeatEveryDraft)).timeInterval
-        guard step > 0 else {
-            return []
-        }
-        return (0..<3).map { index in
-            selectedDate.addingTimeInterval(Double(index) * step)
-        }
+        AutomationSchedule.repeating(AutomationRepeatRule(
+            anchor: selectedDate,
+            interval: repeatUnitDraft.interval(count: repeatEveryDraft)
+        ))
+        .previewOccurrences(startingAt: selectedDate)
+        .map(\.scheduledAt)
     }
 
     private func repeatPreviewTitle(for date: Date) -> String {
@@ -309,6 +364,20 @@ struct AutomationTimelineSchedulePreview: View {
         schedule == nil || schedule == .manual
             ? String(localized: "Schedule", table: "Common")
             : String(localized: "Apply", table: "Common")
+    }
+
+    private var taskEnabledBinding: Binding<Bool> {
+        Binding(
+            get: { isTaskEnabled },
+            set: { onSetTaskEnabled?($0) }
+        )
+    }
+
+    private var targetApplicationPolicyBinding: Binding<AutomationTargetApplicationPolicy> {
+        Binding(
+            get: { targetApplicationPolicy },
+            set: { onSetTargetApplicationPolicy?($0) }
+        )
     }
 
     private func syncDraft() {
@@ -322,7 +391,7 @@ struct AutomationTimelineSchedulePreview: View {
         case .once:
             scheduleMode = .once
         case .manual, nil:
-            scheduleMode = .once
+            scheduleMode = .manual
             repeatEveryDraft = 1
             repeatUnitDraft = .hours
         }

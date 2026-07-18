@@ -56,8 +56,9 @@ if ! XCSTRINGSTOOL=$(xcrun --find xcstringstool 2>/dev/null); then
 fi
 rm -rf "$GENERATED_L10N"
 mkdir -p "$GENERATED_L10N"
-"$XCSTRINGSTOOL" compile "${ROOT}/Sources/SparkleRecorder/Localizable.xcstrings" --output-directory "$GENERATED_L10N"
-"$XCSTRINGSTOOL" compile "${ROOT}/Sources/SparkleRecorder/InfoPlist.xcstrings" --output-directory "$GENERATED_L10N"
+for catalog in "${ROOT}/Sources/SparkleRecorder/"*.xcstrings; do
+    "$XCSTRINGSTOOL" compile "$catalog" --output-directory "$GENERATED_L10N"
+done
 
 # Copy generated runtime localization resources.
 lproj_dirs=("${GENERATED_L10N}/"*.lproj)

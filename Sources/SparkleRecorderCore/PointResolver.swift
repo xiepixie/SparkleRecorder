@@ -98,6 +98,13 @@ public struct PointResolver: Sendable {
     
     public func resolve(_ event: RecordedEvent, context: PlaybackContext) -> Result<CGPoint, PointResolveError> {
         let original = CGPoint(x: event.x, y: event.y)
+
+        // Keyboard events carry cursor coordinates only as recording metadata.
+        // They must never inherit target-window movement or fail screen bounds.
+        if event.kind.isKey {
+            return .success(original)
+        }
+
         let mapper = CoordinateMapper()
         
         let binding = event.coordinateBinding ?? .unbound

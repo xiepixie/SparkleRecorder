@@ -5,17 +5,23 @@ public struct AutomationPlayerStartRequest: Sendable {
     public var macro: SavedMacro
     public var scheduledStartTime: Date?
     public var context: PlaybackContext
+    public var targetApplicationPolicy: AutomationTargetApplicationPolicy
+    public var targetApplicationCleanupPolicy: AutomationTargetApplicationCleanupPolicy
 
     public init(
         runID: UUID,
         macro: SavedMacro,
         scheduledStartTime: Date? = nil,
-        context: PlaybackContext? = nil
+        context: PlaybackContext? = nil,
+        targetApplicationPolicy: AutomationTargetApplicationPolicy = .activateIfRunning,
+        targetApplicationCleanupPolicy: AutomationTargetApplicationCleanupPolicy = .keepOpen
     ) {
         self.runID = runID
         self.macro = macro
         self.scheduledStartTime = scheduledStartTime
         self.context = context ?? macro.playbackContext
+        self.targetApplicationPolicy = targetApplicationPolicy
+        self.targetApplicationCleanupPolicy = targetApplicationCleanupPolicy
     }
 }
 

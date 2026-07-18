@@ -18,6 +18,7 @@ struct AutomationTaskInspectorView: View {
 
     @State private var nameDraft = ""
     @State private var isEnabledDraft = true
+    @State private var targetApplicationPolicyDraft: AutomationTargetApplicationPolicy = .activateIfRunning
     @State private var scheduleMode: ScheduleMode = .manual
     @State private var onceDateDraft = Date()
     @State private var repeatStartDraft = Date()
@@ -309,6 +310,23 @@ struct AutomationTaskInspectorView: View {
                     }
                     .pickerStyle(.menu)
                 }
+            }
+
+            if isMacroTask, selectedMacro?.surfaces.isEmpty == false {
+                Picker(
+                    String(localized: "Target application", table: "Automation"),
+                    selection: $targetApplicationPolicyDraft
+                ) {
+                    ForEach(AutomationTargetApplicationPolicy.allCases, id: \.self) { policy in
+                        Text(policy.title).tag(policy)
+                    }
+                }
+                .pickerStyle(.menu)
+
+                Text(targetApplicationPolicyDraft.detail)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
         }
         .padding(.vertical, 8)
@@ -1125,6 +1143,7 @@ struct AutomationTaskInspectorView: View {
     private func resetDraft() {
         nameDraft = task.name
         isEnabledDraft = task.isEnabled
+        targetApplicationPolicyDraft = task.targetApplicationPolicy
         resetScheduleDraft()
         hasTaskTimeoutDraft = task.timeout != nil
         taskTimeoutDraft = task.timeout ?? 60
@@ -1297,6 +1316,7 @@ struct AutomationTaskInspectorView: View {
         var updated = task
         updated.name = trimmedName
         updated.isEnabled = isEnabledDraft
+        updated.targetApplicationPolicy = targetApplicationPolicyDraft
         updated.schedule = schedule()
         updated.timeout = hasTaskTimeoutDraft ? max(0, taskTimeoutDraft) : nil
         updated.retryPolicy = AutomationRetryPolicy(maxAttempts: max(1, retryAttemptsDraft))

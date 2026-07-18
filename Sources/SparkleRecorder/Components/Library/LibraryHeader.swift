@@ -38,7 +38,7 @@ struct LibraryHeader: View {
                             Image(systemName: "stop.fill").font(.system(size: 11, weight: .black))
                                 .foregroundStyle(.white)
                         } else {
-                            RecDot(size: 8, glassWhite: false)
+                            RecDot(size: 8, glassWhite: false, isAnimated: false)
                         }
                         Text(state.isRecording ? String(localized: "Stop recording", table: "Recording") : String(localized: "Record macro", table: "Recording"))
                             .font(.system(size: 13, weight: .semibold))

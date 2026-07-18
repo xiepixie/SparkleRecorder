@@ -31,6 +31,15 @@ public struct PlaybackStepExecutor: Sendable {
             return .success(.skippedSemanticEvent(event.kind))
         }
 
+        // Keyboard input does not consume a screen point. Resolving its recorded
+        // placeholder location against a moved window can turn (0, 0) into an
+        // out-of-bounds point and abort playback before the key is posted.
+        if event.kind.isKey {
+            let point = event.location
+            eventPoster.post(event, point)
+            return .success(.posted(point))
+        }
+
         switch pointResolver.resolve(event, context: context) {
         case .success(let point):
             eventPoster.post(event, point)

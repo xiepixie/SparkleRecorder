@@ -1,6 +1,27 @@
 {
   "sourceLanguage": "en",
   "strings": {
+    "At": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "At" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "时间" } }
+      }
+    },
+    "Custom": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Custom" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "自定义" } }
+      }
+    },
+    "Run": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Run" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "运行方式" } }
+      }
+    },
     "%.1fs": {
       "extractionState": "manual",
       "localizations": {
@@ -340,23 +361,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "另有 %d 项"
-          }
-        }
-      }
-    },
-    "AI Draft": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "AI Draft"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "AI 草稿"
           }
         }
       }
@@ -3190,23 +3194,6 @@
         }
       }
     },
-    "Exists": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Exists"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "存在"
-          }
-        }
-      }
-    },
     "Expand": {
       "extractionState": "manual",
       "localizations": {
@@ -5887,23 +5874,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "普通"
-          }
-        }
-      }
-    },
-    "Not Exists": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Not Exists"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "不存在"
           }
         }
       }
@@ -9208,23 +9178,6 @@
         }
       }
     },
-    "Time (s)": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Time (s)"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "时间（秒）"
-          }
-        }
-      }
-    },
     "Time Adjustments": {
       "extractionState": "manual",
       "localizations": {
@@ -10716,6 +10669,48 @@
           }
         }
       }
+    },
+    "Screen target": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Screen target"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "屏幕定位目标"
+          }
+        }
+      }
+    },
+    "Schedule…": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Schedule…" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "设置定时…" } }
+      }
+    },
+    "Waiting…": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Waiting…"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "等待中…"
+          }
+        }
+      },
+      "generatesSymbol": false
     }
   },
   "version": "1.1"

@@ -59,6 +59,8 @@ Owner A 是状态语义 owner。目标是把 AutomationEngine 做成纯、确定
 
 ## Interface Requests
 
+- Accepted 2026-07-14: add `AutomationTask.targetApplicationPolicy` with backward-compatible `activateIfRunning` decoding and carry it on `AutomationEffect.startPlayer`. This lets scheduled and manual starts share one deterministic reducer/effect contract without letting adapters read reducer state.
+
 - Owner B should consume `AutomationEffect.requestResource`, `releaseResource`, `startPlayer`, `cancelPlayer`, `evaluateCondition`, `wait`, `sendNotification`, `persistWorkflows`, and `persistRun`.
 - Owner A should include upstream `AutomationOutcome` values in `AutomationEffect.evaluateCondition.previousOutcomes`, derived only from reducer state and `AutomationTaskRun.upstreamRunIDs`.
 - Owner B should emit only `AutomationAction` values back into the reducer after live work completes.
@@ -96,6 +98,9 @@ Owner A 是状态语义 owner。目标是把 AutomationEngine 做成纯、确定
 - 2026-07-07: Fixed-count workflow draft loops gained a pure authoring/expansion first pass. `AutomationWorkflowDraftLoop` validates count/body constraints and rejects nested loops; `AutomationWorkflowDraftEditor.setLoop` / CLI `workflow draft loop set` maintain fixed-count loop bodies; `AutomationWorkflowDraftLoopExpander` lowers loop bodies into acyclic tasks/dependencies before simulate/import, using `conditionMatched` for condition/manual-approval body transitions. Product loop UI, runtime loop evidence, repeat-until and foreach remain future work.
 - 2026-07-07: Condition evidence dynamic delay gained a scoped reducer/projection first pass. `AutomationDependency.dynamicDelay` can parse durations from upstream condition evidence, use a fixed fallback when parsing fails, cap recognized waits, and drive downstream `earliestStartTime` plus branch evidence/projection labels. This supports OCR/visual timer flows without introducing a general variable/expression system or runtime loop semantics.
 - 2026-07-08: Bounded Repeat-Until draft loops now validate/import when `until` and `maxAttempts` are present. The expander lowers each attempt into ordinary body + until condition tasks, branches `conditionNotMatched` to the next attempt, exits through a `firstMatched` complete node on any `conditionMatched`, and handles final exhaustion with continue/manual-approval/stop-path behavior. Draft simulation now honors `any` / `firstMatched` join policies so preview matches reducer unlock semantics. Structured runtime attempt evidence, graph container editing and foreach remain future work.
+- 2026-07-15: Single-macro automation adds backward-compatible `AutomationTask.targetApplicationCleanupPolicy` and carries it through `startPlayer` / `AutomationPlayerStartRequest`. Old tasks decode as `keepOpen`; Quick Schedule tasks use `quitIfLaunched`. Successful reports now bind `AutomationTaskRun.evidenceID` using the same run-ID contract as failures, with direct reducer coverage.
+- 2026-07-15: `AutomationTask.playbackLoops` adds a backward-compatible optional task override. Quick Schedule persists one loop and reducer effects carry it without changing legacy task behavior.
+- 2026-07-15: `AutomationTask.missedRunPolicy` preserves legacy `catchUp` behavior while Quick Schedule opts into `latestOnly`. Reducer selects the most recent due occurrence once and never walks backward through older misses after that occurrence is represented.
 
 ## Handoff Checklist
 

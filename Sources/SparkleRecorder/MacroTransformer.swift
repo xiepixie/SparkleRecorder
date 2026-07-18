@@ -890,19 +890,20 @@ extension Array where Element == RecordedEvent {
         self.sortByTimePreservingOrder()
     }
 
-    /// Duplicate a group of events. The copies are placed right after the originals
-    /// and subsequent events are shifted forward in time.
+    /// Duplicate a group of events. The copies are placed after a visible pause so
+    /// the grouper cannot reinterpret separate copied clicks as one multi-click.
     public mutating func duplicateEvents(at indices: [Int]) {
         let sorted: [Int] = Set(indices).sorted().filter { self.indices.contains($0) }
         guard !sorted.isEmpty else { return }
 
         let sourceEvents = sorted.map { self[$0] }
         let srcBaseTime = sourceEvents[0].time
-        let srcDuration = (sourceEvents.last!.time - srcBaseTime) + 0.1
+        let separation = Swift.max(0.5, EventGroupingOptions().clickMergeGap + 0.01)
+        let copyOffset = (sourceEvents.last!.time - srcBaseTime) + separation
 
         // Shift all events after the source group forward
         let afterIdx = (sorted.last! + 1)
-        for i in afterIdx..<self.count { self[i].time += srcDuration }
+        for i in afterIdx..<self.count { self[i].time += copyOffset }
 
         let sourceBehaviorNames = sourceEvents.reduce(into: [BehaviorGroupID: String]()) { partial, event in
             guard let id = event.behaviorGroupID,
@@ -919,7 +920,7 @@ extension Array where Element == RecordedEvent {
         var copies: [RecordedEvent] = []
         for ev in sourceEvents {
             var copy = ev
-            copy.time += srcDuration
+            copy.time += copyOffset
             if let sourceBehaviorID = ev.behaviorGroupID {
                 let copiedID = copiedBehaviorIDs[sourceBehaviorID] ?? BehaviorGroupID()
                 copiedBehaviorIDs[sourceBehaviorID] = copiedID

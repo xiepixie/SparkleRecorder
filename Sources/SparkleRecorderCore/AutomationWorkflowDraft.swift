@@ -53,6 +53,10 @@ public struct AutomationWorkflowDraftTask: Codable, Equatable, Sendable {
     public var retry: AutomationWorkflowDraftRetry?
     public var joinPolicy: String?
     public var enabled: Bool?
+    public var targetApplicationPolicy: String?
+    public var targetApplicationCleanupPolicy: String?
+    public var playbackLoops: Int?
+    public var missedRunPolicy: String?
     public var graphPosition: AutomationGraphPoint?
 
     public init(
@@ -72,6 +76,10 @@ public struct AutomationWorkflowDraftTask: Codable, Equatable, Sendable {
         retry: AutomationWorkflowDraftRetry? = nil,
         joinPolicy: String? = nil,
         enabled: Bool? = nil,
+        targetApplicationPolicy: String? = nil,
+        targetApplicationCleanupPolicy: String? = nil,
+        playbackLoops: Int? = nil,
+        missedRunPolicy: String? = nil,
         graphPosition: AutomationGraphPoint? = nil
     ) {
         self.key = key
@@ -90,6 +98,10 @@ public struct AutomationWorkflowDraftTask: Codable, Equatable, Sendable {
         self.retry = retry
         self.joinPolicy = joinPolicy
         self.enabled = enabled
+        self.targetApplicationPolicy = targetApplicationPolicy
+        self.targetApplicationCleanupPolicy = targetApplicationCleanupPolicy
+        self.playbackLoops = playbackLoops
+        self.missedRunPolicy = missedRunPolicy
         self.graphPosition = graphPosition
     }
 }
@@ -1058,6 +1070,9 @@ public enum AutomationWorkflowDraftIssueCode: String, Codable, Equatable, Sendab
     case invalidSchedule
     case invalidRetry
     case invalidJoinPolicy
+    case invalidTargetApplicationPolicy
+    case invalidTargetApplicationCleanupPolicy
+    case invalidMissedRunPolicy
     case invalidLoop
     case missingVisualReference
     case missingPixel
@@ -1116,6 +1131,15 @@ private struct Validator {
         AutomationJoinPolicy.any.rawValue,
         AutomationJoinPolicy.firstMatched.rawValue
     ]
+    private static let supportedTargetApplicationPolicies = Set(
+        AutomationTargetApplicationPolicy.allCases.map(\.rawValue)
+    )
+    private static let supportedTargetApplicationCleanupPolicies = Set(
+        AutomationTargetApplicationCleanupPolicy.allCases.map(\.rawValue)
+    )
+    private static let supportedMissedRunPolicies = Set(
+        AutomationMissedRunPolicy.allCases.map(\.rawValue)
+    )
     private static let supportedLoopKinds: Set<String> = [
         AutomationWorkflowDraftLoopKind.fixedCount,
         AutomationWorkflowDraftLoopKind.repeatUntil
@@ -1304,6 +1328,48 @@ private struct Validator {
                 .invalidJoinPolicy,
                 "Join policy '\(joinPolicy)' must be all, any, or firstMatched.",
                 "\(path).joinPolicy",
+                taskKey: key
+            )
+        }
+        if let policy = task.targetApplicationPolicy?.trimmedForDraftValidation,
+           !policy.isEmpty,
+           !Self.supportedTargetApplicationPolicies.contains(policy) {
+            add(
+                .error,
+                .invalidTargetApplicationPolicy,
+                "Target application policy '\(policy)' is not supported.",
+                "\(path).targetApplicationPolicy",
+                taskKey: key
+            )
+        }
+        if let policy = task.targetApplicationCleanupPolicy?.trimmedForDraftValidation,
+           !policy.isEmpty,
+           !Self.supportedTargetApplicationCleanupPolicies.contains(policy) {
+            add(
+                .error,
+                .invalidTargetApplicationCleanupPolicy,
+                "Target application cleanup policy '\(policy)' is not supported.",
+                "\(path).targetApplicationCleanupPolicy",
+                taskKey: key
+            )
+        }
+        if let playbackLoops = task.playbackLoops, playbackLoops < 1 {
+            add(
+                .error,
+                .invalidLoop,
+                "Playback loops must be at least 1.",
+                "\(path).playbackLoops",
+                taskKey: key
+            )
+        }
+        if let policy = task.missedRunPolicy?.trimmedForDraftValidation,
+           !policy.isEmpty,
+           !Self.supportedMissedRunPolicies.contains(policy) {
+            add(
+                .error,
+                .invalidMissedRunPolicy,
+                "Missed run policy '\(policy)' is not supported.",
+                "\(path).missedRunPolicy",
                 taskKey: key
             )
         }

@@ -2,6 +2,50 @@ import Cocoa
 import SwiftUI
 import SparkleRecorderCore
 
+private enum SettingsCategory: String, CaseIterable, Identifiable {
+    case general
+    case shortcuts
+    case recording
+    case playback
+    case visualEvidence
+    case permissions
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .general: return String(localized: "General", table: "Common")
+        case .shortcuts: return String(localized: "Keyboard Shortcuts", table: "Settings")
+        case .recording: return String(localized: "Recording", table: "Recording")
+        case .playback: return String(localized: "Playback", table: "Settings")
+        case .visualEvidence: return String(localized: "Visual Evidence", table: "Automation")
+        case .permissions: return String(localized: "Permissions", table: "Settings")
+        }
+    }
+
+    var subtitle: String {
+        switch self {
+        case .general: return String(localized: "Appearance and application language.", table: "Settings")
+        case .shortcuts: return String(localized: "Global shortcuts for recording and playback.", table: "Settings")
+        case .recording: return String(localized: "Capture behavior and status feedback.", table: "Settings")
+        case .playback: return String(localized: "Default repeat count and playback speed.", table: "Settings")
+        case .visualEvidence: return String(localized: "Optional visual context, privacy, and retention.", table: "Settings")
+        case .permissions: return String(localized: "System access required to record and replay.", table: "Settings")
+        }
+    }
+
+    var systemImage: String {
+        switch self {
+        case .general: return "gearshape"
+        case .shortcuts: return "keyboard"
+        case .recording: return "record.circle"
+        case .playback: return "play.circle"
+        case .visualEvidence: return "film.stack"
+        case .permissions: return "lock.shield"
+        }
+    }
+}
+
 struct SettingsPanel: View {
     let controller: MenuBarController
     /// True when hosted in the dedicated Settings window.
@@ -13,6 +57,8 @@ struct SettingsPanel: View {
     @State private var semanticRetentionCleanupPreview: SemanticRecordingRetentionCleanupPreview?
     @State private var semanticRetentionCleanupBusy = false
     @State private var showSemanticRetentionCleanupConfirmation = false
+    @State private var languagePreferenceDraft = AppLanguagePreference.current()
+    @State private var selectedCategory: SettingsCategory = .general
 
     private let hotkeyOptions: [HotkeyBinding] = [
         HotkeyBinding(keyCode: 15, name: "⌥R", modifiers: 2048),
@@ -56,174 +102,19 @@ struct SettingsPanel: View {
     var body: some View {
         ZStack {
             VisualEffectBackground(material: inWindow ? .windowBackground : .popover)
-            ScrollView {
-                VStack(alignment: .leading, spacing: 14) {
-                    settingsHeader
-
-                    settingsGroup(String(localized: "Hotkeys", table: "Common"), systemImage: "keyboard") {
-                        hotkeyRow(title: String(localized: "Record / Stop", table: "Recording"), binding: Binding(
-                            get: { state.recordHotkey },
-                            set: { state.recordHotkey = $0; controller.reapplyHotkeys() }
-                        ))
-                        hotkeyRow(title: String(localized: "Stop everything", table: "Common"), binding: Binding(
-                            get: { state.stopHotkey },
-                            set: { state.stopHotkey = $0; controller.reapplyHotkeys() }
-                        ))
-                        hotkeyRow(title: String(localized: "Play", table: "Common"), binding: Binding(
-                            get: { state.playHotkey },
-                            set: { state.playHotkey = $0; controller.reapplyHotkeys() }
-                        ))
-                    }
-
-                    settingsGroup(String(localized: "General", table: "Common"), systemImage: "macwindow") {
-                        HStack {
-                            Text("Show as", tableName: "Common").font(.system(size: 11.5))
-                            Spacer()
-                            Picker("", selection: Binding(
-                                get: { state.menuBarOnly },
-                                set: { controller.setMenuBarOnly($0) }
-                            )) {
-                                Text("Dock app", tableName: "Common").tag(false)
-                                Text("Menu bar only", tableName: "Common").tag(true)
-                            }
-                            .labelsHidden()
-                            .frame(width: 140)
-                        }
-                        Text("Menu bar only hides the Dock icon. Use the menu-bar icon to reopen SparkleRecorder.", tableName: "Recording")
-                            .font(.system(size: 10))
-                            .foregroundStyle(.tertiary)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
-
-                    settingsGroup(String(localized: "Recording", table: "Recording"), systemImage: "record.circle") {
-                        HStack {
-                            Text("Countdown", tableName: "Common").font(.system(size: 11.5))
-                            Spacer()
-                            Picker("", selection: $state.countdownSeconds) {
-                                Text("Off", tableName: "Common").tag(0)
-                                Text("1s").tag(1)
-                                Text("3s").tag(3)
-                                Text("5s").tag(5)
-                            }
-                            .labelsHidden()
-                            .frame(width: 110)
-                        }
-                        HStack {
-                            Text("Status UI", tableName: "Common").font(.system(size: 11.5))
-                            Spacer()
-                            Picker("", selection: $state.recordingHUDMode) {
-                                ForEach(RecordingHUDMode.allCases) { mode in
-                                    Text(mode.title).tag(mode)
-                                }
-                            }
-                            .labelsHidden()
-                            .pickerStyle(.segmented)
-                            .frame(width: 210)
-                        }
-                        Toggle(isOn: $state.soundEnabled) {
-                            Text("Sound effects", tableName: "Common").font(.system(size: 11.5))
-                        }
-                        .toggleStyle(.switch)
-                        .controlSize(.mini)
-                        Toggle(isOn: $state.recordMouseMoves) {
-                            Text("Record mouse moves", tableName: "Recording").font(.system(size: 11.5))
-                        }
-                        .toggleStyle(.switch)
-                        .controlSize(.mini)
-                    }
-
-                    settingsGroup(String(localized: "Visual Evidence", table: "Automation"), systemImage: "film.stack") {
-                        Toggle(isOn: semanticRecordingEnabledBinding) {
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text("Record visual evidence", tableName: "Automation")
-                                    .font(.system(size: 11.5))
-                                Text("Frames, OCR, and privacy exclusions stay separate from playable macro events.", tableName: "EditorUX")
-                                    .font(.system(size: 10))
-                                    .foregroundStyle(.tertiary)
-                                    .fixedSize(horizontal: false, vertical: true)
-                            }
-                        }
-                        .toggleStyle(.switch)
-                        .controlSize(.mini)
-                        if state.semanticRecordingEnabled {
-                            Divider()
-                            semanticRecordingPreflightPanel(state.semanticRecordingPreflightPresentation)
-                            Divider()
-                            semanticRecordingRetentionPanel()
-                            Divider()
-                            semanticRecordingSuppressionPanel()
-                        }
-                    }
-
-                    settingsGroup(String(localized: "Replay Defaults", table: "Common"), systemImage: "play.circle") {
-                        HStack {
-                            Text("Repeat", tableName: "Common").font(.system(size: 11.5))
-                            Spacer()
-                            Menu {
-                                Button(String(localized: "Once", table: "Common")) { state.loops = 1 }
-                                Button("2×") { state.loops = 2 }
-                                Button("5×") { state.loops = 5 }
-                                Button("10×") { state.loops = 10 }
-                                Button("25×") { state.loops = 25 }
-                                Button("100×") { state.loops = 100 }
-                                Divider()
-                                Button { state.loops = 0 } label: { Label(String(localized: "Continuous", table: "Common"), systemImage: "infinity") }
-                                Divider()
-                                Button(String(localized: "Custom…", table: "Common")) {
-                                    customLoopText = state.loops > 0 ? "\(state.loops)" : ""
-                                    showCustomLoop = true
-                                }
-                            } label: {
-                                Text(state.loops <= 0 ? String(localized: "Continuous", table: "Common") : "\(state.loops)×")
-                                    .font(.system(size: 11.5, weight: .semibold, design: .monospaced))
-                            }
-                            .menuStyle(.borderlessButton)
-                            .frame(width: 120)
-                        }
-                        HStack {
-                            Text("Speed", tableName: "Common").font(.system(size: 11.5))
-                            Spacer()
-                            Picker("", selection: $state.speed) {
-                                Text("0.5×").tag(0.5)
-                                Text("1×").tag(1.0)
-                                Text("2×").tag(2.0)
-                                Text("4×").tag(4.0)
-                            }
-                            .labelsHidden()
-                            .frame(width: 110)
-                        }
-                    }
-
-                    settingsGroup(String(localized: "Permissions", table: "Settings"), systemImage: "lock.shield") {
-                        permissionRow(title: String(localized: "Accessibility", table: "Settings"),
-                                      granted: state.accessibilityGranted,
-                                      action: controller.openAccessibilityPrefs)
-                        permissionRow(title: String(localized: "Input Monitoring", table: "Common"),
-                                      granted: state.inputMonitoringGranted,
-                                      action: controller.openInputMonitoringPrefs)
-                        permissionRow(title: String(localized: "Screen Recording", table: "Recording"),
-                                      granted: state.screenCaptureGranted,
-                                      action: controller.openScreenCapturePrefs)
-                    }
-
-                    HStack {
-                        Button(String(localized: "Replay welcome", table: "Common")) { controller.showWelcome() }
-                            .buttonStyle(.borderless)
-                            .controlSize(.small)
-                        Spacer()
-                        Text(appVersion)
-                            .font(.system(size: 10))
-                            .foregroundStyle(.secondary)
-                        Button(String(localized: "Quit", table: "Common")) { controller.quit() }
-                            .buttonStyle(.borderless)
-                            .controlSize(.small)
-                    }
-                }
-                .padding(14)
+            if inWindow {
+                settingsWindowContent
+            } else {
+                compactSettingsContent
             }
         }
-        .frame(width: inWindow ? 560 : 340)
+        .frame(
+            minWidth: inWindow ? 640 : 340,
+            idealWidth: inWindow ? 760 : 340,
+            maxWidth: inWindow ? .infinity : 340
+        )
         .onAppear {
+            languagePreferenceDraft = AppLanguagePreference.current()
             if state.semanticRecordingEnabled,
                state.semanticRecordingPreflightPresentation == nil {
                 controller.refreshSemanticRecordingPreflightPresentation()
@@ -252,6 +143,351 @@ struct SettingsPanel: View {
         }
     }
 
+    private var settingsWindowContent: some View {
+        HStack(spacing: 0) {
+            VStack(spacing: 0) {
+                VStack(spacing: 4) {
+                    ForEach(SettingsCategory.allCases) { category in
+                        settingsSidebarButton(category)
+                    }
+                }
+                .padding(12)
+                .frame(maxWidth: .infinity, alignment: .top)
+
+                Spacer(minLength: 20)
+
+                Divider()
+                VStack(alignment: .leading, spacing: 8) {
+                    sidebarStatusRow(
+                        title: permissionsReady
+                            ? String(localized: "Ready", table: "Common")
+                            : String(localized: "Needs access", table: "Settings"),
+                        systemImage: permissionsReady ? "checkmark.circle.fill" : "exclamationmark.triangle.fill",
+                        tint: permissionsReady ? .green : .orange
+                    )
+                    sidebarStatusRow(
+                        title: state.semanticRecordingEnabled
+                            ? String(localized: "Evidence on", table: "Automation")
+                            : String(localized: "Evidence off", table: "Automation"),
+                        systemImage: state.semanticRecordingEnabled ? "film.stack.fill" : "film.stack",
+                        tint: Brand.libraryBlue
+                    )
+                    Text(appVersion)
+                        .font(.system(size: 10, design: .monospaced))
+                        .foregroundStyle(.tertiary)
+                }
+                .padding(14)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .frame(width: 196)
+
+            Divider()
+
+            ScrollView {
+                VStack(alignment: .leading, spacing: 22) {
+                    VStack(alignment: .leading, spacing: 5) {
+                        Label(selectedCategory.title, systemImage: selectedCategory.systemImage)
+                            .font(.system(size: 21, weight: .semibold))
+                        Text(selectedCategory.subtitle)
+                            .font(.system(size: 12))
+                            .foregroundStyle(.secondary)
+                    }
+
+                    selectedSettingsGroup
+
+                    if selectedCategory == .general {
+                        Divider()
+                        settingsFooter
+                    }
+                }
+                .frame(maxWidth: 620, alignment: .leading)
+                .padding(.horizontal, 28)
+                .padding(.vertical, 24)
+                .frame(maxWidth: .infinity, alignment: .topLeading)
+            }
+        }
+    }
+
+    private func settingsSidebarButton(_ category: SettingsCategory) -> some View {
+        let isSelected = selectedCategory == category
+        return Button {
+            selectedCategory = category
+        } label: {
+            HStack(spacing: 9) {
+                Image(systemName: category.systemImage)
+                    .font(.system(size: 12, weight: .medium))
+                    .frame(width: 18, height: 18)
+                Text(category.title)
+                    .font(.system(size: 12, weight: isSelected ? .semibold : .medium))
+                    .lineLimit(1)
+                Spacer(minLength: 0)
+            }
+            .foregroundStyle(isSelected ? AnyShapeStyle(.primary) : AnyShapeStyle(.secondary))
+            .padding(.horizontal, 11)
+            .frame(maxWidth: .infinity, minHeight: 36, alignment: .leading)
+            .background(
+                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                    .fill(Color.primary.opacity(isSelected ? 0.075 : 0))
+            )
+            .overlay(alignment: .leading) {
+                if isSelected {
+                    RoundedRectangle(cornerRadius: 1.5, style: .continuous)
+                        .fill(Brand.libraryBlue)
+                        .frame(width: 3, height: 20)
+                        .padding(.leading, 2)
+                }
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
+    }
+
+    private var compactSettingsContent: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 14) {
+                settingsHeader
+                settingsSections
+                settingsFooter
+            }
+            .padding(14)
+        }
+    }
+
+    @ViewBuilder
+    private var selectedSettingsGroup: some View {
+        switch selectedCategory {
+        case .general: applicationSettingsGroup
+        case .shortcuts: hotkeySettingsGroup
+        case .recording: recordingSettingsGroup
+        case .playback: replaySettingsGroup
+        case .visualEvidence: visualEvidenceSettingsGroup
+        case .permissions: permissionsSettingsGroup
+        }
+    }
+
+    private var settingsFooter: some View {
+        HStack {
+            Button(String(localized: "Replay welcome", table: "Common")) { controller.showWelcome() }
+                .buttonStyle(.borderless)
+                .controlSize(.small)
+            Spacer()
+            Button(String(localized: "Quit", table: "Common")) { controller.quit() }
+                .buttonStyle(.borderless)
+                .controlSize(.small)
+        }
+    }
+
+    private func sidebarStatusRow(title: String, systemImage: String, tint: Color) -> some View {
+        Label(title, systemImage: systemImage)
+            .font(.system(size: 10.5, weight: .medium))
+            .foregroundStyle(tint)
+    }
+
+    @ViewBuilder
+    private var settingsSections: some View {
+        hotkeySettingsGroup
+        applicationSettingsGroup
+        recordingSettingsGroup
+        visualEvidenceSettingsGroup
+        replaySettingsGroup
+        permissionsSettingsGroup
+    }
+
+    private var applicationSettingsGroup: some View {
+        settingsGroup(String(localized: "General", table: "Common"), systemImage: "macwindow") {
+            settingRow(String(localized: "Show as", table: "Common")) {
+                Picker("", selection: Binding(
+                    get: { state.menuBarOnly },
+                    set: { controller.setMenuBarOnly($0) }
+                )) {
+                    Text("Dock app", tableName: "Common").tag(false)
+                    Text("Menu bar only", tableName: "Common").tag(true)
+                }
+                .labelsHidden()
+                .frame(width: 160)
+            }
+            Text("Menu bar only hides the Dock icon. Use the menu-bar icon to reopen SparkleRecorder.", tableName: "Recording")
+                .settingsDescriptionStyle()
+
+            Divider()
+
+            settingRow(String(localized: "Language", table: "Settings")) {
+                Picker("", selection: $languagePreferenceDraft) {
+                    ForEach(AppLanguagePreference.allCases) { preference in
+                        Text(preference.title).tag(preference)
+                    }
+                }
+                .labelsHidden()
+                .frame(width: 190)
+            }
+            Text("The selected language applies after SparkleRecorder relaunches.", tableName: "Settings")
+                .settingsDescriptionStyle()
+
+            if languagePreferenceNeedsRelaunch {
+                HStack(spacing: 8) {
+                    Image(systemName: "arrow.clockwise")
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundStyle(.secondary)
+                    Text("Relaunch required", tableName: "Settings")
+                        .font(.system(size: 10.5, weight: .medium))
+                        .foregroundStyle(.secondary)
+                    Spacer(minLength: 8)
+                    Button(String(localized: "Apply and Relaunch", table: "Settings")) {
+                        controller.applyLanguagePreferenceAndRelaunch(languagePreferenceDraft)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.small)
+                }
+            }
+        }
+    }
+
+    private var hotkeySettingsGroup: some View {
+        settingsGroup(String(localized: "Hotkeys", table: "Common"), systemImage: "keyboard") {
+            hotkeyRow(title: String(localized: "Record / Stop", table: "Recording"), binding: Binding(
+                get: { state.recordHotkey },
+                set: { state.recordHotkey = $0; controller.reapplyHotkeys() }
+            ))
+            hotkeyRow(title: String(localized: "Stop everything", table: "Common"), binding: Binding(
+                get: { state.stopHotkey },
+                set: { state.stopHotkey = $0; controller.reapplyHotkeys() }
+            ))
+            hotkeyRow(title: String(localized: "Play", table: "Common"), binding: Binding(
+                get: { state.playHotkey },
+                set: { state.playHotkey = $0; controller.reapplyHotkeys() }
+            ))
+        }
+    }
+
+    private var languagePreferenceNeedsRelaunch: Bool {
+        languagePreferenceDraft != AppLanguagePreference.current()
+            || !languagePreferenceDraft.matches(languageIdentifiers: Locale.preferredLanguages)
+    }
+
+    private var recordingSettingsGroup: some View {
+        settingsGroup(String(localized: "Recording", table: "Recording"), systemImage: "record.circle") {
+            settingRow(String(localized: "Countdown", table: "Common")) {
+                Picker("", selection: $state.countdownSeconds) {
+                    Text("Off", tableName: "Common").tag(0)
+                    Text("1s").tag(1)
+                    Text("3s").tag(3)
+                    Text("5s").tag(5)
+                }
+                .labelsHidden()
+                .frame(width: 112)
+            }
+            VStack(alignment: .leading, spacing: 5) {
+                Text("Status UI", tableName: "Common")
+                    .font(.system(size: 11.5))
+                Picker("", selection: $state.recordingHUDMode) {
+                    ForEach(RecordingHUDMode.allCases) { mode in
+                        Text(mode.title).tag(mode)
+                    }
+                }
+                .labelsHidden()
+                .pickerStyle(.segmented)
+                .frame(maxWidth: .infinity)
+            }
+            Toggle(isOn: $state.soundEnabled) {
+                Text("Sound effects", tableName: "Common").font(.system(size: 11.5))
+            }
+            .toggleStyle(.switch)
+            .controlSize(.mini)
+            Toggle(isOn: $state.recordMouseMoves) {
+                Text("Record mouse moves", tableName: "Recording").font(.system(size: 11.5))
+            }
+            .toggleStyle(.switch)
+            .controlSize(.mini)
+        }
+    }
+
+    private var visualEvidenceSettingsGroup: some View {
+        settingsGroup(String(localized: "Visual Evidence", table: "Automation"), systemImage: "film.stack") {
+            Toggle(isOn: semanticRecordingEnabledBinding) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Record visual evidence", tableName: "Automation")
+                        .font(.system(size: 11.5))
+                    Text("Frames, OCR, and privacy exclusions stay separate from playable macro events.", tableName: "EditorUX")
+                        .settingsDescriptionStyle()
+                }
+            }
+            .toggleStyle(.switch)
+            .controlSize(.mini)
+            if state.semanticRecordingEnabled {
+                Divider()
+                semanticRecordingPreflightPanel(state.semanticRecordingPreflightPresentation)
+                Divider()
+                semanticRecordingRetentionPanel()
+                Divider()
+                semanticRecordingSuppressionPanel()
+            }
+        }
+    }
+
+    private var replaySettingsGroup: some View {
+        settingsGroup(String(localized: "Replay Defaults", table: "Common"), systemImage: "play.circle") {
+            settingRow(String(localized: "Repeat", table: "Common")) {
+                Menu {
+                    Button(String(localized: "Once", table: "Common")) { state.loops = 1 }
+                    Button("2×") { state.loops = 2 }
+                    Button("5×") { state.loops = 5 }
+                    Button("10×") { state.loops = 10 }
+                    Button("25×") { state.loops = 25 }
+                    Button("100×") { state.loops = 100 }
+                    Divider()
+                    Button { state.loops = 0 } label: { Label(String(localized: "Continuous", table: "Common"), systemImage: "infinity") }
+                    Divider()
+                    Button(String(localized: "Custom…", table: "Common")) {
+                        customLoopText = state.loops > 0 ? "\(state.loops)" : ""
+                        showCustomLoop = true
+                    }
+                } label: {
+                    Text(state.loops <= 0 ? String(localized: "Continuous", table: "Common") : "\(state.loops)×")
+                        .font(.system(size: 11.5, weight: .semibold, design: .monospaced))
+                }
+                .menuStyle(.borderlessButton)
+                .frame(width: 120)
+            }
+            settingRow(String(localized: "Speed", table: "Common")) {
+                Picker("", selection: $state.speed) {
+                    Text("0.5×").tag(0.5)
+                    Text("1×").tag(1.0)
+                    Text("2×").tag(2.0)
+                    Text("4×").tag(4.0)
+                }
+                .labelsHidden()
+                .frame(width: 112)
+            }
+        }
+    }
+
+    private var permissionsSettingsGroup: some View {
+        settingsGroup(String(localized: "Permissions", table: "Settings"), systemImage: "lock.shield") {
+            permissionRow(title: String(localized: "Accessibility", table: "Settings"),
+                          granted: state.accessibilityGranted,
+                          action: controller.openAccessibilityPrefs)
+            permissionRow(title: String(localized: "Input Monitoring", table: "Common"),
+                          granted: state.inputMonitoringGranted,
+                          action: controller.openInputMonitoringPrefs)
+            permissionRow(title: String(localized: "Screen Recording", table: "Recording"),
+                          granted: state.screenCaptureGranted,
+                          action: controller.openScreenCapturePrefs)
+        }
+    }
+
+    private func settingRow<Control: View>(
+        _ title: String,
+        @ViewBuilder control: () -> Control
+    ) -> some View {
+        HStack(spacing: 12) {
+            Text(title)
+                .font(.system(size: 11.5))
+            Spacer(minLength: 12)
+            control()
+        }
+    }
+
     private var settingsHeader: some View {
         HStack(alignment: .center, spacing: 10) {
             Image(systemName: "gearshape.fill")
@@ -268,20 +504,10 @@ struct SettingsPanel: View {
 
             Spacer()
 
-            settingsStatusBadge(
-                title: permissionsReady
-                    ? String(localized: "Ready", table: "Common")
-                    : String(localized: "Needs access", table: "Settings"),
-                systemImage: permissionsReady ? "checkmark.circle.fill" : "exclamationmark.triangle.fill",
-                tint: permissionsReady ? .green : .orange
-            )
-            settingsStatusBadge(
-                title: state.semanticRecordingEnabled
-                    ? String(localized: "Evidence on", table: "Automation")
-                    : String(localized: "Evidence off", table: "Automation"),
-                systemImage: state.semanticRecordingEnabled ? "film.stack.fill" : "film.stack",
-                tint: Brand.libraryBlue
-            )
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 8) { settingsStatusBadges }
+                VStack(alignment: .trailing, spacing: 5) { settingsStatusBadges }
+            }
         }
         .padding(12)
         .background(
@@ -291,6 +517,24 @@ struct SettingsPanel: View {
                     RoundedRectangle(cornerRadius: 8, style: .continuous)
                         .strokeBorder(Color.primary.opacity(0.08), lineWidth: 0.5)
                 )
+        )
+    }
+
+    @ViewBuilder
+    private var settingsStatusBadges: some View {
+        settingsStatusBadge(
+            title: permissionsReady
+                ? String(localized: "Ready", table: "Common")
+                : String(localized: "Needs access", table: "Settings"),
+            systemImage: permissionsReady ? "checkmark.circle.fill" : "exclamationmark.triangle.fill",
+            tint: permissionsReady ? .green : .orange
+        )
+        settingsStatusBadge(
+            title: state.semanticRecordingEnabled
+                ? String(localized: "Evidence on", table: "Automation")
+                : String(localized: "Evidence off", table: "Automation"),
+            systemImage: state.semanticRecordingEnabled ? "film.stack.fill" : "film.stack",
+            tint: Brand.libraryBlue
         )
     }
 
@@ -347,18 +591,28 @@ struct SettingsPanel: View {
     @ViewBuilder
     func settingsGroup<Content: View>(_ title: String, systemImage: String, @ViewBuilder content: () -> Content) -> some View {
         VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 5) {
-                Image(systemName: systemImage)
-                    .font(.system(size: 9, weight: .semibold))
-                Text(title.uppercased())
-                    .font(.system(size: 9, weight: .semibold))
-                    .tracking(0.7)
+            if !inWindow {
+                HStack(spacing: 5) {
+                    Image(systemName: systemImage)
+                        .font(.system(size: 9, weight: .semibold))
+                    Text(title.uppercased())
+                        .font(.system(size: 10, weight: .semibold))
+                }
+                .foregroundStyle(.secondary)
             }
-            .foregroundStyle(.secondary)
             VStack(alignment: .leading, spacing: 8) { content() }
-                .padding(10)
-                .cardSurface(cornerRadius: 8)
+                .padding(inWindow ? 18 : 10)
+                .background(
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .fill(Color.primary.opacity(inWindow ? 0.035 : 0.05))
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .strokeBorder(Color.primary.opacity(0.08), lineWidth: 0.5)
+                )
+                .frame(maxWidth: .infinity, alignment: .leading)
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     /// One permission row: shows a green "Granted" status when the permission is
@@ -799,5 +1053,13 @@ struct SettingsPanel: View {
             .labelsHidden()
             .frame(width: 110)
         }
+    }
+}
+
+private extension View {
+    func settingsDescriptionStyle() -> some View {
+        font(.system(size: 10.5))
+            .foregroundStyle(.secondary)
+            .fixedSize(horizontal: false, vertical: true)
     }
 }

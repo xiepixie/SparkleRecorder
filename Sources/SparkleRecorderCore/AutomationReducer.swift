@@ -23,7 +23,15 @@ public struct AutomationReducerResult: Equatable, Sendable {
 public enum AutomationEffect: Codable, Equatable, Sendable {
     case requestResource(runID: UUID, requirement: AutomationResourceRequirement)
     case releaseResource(runID: UUID, lease: AutomationResourceLease)
-    case startPlayer(runID: UUID, workflowID: UUID, taskID: UUID, macroID: UUID)
+    case startPlayer(
+        runID: UUID,
+        workflowID: UUID,
+        taskID: UUID,
+        macroID: UUID,
+        targetApplicationPolicy: AutomationTargetApplicationPolicy = .activateIfRunning,
+        targetApplicationCleanupPolicy: AutomationTargetApplicationCleanupPolicy = .keepOpen,
+        playbackLoops: Int? = nil
+    )
     case cancelPlayer(runID: UUID)
     case evaluateCondition(
         runID: UUID,
@@ -558,10 +566,20 @@ public enum AutomationReducer {
                     }
                     return run.scheduledStartTime
                 })
-                guard let occurrence = schedule.nextDueOccurrence(
-                    onOrBefore: now,
-                    excludingScheduledStartTimes: representedScheduledStarts
-                ) else {
+                let occurrence: AutomationScheduledOccurrence?
+                switch task.missedRunPolicy {
+                case .catchUp:
+                    occurrence = schedule.nextDueOccurrence(
+                        onOrBefore: now,
+                        excludingScheduledStartTimes: representedScheduledStarts
+                    )
+                case .latestOnly:
+                    occurrence = schedule.latestDueOccurrence(
+                        onOrBefore: now,
+                        excludingScheduledStartTimes: representedScheduledStarts
+                    )
+                }
+                guard let occurrence else {
                     continue
                 }
 
@@ -730,7 +748,15 @@ public enum AutomationReducer {
                 state.runs[index].actualStartTime = now
             }
             state.runs[index].status = .queued
-            return [.startPlayer(runID: runID, workflowID: workflow.id, taskID: task.id, macroID: macroID)]
+            return [.startPlayer(
+                runID: runID,
+                workflowID: workflow.id,
+                taskID: task.id,
+                macroID: macroID,
+                targetApplicationPolicy: task.targetApplicationPolicy,
+                targetApplicationCleanupPolicy: task.targetApplicationCleanupPolicy,
+                playbackLoops: task.playbackLoops
+            )]
 
         case .condition(let condition):
             if state.runs[index].actualStartTime == nil {
@@ -983,9 +1009,11 @@ public enum AutomationReducer {
 
     private static func evidenceID(for outcome: AutomationOutcome) -> UUID? {
         switch outcome {
+        case .succeeded(let report):
+            return report?.runID
         case .failed(let report):
             return report?.runID
-        case .succeeded, .cancelled, .timedOut, .resourceConflict, .permissionDenied,
+        case .cancelled, .timedOut, .resourceConflict, .permissionDenied,
              .conditionMatched, .conditionNotMatched, .missingMacro, .rejected:
             return nil
         }

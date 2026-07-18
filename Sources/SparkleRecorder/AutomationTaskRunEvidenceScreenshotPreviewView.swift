@@ -21,7 +21,7 @@ struct AutomationTaskRunEvidenceScreenshotPreviewView: View {
                         RoundedRectangle(cornerRadius: 7)
                             .strokeBorder(Color.primary.opacity(0.08), lineWidth: 0.6)
                     )
-                    .accessibilityLabel(String(localized: "Failure screenshot preview", table: "Common"))
+                    .accessibilityLabel(String(localized: "Run result screenshot preview", table: "Automation"))
             } else {
                 Label(String(localized: "Screenshot preview unavailable", table: "Common"), systemImage: "photo.badge.exclamationmark")
                     .font(.caption)

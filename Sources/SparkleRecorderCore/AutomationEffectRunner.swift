@@ -325,8 +325,14 @@ public struct AutomationEffectRunner: Sendable {
             await resourceArbiter.release(lease.id)
             return []
 
-        case .startPlayer(let runID, _, _, let macroID):
-            return await startPlayer(runID: runID, macroID: macroID)
+        case .startPlayer(let runID, _, _, let macroID, let targetApplicationPolicy, let cleanupPolicy, let playbackLoops):
+            return await startPlayer(
+                runID: runID,
+                macroID: macroID,
+                targetApplicationPolicy: targetApplicationPolicy,
+                cleanupPolicy: cleanupPolicy,
+                playbackLoops: playbackLoops
+            )
 
         case .cancelPlayer(let runID):
             await player.cancel(runID)
@@ -412,11 +418,20 @@ public struct AutomationEffectRunner: Sendable {
         return [.resourceLeasesAcquired(runID: runID, leases: acquiredLeases, at: requestedAt)]
     }
 
-    private func startPlayer(runID: UUID, macroID: UUID) async -> [AutomationAction] {
+    private func startPlayer(
+        runID: UUID,
+        macroID: UUID,
+        targetApplicationPolicy: AutomationTargetApplicationPolicy,
+        cleanupPolicy: AutomationTargetApplicationCleanupPolicy,
+        playbackLoops: Int?
+    ) async -> [AutomationAction] {
         let startedAt = now()
         do {
-            guard let macro = try await loadMacro(macroID) else {
+            guard var macro = try await loadMacro(macroID) else {
                 return [.playerFinished(runID: runID, outcome: .missingMacro(macroID: macroID), at: startedAt)]
+            }
+            if let playbackLoops {
+                macro.loops = max(1, playbackLoops)
             }
             guard !PlaybackPlanner.plan(events: macro.events, loops: macro.loops, speed: macro.speed).steps.isEmpty else {
                 return [.playerFinished(
@@ -426,7 +441,12 @@ public struct AutomationEffectRunner: Sendable {
                 )]
             }
 
-            let request = AutomationPlayerStartRequest(runID: runID, macro: macro)
+            let request = AutomationPlayerStartRequest(
+                runID: runID,
+                macro: macro,
+                targetApplicationPolicy: targetApplicationPolicy,
+                targetApplicationCleanupPolicy: cleanupPolicy
+            )
             let result = await player.start(request)
             return [result.action(runID: runID, at: startedAt)]
         } catch {

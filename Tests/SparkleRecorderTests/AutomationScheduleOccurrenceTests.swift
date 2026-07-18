@@ -4,13 +4,13 @@ import Testing
 
 @Suite("Automation Schedule Occurrence Tests")
 struct AutomationScheduleOccurrenceTests {
-    @Test("Once schedule returns its date unless already represented by a run")
+    @Test("Upcoming once schedule returns its date unless already represented by a run")
     func onceScheduleReturnsDateUntilRepresented() throws {
         let scheduledAt = Date(timeIntervalSince1970: 7_000)
         let schedule = AutomationSchedule.once(scheduledAt)
 
         let occurrence = try #require(schedule.nextOccurrence(
-            onOrAfter: scheduledAt.addingTimeInterval(10)
+            onOrAfter: scheduledAt.addingTimeInterval(-10)
         ))
         let excluded = schedule.nextOccurrence(
             onOrAfter: scheduledAt.addingTimeInterval(-10),
@@ -20,6 +20,14 @@ struct AutomationScheduleOccurrenceTests {
         #expect(occurrence.occurrenceIndex == 0)
         #expect(occurrence.scheduledAt == scheduledAt)
         #expect(excluded == nil)
+    }
+
+    @Test("Past one-time schedule has no upcoming occurrence")
+    func pastOnceScheduleHasNoUpcomingOccurrence() {
+        let scheduledAt = Date(timeIntervalSince1970: 1_000)
+        let schedule = AutomationSchedule.once(scheduledAt)
+
+        #expect(schedule.nextOccurrence(onOrAfter: scheduledAt.addingTimeInterval(1)) == nil)
     }
 
     @Test("Repeating schedule finds the next unrepresented occurrence")

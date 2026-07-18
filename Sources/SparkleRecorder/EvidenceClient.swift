@@ -19,6 +19,23 @@ public actor EvidenceClient {
         )
     }
 
+    public func recordSuccess(
+        macroID: UUID,
+        report: RunReport,
+        surfaces: [String: PlaybackSurface]
+    ) async {
+        let preferredSurface = surfaces.values.first
+        let screenshotData = await captureWindowScreenshot(
+            bundleIdentifier: preferredSurface?.bundleIdentifier,
+            title: preferredSurface?.windowTitle
+        )
+        await savePlaybackEvidence(
+            macroID: macroID,
+            report: report,
+            screenshotData: screenshotData
+        )
+    }
+
     /// Records the outcome of a macro playback.
     public func recordPlayback(macroID: UUID, startTime: Date, duration: TimeInterval, success: Bool, failedEventIndex: Int?, errorMessage: String?, screenshotData: Data? = nil) async {
         
@@ -42,6 +59,10 @@ public actor EvidenceClient {
     }
 
     private func captureFailureScreenshot(bundleIdentifier: String?, title: String?) async -> Data? {
+        await captureWindowScreenshot(bundleIdentifier: bundleIdentifier, title: title)
+    }
+
+    private func captureWindowScreenshot(bundleIdentifier: String?, title: String?) async -> Data? {
         guard #available(macOS 14.0, *) else { return nil }
         do {
             let image = try await ScreenCaptureService.shared.captureWindow(bundleIdentifier: bundleIdentifier, title: title)

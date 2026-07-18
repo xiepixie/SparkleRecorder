@@ -207,7 +207,7 @@ struct AutomationWorkflowDraftPreviewSheet: View {
 
     private var footer: some View {
         HStack(spacing: 10) {
-            Button("Close", systemImage: "xmark", action: dismiss.callAsFunction)
+            LocalizedSystemButton("Close", tableName: L10nTable.common, systemImage: "xmark", action: dismiss.callAsFunction)
                 .buttonStyle(.bordered)
 
             Spacer()

@@ -70,6 +70,14 @@ Reducer 基本签名不再放在 Phase 0，它是 Owner A 在 Phase 1 的第一�
 
 当前已接受的 A/C 接口变更：FlowGraph 节点移动使用 `AutomationAction.moveTask`，reducer 持久化 `AutomationTask.graphPosition`，projection 优先读取该位置再回退到自动 DAG 布局；workflow/task/dependency authoring 使用 reducer edit actions，schedule/condition 表单只提交 `AutomationAction.upsertTask`；join policy UI 读取 `AutomationTaskNodeProjection.joinPolicy` / `joinPolicyLabel` / `incomingDependencyCount`，Graph badge 和 Inspector 编辑不重新实现 dependency resolution。
 
+当前已接受的 A/B/C 目标应用启动接口：`AutomationTask.targetApplicationPolicy` 使用 `doNotActivate` / `activateIfRunning` / `launchIfNeeded` 表达任务级意图，旧 workflow 解码默认 `activateIfRunning`；reducer 将策略随 `AutomationEffect.startPlayer` 交给 Owner B，Owner B 在 Player 开始前激活或启动宏绑定 surface 的 bundle identifier，并在 `launchIfNeeded` 下等待绑定窗口出现，失败时返回可解释的 rejected outcome。Owner C 只编辑该字段并通过 `.upsertTask` 保存；Quick Schedule 新任务默认 `launchIfNeeded`，现有任务行为不变。
+
+当前已接受的单宏自动运行接口：`AutomationTask.targetApplicationCleanupPolicy` 使用 `keepOpen` / `quitIfLaunched` 表达结束清理意图，旧 workflow 解码默认 `keepOpen`。Owner B 的目标应用 prepare 返回本次实际启动的 bundle identifiers，证据捕获完成后才允许 cleanup；`quitIfLaunched` 只处理该 session 内的应用，禁止退出运行前已存在的应用。Quick Schedule 新任务默认 `quitIfLaunched`。成功 `RunReport` 与失败报告一样将 `runID` 绑定为 `AutomationTaskRun.evidenceID`，Owner C 从 Library 通过 presenter 读取证据，不直接访问文件系统。
+
+当前已接受的单宏播放次数接口：`AutomationTask.playbackLoops` 是可选任务级覆盖，旧 workflow 缺失时保持宏自身循环语义。Quick Schedule 固定写入 `1`，Owner A 随 `startPlayer` effect 交给 Owner B，Owner B 在规划与播放前覆盖加载宏的 loop count。该字段随 workflow Codable 和 draft import/export 往返，避免 Library 的无限循环配置阻止自动任务完成与清理。
+
+当前已接受的遗漏运行接口：`AutomationTask.missedRunPolicy` 使用 `catchUp` / `latestOnly`。旧 workflow 解码为 `catchUp` 以保持历史语义；Quick Schedule 写入 `latestOnly`。Reducer 对 `latestOnly` 只创建当前时刻最近一个到期 occurrence，若它已被 run 表示则不会回头补建更早遗漏，防止 App 关闭数天后形成补跑队列。该字段随 workflow Codable 和 draft import/export 往返。
+
 当前已接受的 draft/import loop 变更：`sparkle.workflow.draft.v1` 可以表达固定次数 `loop` draft task；`AutomationWorkflowDraftLoopExpander` 在 validate 通过后、simulate/import 前把 loop body 展开成普通 acyclic tasks/dependencies，并按 body source 类型使用 `success` 或 `conditionMatched` 触发下一步。Owner A 保持 reducer/runtime 只接收普通 DAG workflow，Owner C 只显示 Draft Preview 的 loop 摘要和 projection-backed expansion/boundary explanation，Owner B package/repository 不保存特殊 runtime loop state。dependency cycle/self-edge validation 仍然有效，repeat-until / foreach、loop authoring UI 和 run evidence 是未来接口请求。
 
 ## Planning Files

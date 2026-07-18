@@ -292,7 +292,12 @@ final class Player: ObservableObject {
             let evidenceClient = evidenceClient
             Task(priority: .utility) {
                 await evidenceClient.recordFailure(failureEvidence)
+                await MainActor.run {
+                    automationCompletion?(terminalOutcome.automationCompletion)
+                    completion?(terminalOutcome.didFinishNaturally)
+                }
             }
+            return
         }
 
         automationCompletion?(terminalOutcome.automationCompletion)

@@ -11,12 +11,16 @@ struct CompactMacroRow: View {
     let onSelect: (NSEvent.ModifierFlags) -> Void
     let onPlay: () -> Void
     let onEdit: () -> Void
+    let automationSummary: AutomationMacroScheduleSummary?
+    let onSchedule: () -> Void
+    let onShowEvidence: () -> Void
     let onSetIcon: (String?) -> Void
     let onAssignHotkey: () -> Void
 
     @State private var hovered = false
     @State private var playHovered = false
     @State private var editHovered = false
+    @State private var scheduleHovered = false
 
     var body: some View {
         HStack(spacing: 12) {
@@ -46,12 +50,44 @@ struct CompactMacroRow: View {
                             .font(.system(size: 10, weight: .semibold))
                             .foregroundStyle(AnyShapeStyle(.yellow))
                     }
+
+                    if let automationSummary {
+                        Button(action: onSchedule) {
+                            Label(automationSummary.statusText, systemImage: "calendar.badge.checkmark")
+                                .font(.system(size: 10, weight: .medium))
+                                .foregroundStyle(.secondary)
+                                .lineLimit(1)
+                                .frame(maxWidth: 190, alignment: .leading)
+                        }
+                        .buttonStyle(.plain)
+                        .help(String(localized: "Edit automatic run…", table: "Automation"))
+                    }
                 }
             }
             
             Spacer(minLength: 8)
             
             if hovered || isCurrent {
+                Button(action: onShowEvidence) {
+                    Image(systemName: "photo.on.rectangle.angled")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(.secondary)
+                        .frame(width: 24, height: 24)
+                }
+                .buttonStyle(.plain)
+                .help(String(localized: "Latest run…", table: "Automation"))
+
+                Button(action: onSchedule) {
+                    Image(systemName: "calendar.badge.clock")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(scheduleHovered ? Brand.sigAmber : .secondary)
+                        .frame(width: 24, height: 24)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .onHover { scheduleHovered = $0 }
+                .help(String(localized: "Run automatically…", table: "Automation"))
+
                 Button(action: onEdit) {
                     Image(systemName: "slider.horizontal.below.rectangle")
                         .font(.system(size: 12, weight: .bold))
@@ -96,10 +132,11 @@ struct CompactMacroRow: View {
             onSelect(mods)
         }
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(macro.name)
+        .accessibilityLabel(accessibilitySummary)
         .accessibilityAction { onSelect([]) }
         .accessibilityAction(named: String(localized: "Play", table: "Common")) { onPlay() }
         .accessibilityAction(named: String(localized: "Edit", table: "Common")) { onEdit() }
+        .accessibilityAction(named: automationActionTitle) { onSchedule() }
         .animation(.spring(response: 0.2, dampingFraction: 0.8), value: hovered)
     }
     
@@ -109,5 +146,16 @@ struct CompactMacroRow: View {
         let s = Int(d) % 60
         let cs = Int((d - floor(d)) * 100)
         return String(format: "%02d:%02d.%02d", m, s, cs)
+    }
+
+    private var automationActionTitle: String {
+        automationSummary == nil
+            ? String(localized: "Run automatically", table: "Automation")
+            : String(localized: "Edit automatic run", table: "Automation")
+    }
+
+    private var accessibilitySummary: String {
+        guard let automationSummary else { return macro.name }
+        return "\(macro.name), \(automationSummary.statusText)"
     }
 }

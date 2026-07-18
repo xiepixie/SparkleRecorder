@@ -1,6 +1,30 @@
 {
   "sourceLanguage": "en",
   "strings": {
+    "Appearance and application language.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Appearance and application language." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "显示方式与应用语言。" } }
+      }
+    },
+    "Apply and Relaunch": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apply and Relaunch"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "应用并重新打开"
+          }
+        }
+      }
+    },
     "ADVANCED": {
       "extractionState": "manual",
       "localizations": {
@@ -32,6 +56,54 @@
           "stringUnit": {
             "state": "translated",
             "value": "辅助功能"
+          }
+        }
+      }
+    },
+    "Could not relaunch SparkleRecorder: %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Could not relaunch SparkleRecorder: %@"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "无法重新打开 SparkleRecorder：%@"
+          }
+        }
+      }
+    },
+    "Capture behavior and status feedback.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Capture behavior and status feedback." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "录制行为与状态反馈。" } }
+      }
+    },
+    "Default repeat count and playback speed.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Default repeat count and playback speed." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "默认重复次数与播放速度。" } }
+      }
+    },
+    "English": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "English"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "English"
           }
         }
       }
@@ -69,6 +141,37 @@
             "value": "已授权"
           }
         }
+      }
+    },
+    "Global shortcuts for recording and playback.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Global shortcuts for recording and playback." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "录制和播放使用的全局快捷键。" } }
+      }
+    },
+    "Language": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Language"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "语言"
+          }
+        }
+      }
+    },
+    "Keyboard Shortcuts": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Keyboard Shortcuts" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "键盘快捷键" } }
       }
     },
     "Grant…": {
@@ -191,6 +294,54 @@
         }
       }
     },
+    "Optional visual context, privacy, and retention.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Optional visual context, privacy, and retention." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "可选的视觉上下文、隐私与保留策略。" } }
+      }
+    },
+    "Playback": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Playback" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "播放" } }
+      }
+    },
+    "Relaunch required": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Relaunch required"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "需要重新打开"
+          }
+        }
+      }
+    },
+    "Simplified Chinese": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Simplified Chinese"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "简体中文"
+          }
+        }
+      }
+    },
     "Settings": {
       "extractionState": "manual",
       "localizations": {
@@ -204,6 +355,47 @@
           "stringUnit": {
             "state": "translated",
             "value": "设置"
+          }
+        }
+      }
+    },
+    "System Default": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "System Default"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "跟随系统"
+          }
+        }
+      }
+    },
+    "System access required to record and replay.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "System access required to record and replay." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "录制和回放所需的系统权限。" } }
+      }
+    },
+    "The selected language applies after SparkleRecorder relaunches.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The selected language applies after SparkleRecorder relaunches."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "重新打开 SparkleRecorder 后应用所选语言。"
           }
         }
       }

@@ -756,23 +756,6 @@
         }
       }
     },
-    "Screen target": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Screen target"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "屏幕定位目标"
-          }
-        }
-      }
-    },
     "Screen text": {
       "extractionState": "manual",
       "localizations": {

@@ -28,12 +28,12 @@ struct AutomationOverviewHeader: View {
                 }
             }
 
-            Button("AI Draft", systemImage: "sparkles", action: onOpenAIDraftPreview)
+            LocalizedSystemButton("AI Draft", tableName: L10nTable.automation, systemImage: "sparkles", action: onOpenAIDraftPreview)
                 .buttonStyle(.borderless)
                 .help(String(localized: "Open AI workflow draft", table: "Automation"))
                 .accessibilityLabel(String(localized: "Open AI workflow draft", table: "Automation"))
 
-            Button("Refresh", systemImage: "arrow.clockwise", action: onRefresh)
+            LocalizedSystemButton("Refresh", tableName: L10nTable.common, systemImage: "arrow.clockwise", action: onRefresh)
                 .labelStyle(.iconOnly)
                 .buttonStyle(.borderless)
                 .frame(width: 28, height: 28)

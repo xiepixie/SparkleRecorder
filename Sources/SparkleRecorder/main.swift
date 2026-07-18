@@ -7837,6 +7837,7 @@ if let twin {
 }
 
 // Normal app mode — full Dock app.
+AppLanguagePreference.bootstrap()
 let app = NSApplication.shared
 let delegate = AppDelegate()
 app.delegate = delegate

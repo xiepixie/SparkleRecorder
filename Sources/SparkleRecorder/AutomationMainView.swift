@@ -48,6 +48,7 @@ struct AutomationMainView: View {
     }
 
     var body: some View {
+        let destination = appState.automationWorkspaceDestination
         Group {
             if #available(macOS 26.0, *) {
                 GlassEffectContainer(spacing: 12) {
@@ -59,6 +60,8 @@ struct AutomationMainView: View {
                         refreshState: model.refreshState,
                         isRecordingMacro: appState.isRecording,
                         recordHotkeyName: appState.recordHotkey.name,
+                        initialSelectedWorkflowID: destination?.workflowID,
+                        initialSelection: destination?.taskID.map(AutomationAuthoringSelection.task) ?? .workflow,
                         onRefresh: refresh,
                         onAction: handleAction,
                         onRecordMacro: onRecordMacro,
@@ -75,6 +78,8 @@ struct AutomationMainView: View {
                     refreshState: model.refreshState,
                     isRecordingMacro: appState.isRecording,
                     recordHotkeyName: appState.recordHotkey.name,
+                    initialSelectedWorkflowID: destination?.workflowID,
+                    initialSelection: destination?.taskID.map(AutomationAuthoringSelection.task) ?? .workflow,
                     onRefresh: refresh,
                     onAction: handleAction,
                     onRecordMacro: onRecordMacro,
@@ -85,6 +90,7 @@ struct AutomationMainView: View {
         }
         .task {
             model.startAutoRefresh()
+            appState.automationWorkspaceDestination = nil
         }
         .onDisappear {
             model.stopAutoRefresh()

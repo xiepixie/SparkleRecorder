@@ -36,6 +36,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         false
     }
 
+    func applicationDidBecomeActive(_ notification: Notification) {
+        menuBar?.state.refreshPermissions()
+    }
+
     // Cmd-Q / Quit menu: never lose an in-flight recording or unsaved edits.
     func applicationWillTerminate(_ notification: Notification) {
         menuBar?.prepareForTermination()

@@ -47,6 +47,46 @@ struct PlaybackStepExecutorTests {
         ])
     }
 
+    @Test("Keyboard input ignores moved-window coordinate offsets")
+    func keyboardInputIgnoresMovedWindowOffsets() throws {
+        let recorder = PostedEventRecorder()
+        let executor = PlaybackStepExecutor(
+            eventPoster: EventPosterClient { event, point in
+                recorder.append(event: event, point: point)
+            }
+        )
+        let recordedSurface = TestFixtures.surface(
+            recordedFrame: RectValue(x: 777, y: 379, width: 788, height: 623),
+            recordedContentFrame: RectValue(x: 777, y: 411, width: 788, height: 591)
+        )
+        let context = TestFixtures.playbackContext(
+            surface: recordedSurface,
+            currentFrame: RectValue(x: 1089, y: 250, width: 788, height: 623),
+            currentContentFrame: RectValue(x: 1089, y: 282, width: 788, height: 591)
+        )
+
+        for (index, kind) in [
+            RecordedEvent.Kind.keyDown,
+            .keyUp,
+            .flagsChanged
+        ].enumerated() {
+            let event = RecordedEvent.make(kind, time: Double(index) * 0.1, keyCode: 53)
+            let step = PlaybackStep(
+                eventIndex: index,
+                event: event,
+                deltaFromPrevious: 0.1,
+                scheduledOffset: Double(index) * 0.1,
+                progress: 1.0
+            )
+
+            let outcome = try executor.execute(step, context: context).get()
+            #expect(outcome == .posted(.zero))
+            #expect(try PointResolver().resolve(event, context: context).get() == .zero)
+        }
+
+        #expect(recorder.snapshot().map(\.point) == [.zero, .zero, .zero])
+    }
+
     @Test("Executor skips semantic events without posting input")
     func executorSkipsSemanticEvents() throws {
         let recorder = PostedEventRecorder()

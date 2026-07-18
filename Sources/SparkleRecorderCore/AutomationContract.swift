@@ -83,6 +83,22 @@ public enum AutomationJoinPolicy: String, Codable, Equatable, Sendable {
     case firstMatched
 }
 
+public enum AutomationTargetApplicationPolicy: String, Codable, Equatable, Sendable, CaseIterable {
+    case doNotActivate
+    case activateIfRunning
+    case launchIfNeeded
+}
+
+public enum AutomationTargetApplicationCleanupPolicy: String, Codable, Equatable, Sendable, CaseIterable {
+    case keepOpen
+    case quitIfLaunched
+}
+
+public enum AutomationMissedRunPolicy: String, Codable, Equatable, Sendable, CaseIterable {
+    case catchUp
+    case latestOnly
+}
+
 public struct AutomationTask: Codable, Equatable, Sendable, Identifiable {
     public var id: UUID
     public var name: String
@@ -93,6 +109,10 @@ public struct AutomationTask: Codable, Equatable, Sendable, Identifiable {
     public var retryPolicy: AutomationRetryPolicy
     public var joinPolicy: AutomationJoinPolicy
     public var isEnabled: Bool
+    public var targetApplicationPolicy: AutomationTargetApplicationPolicy
+    public var targetApplicationCleanupPolicy: AutomationTargetApplicationCleanupPolicy
+    public var playbackLoops: Int?
+    public var missedRunPolicy: AutomationMissedRunPolicy
     public var graphPosition: AutomationGraphPoint?
 
     public init(
@@ -105,6 +125,10 @@ public struct AutomationTask: Codable, Equatable, Sendable, Identifiable {
         retryPolicy: AutomationRetryPolicy = .none,
         joinPolicy: AutomationJoinPolicy = .all,
         isEnabled: Bool = true,
+        targetApplicationPolicy: AutomationTargetApplicationPolicy = .activateIfRunning,
+        targetApplicationCleanupPolicy: AutomationTargetApplicationCleanupPolicy = .keepOpen,
+        playbackLoops: Int? = nil,
+        missedRunPolicy: AutomationMissedRunPolicy = .catchUp,
         graphPosition: AutomationGraphPoint? = nil
     ) {
         self.id = id
@@ -116,6 +140,10 @@ public struct AutomationTask: Codable, Equatable, Sendable, Identifiable {
         self.retryPolicy = retryPolicy
         self.joinPolicy = joinPolicy
         self.isEnabled = isEnabled
+        self.targetApplicationPolicy = targetApplicationPolicy
+        self.targetApplicationCleanupPolicy = targetApplicationCleanupPolicy
+        self.playbackLoops = playbackLoops.map { max(1, $0) }
+        self.missedRunPolicy = missedRunPolicy
         self.graphPosition = graphPosition
     }
 
@@ -129,6 +157,10 @@ public struct AutomationTask: Codable, Equatable, Sendable, Identifiable {
         case retryPolicy
         case joinPolicy
         case isEnabled
+        case targetApplicationPolicy
+        case targetApplicationCleanupPolicy
+        case playbackLoops
+        case missedRunPolicy
         case graphPosition
     }
 
@@ -146,6 +178,19 @@ public struct AutomationTask: Codable, Equatable, Sendable, Identifiable {
         self.retryPolicy = try container.decodeIfPresent(AutomationRetryPolicy.self, forKey: .retryPolicy) ?? .none
         self.joinPolicy = try container.decodeIfPresent(AutomationJoinPolicy.self, forKey: .joinPolicy) ?? .all
         self.isEnabled = try container.decodeIfPresent(Bool.self, forKey: .isEnabled) ?? true
+        self.targetApplicationPolicy = try container.decodeIfPresent(
+            AutomationTargetApplicationPolicy.self,
+            forKey: .targetApplicationPolicy
+        ) ?? .activateIfRunning
+        self.targetApplicationCleanupPolicy = try container.decodeIfPresent(
+            AutomationTargetApplicationCleanupPolicy.self,
+            forKey: .targetApplicationCleanupPolicy
+        ) ?? .keepOpen
+        self.playbackLoops = try container.decodeIfPresent(Int.self, forKey: .playbackLoops).map { max(1, $0) }
+        self.missedRunPolicy = try container.decodeIfPresent(
+            AutomationMissedRunPolicy.self,
+            forKey: .missedRunPolicy
+        ) ?? .catchUp
         self.graphPosition = try container.decodeIfPresent(AutomationGraphPoint.self, forKey: .graphPosition)
     }
 
@@ -160,6 +205,10 @@ public struct AutomationTask: Codable, Equatable, Sendable, Identifiable {
         try container.encode(retryPolicy, forKey: .retryPolicy)
         try container.encode(joinPolicy, forKey: .joinPolicy)
         try container.encode(isEnabled, forKey: .isEnabled)
+        try container.encode(targetApplicationPolicy, forKey: .targetApplicationPolicy)
+        try container.encode(targetApplicationCleanupPolicy, forKey: .targetApplicationCleanupPolicy)
+        try container.encodeIfPresent(playbackLoops, forKey: .playbackLoops)
+        try container.encode(missedRunPolicy, forKey: .missedRunPolicy)
         try container.encodeIfPresent(graphPosition, forKey: .graphPosition)
     }
 

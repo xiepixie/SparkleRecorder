@@ -9,10 +9,10 @@ struct PickerInstructionView: View {
                 .font(.system(size: 16, weight: .semibold))
                 .foregroundColor(.white)
             VStack(alignment: .leading, spacing: 2) {
-                Text("Double-click anywhere to pick coordinate", tableName: "EditorUX")
+                Text(NSLocalizedString("Double-click anywhere to pick coordinate", tableName: "EditorUX", comment: ""))
                     .font(.system(size: 13, weight: .bold))
                     .foregroundColor(.white)
-                Text("Press ESC to cancel", tableName: "Common")
+                Text(NSLocalizedString("Press ESC to cancel", tableName: "Common", comment: ""))
                     .font(.system(size: 10))
                     .foregroundColor(.white.opacity(0.7))
             }

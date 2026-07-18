@@ -1,227 +1,62 @@
 {
   "sourceLanguage": "en",
   "strings": {
-  "Add a task before scheduling": {
-    "extractionState": "manual",
-    "localizations": {
-      "en": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "Add a task before scheduling"
-        }
-      },
-      "zh-Hans": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "请先添加任务再设定计划"
-        }
+    "Every day": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Every day" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "每天" } }
       }
-    }
-  },
-  "Drag a macro into the workflow, then choose when it should run.": {
-    "extractionState": "manual",
-    "localizations": {
-      "en": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "Drag a macro into the workflow, then choose when it should run."
-        }
-      },
-      "zh-Hans": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "将宏拖入工作流，然后选择运行时间。"
-        }
+    },
+    "Keep SparkleRecorder open so this run can start on time.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Keep SparkleRecorder open so this run can start on time." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "请保持 SparkleRecorder 运行，以便按时开始。" } }
       }
-    }
-  },
-  "Keep SparkleRecorder open": {
-    "extractionState": "manual",
-    "localizations": {
-      "en": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "Keep SparkleRecorder open"
-        }
-      },
-      "zh-Hans": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "请保持 SparkleRecorder 打开"
-        }
+    },
+    "Run at": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Run at" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "运行时间" } }
       }
-    }
-  },
-  "Manual only": {
-    "extractionState": "manual",
-    "localizations": {
-      "en": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "Manual only"
-        }
-      },
-      "zh-Hans": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "仅手动运行"
-        }
+    },
+    "Run automatically": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Run automatically" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "自动运行" } }
       }
-    }
-  },
-  "Needs setup": {
-    "extractionState": "manual",
-    "localizations": {
-      "en": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "Needs setup"
-        }
-      },
-      "zh-Hans": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "需要设置"
-        }
+    },
+    "Run automatically…": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Run automatically…" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "自动运行…" } }
       }
-    }
-  },
-  "Next run": {
-    "extractionState": "manual",
-    "localizations": {
-      "en": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "Next run"
-        }
-      },
-      "zh-Hans": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "下次运行"
-        }
+    },
+    "Run every day": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Run every day" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "设为每天运行" } }
       }
-    }
-  },
-  "No scheduled tasks": {
-    "extractionState": "manual",
-    "localizations": {
-      "en": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "No scheduled tasks"
-        }
-      },
-      "zh-Hans": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "没有定时任务"
-        }
+    },
+    "Schedule created.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Schedule created." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "日程已创建。" } }
       }
-    }
-  },
-  "Schedule is ready": {
-    "extractionState": "manual",
-    "localizations": {
-      "en": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "Schedule is ready"
-        }
-      },
-      "zh-Hans": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "计划已就绪"
-        }
+    },
+    "Scheduled. Next run: %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Scheduled. Next run: %@" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "已设定，下次运行：%@" } }
       }
-    }
-  },
-  "Schedule readiness": {
-    "extractionState": "manual",
-    "localizations": {
-      "en": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "Schedule readiness"
-        }
-      },
-      "zh-Hans": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "计划就绪状态"
-        }
-      }
-    }
-  },
-  "Scheduled workflows currently run only while the app is open.": {
-    "extractionState": "manual",
-    "localizations": {
-      "en": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "Scheduled workflows currently run only while the app is open."
-        }
-      },
-      "zh-Hans": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "定时工作流目前仅在应用保持打开时运行。"
-        }
-      }
-    }
-  },
-  "The next run time has been calculated.": {
-    "extractionState": "manual",
-    "localizations": {
-      "en": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "The next run time has been calculated."
-        }
-      },
-      "zh-Hans": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "已计算下一次运行时间。"
-        }
-      }
-    }
-  },
-  "This workflow runs only when you start a task manually.": {
-    "extractionState": "manual",
-    "localizations": {
-      "en": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "This workflow runs only when you start a task manually."
-        }
-      },
-      "zh-Hans": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "此工作流仅在您手动启动任务时运行。"
-        }
-      }
-    }
-  },
-  "Workflow is running": {
-    "extractionState": "manual",
-    "localizations": {
-      "en": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "Workflow is running"
-        }
-      },
-      "zh-Hans": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "工作流正在运行"
-        }
-      }
-    }
-  },
+    },
     "%@, %d tasks, %d dependencies": {
       "extractionState": "manual",
       "localizations": {
@@ -4461,6 +4296,506 @@
           "stringUnit": {
             "state": "translated",
             "value": "工作流宏"
+          }
+        }
+      }
+    },
+    "Create Workflow": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Create Workflow" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "创建工作流" } }
+      }
+    },
+    "Create workflow": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Create workflow" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "创建工作流" } }
+      }
+    },
+    "Create schedule": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Create schedule" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "创建定时运行" } }
+      }
+    },
+    "Schedule macro": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Schedule macro" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "定时运行宏" } }
+      }
+    },
+    "Scheduled runs require SparkleRecorder to remain open.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Scheduled runs require SparkleRecorder to remain open." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "定时运行需要 SparkleRecorder 保持打开。" } }
+      }
+    },
+    "Runs while SparkleRecorder is open": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Runs while SparkleRecorder is open" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "SparkleRecorder 打开时运行" } }
+      }
+    },
+    "Task enabled": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Task enabled" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "启用任务" } }
+      }
+    },
+    "Do not switch apps": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Do not switch apps" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "不要切换应用" } }
+      }
+    },
+    "Activate if running": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Activate if running" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "运行中则激活" } }
+      }
+    },
+    "Open if needed": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Open if needed" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "需要时打开" } }
+      }
+    },
+    "Keep the current application in front.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Keep the current application in front." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "保持当前应用位于前台。" } }
+      }
+    },
+    "Bring the bound application forward only when it is already open.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Bring the bound application forward only when it is already open." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "仅在绑定应用已经打开时将其切到前台。" } }
+      }
+    },
+    "Open the bound application and wait for its window before running.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Open the bound application and wait for its window before running." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "打开绑定应用并等待窗口出现后再运行。" } }
+      }
+    },
+    "Target application": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Target application" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "目标应用" } }
+      }
+    },
+    "Bound to": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Bound to" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "已绑定" } }
+      }
+    },
+    "Could not find the bound application %@.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Could not find the bound application %1$@." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "找不到绑定的应用 %1$@。" } }
+      }
+    },
+    "Could not open the bound application %@.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Could not open the bound application %1$@." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "无法打开绑定的应用 %1$@。" } }
+      }
+    },
+    "Timed out while opening the bound application %@.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Timed out while opening the bound application %1$@." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "打开绑定应用 %1$@ 时超时。" } }
+      }
+    },
+    "The bound window for %@ did not appear in time.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "The bound window for %1$@ did not appear in time." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "%1$@ 的绑定窗口未及时出现。" } }
+      }
+    },
+    "The bound window does not identify an application to open.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "The bound window does not identify an application to open." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "绑定窗口没有可用于打开应用的标识。" } }
+      }
+    },
+    "Every week": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Every week" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "每周" } }
+      }
+    },
+    "Interval": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Interval" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "间隔" } }
+      }
+    },
+    "After running": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "After running" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "运行结束后" } }
+      }
+    },
+    "Keep open after running": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Keep open after running" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "保持应用打开" } }
+      }
+    },
+    "Close after running": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Close after running" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "运行后关闭应用" } }
+      }
+    },
+    "Preview in 5 seconds": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Preview in 5 seconds" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "5 秒后试跑" } }
+      }
+    },
+    "Cancel preview (%d)": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Cancel preview (%d)" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "取消试跑（%d）" } }
+      }
+    },
+    "Starting preview…": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Starting preview…" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "正在开始试跑…" } }
+      }
+    },
+    "Latest run": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Latest run" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "最近运行" } }
+      }
+    },
+    "Latest run…": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Latest run…" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "最近运行…" } }
+      }
+    },
+    "No runs yet": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "No runs yet" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "还没有运行记录" } }
+      }
+    },
+    "Preview or run this macro to create a report and ending screenshot.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Preview or run this macro to create a report and ending screenshot." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "试跑或运行这个宏后，这里会显示报告和结束截图。" } }
+      }
+    },
+    "Completed": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Completed" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "已完成" } }
+      }
+    },
+    "The report was saved, but no ending screenshot was captured.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "The report was saved, but no ending screenshot was captured." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "运行报告已保存，但未能截取结束画面。" } }
+      }
+    },
+    "Show report": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Show report" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "显示报告" } }
+      }
+    },
+    "Could not load the latest run": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Could not load the latest run" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "无法载入最近运行" } }
+      }
+    },
+    "Run result screenshot preview": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Run result screenshot preview" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "运行结果截图预览" } }
+      }
+    },
+    "The macro is no longer available.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "The macro is no longer available." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "这个宏已不存在。" } }
+      }
+    },
+    "Stop recording or playback before previewing.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Stop recording or playback before previewing." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "请先停止录制或播放，再开始试跑。" } }
+      }
+    },
+    "Macro has no playable events.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Macro has no playable events." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "宏中没有可播放的操作。" } }
+      }
+    },
+    "Preview failed.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Preview failed." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "试跑失败。" } }
+      }
+    },
+    "Preview was cancelled.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Preview was cancelled." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "试跑已取消。" } }
+      }
+    },
+    "Preview timed out.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Preview timed out." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "试跑超时。" } }
+      }
+    },
+    "Turn off automatic runs": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Turn off automatic runs" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "关闭自动运行" } }
+      }
+    },
+    "Automatic runs turned off.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Automatic runs turned off." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "已关闭自动运行。" } }
+      }
+    },
+    "Edit automatic run": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Edit automatic run" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "编辑自动运行" } }
+      }
+    },
+    "Edit automatic run…": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Edit automatic run…" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "编辑自动运行…" } }
+      }
+    },
+    "Next run": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Next run" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "下次运行" } }
+      }
+    },
+    "Next: %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Next: %1$@" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "下次：%1$@" } }
+      }
+    },
+    "No upcoming run": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "No upcoming run" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "暂无后续运行" } }
+      }
+    },
+    "Automatic run paused": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Automatic run paused" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "自动运行已暂停" } }
+      }
+    },
+    "Multiple schedules were found. Saving will merge them into one.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Multiple schedules were found. Saving will merge them into one." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "检测到多个重复计划，保存后会合并为一个。" } }
+      }
+    },
+    "Turn off automatic runs?": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Turn off automatic runs?" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "关闭自动运行？" } }
+      }
+    },
+    "The macro stays in Library and can still be run manually.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "The macro stays in Library and can still be run manually." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "宏会保留在资料库中，仍可手动运行。" } }
+      }
+    },
+    "Preview completed. The result was saved to Latest run.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Preview completed. The result was saved to Latest run." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "试跑完成，结果已保存到“最近运行”。" } }
+      }
+    },
+    "Another foreground automation is running.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Another foreground automation is running." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "另一个前台自动任务正在运行。" } }
+      }
+    },
+    "Preview could not be completed.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Preview could not be completed." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "试跑未能完成。" } }
+      }
+    },
+    "Preview completed.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Preview completed." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "试跑完成。" } }
+      }
+    },
+    "Complete macro once": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Complete macro once" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "完整运行宏一次" } }
+      }
+    },
+    "On": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "On" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "已开启" } }
+      }
+    },
+    "Playback": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Playback" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "播放" } }
+      }
+    },
+    "Paused": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Paused" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "已暂停" } }
+      }
+    },
+    "Turn on and save": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Turn on and save" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "开启并保存" } }
+      }
+    },
+    "Close only if opened for this run": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Close only if opened for this run" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "仅关闭本次自动打开的应用" } }
+      }
+    },
+    "Keep SparkleRecorder open for on-time runs. Missed runs do not stack.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Keep SparkleRecorder open for on-time runs. Missed runs do not stack." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "请保持 SparkleRecorder 运行；错过的任务不会累积补跑。" } }
+      }
+    },
+    "The macro needs a name before it can be scheduled.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "The macro needs a name before it can be scheduled." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "请先为宏命名，再创建计划。" } }
+      }
+    },
+    "The interval must be at least 1.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "The interval must be at least 1." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "间隔数值至少为 1。" } }
+      }
+    },
+    "Choose a future time for a one-time run.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Choose a future time for a one-time run." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "一次性运行请选择未来时间。" } }
+      }
+    },
+    "Preview ended before a result was reported.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Preview ended before a result was reported." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "试跑已结束，但没有收到运行结果。" } }
+      }
+    },
+    "AI Draft": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "AI Draft"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "AI 草稿"
           }
         }
       }

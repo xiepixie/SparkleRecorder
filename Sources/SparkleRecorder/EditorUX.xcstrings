@@ -5506,24 +5506,6 @@
         }
       }
     },
-    "Waiting…": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Waiting…"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "等待中…"
-          }
-        }
-      },
-      "generatesSymbol": false
-    },
     "Waits for the target text up to the timeout, then clicks the matched text box.": {
       "extractionState": "manual",
       "localizations": {
@@ -5713,6 +5695,57 @@
         }
       },
       "generatesSymbol": false
+    },
+    "Exists": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Exists"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "存在"
+          }
+        }
+      }
+    },
+    "Not Exists": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Not Exists"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "不存在"
+          }
+        }
+      }
+    },
+    "Time (s)": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Time (s)"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "时间（秒）"
+          }
+        }
+      }
     }
   },
   "version": "1.1"

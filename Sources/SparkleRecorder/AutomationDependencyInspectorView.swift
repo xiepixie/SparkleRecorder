@@ -129,10 +129,10 @@ struct AutomationDependencyInspectorView: View {
 
     private var actionFooter: some View {
         HStack(spacing: 8) {
-            Button("Save Dependency", systemImage: "checkmark", action: saveDependency)
+            LocalizedSystemButton("Save Dependency", tableName: L10nTable.automation, systemImage: "checkmark", action: saveDependency)
                 .buttonStyle(.bordered)
 
-            Button("Delete Dependency", systemImage: "trash", role: .destructive, action: deleteDependency)
+            LocalizedSystemButton("Delete Dependency", tableName: L10nTable.automation, systemImage: "trash", role: .destructive, action: deleteDependency)
                 .buttonStyle(.bordered)
                 .tint(Brand.red500)
         }

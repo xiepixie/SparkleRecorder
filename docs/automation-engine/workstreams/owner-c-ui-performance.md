@@ -62,6 +62,8 @@ Owner C owns how users understand and edit automation. The first UI goal is not 
 
 ## Interface Requests
 
+- Accepted 2026-07-14: Quick Schedule and Task Inspector edit `AutomationTask.targetApplicationPolicy` through `.upsertTask`. UI labels are user-facing (`Do not switch apps`, `Activate if running`, `Open if needed`); SwiftUI does not call `NSWorkspace`, inspect running apps, or wait for windows.
+
 - Resolved: Owner A/C projection contract is `AutomationViewProjection.overview(from:)`.
 - Resolved: Owner A preserves precomputed node positions, edge statuses, Canvas endpoints, status counts, and user-facing status labels when the live reducer projection is wired in.
 - Resolved: Task node manual run uses `AutomationViewIntent.startTask` -> `AutomationAction.manualStart`; runtime host dispatches it through the same reducer/effect path as scheduler starts.
@@ -123,6 +125,9 @@ Owner C owns how users understand and edit automation. The first UI goal is not 
 - 2026-07-05: Owner C added task inspector run history/detail rows for outcome reason, lifecycle timing, attempts, execution chain, upstream count, evidence availability, and duration metadata without crossing into Player/evidence payload loading.
 - 2026-07-06: Owner A/B exposed durable condition diagnostics with optional sample artifact refs. Owner C may render `AutomationTaskRun.conditionEvidence` and route artifact preview/open/reveal through `AutomationConditionEvidenceArtifactPresenter`, but SwiftUI must not call ScreenCapture, OCR, evaluator clients, image providers, or ad-hoc artifact path builders for diagnostics. Failure/rejected condition runs can now still carry explanatory evidence; UI should show the payload when present and only label diagnostics missing when `conditionEvidence == nil`.
 - 2026-07-07/08: Draft Preview projection now labels fixed-count and bounded Repeat-Until loop draft rows and summarizes repeat/body counts. Follow-up UI polish added a `LOOP EXPANSION` section that explains imported step count, acyclic expansion and the no-structured-runtime-loop-evidence boundary from projection data. It still consumes validation/simulation/import projections only; product loop authoring UI and run-evidence presentation remain future work.
+- 2026-07-15: Library owns the single-macro automation surface: daily/weekly/interval/once timing, exact next-run preview, cancellable five-second trial run, target lifecycle choices, and a latest-run report/screenshot sheet. The UI calls injected controller/presenter boundaries and does not invoke scheduler, repository, or file IO directly.
+- 2026-07-15: Library cards now project configured/paused automatic-run state and next occurrence, refresh it while visible, and reopen a prefilled edit sheet. The sheet confirms destructive disable, reports preview success inline, identifies duplicate schedules for save-time consolidation, and keeps accessibility summaries aligned with visible state.
+- 2026-07-15: Quick Schedule discloses that SparkleRecorder must remain open for on-time execution and that missed occurrences do not stack; this copy corresponds to the accepted `latestOnly` reducer policy rather than a UI-only promise.
 
 ## Handoff Checklist
 

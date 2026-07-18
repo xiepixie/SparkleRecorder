@@ -87,6 +87,40 @@ struct AutomationReducerTests {
         #expect(duplicateTick.effects.isEmpty)
     }
 
+    @Test("Latest-only schedules run one recent occurrence without replaying older misses")
+    func latestOnlyScheduleSkipsOlderMissedOccurrences() throws {
+        let ids = TestIDs()
+        let anchor = Date(timeIntervalSince1970: 1_000)
+        let latestDue = anchor.addingTimeInterval(3 * 3_600)
+        let tickAt = latestDue.addingTimeInterval(30)
+        let task = AutomationTask(
+            id: ids.taskA,
+            name: "Daily claim",
+            kind: .delay(0),
+            schedule: .repeating(AutomationRepeatRule(anchor: anchor, interval: .hours(1))),
+            resourceRequirement: .none,
+            missedRunPolicy: .latestOnly
+        )
+        let initial = AutomationRunState(workflows: [
+            AutomationWorkflow(id: ids.workflow, name: "Scheduled", tasks: [task])
+        ])
+
+        let firstTick = AutomationReducer.reduce(
+            state: initial,
+            action: .clockTick(tickAt),
+            environment: environment(ids.runA)
+        )
+        let secondTick = AutomationReducer.reduce(
+            state: firstTick.state,
+            action: .clockTick(tickAt.addingTimeInterval(10)),
+            environment: environment(ids.runB)
+        )
+
+        #expect(firstTick.state.run(id: ids.runA)?.scheduledStartTime == latestDue)
+        #expect(secondTick.state.run(id: ids.runB) == nil)
+        #expect(secondTick.state.runs.count == 1)
+    }
+
     @Test("Clock tick does not create repeating runs after schedule end")
     func clockTickDoesNotCreateRepeatingRunAfterScheduleEnd() {
         let ids = TestIDs()
@@ -146,7 +180,11 @@ struct AutomationReducerTests {
             resource: .foregroundInput,
             acquiredAt: start
         )
-        let task = macroTask(id: ids.taskA, macroID: ids.macroA)
+        let task = macroTask(
+            id: ids.taskA,
+            macroID: ids.macroA,
+            targetApplicationPolicy: .launchIfNeeded
+        )
         let initial = AutomationRunState(workflows: [
             AutomationWorkflow(id: ids.workflow, name: "Workflow", tasks: [task])
         ])
@@ -166,7 +204,13 @@ struct AutomationReducerTests {
         #expect(acquired.state.run(id: ids.runA)?.leaseID == ids.leaseA)
         #expect(acquired.state.run(id: ids.runA)?.status == .queued)
         #expect(acquired.effects == [
-            .startPlayer(runID: ids.runA, workflowID: ids.workflow, taskID: ids.taskA, macroID: ids.macroA)
+            .startPlayer(
+                runID: ids.runA,
+                workflowID: ids.workflow,
+                taskID: ids.taskA,
+                macroID: ids.macroA,
+                targetApplicationPolicy: .launchIfNeeded
+            )
         ])
 
         let playerStarted = AutomationReducer.reduce(
@@ -391,6 +435,35 @@ struct AutomationReducerTests {
             }
             return persistedRun.id == ids.runA && persistedRun.evidenceID == ids.runA
         })
+    }
+
+    @Test("Successful playback report binds run evidence id")
+    func successfulPlaybackReportBindsRunEvidenceID() throws {
+        let ids = TestIDs()
+        let start = Date(timeIntervalSince1970: 100)
+        let report = RunReport(
+            runID: ids.runA,
+            startTime: start,
+            duration: 5,
+            isSuccess: true,
+            failedEventIndex: nil,
+            errorMessage: nil
+        )
+        let task = macroTask(id: ids.taskA, macroID: ids.macroA, resourceRequirement: .none)
+        let workflow = AutomationWorkflow(id: ids.workflow, name: "Evidence", tasks: [task])
+        let started = AutomationReducer.reduce(
+            state: AutomationRunState(workflows: [workflow]),
+            action: .manualStart(workflowID: ids.workflow, taskID: ids.taskA, requestedAt: start),
+            environment: environment(ids.runA)
+        )
+
+        let completed = AutomationReducer.reduce(
+            state: started.state,
+            action: .playerFinished(runID: ids.runA, outcome: .succeeded(report: report), at: start.addingTimeInterval(5)),
+            environment: environment()
+        )
+
+        #expect(completed.state.run(id: ids.runA)?.evidenceID == ids.runA)
     }
 
     @Test("Terminal run persists durable branch decision evidence")
@@ -1786,7 +1859,8 @@ struct AutomationReducerTests {
         schedule: AutomationSchedule? = nil,
         resourceRequirement: AutomationResourceRequirement = .foregroundInput,
         timeout: TimeInterval? = nil,
-        retryPolicy: AutomationRetryPolicy = .none
+        retryPolicy: AutomationRetryPolicy = .none,
+        targetApplicationPolicy: AutomationTargetApplicationPolicy = .activateIfRunning
     ) -> AutomationTask {
         AutomationTask(
             id: id,
@@ -1795,7 +1869,8 @@ struct AutomationReducerTests {
             schedule: schedule,
             resourceRequirement: resourceRequirement,
             timeout: timeout,
-            retryPolicy: retryPolicy
+            retryPolicy: retryPolicy,
+            targetApplicationPolicy: targetApplicationPolicy
         )
     }
 

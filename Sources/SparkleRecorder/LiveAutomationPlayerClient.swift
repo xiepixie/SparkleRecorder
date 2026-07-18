@@ -39,17 +39,27 @@ private final class AutomationPlayerContinuationBox: @unchecked Sendable {
 private final class LiveAutomationPlayerBox: @unchecked Sendable {
     private let player: Player
     private let windowTracker: WindowTracker?
+    private let targetApplications: AutomationTargetApplicationClient
+    private var targetSessions: [UUID: (
+        session: AutomationTargetApplicationSession,
+        cleanupPolicy: AutomationTargetApplicationCleanupPolicy
+    )] = [:]
 
-    init(player: Player, windowTracker: WindowTracker?) {
+    init(
+        player: Player,
+        windowTracker: WindowTracker?,
+        targetApplications: AutomationTargetApplicationClient
+    ) {
         self.player = player
         self.windowTracker = windowTracker
+        self.targetApplications = targetApplications
     }
 
     func start(
         request: AutomationPlayerStartRequest,
         bridge: AutomationPlayerEventBridge,
         now: @escaping @Sendable () -> Date
-    ) -> AutomationPlayerStartResult {
+    ) async -> AutomationPlayerStartResult {
         guard !player.isPlaying else {
             return .rejected(.rejected(reason: "Player is already running"))
         }
@@ -61,6 +71,15 @@ private final class LiveAutomationPlayerBox: @unchecked Sendable {
             return .rejected(.rejected(reason: "Macro has no playable events"))
         }
 
+        let targetSession: AutomationTargetApplicationSession
+        switch await targetApplications.prepare(request.context.surfaces, request.targetApplicationPolicy) {
+        case .success(let session):
+            targetSession = session
+        case .failure(let failure):
+            return .rejected(.rejected(reason: failure.message))
+        }
+        targetSessions[request.runID] = (targetSession, request.targetApplicationCleanupPolicy)
+
         player.play(
             macroID: request.macro.id,
             events: request.macro.events,
@@ -70,7 +89,17 @@ private final class LiveAutomationPlayerBox: @unchecked Sendable {
             context: request.context,
             windowTracker: windowTracker,
             automationCompletion: { completion in
-                bridge.yield(completion.action(runID: request.runID, at: now()))
+                Task { @MainActor in
+                    if case .succeeded(let report?) = completion {
+                        await EvidenceClient.shared.recordSuccess(
+                            macroID: request.macro.id,
+                            report: report,
+                            surfaces: request.context.surfaces
+                        )
+                    }
+                    await self.cleanupTargets(for: request.runID)
+                    bridge.yield(completion.action(runID: request.runID, at: now()))
+                }
             }
         )
         return .started
@@ -80,17 +109,26 @@ private final class LiveAutomationPlayerBox: @unchecked Sendable {
         runID: UUID,
         bridge: AutomationPlayerEventBridge,
         now: @escaping @Sendable () -> Date
-    ) {
+    ) async {
         guard player.isPlaying else {
+            await cleanupTargets(for: runID)
             return
         }
 
         player.stop()
+        await cleanupTargets(for: runID)
         bridge.yield(.playerFinished(
             runID: runID,
             outcome: .cancelled(reason: "Automation cancelled playback"),
             at: now()
         ))
+    }
+
+    private func cleanupTargets(for runID: UUID) async {
+        guard let targetSession = targetSessions.removeValue(forKey: runID) else {
+            return
+        }
+        await targetApplications.cleanup(targetSession.session, targetSession.cleanupPolicy)
     }
 }
 
@@ -99,10 +137,15 @@ extension AutomationPlayerClient {
     static func live(
         player: Player,
         windowTracker: WindowTracker? = nil,
+        targetApplications: AutomationTargetApplicationClient? = nil,
         now: @escaping @Sendable () -> Date = { Date() }
     ) -> AutomationPlayerClient {
         let bridge = AutomationPlayerEventBridge()
-        let box = LiveAutomationPlayerBox(player: player, windowTracker: windowTracker)
+        let box = LiveAutomationPlayerBox(
+            player: player,
+            windowTracker: windowTracker,
+            targetApplications: targetApplications ?? .live(windowTracker: windowTracker)
+        )
 
         return AutomationPlayerClient(
             start: { request in

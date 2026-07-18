@@ -18,6 +18,9 @@ struct LibraryMainView: View {
     @Binding var showAddTag: SavedMacro?
     @Binding var showNotesFor: SavedMacro?
     @State private var showSequenceBuilderFor: [SavedMacro]?
+    @State private var showQuickScheduleFor: SavedMacro?
+    @State private var showEvidenceFor: SavedMacro?
+    @State private var automaticRunSummaries: [UUID: AutomationMacroScheduleSummary] = [:]
     
     @State private var showSearch = false
     @FocusState private var searchFocused: Bool
@@ -55,6 +58,76 @@ struct LibraryMainView: View {
             }
             .sheet(item: sequenceBuilderSheetBinding) { _ in
                 sequenceBuilderSheetContent
+            }
+            .sheet(item: $showQuickScheduleFor) { macro in
+                AutomationQuickScheduleSheet(
+                    macro: macro,
+                    existingSummary: automaticRunSummaries[macro.id],
+                    onPreview: {
+                        try await controller.previewScheduledMacro(macro.id)
+                    },
+                    onDisable: {
+                        let host = controller.automationHost()
+                        let current = await host.currentState()
+                        let workflowIDs = AutomationMacroScheduleSummary.summaries(
+                            from: current
+                        )[macro.id]?.matchingWorkflowIDs ?? []
+                        for workflowID in workflowIDs {
+                            _ = try await host.dispatch(.deleteWorkflow(workflowID: workflowID, at: Date()))
+                        }
+                        await refreshAutomaticRuns()
+                        state.statusMessage = String(localized: "Automatic runs turned off.", table: "Automation")
+                    }
+                ) { workflow, taskID in
+                    let host = controller.automationHost()
+                    var savedWorkflow = workflow
+                    var savedTaskID = taskID
+                    let current = await host.currentState()
+                    let existingSummary = AutomationMacroScheduleSummary.summaries(
+                        from: current
+                    )[macro.id]
+                    if let existingSummary {
+                        savedWorkflow.id = existingSummary.workflowID
+                        savedWorkflow.createdAt = current?.workflows.first {
+                            $0.id == existingSummary.workflowID
+                        }?.createdAt ?? savedWorkflow.createdAt
+                        let existingTask = existingSummary.task
+                        savedWorkflow.tasks[0].id = existingTask.id
+                        savedTaskID = existingTask.id
+                    }
+                    _ = try await host.dispatch(.upsertWorkflow(savedWorkflow, at: Date()))
+                    for duplicateID in existingSummary?.matchingWorkflowIDs ?? []
+                    where duplicateID != savedWorkflow.id {
+                        _ = try await host.dispatch(.deleteWorkflow(workflowID: duplicateID, at: Date()))
+                    }
+                    await refreshAutomaticRuns()
+                    let nextRun = savedWorkflow.tasks
+                        .first(where: { $0.id == savedTaskID })
+                        .flatMap { task in
+                            task.schedule?.nextOccurrence(onOrAfter: Date())?.scheduledAt
+                        }
+                    if let nextRun {
+                        state.statusMessage = String(
+                            format: String(localized: "Scheduled. Next run: %@", table: "Automation"),
+                            nextRun.formatted(date: .abbreviated, time: .shortened)
+                        )
+                    } else {
+                        state.statusMessage = String(localized: "Schedule created.", table: "Automation")
+                    }
+                }
+            }
+            .sheet(item: $showEvidenceFor) { macro in
+                MacroRunEvidenceSheet(macro: macro)
+            }
+            .task {
+                while !Task.isCancelled {
+                    await refreshAutomaticRuns()
+                    do {
+                        try await Task.sleep(for: .seconds(60))
+                    } catch {
+                        return
+                    }
+                }
             }
     }
     
@@ -94,7 +167,14 @@ struct LibraryMainView: View {
                     visualEvidenceEnabled: state.semanticRecordingEnabled,
                     isRecording: state.isRecording,
                     onReview: { controller.openEditor() },
-                    onWorkflow: { controller.showAutomationWorkspace() }
+                    onWorkflow: {
+                        if let currentID = library.currentMacroID,
+                           let macro = library.macros.first(where: { $0.id == currentID }) {
+                            showQuickScheduleFor = macro
+                        } else {
+                            controller.showAutomationWorkspace()
+                        }
+                    }
                 )
                 .padding(.horizontal, 12)
                 .padding(.bottom, 8)
@@ -202,13 +282,7 @@ struct LibraryMainView: View {
     }
 
     private func handleCreateSequence(from selection: Set<UUID>) {
-        var arr = [SavedMacro]()
-        for id in selection {
-            if let m = library.macros.first(where: { $0.id == id }) {
-                arr.append(m)
-            }
-        }
-        showSequenceBuilderFor = arr
+        showSequenceBuilderFor = filteredMacros.filter { selection.contains($0.id) }
     }
     
     @ViewBuilder
@@ -274,11 +348,12 @@ struct LibraryMainView: View {
 
             if isWindow {
                 LazyVGrid(
-                    columns: [GridItem(.adaptive(minimum: 250, maximum: 320), spacing: 12, alignment: .top)],
+                    columns: [GridItem(.adaptive(minimum: 280), spacing: 12, alignment: .top)],
                     spacing: 12
                 ) {
                     ForEach(filtered) { macro in
                         macroCardView(for: macro)
+                            .frame(maxWidth: .infinity, alignment: .topLeading)
                     }
                 }
                 .padding(.horizontal, 12)
@@ -385,6 +460,9 @@ struct LibraryMainView: View {
             onSetChain: { target in controller.setChain(macro.id, to: target) },
             chainCandidates: chainCandidates,
             chainTargetName: macro.chainTo.flatMap { chainNameByID[$0] },
+            automationSummary: automaticRunSummaries[macro.id],
+            onSchedule: { openAutomaticRunSheet(for: macro) },
+            onShowEvidence: { showEvidenceFor = macro },
             onCreateSequence: { () -> Void in showSequenceBuilderFor = [macro] }
         )
     }
@@ -406,9 +484,34 @@ struct LibraryMainView: View {
                 controller.selectMacro(macro.id)
                 controller.openEditor()
             },
+            automationSummary: automaticRunSummaries[macro.id],
+            onSchedule: { openAutomaticRunSheet(for: macro) },
+            onShowEvidence: { showEvidenceFor = macro },
             onSetIcon: { icon in controller.setMacroIcon(macro.id, to: icon) },
             onAssignHotkey: { () -> Void in showAssignHotkey = macro }
         )
+    }
+
+    private func openAutomaticRunSheet(for macro: SavedMacro) {
+        Task { @MainActor in
+            await refreshAutomaticRuns()
+            showQuickScheduleFor = macro
+        }
+    }
+
+    @MainActor
+    private func refreshAutomaticRuns() async {
+        let host = controller.automationHost()
+        let current: AutomationRunState?
+        if let liveState = await host.currentState() {
+            current = liveState
+        } else {
+            current = await host.refreshRepositorySnapshot().snapshot?.state
+        }
+        let summaries = AutomationMacroScheduleSummary.summaries(from: current)
+        if summaries != automaticRunSummaries {
+            automaticRunSummaries = summaries
+        }
     }
 
     func scheduleStatusClear() {
@@ -471,9 +574,15 @@ private struct LibraryWorkflowActionStrip: View {
             )
 
             libraryWorkflowButton(
-                title: String(localized: "Workflow", table: "Automation"),
-                detail: String(localized: "Schedule / repeat", table: "Common"),
-                systemImage: "point.topleft.down.curvedto.point.bottomright.up",
+                title: hasCurrentMacro
+                    ? String(localized: "Run automatically", table: "Automation")
+                    : String(localized: "Workflow", table: "Automation"),
+                detail: hasCurrentMacro
+                    ? String(localized: "Current macro", table: "EditorUX")
+                    : String(localized: "Schedule / repeat", table: "Common"),
+                systemImage: hasCurrentMacro
+                    ? "calendar.badge.clock"
+                    : "point.topleft.down.curvedto.point.bottomright.up",
                 isEnabled: macroCount > 0,
                 action: onWorkflow
             )
