@@ -1,6 +1,6 @@
 # Parallel Workstreams
 
-更新时间：2026-07-06
+更新时间：2026-09-01
 状态：并行工作边界草案
 Owner：Semantic Recording program coordination
 
@@ -28,6 +28,7 @@ Owner：Semantic Recording program coordination
 | `12-remaining-work-and-direction-control.md` | Direction control | 当前剩余任务、P0-P4 队列、过度设计裁剪、可维护性规则和“做/不做”决策的一页式控制台 |
 | `13-direction-decision-and-remaining-slices.md` | Direction decision | 本轮方向纠偏记录；按 Slice A-E 固定当前剩余任务、用户行为逻辑、过度设计边界和维护状态 |
 | `14-s0-s4-final-gap-alignment.md` | Stage closeout / UI focus | S3 first pass 暂停后的 S0-S4 最终差距、S2 live-evidence blocker、验收姿态和后续 UI/UX owner 聚焦 |
+| `17-ai-assisted-macro-reconstruction-design.md` | Accepted design | 清洗宏 + MP4 的帧级对齐、操作还原、AI 完整候选文件重写、试跑、晋升和恢复合同；实现状态保持 open |
 | `workstreams/s0-workflow-evidence.md` | Active workstream | S0 当前任务、证据缺口、S1 接口请求和实施日志 |
 | `workstreams/s1-contract-core.md` | Active workstream | S1 core schema v0、safe refs、timeline/events/suppression 和 preview comparison 合同 |
 | `workstreams/s2-app-capture-visual-index.md` | Active workstream | S2 core session、app-edge ScreenCaptureKit/Vision/store/preflight skeleton、experimental Recorder bridge、Settings preflight panel、live suppression context ingestion、Secure Input diagnostics、capture-level suppression、AI-safe semantic/OCR text redaction、playback-preserving playable macro save/export/status sanitization、pure frame/video redaction planning、app-edge redacted frame PNG writing hook、app-edge redacted `.mov` renderer/store hook、live finish redaction application、Review/CLI redacted-frame preference、retention settings/manual cleanup/scheduled cleanup first pass、pure retention confirmation projection、macro metadata link 和 cancel/failure cleanup first pass；live product evidence、default rollout、redacted frame/video product evidence、reviewed text-anchor mutation 和 live cleanup product evidence 仍 open |
