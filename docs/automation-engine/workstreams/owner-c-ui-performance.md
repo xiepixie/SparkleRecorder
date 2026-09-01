@@ -1,5 +1,9 @@
 # Owner C: UI / Performance Workstream
 
+## Workflow readiness UI slice (2026-08-25)
+
+Owner C now renders the accepted `AutomationWorkflowActivationProjection` in workflow rows and a workflow settings readiness card. The UI surfaces a full next-run date, stable readiness explanations, and the current App-online scheduling limitation without directly querying platform services. Quick-create presets and recovery actions remain future slices.
+
 Owner C owns how users understand and edit automation. The first UI goal is not a flashy graph; it is a clear, fast, read-only projection of workflows, runs, resources, dependencies, and evidence. Editing and drag interactions come only after reducer projection is stable.
 
 ## Owns

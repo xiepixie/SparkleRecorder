@@ -7,7 +7,7 @@ struct AutomationWorkflowSettingsView: View {
     let statusDetail: String
     let nextScheduledOccurrence: Date?
     let nextScheduledTaskName: String?
-    let workflowProjection: AutomationWorkflowProjection?
+    let workflowProjection: AutomationWorkflowProjection
     var taskListPreviewState: AutomationWorkflowTaskListPreviewState?
     let onInsertMacroTask: (UUID, Int) -> Void
     let onSelectTask: (UUID) -> Void
@@ -24,6 +24,14 @@ struct AutomationWorkflowSettingsView: View {
 
     var body: some View {
         Form {
+            Section {
+                AutomationWorkflowActivationCard(
+                    activation: AutomationWorkflowActivationProjection(workflow: workflowProjection)
+                )
+            } header: {
+                Text("Schedule readiness", tableName: "Automation")
+            }
+
             Section {
                 TextField(String(localized: "Workflow Name", table: "Common"), text: $nameDraft)
                     .textFieldStyle(.roundedBorder)

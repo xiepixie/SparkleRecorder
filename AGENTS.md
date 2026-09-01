@@ -10,7 +10,7 @@
 - Automation work starts at [docs/automation-engine/README.md](docs/automation-engine/README.md).
 - A/B/C owner boundaries live in [docs/automation-engine/02-parallel-workstreams.md](docs/automation-engine/02-parallel-workstreams.md).
 - Testing rules live in [docs/automation-engine/09-testing-plan.md](docs/automation-engine/09-testing-plan.md).
-- Do not treat archived snippets in `docs/CodebaseTargetModifications.md` or old plan snapshots as current code.
+- Do not treat archived snippets in `docs/archive/references/CodebaseTargetModifications.md` or old plan snapshots as current code.
 
 ## Architecture Layers
 - `SparkleRecorderCore` target: pure value types, planners, reducers, state machines, effect contracts, cache keys, failure evidence builders, and mockable clients.

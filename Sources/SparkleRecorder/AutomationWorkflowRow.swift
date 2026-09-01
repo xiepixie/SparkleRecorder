@@ -7,6 +7,8 @@ struct AutomationWorkflowRow: View {
     @State private var isHovered = false
 
     var body: some View {
+        let activation = AutomationWorkflowActivationProjection(workflow: workflow)
+
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 8) {
                 Image(systemName: "square.stack.3d.up")
@@ -29,10 +31,10 @@ struct AutomationWorkflowRow: View {
             .font(.caption)
             .foregroundStyle(.secondary)
 
-            Label(workflow.statusDetail, systemImage: workflow.status.systemImage)
+            Label(activation.title, systemImage: activation.state.systemImage)
                 .font(.caption2)
                 .lineLimit(1)
-                .foregroundStyle(workflow.status.tint)
+                .foregroundStyle(activation.state.tint)
 
             AutomationNextScheduleBadge(
                 date: workflow.nextScheduledOccurrence,
@@ -58,4 +60,5 @@ struct AutomationWorkflowRow: View {
         ))
         .accessibilityValue("\(workflow.status.label), \(workflow.statusDetail)")
     }
+
 }

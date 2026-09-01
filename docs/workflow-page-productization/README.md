@@ -43,13 +43,11 @@ SparkleRecorder 的 App 定位是 Pro 级 macOS 原生生产力工具，审查�
    idle、drag-link、task-reorder、running 以及 future drill-in 截图/录屏验收 artifact 的收集规则。
 9. [acceptance-checklist.md](acceptance-checklist.md)
    下一阶段验收清单。未被代码、测试和体验同时证明的项不能打勾。
-10. [08-current-architecture-and-future.md](08-current-architecture-and-future.md)
-   当前暂停快照：整体架构、后端逻辑、文件结构、已完成边界和未来设计。
-11. [07-owner2-current-state-and-future.md](07-owner2-current-state-and-future.md)
-    Owner 2 前端暂停交接快照：Workflow UI 架构、前端逻辑、文件结构、first-pass 边界、产品债和后续设计构想。
-12. Owner 工作文件：
+10. Owner 工作文件：
    - [workstreams/engine-runtime-ai.md](workstreams/engine-runtime-ai.md)
    - [workstreams/product-ui-ux.md](workstreams/product-ui-ux.md)
+11. [scheduler-run-evidence-ux/README.md](scheduler-run-evidence-ux/README.md)
+    定时任务设定、运行反馈与证据管理的现状审计和端到端 UX 改造方案；这里定义渐进披露、运行中心、证据工作台、跨 owner 合同请求与分阶段验收门槛。
 
 ## 非目标
 
@@ -57,3 +55,7 @@ SparkleRecorder 的 App 定位是 Pro 级 macOS 原生生产力工具，审查�
 - 本目录不替代 `automation-engine/` 的底层合同。
 - 本目录不把当前 FlowGraph UI 描述成完成态。
 - 本目录不让 AI 直接写内部 Swift Codable JSON。
+
+## Archived snapshots
+
+The superseded 2026-07-06 architecture and Owner 2 pause snapshots moved to [`../archive/progress/workflow-page-productization/`](../archive/progress/workflow-page-productization/). Use `00-current-status.md` and active workstreams for current claims.

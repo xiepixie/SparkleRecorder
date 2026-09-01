@@ -1,5 +1,7 @@
 # Owner 2 Workflow UI Current State And Future
 
+
+Role: Archived snapshot. Frozen 2026-07-06; use [`../../../workflow-page-productization/00-current-status.md`](../../../workflow-page-productization/00-current-status.md) for current status.
 更新时间：2026-07-06
 状态：暂停交接文档
 Owner：Owner 2, Product UI And Workflow UX
