@@ -94,7 +94,7 @@ SparkleRecorder 不应把 OpenAI 官方 Record & Replay 插件作为产品内依
 - `docs/VisionArchitecturePlan.md`：coordinate-first、vision-assisted 的定位策略。
 - `docs/WindowBoundAutomationPlan.md`：窗口绑定、视觉定位、AX/CGEvent/AppleEvent 执行边界。
 - `docs/workflow-page-productization/03-ai-interface-mcp-cli.md`：Workflow AI draft 的 CLI-first 原则。
-- `docs/workflow-page-productization/08-current-architecture-and-future.md`：AutomationEngine 与 Workflow UI 当前 pause snapshot。
+- `docs/workflow-page-productization/00-current-status.md`：AutomationEngine 与 Workflow UI 当前产品化状态。
 
 ## Non-Goals
 

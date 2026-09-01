@@ -1,6 +1,227 @@
 {
   "sourceLanguage": "en",
   "strings": {
+  "Add a task before scheduling": {
+    "extractionState": "manual",
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Add a task before scheduling"
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "请先添加任务再设定计划"
+        }
+      }
+    }
+  },
+  "Drag a macro into the workflow, then choose when it should run.": {
+    "extractionState": "manual",
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Drag a macro into the workflow, then choose when it should run."
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "将宏拖入工作流，然后选择运行时间。"
+        }
+      }
+    }
+  },
+  "Keep SparkleRecorder open": {
+    "extractionState": "manual",
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Keep SparkleRecorder open"
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "请保持 SparkleRecorder 打开"
+        }
+      }
+    }
+  },
+  "Manual only": {
+    "extractionState": "manual",
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Manual only"
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "仅手动运行"
+        }
+      }
+    }
+  },
+  "Needs setup": {
+    "extractionState": "manual",
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Needs setup"
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "需要设置"
+        }
+      }
+    }
+  },
+  "Next run": {
+    "extractionState": "manual",
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Next run"
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "下次运行"
+        }
+      }
+    }
+  },
+  "No scheduled tasks": {
+    "extractionState": "manual",
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "No scheduled tasks"
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "没有定时任务"
+        }
+      }
+    }
+  },
+  "Schedule is ready": {
+    "extractionState": "manual",
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Schedule is ready"
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "计划已就绪"
+        }
+      }
+    }
+  },
+  "Schedule readiness": {
+    "extractionState": "manual",
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Schedule readiness"
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "计划就绪状态"
+        }
+      }
+    }
+  },
+  "Scheduled workflows currently run only while the app is open.": {
+    "extractionState": "manual",
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Scheduled workflows currently run only while the app is open."
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "定时工作流目前仅在应用保持打开时运行。"
+        }
+      }
+    }
+  },
+  "The next run time has been calculated.": {
+    "extractionState": "manual",
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "The next run time has been calculated."
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "已计算下一次运行时间。"
+        }
+      }
+    }
+  },
+  "This workflow runs only when you start a task manually.": {
+    "extractionState": "manual",
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "This workflow runs only when you start a task manually."
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "此工作流仅在您手动启动任务时运行。"
+        }
+      }
+    }
+  },
+  "Workflow is running": {
+    "extractionState": "manual",
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Workflow is running"
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "工作流正在运行"
+        }
+      }
+    }
+  },
     "%@, %d tasks, %d dependencies": {
       "extractionState": "manual",
       "localizations": {

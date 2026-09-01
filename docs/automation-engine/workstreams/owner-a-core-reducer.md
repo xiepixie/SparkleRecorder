@@ -1,5 +1,9 @@
 # Owner A: Core / Reducer Workstream
 
+## Accepted activation projection slice (2026-08-25)
+
+Owner A now owns `AutomationWorkflowActivationProjection` as the first scheduling-readiness summary. The initial contract is deliberately narrow: empty workflows are blocked, workflows without a next occurrence are manual-only, scheduled workflows carry the App-online limitation, and an active run takes precedence. Future permission, macro-availability, pause, and background-capability checks require an Owner B capability contract before they are added.
+
 Owner A 是状态语义 owner。目标是把 AutomationEngine 做成纯、确定、可测试的状态机，让时间、手动启动、依赖、资源、Player 结果、条件判断和取消都通过 `AutomationAction` 收敛。
 
 ## Owns

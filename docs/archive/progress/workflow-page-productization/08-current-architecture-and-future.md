@@ -1,5 +1,7 @@
 # Current Architecture And Future Snapshot
 
+
+Role: Archived snapshot. Frozen 2026-07-06; use [`../../../workflow-page-productization/00-current-status.md`](../../../workflow-page-productization/00-current-status.md) for current status.
 Updated: 2026-07-06
 
 本文件是本轮长时间并行开发后的暂停快照。它不替代 `automation-engine/` 的底层合同，也不把当前 Workflow 页面描述为完成态。它的用途是让后续 owner、AI agent 和人工审阅者快速理解：现在架构到了哪里，后端逻辑如何流动，文件大致怎么分层，哪些能力已经有 first pass，哪些仍然只是未来设计。

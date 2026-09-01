@@ -1,5 +1,13 @@
 # Automation Engine Parallel Workstreams
 
+## Accepted interface note: workflow activation summary (2026-08-25)
+
+- Owner C requested a user-facing readiness boundary for the scheduling UX.
+- Owner A accepted the first pure `AutomationWorkflowActivationProjection` slice derived from the existing workflow projection. It owns blocked/manual-only/scheduled/running precedence and stable check IDs.
+- Owner C consumes that projection in the workflow list and settings readiness card; Views do not query scheduler, repository, permissions, or files.
+- Owner B capability snapshots for permissions, macro availability, and future background execution remain an explicit follow-up and are not inferred by the UI.
+- Direct coverage lives in `AutomationWorkflowActivationProjectionTests`.
+
 本文件说明哪些任务可以并行、哪些必须串行。核心判断标准：是否依赖 Automation Core 合同。
 
 ## Phase 0: 已完成的合同冻结

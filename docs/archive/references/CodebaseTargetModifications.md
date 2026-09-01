@@ -1,6 +1,6 @@
 # Codebase Target Modifications Plan
 
-> Document status (2026-07-05): archival implementation reference. The file-level targets in this document guided the coordinate/window migration, but snippets should not be treated as exact current source. Use `SparkleRecorderArchitecture.md`, `DOCUMENTATION_STATUS.md`, and `automation-engine/` for current direction.
+> Document status (2026-07-05): archival implementation reference. The file-level targets in this document guided the coordinate/window migration, but snippets should not be treated as exact current source. Use [`../../SparkleRecorderArchitecture.md`](../../SparkleRecorderArchitecture.md), [`../../DOCUMENTATION_STATUS.md`](../../DOCUMENTATION_STATUS.md), and [`../../automation-engine/`](../../automation-engine/README.md) for current direction.
 
 This document details the exact file changes, target functions, and implementation code snippets required to construct the upgraded coordinate and window tracker systems.
 
