@@ -150,3 +150,13 @@ Coordinator/C requests and B accepts shared Player reservation through target pr
 ## Accepted manual playback handoff repair (2026-09-05)
 
 UI requests the existing Owner B target-preparation/player/evidence path for manual playback; Owner B accepts a default-empty `onStarted` callback on the preview client so UI cannot announce playback before acceptance. Player uses an injected post-event permission check before starting; live automation rejects before launching targets. Reducer and persisted outcome schemas are unchanged. Direct tests are PlaybackPermissionTests and AutomationScheduledMacroPreviewClientTests, plus existing reservation/target-preparation tests. Investigation and live-evidence limits: [playback audit](../semantic-recording-ai/24-playback-reliability-audit.md).
+
+### Accepted playback presentation callback — 2026-09-05
+
+App/UI requested an ephemeral playback action callback from the core engines.
+Accepted: both playback callback structs append a default-noop `stepStarted`
+closure receiving `PlaybackActionFeedback` before event execution. Existing
+callers retain source compatibility. The app Player coalesces presentation data;
+its HUD is nonactivating. The callback does not alter reducer state, persistence,
+or terminal ordering. Direct coverage: `PlaybackActionFeedbackTests` (fake async
+and synchronous engines, conflict suppression, printable-input privacy).

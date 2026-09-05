@@ -95,13 +95,16 @@ public struct PlaybackRunStepClient: Sendable {
 public struct PlaybackRunEngineCallbacks: Sendable {
     public var loopStarted: @Sendable (Int) async -> Void
     public var progressChanged: @Sendable (Double) async -> Void
+    public var stepStarted: @Sendable (PlaybackActionFeedback) async -> Void
 
     public init(
         loopStarted: @escaping @Sendable (Int) async -> Void = { _ in },
-        progressChanged: @escaping @Sendable (Double) async -> Void = { _ in }
+        progressChanged: @escaping @Sendable (Double) async -> Void = { _ in },
+        stepStarted: @escaping @Sendable (PlaybackActionFeedback) async -> Void = { _ in }
     ) {
         self.loopStarted = loopStarted
         self.progressChanged = progressChanged
+        self.stepStarted = stepStarted
     }
 
     public static let none = PlaybackRunEngineCallbacks()
@@ -182,7 +185,7 @@ public struct PlaybackRunEngine: Sendable {
             windowContext.refreshResolvedFrames(in: &runningContext)
 
             var scheduledTime = clock.now()
-            for step in plan.steps {
+            for (stepIndex, step) in plan.steps.enumerated() {
                 if Task.isCancelled {
                     return PlaybackRunEngineResult(didAbort: false)
                 }
@@ -214,6 +217,9 @@ public struct PlaybackRunEngine: Sendable {
                     targetSurfaceId: targetSurfaceId,
                     scheduledTime: scheduledTime
                 )
+
+                await callbacks.stepStarted(PlaybackActionFeedback(event: step.event, loopNumber: loopIndex,
+                    stepNumber: stepIndex + 1, stepCount: plan.steps.count))
 
                 switch await stepClient.run(request) {
                 case .succeeded(let success):

@@ -92,6 +92,9 @@ private final class PlayerRunState: @unchecked Sendable {
     let completion: ((Bool) -> Void)?
     let automationCompletion: ((AutomationPlayerCompletion) -> Void)?
     let automationEvidencePersistence: ((AutomationRunEvidencePersistence) -> Void)?
+    private let feedbackLock = NSLock()
+    private var pendingAction: PlaybackActionFeedback?
+    private var feedbackScheduled = false
 
     init(
         player: Player,
@@ -110,6 +113,26 @@ private final class PlayerRunState: @unchecked Sendable {
     @MainActor
     func updateCurrentLoop(_ loop: Int) {
         player?.updateCurrentLoop(loop, generation: generation)
+    }
+
+    func enqueueAction(_ action: PlaybackActionFeedback) {
+        feedbackLock.lock()
+        pendingAction = action
+        let shouldSchedule = !feedbackScheduled
+        feedbackScheduled = true
+        feedbackLock.unlock()
+        guard shouldSchedule else { return }
+        // Feedback never waits for SwiftUI/AppKit before posting the real event.
+        // Keep only the newest pending snapshot instead of building an input log.
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            self.feedbackLock.lock()
+            let action = self.pendingAction
+            self.pendingAction = nil
+            self.feedbackScheduled = false
+            self.feedbackLock.unlock()
+            if let action { self.player?.updateAction(action, generation: self.generation) }
+        }
     }
 
     @MainActor
@@ -140,6 +163,7 @@ private final class PlayerRunState: @unchecked Sendable {
 final class Player: ObservableObject {
     @Published private(set) var isPlaying = false
     let clock = PlaybackClock()
+    let feedback = PlaybackFeedbackState()
     @Published private(set) var currentLoop: Int = 0
     @Published private(set) var totalLoops: Int = 1
 
@@ -280,6 +304,9 @@ final class Player: ObservableObject {
                 },
                 progressChanged: { progress in
                     await runState.updateProgress(progress)
+                },
+                stepStarted: { action in
+                    runState.enqueueAction(action)
                 }
             ))
             let didAbort = result.didAbort
@@ -320,6 +347,12 @@ final class Player: ObservableObject {
             generation: expectedGeneration
         ) else { return }
         apply(snapshot)
+    }
+
+    fileprivate func updateAction(_ action: PlaybackActionFeedback, generation expectedGeneration: UInt64) {
+        guard runStateMachine.snapshot.generation == expectedGeneration,
+              runStateMachine.snapshot.isPlaying else { return }
+        feedback.action = action
     }
 
     fileprivate func updateProgress(_ progress: Double, generation expectedGeneration: UInt64) {
@@ -369,6 +402,7 @@ final class Player: ObservableObject {
     }
 
     private func apply(_ snapshot: PlaybackRunSnapshot) {
+        if !snapshot.isPlaying { feedback.action = nil }
         isPlaying = snapshot.isPlaying
         clock.progress = snapshot.progress
         currentLoop = snapshot.currentLoop

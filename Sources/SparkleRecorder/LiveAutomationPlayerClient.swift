@@ -1,4 +1,5 @@
 import AppKit
+import OSLog
 import Foundation
 import SparkleRecorderCore
 
@@ -100,8 +101,10 @@ private final class LiveAutomationPlayerBox: @unchecked Sendable {
             request.context.surfaces, request.targetApplicationPolicy)
         {
         case .success(let session):
+            Logger(subsystem: "com.sparklerecorder.app", category: "Playback").notice("SparkleRecorder playback: target ready")
             targetSession = session
         case .failure(let failure):
+            Logger(subsystem: "com.sparklerecorder.app", category: "Playback").notice("SparkleRecorder playback: target preparation rejected")
             _ = await targetApplications.cleanup(
                 failure.session,
                 request.targetApplicationCleanupPolicy,
@@ -145,13 +148,16 @@ private final class LiveAutomationPlayerBox: @unchecked Sendable {
             context: request.context,
             windowTracker: windowTracker,
             automationCompletion: { completion in
+                Logger(subsystem: "com.sparklerecorder.app", category: "Playback").notice("SparkleRecorder playback: engine completed")
                 Task { @MainActor in
                     if case .succeeded(let report?) = completion {
+                        Logger(subsystem: "com.sparklerecorder.app", category: "Playback").notice("SparkleRecorder playback: saving success evidence")
                         let persistence = await EvidenceClient.shared.recordSuccess(
                             macroID: request.macro.id,
                             report: report,
                             surfaces: request.context.surfaces
                         )
+                        Logger(subsystem: "com.sparklerecorder.app", category: "Playback").notice("SparkleRecorder playback: success evidence saved")
                         bridge.yield(
                             .evidencePersistenceUpdated(
                                 runID: request.runID,
@@ -177,6 +183,7 @@ private final class LiveAutomationPlayerBox: @unchecked Sendable {
             await cleanupTargets(for: request.runID)
             return .rejected(.rejected(reason: "Player could not start the reserved run"))
         }
+        Logger(subsystem: "com.sparklerecorder.app", category: "Playback").notice("SparkleRecorder playback: engine started")
         startedPlayback = true
         return .started
     }

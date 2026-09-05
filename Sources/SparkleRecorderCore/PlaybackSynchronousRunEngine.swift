@@ -24,13 +24,16 @@ public struct PlaybackSynchronousRunStepClient: Sendable {
 public struct PlaybackSynchronousRunEngineCallbacks: Sendable {
     public var loopStarted: @Sendable (Int) -> Void
     public var progressChanged: @Sendable (Double) -> Void
+    public var stepStarted: @Sendable (PlaybackActionFeedback) -> Void
 
     public init(
         loopStarted: @escaping @Sendable (Int) -> Void = { _ in },
-        progressChanged: @escaping @Sendable (Double) -> Void = { _ in }
+        progressChanged: @escaping @Sendable (Double) -> Void = { _ in },
+        stepStarted: @escaping @Sendable (PlaybackActionFeedback) -> Void = { _ in }
     ) {
         self.loopStarted = loopStarted
         self.progressChanged = progressChanged
+        self.stepStarted = stepStarted
     }
 
     public static let none = PlaybackSynchronousRunEngineCallbacks()
@@ -99,7 +102,7 @@ public struct PlaybackSynchronousRunEngine: Sendable {
             windowContext.refreshResolvedFrames(in: &runningContext)
 
             var scheduledTime = clock.now()
-            for step in plan.steps {
+            for (stepIndex, step) in plan.steps.enumerated() {
                 scheduledTime += step.deltaFromPrevious
                 clock.waitSynchronously(until: scheduledTime, strategy: waitStrategy)
 
@@ -124,6 +127,9 @@ public struct PlaybackSynchronousRunEngine: Sendable {
                     targetSurfaceId: targetSurfaceId,
                     scheduledTime: scheduledTime
                 )
+
+                callbacks.stepStarted(PlaybackActionFeedback(event: step.event, loopNumber: loopIndex,
+                    stepNumber: stepIndex + 1, stepCount: plan.steps.count))
 
                 switch stepClient.run(request) {
                 case .succeeded(let success):

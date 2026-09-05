@@ -12,6 +12,7 @@ final class MenuBarController: NSObject, NSPopoverDelegate {
     private var cancellables: Set<AnyCancellable> = []
     private var editorWC: EditorWindowController?
     private var hud: RecordingHUDController?
+    private var playbackHUD: PlaybackHUDController?
     private var countdown: CountdownOverlayController?
     private var manualPlaybackTask: Task<Void, Never>?
     private var playbackRequestGeneration: UInt64 = 0
@@ -57,6 +58,7 @@ final class MenuBarController: NSObject, NSPopoverDelegate {
         configureStatusItem()
         configurePopover()
         configureHUD()
+        playbackHUD = PlaybackHUDController(player: player)
         countdown = CountdownOverlayController()
         observeStateForIcon()
         observeSemanticRecordingStatus()
@@ -712,8 +714,11 @@ final class MenuBarController: NSObject, NSPopoverDelegate {
     private func prepareSemanticRecordingAndContinue() async {
         pendingRecordingStartMessage = nil
         state.semanticRecordingPreflightPresentation = nil
+        guard await chooseRecordingEvidenceModeIfNeeded() else { return }
         guard state.semanticRecordingEnabled else {
             closePopoverForRecording()
+            try? await Task.sleep(for: .milliseconds(150))
+            guard !Task.isCancelled else { return }
             startRecordingAfterPreflight()
             return
         }
@@ -734,11 +739,42 @@ final class MenuBarController: NSObject, NSPopoverDelegate {
             pendingRecordingStartMessage = "Recording with limited visual context."
         }
         closePopoverForRecording()
+        try? await Task.sleep(for: .milliseconds(150))
+        guard !Task.isCancelled else { return }
         startRecordingAfterPreflight()
+    }
+
+    /// Ask once before the first action-only recording, so missing visual
+    /// evidence is a deliberate choice rather than an invisible default.
+    private func chooseRecordingEvidenceModeIfNeeded() async -> Bool {
+        let defaults = UserDefaults.standard
+        guard !state.semanticRecordingEnabled,
+              !defaults.bool(forKey: "recordingEvidenceModeChosen") else { return true }
+        let alert = NSAlert()
+        alert.messageText = String(localized: "Save visual evidence with this recording?", table: "Recording")
+        alert.informativeText = String(localized: "Video and keyframes are saved locally with your actions. AI can use these images to locate anchors when you explicitly include them in an export. Action-only recordings cannot recover missing images later. You can change this in Settings.", table: "Recording")
+        alert.addButton(withTitle: String(localized: "Record with video and keyframes", table: "Recording"))
+        alert.addButton(withTitle: String(localized: "Record actions only", table: "Recording"))
+        alert.addButton(withTitle: String(localized: "Cancel", table: "Common"))
+        let response: NSApplication.ModalResponse
+        if let window = NSApp.keyWindow ?? NSApp.mainWindow {
+            response = await withCheckedContinuation { continuation in
+                alert.beginSheetModal(for: window) { continuation.resume(returning: $0) }
+            }
+        } else {
+            response = alert.runModal()
+        }
+        guard response != .alertThirdButtonReturn else { return false }
+        state.semanticRecordingEnabled = response == .alertFirstButtonReturn
+        defaults.set(true, forKey: "recordingEvidenceModeChosen")
+        return true
     }
 
     private func closePopoverForRecording() {
         if popover.isShown { popover.performClose(nil) }
+        // The standalone library must also relinquish focus before capturing
+        // the recording surface, including when countdown is disabled.
+        NSApp.hide(nil)
     }
 
     private func startRecordingAfterPreflight() {

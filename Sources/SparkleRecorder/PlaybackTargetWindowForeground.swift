@@ -1,49 +1,83 @@
 import AppKit
 import ApplicationServices
+import OSLog
 import SparkleRecorderCore
 
 @MainActor
 enum PlaybackTargetWindowForeground {
+    private static let logger = Logger(subsystem: "com.sparklerecorder.app", category: "PlaybackForeground")
     static func prepare(app: NSRunningApplication, surfaces: [String: PlaybackSurface]) async -> Bool {
         let application = AXUIElementCreateApplication(app.processIdentifier)
         AXUIElementSetMessagingTimeout(application, 0.3)
-        // Use the same resolved frame as playback, rather than raising whichever
-        // browser window happened to be frontmost when the macro was started.
-        let frames = WindowTracker().resolveCurrentFrames(for: surfaces)
-        guard let target = matchingWindow(application: application, surfaces: surfaces, frames: frames) else { return false }
-        let handles = ForegroundWindowHandles(application: application, target: target)
+        // Wake and activate before querying AX: hidden Chromium windows may
+        // otherwise time out before an activation request is even issued.
+        let handles = ForegroundWindowHandles(application: application)
         let handoff = PlaybackForegroundPreparation(request: {
             await MainActor.run {
                 NSApp.yieldActivation(to: app)
                 app.unhide()
                 _ = app.activate(from: .current, options: [])
-                AXUIElementSetAttributeValue(handles.target, kAXMinimizedAttribute as CFString, kCFBooleanFalse)
-                AXUIElementSetAttributeValue(handles.target, kAXMainAttribute as CFString, kCFBooleanTrue)
-                AXUIElementPerformAction(handles.target, kAXRaiseAction as CFString)
-                AXUIElementSetAttributeValue(handles.application, kAXFocusedWindowAttribute as CFString, handles.target)
+                if handles.target == nil {
+                    let frames = WindowTracker().resolveCurrentFrames(for: surfaces)
+                    handles.target = matchingWindow(application: handles.application, surfaces: surfaces, frames: frames)
+                }
+                guard let target = handles.target else { return }
+                AXUIElementSetAttributeValue(target, kAXMinimizedAttribute as CFString, kCFBooleanFalse)
+                AXUIElementSetAttributeValue(target, kAXMainAttribute as CFString, kCFBooleanTrue)
+                AXUIElementPerformAction(target, kAXRaiseAction as CFString)
+                AXUIElementSetAttributeValue(handles.application, kAXFocusedWindowAttribute as CFString, target)
             }
         }, isReady: {
             await MainActor.run {
-                guard app.isActive else { return false }
+                guard app.isActive, let target = handles.target else {
+                    guard let entry = surfaces.sorted(by: { $0.key < $1.key }).first,
+                          let frame = WindowTracker().resolveCurrentFrames(for: surfaces)[entry.key] else { return false }
+                    let ready = PlaybackForegroundWindowVerification.isReady(active: app.isActive,
+                        targetProcessID: app.processIdentifier, expectedFrame: frame, windows: visibleWindows())
+                    if ready { logger.notice("Foreground verified by window-server ordering") }
+                    return ready
+                }
                 var focused: CFTypeRef?
-                guard AXUIElementCopyAttributeValue(handles.application, kAXFocusedWindowAttribute as CFString, &focused) == .success,
-                      let focused, CFEqual(focused, handles.target) else { return false }
+                let status = AXUIElementCopyAttributeValue(handles.application, kAXFocusedWindowAttribute as CFString, &focused)
+                let matches = focused.map { CFEqual($0, target) } ?? false
+                guard status == .success, matches else {
+                    logger.notice("Foreground readiness: focusedStatus=\(status.rawValue, privacy: .public), matches=\(matches, privacy: .public)")
+                    return false
+                }
                 return true
             }
         }, sleep: { try await Task.sleep(for: .milliseconds(100)) })
         return await handoff.prepare()
     }
 
+    private static func visibleWindows() -> [PlaybackForegroundWindowObservation] {
+        guard let info = CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID) as? [[String: Any]] else { return [] }
+        return info.compactMap { window in
+            guard (window[kCGWindowLayer as String] as? Int) == 0,
+                  let id = window[kCGWindowNumber as String] as? UInt32,
+                  let pid = window[kCGWindowOwnerPID as String] as? Int32,
+                  let bounds = window[kCGWindowBounds as String] as? [String: Any],
+                  let x = bounds["X"] as? Double, let y = bounds["Y"] as? Double,
+                  let width = bounds["Width"] as? Double, let height = bounds["Height"] as? Double,
+                  width > 0, height > 0 else { return nil }
+            return .init(id: id, processID: pid, frame: .init(x: x, y: y, width: width, height: height))
+        }
+    }
+
     private static func matchingWindow(application: AXUIElement, surfaces: [String: PlaybackSurface], frames: [String: RectValue]) -> AXUIElement? {
         var value: CFTypeRef?
-        guard AXUIElementCopyAttributeValue(application, kAXWindowsAttribute as CFString, &value) == .success,
-              let windows = value as? [AXUIElement] else { return nil }
+        let status = AXUIElementCopyAttributeValue(application, kAXWindowsAttribute as CFString, &value)
+        guard status == .success, let windows = value as? [AXUIElement] else {
+            logger.notice("Window enumeration status=\(status.rawValue, privacy: .public)")
+            return nil
+        }
         let entries = surfaces.sorted { $0.key < $1.key }
         guard let entry = entries.first else { return nil }
         let frame = frames[entry.key] ?? entry.value.recordedFrame
         var best: AXUIElement?
         var bestScore = -Double.infinity
         for window in windows {
+            AXUIElementSetMessagingTimeout(window, 0.3)
             var titleValue: CFTypeRef?
             AXUIElementCopyAttributeValue(window, kAXTitleAttribute as CFString, &titleValue)
             let title = titleValue as? String
@@ -70,8 +104,6 @@ enum PlaybackTargetWindowForeground {
 @MainActor
 private final class ForegroundWindowHandles {
     let application: AXUIElement
-    let target: AXUIElement
-    init(application: AXUIElement, target: AXUIElement) {
-        self.application = application; self.target = target
-    }
+    var target: AXUIElement?
+    init(application: AXUIElement) { self.application = application }
 }
