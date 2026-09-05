@@ -20,6 +20,7 @@ struct LibraryMainView: View {
   @State private var showSequenceBuilderFor: [SavedMacro]?
   @State private var showQuickScheduleFor: SavedMacro?
   @State private var showEvidenceFor: SavedMacro?
+  @State private var showReconstructionFor: SavedMacro?
   @State private var showRunCenter = false
   @State private var automaticRunSummaries: [UUID: AutomationMacroScheduleSummary] = [:]
 
@@ -59,6 +60,9 @@ struct LibraryMainView: View {
       }
       .sheet(item: sequenceBuilderSheetBinding) { _ in
         sequenceBuilderSheetContent
+      }
+      .sheet(item: $showReconstructionFor) { macro in
+        MacroReconstructionSheet(model: controller.reconstructionReviewModel(for: macro.id))
       }
       .sheet(item: $showQuickScheduleFor) { macro in
         AutomationQuickScheduleSheet(
@@ -185,6 +189,7 @@ struct LibraryMainView: View {
           visualEvidenceEnabled: state.semanticRecordingEnabled,
           isRecording: state.isRecording,
           onReview: { controller.openEditor() },
+          onReconstruct: { showReconstructionFor = library.currentMacro },
           onRuns: { showRunCenter = true },
           onAutomations: { controller.showAutomationWorkspace() }
         )
@@ -647,6 +652,7 @@ struct LibraryMainView: View {
       automationSummary: automaticRunSummaries[macro.id],
       onSchedule: { openAutomaticRunSheet(for: macro) },
       onShowEvidence: { showEvidenceFor = macro },
+      onReconstruct: { showReconstructionFor = macro },
       onCreateSequence: { () -> Void in showSequenceBuilderFor = [macro] }
     )
   }
@@ -671,6 +677,7 @@ struct LibraryMainView: View {
       automationSummary: automaticRunSummaries[macro.id],
       onSchedule: { openAutomaticRunSheet(for: macro) },
       onShowEvidence: { showEvidenceFor = macro },
+      onReconstruct: { showReconstructionFor = macro },
       onSetIcon: { icon in controller.setMacroIcon(macro.id, to: icon) },
       onAssignHotkey: { () -> Void in showAssignHotkey = macro }
     )
@@ -715,6 +722,7 @@ private struct LibraryWorkflowActionStrip: View {
   let visualEvidenceEnabled: Bool
   let isRecording: Bool
   let onReview: () -> Void
+  let onReconstruct: () -> Void
   let onRuns: () -> Void
   let onAutomations: () -> Void
 
@@ -756,6 +764,14 @@ private struct LibraryWorkflowActionStrip: View {
         systemImage: "slider.horizontal.below.rectangle",
         isEnabled: hasCurrentMacro,
         action: onReview
+      )
+
+      libraryWorkflowButton(
+        title: String(localized: "Refine", table: "EditorUX"),
+        detail: String(localized: "AI-assisted", table: "EditorUX"),
+        systemImage: "wand.and.stars",
+        isEnabled: hasCurrentMacro && !isRecording,
+        action: onReconstruct
       )
 
       libraryWorkflowButton(

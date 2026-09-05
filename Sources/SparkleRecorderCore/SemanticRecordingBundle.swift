@@ -867,6 +867,7 @@ public enum SemanticRecordingBundleIssue: Equatable, Sendable {
 }
 
 public struct SemanticRecordingBundle: Codable, Equatable, Sendable, Identifiable {
+    public var reconstructionProvenance: RecordingReconstructionProvenance?
     public var id: UUID
     public var schemaVersion: SemanticRecordingSchemaVersion
     public var createdAt: Date
@@ -885,6 +886,7 @@ public struct SemanticRecordingBundle: Codable, Equatable, Sendable, Identifiabl
     public var redactedVideos: [SemanticRecordingRenderedVideoRedaction]
 
     private enum CodingKeys: String, CodingKey {
+        case reconstructionProvenance
         case id
         case schemaVersion
         case createdAt
@@ -919,8 +921,10 @@ public struct SemanticRecordingBundle: Codable, Equatable, Sendable, Identifiabl
         previewComparisons: [RecordingPreviewComparison] = [],
         suppressions: [RecordingSuppressionRecord] = [],
         redactedFrames: [SemanticRecordingRenderedFrameRedaction] = [],
-        redactedVideos: [SemanticRecordingRenderedVideoRedaction] = []
+        redactedVideos: [SemanticRecordingRenderedVideoRedaction] = [],
+        reconstructionProvenance: RecordingReconstructionProvenance? = nil
     ) {
+        self.reconstructionProvenance = reconstructionProvenance
         self.id = id
         self.schemaVersion = schemaVersion
         self.createdAt = createdAt
@@ -941,6 +945,7 @@ public struct SemanticRecordingBundle: Codable, Equatable, Sendable, Identifiabl
 
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.reconstructionProvenance = try container.decodeIfPresent(RecordingReconstructionProvenance.self, forKey: .reconstructionProvenance)
         self.id = try container.decode(UUID.self, forKey: .id)
         self.schemaVersion = try container.decodeIfPresent(
             SemanticRecordingSchemaVersion.self,
@@ -1475,7 +1480,8 @@ public extension SemanticRecordingBundle {
             previewComparisons: sidecars.previewComparisons ?? previewComparisons,
             suppressions: sidecars.suppressions ?? suppressions,
             redactedFrames: sidecars.redactedFrames ?? redactedFrames,
-            redactedVideos: sidecars.redactedVideos ?? redactedVideos
+            redactedVideos: sidecars.redactedVideos ?? redactedVideos,
+            reconstructionProvenance: reconstructionProvenance
         )
     }
 }

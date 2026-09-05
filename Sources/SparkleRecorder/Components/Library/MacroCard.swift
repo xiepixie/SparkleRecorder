@@ -36,6 +36,7 @@ struct MacroCard: View {
   let automationSummary: AutomationMacroScheduleSummary?
   let onSchedule: () -> Void
   let onShowEvidence: () -> Void
+    let onReconstruct: () -> Void
   let onCreateSequence: () -> Void
 
   @State private var hovered = false
@@ -205,6 +206,10 @@ struct MacroCard: View {
 
   @ViewBuilder
   func cardMenuItems(includePlayEdit: Bool) -> some View {
+    Button(action: onReconstruct) {
+      Label(String(localized: "AI-assisted reconstruction…", table: "EditorUX"), systemImage: "wand.and.stars")
+    }
+    Divider()
     if includePlayEdit {
       Button {
         onPlay()

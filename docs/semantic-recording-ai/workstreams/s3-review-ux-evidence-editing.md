@@ -1,5 +1,14 @@
 # S3 Review UX And Evidence Editing
 
+Updated: 2026-09-04
+Status: Accepted reconstruction handoff; verification and live acceptance pending
+
+## Reconstruction interface request and accepted contract
+
+S3 accepts S1 action/timing projections and S2 source/candidate repository snapshots through `MacroReconstructionReviewModel`. The model exposes import, locator correction, test, cancellation, explicit acceptance and original restore intents, retaining unavailable alignment and fresh-test requirements after correction. Views render state and dispatch model intents; they do not perform repository/file/Player work. S3 requests source-protected normalization and attention acknowledgement from S1/S2 and local authorized package export from S4. Direct suite: `MacroReconstructionReviewTests`. This bounded reconstruction implementation resumes development under spec 17; prior installed-app Review/Draft Preview gates stay pending.
+
+Current code/test mappings are recorded in [../19-reconstruction-product-implementation-plan.md](../19-reconstruction-product-implementation-plan.md). No new tests/build/live gates are closed by this note.
+
 更新时间：2026-07-07
 状态：first pass paused; Macro Review integration + linked Run Detail opener + Draft Preview handoff + selected-region draft selection + Review linked-macro Repeat-Until first slice + Macro Editor OCR-text Repeat-Until first slice + stored-frame pixel sampling + Review action semantics / S4 evidence alignment + Bundle Health / Run Target first passes done; live product evidence waits on S2 live bundle evidence
 Owner：S3, Review UX / Evidence Editing

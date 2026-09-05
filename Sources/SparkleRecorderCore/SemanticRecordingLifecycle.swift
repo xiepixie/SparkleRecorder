@@ -90,9 +90,9 @@ public actor SemanticRecordingLifecycle {
         return .started(preflight)
     }
 
-    public func record(_ event: RecordedEvent, index: Int) async throws {
+    public func record(_ event: RecordedEvent, index: Int, sessionTime: Double? = nil) async throws {
         let activeSession = try requireSession()
-        try await activeSession.record(event, index: index)
+        try await activeSession.record(event, index: index, sessionTime: sessionTime)
     }
 
     public func addSuppression(_ suppression: RecordingSuppressionRecord) async throws {

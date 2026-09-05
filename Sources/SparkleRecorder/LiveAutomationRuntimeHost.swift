@@ -96,13 +96,7 @@ final class LiveAutomationRuntimeHost {
             ),
             repository: repository,
             loadMacro: { macroID in
-                var macro = try await macroClient.loadAllManifests()
-                    .first { $0.id == macroID }
-                guard macro != nil else {
-                    return nil
-                }
-                macro?.events = try await macroClient.loadEvents(macroID)
-                return macro
+                try await macroClient.loadPinnedMacro(macroID)
             },
             now: now
         )

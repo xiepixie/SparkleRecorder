@@ -13,6 +13,8 @@ final class MenuBarController: NSObject, NSPopoverDelegate {
     private var editorWC: EditorWindowController?
     private var hud: RecordingHUDController?
     private var countdown: CountdownOverlayController?
+    private var reconstructionTestActive = false
+    private var recordingPreparationActive = false
     private var welcomeWC: WelcomeWindowController?
 
     let recorder = Recorder()
@@ -691,11 +693,15 @@ final class MenuBarController: NSObject, NSPopoverDelegate {
 
     /// Wraps the actual recording start with an optional countdown.
     private func beginRecordingFlow() {
+        guard !reconstructionTestActive, !recordingPreparationActive else { return }
+        recordingPreparationActive = true
         if player.isPlaying { player.stop() }
         persistCurrentMacroIfNeeded()
 
         Task { @MainActor [weak self] in
-            await self?.prepareSemanticRecordingAndContinue()
+            guard let self else { return }
+            defer { self.recordingPreparationActive = false }
+            await self.prepareSemanticRecordingAndContinue()
         }
     }
 
@@ -1134,6 +1140,7 @@ final class MenuBarController: NSObject, NSPopoverDelegate {
     }
 
     func play() {
+        guard !reconstructionTestActive else { return }
         play(isChained: false)
     }
 
@@ -1232,6 +1239,39 @@ final class MenuBarController: NSObject, NSPopoverDelegate {
                 }
             }
         }
+    }
+
+    func reconstructionReviewModel(for id: UUID) -> MacroReconstructionReviewModel {
+        MacroReconstructionReviewModel(macroID: id, testMacro: { [weak self] macro in
+            guard let self, !self.recorder.isRecording, !self.player.isPlaying,
+                  !self.reconstructionTestActive, !self.recordingPreparationActive, self.countdown?.isActive != true else {
+                throw AutomationTargetApplicationPreparationFailure(message: String(
+                    localized: "Stop recording or playback before previewing.", table: "Automation"))
+            }
+            guard !PlaybackPlanner.plan(events: macro.events, loops: macro.loops, speed: macro.speed).steps.isEmpty else {
+                throw AutomationTargetApplicationPreparationFailure(message: String(
+                    localized: "Macro has no playable events.", table: "Automation"))
+            }
+            self.reconstructionTestActive = true
+            defer { self.reconstructionTestActive = false }
+            let client = AutomationPlayerClient.live(player: self.player, windowTracker: WindowTracker())
+            let request = AutomationPlayerStartRequest(runID: UUID(), macro: macro,
+                targetApplicationPolicy: macro.surfaces.isEmpty ? .doNotActivate : .launchIfNeeded,
+                targetApplicationReadyDelay: 0, targetApplicationCleanupPolicy: .keepOpen,
+                targetApplicationQuitTimeout: 5, targetApplicationForceQuitOnTimeout: false)
+            try await AutomationScheduledMacroPreviewClient(player: client).run(request)
+        }, stopTest: {}, canPublish: { [weak self] in
+            guard let self else { return false }
+            return !self.recorder.isRecording && !self.player.isPlaying && !self.recordingPreparationActive
+                && !self.reconstructionTestActive && self.countdown?.isActive != true
+        }, onRevision: { [weak self] macro in
+            guard let self else { return }
+            await self.library.load()
+            if self.library.currentMacroID == macro.id, !self.recorder.isRecording {
+                self.recorder.loadEvents(macro.events)
+                self.recorderLoadedMacroID = macro.id
+            }
+        })
     }
 
     func previewScheduledMacro(

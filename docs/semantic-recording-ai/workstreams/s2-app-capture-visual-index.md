@@ -1,5 +1,14 @@
 # S2 App Capture And Visual Index
 
+Updated: 2026-09-04
+Status: Accepted reconstruction handoff; verification and live acceptance pending
+
+## Reconstruction interface request and accepted contract
+
+S1 requests actual session/source/frame/movie timing rather than event-time equality; accepted producers now capture monotonic origin/end, source-session mapping, actual screenshot timing and bounded stream sample/geometry evidence. Raw movie PTS is not a verified clock segment; legacy and unverified correspondence remain unavailable. S3 requests immutable candidate tests and atomic promotion; accepted repository APIs retain revisions, pin complete macro snapshots, consume test tokens, reject stale sources and require attention acknowledgement. S4 package export checks source sanitization and requires renderer-compatible clock plus complete distinct redaction receipts before suppressed movie export. Direct suites: `RecordingReconstructionProvenanceTests`, `MacroCandidateRepositoryTests`, `PlaybackTextObservationTests`, `MacroReconstructionPackageTests`.
+
+Current code/test mappings are recorded in [../19-reconstruction-product-implementation-plan.md](../19-reconstruction-product-implementation-plan.md). No new tests/build/live gates are closed by this note.
+
 状态：active first pass; next unblocker is authorized live bundle evidence for S3/S4
 Owner：App-edge capture / Vision index / recording bundle storage
 并行对象：S0 Workflow Evidence Closure, S1 Contract/Core, S3 Review UX

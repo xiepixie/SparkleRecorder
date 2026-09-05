@@ -3,6 +3,13 @@
 更新时间：2026-07-06
 状态：规划快照
 
+## Reconstruction implementation update
+
+Updated: 2026-09-04
+Status: Current code inventory; automated verification passed, live acceptance pending
+
+The newer reconstruction slice has optional actual capture provenance, full-file candidate validation/identity, immutable revision promotion, text observation distinctions, local package/CLI authoring and a Review model. See [19-reconstruction-product-implementation-plan.md](19-reconstruction-product-implementation-plan.md) for exact contracts, test mappings and gaps, and [20-reconstruction-cli-guide.md](20-reconstruction-cli-guide.md) for commands. The historical foundation inventory below is not a claim that these newer files are absent. Verified movie clock correspondence, live product proof, unified artifact/capability test binding and checkpoint recovery remain open.
+
 ## What Exists
 
 Recording 已经有可继续扩展的底座：

@@ -20,6 +20,10 @@ SparkleRecorder 不只是录制一串 `CGEvent`。它应该把用户的一次真
 
 目标不是复制 OpenAI Record & Replay，而是吸收它的 demo-to-skill 思想，再叠加 SparkleRecorder 自己的本地视频证据、精确回放、视觉条件和 workflow 编排能力。
 
+## Reconstruction Product Implementation
+
+[19-reconstruction-product-implementation-plan.md](19-reconstruction-product-implementation-plan.md) tracks current capture provenance, candidate validation, revision storage, playback text observation, local authoring package/CLI and Review implementation. [20-reconstruction-cli-guide.md](20-reconstruction-cli-guide.md) documents `reconstruction inspect/export/import`. This is an implementation inventory with direct test mappings; current central tests/build and all new live-product gates remain pending. Earlier S3/S4 pause statements concern the prior live-product gates and do not supersede the accepted spec 17 implementation scope.
+
 ## Foundation Implementation
 
 [18-reconstruction-foundation-implementation-plan.md](18-reconstruction-foundation-implementation-plan.md) tracks the first parallel batch: pure clock mapping, historical geometry, deterministic actions and their review projection. Live capture, video UI, AI generation and promotion remain later integration slices.
@@ -117,3 +121,5 @@ SparkleRecorder 不应把 OpenAI 官方 Record & Replay 插件作为产品内依
 - 不承诺完全后台、不可见窗口、跨 Space 的无焦点自动化。
 - 不用视频语义替代可测试的 reducer、locator、condition evaluator 和 playback engine。
 - 不让 semantic recording 发明一套与 Workflow `visualAssets` / artifact presenter 不兼容的 asset ref 系统。
+
+Current Review workflow and UX verification: [21-reconstruction-review-ux.md](21-reconstruction-review-ux.md). Product code passes 829 tests and Swift 6 build; live acceptance remains blocked by local Input Monitoring permission.

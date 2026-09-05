@@ -1,5 +1,11 @@
 # Owner C: UI / Performance Workstream
 
+Updated: 2026-09-04
+
+## Accepted reconstruction boundary (verification pending)
+
+Request to Owner B accepted: reconstruction Review receives source/candidate snapshots and test/accept/restore operations through `MacroReconstructionReviewModel`; SwiftUI dispatches intents and renders state. Source/candidate actions and unavailable alignment come from core projections. Corrections create fresh candidates requiring new tests; completed playback does not replace explicit result confirmation. `MacroReconstructionReviewTests` maps fake-client behavior. Full UI integration, current central tests/build and installed-app proof remain pending. No direct repository, file or Player calls belong in the view.
+
 ## Workflow readiness UI slice (2026-08-25)
 
 Owner C now renders the accepted `AutomationWorkflowActivationProjection` in workflow rows and a workflow settings readiness card. The UI surfaces a full next-run date, stable readiness explanations, and the current App-online scheduling limitation without directly querying platform services. Quick-create presets and recovery actions remain future slices.
@@ -172,3 +178,8 @@ Owner C owns how users understand and edit automation. The first UI goal is not 
 - [x] Workflow package sharing uses the same Owner B codec and does not add macro payloads.
 - [x] Workflow package import warns when referenced macro IDs are absent from the local macro library.
 - [x] Performance risks documented before adding drag interactions.
+
+
+## Accepted reconstruction trial contract (2026-09-04)
+
+C requests/B accepts shared Player reservation through target preparation, playback and deduplicated cleanup. Review cancels the complete test task and guards recording entry. Scoped cancellation cannot stop another run. Trial executes one iteration without chains; the bound receipt records capability, policy and exact execution digest while accepting preserves saved repeat/chain settings. Direct tests: `AutomationPlayerReservationTests`, `MacroReconstructionReviewTests`, `MacroCandidateRepositoryTests` (passed in full suite).

@@ -1,5 +1,11 @@
 # Automation Engine Parallel Workstreams
 
+Updated: 2026-09-04
+
+## Accepted reconstruction boundary (verification pending)
+
+S3 reconstruction Review requests complete macro snapshots and user-driven test/correction/accept/restore intents from Owner B. Accepted: repository loading pins one complete accepted revision; candidate test tokens bind source revision and normalized executable digest; acceptance revalidates the current source and preserves metadata. Live text observation distinguishes absent from unavailable and bounds polling/cancellation. Owner C consumes `MacroReconstructionReviewModel` state and intents. No Automation reducer action/effect or terminal semantics change is requested. Direct test mappings: `MacroCandidateRepositoryTests`, `PlaybackTextObservationTests`, `MacroReconstructionReviewTests`, plus existing `PlaybackLocatorCacheTests`. Central verification and all installed-app gates remain pending.
+
 ## Accepted interface note: workflow activation summary (2026-08-25)
 
 - Owner C requested a user-facing readiness boundary for the scheduling UX.
@@ -134,3 +140,8 @@ Reducer 基本签名不再放在 Phase 0，它是 Owner A 在 Phase 1 的第一�
 - ResourceArbiter 不知道宏内容，只知道 run 和 resource。
 - Persistence 不保存 volatile UI state。
 - Tests 先验证 reducer，不依赖真实 time、mouse、keyboard、OCR。
+
+
+## Reconstruction test lifecycle contract (2026-09-04)
+
+Coordinator/C requests and B accepts shared Player reservation through target preparation, playback and deduplicated cleanup. Scoped cancellation identifies its own run; cancelled preparation cannot start late. Review cancels the whole test task and prevents recording entry while it is active. Tests: `AutomationPlayerReservationTests`, `MacroReconstructionReviewTests`. Candidate trial policy runs one iteration without chains; repository receipt binds policy, capability version and execution digest while accepted repeat/chain settings are preserved.

@@ -1,5 +1,14 @@
 # Owner B: Adapters / Persistence Workstream
 
+Updated: 2026-09-04
+
+## Accepted reconstruction boundary (verification pending)
+
+Request from reconstruction Review / Owner C: provide a complete immutable macro snapshot for candidate testing, explicit test result recording, stale-safe accepted revision publication and original restore. Accepted implementation lives in `MacroCandidateStore` / `MacroRepository`; whole-snapshot playback loading prevents mixing metadata/events from different revisions. `LivePlaybackTextObservation` and both playback step adapters preserve unavailable observations rather than treating them as absence. Direct suites: `MacroCandidateRepositoryTests`, `PlaybackTextObservationTests`, `MacroReconstructionReviewTests`. No reducer contract is changed. Receipts now also bind the current executable capability version; legacy receipts without it require retesting. Current text-only candidates carry no executable asset references; exported artifact SHA hashes are a separate evidence audit. Checkpoint recovery remains future work; current central tests/build and live acceptance are pending.
+
+
+Owner C reconstruction requested shared playback ownership across target preparation and cancellation. Accepted: `Player` owns the automation run reservation, shared by all live client boxes, through preparation/playback/target cleanup. `Player.play` returns a discardable started flag and rejects a different reservation; existing callers can ignore the return. Scoped cancellation stops only the matching run, while global stop invalidates pending preparation. Old callbacks release only their own reservation. Direct fake tests: `AutomationPlayerReservationTests`; no live input is posted. `MacroRepositoryClient.loadSnapshot` is optional for existing injected clients; live runtime loading uses `loadPinnedMacro` and a complete accepted snapshot. Direct fallback/snapshot tests and capability receipt migration tests live in `MacroCandidateRepositoryTests`. Both adapter modes have fake observation/cancellation and long-gesture locator tests in `LivePlaybackReconstructionAdapterTests`. Central verification is pending for these latest additions.
+
 Owner B owns the boundary between pure AutomationEngine state and the real macOS/app world. The job is to wrap Player, Scheduler, ResourceArbiter, and repository persistence as mockable clients that emit `AutomationAction` instead of mutating state directly.
 
 ## Owns

@@ -1,6 +1,7 @@
 import AppKit
 import AVFoundation
 import CoreMedia
+import CoreImage
 import Foundation
 import ScreenCaptureKit
 import SparkleRecorderCore
@@ -12,6 +13,7 @@ enum ScreenCaptureKitSemanticCaptureError: Error {
     case missingLiveFrameSession
     case missingMovieFile(String)
     case emptyMovieFile(String)
+    case movieWritingFailed(String)
     case pngEncodingFailed
 }
 
@@ -43,8 +45,7 @@ enum LiveSemanticCaptureClient {
 actor ScreenCaptureKitMovieRecorder {
     private struct MovieSession {
         var stream: SCStream
-        var output: SCRecordingOutput
-        var delegate: RecordingOutputDelegate
+        var writer: RecordingMovieWriter
         var frameSize: RecordingImageSize?
     }
 
@@ -65,21 +66,13 @@ actor ScreenCaptureKitMovieRecorder {
         let resolved = try await ScreenCaptureKitTargetResolver.resolve(target: request.target)
         let stream = SCStream(filter: resolved.filter, configuration: resolved.configuration, delegate: nil)
 
-        let outputConfiguration = SCRecordingOutputConfiguration()
-        outputConfiguration.outputURL = outputURL
-        outputConfiguration.outputFileType = .mov
-        outputConfiguration.videoCodecType = .h264
-
-        let delegate = RecordingOutputDelegate()
-        let output = SCRecordingOutput(configuration: outputConfiguration, delegate: delegate)
-        try stream.addRecordingOutput(output)
-        try await stream.startCapture()
+        let writer = try RecordingMovieWriter(url: outputURL)
+        try stream.addStreamOutput(writer, type: .screen, sampleHandlerQueue: writer.queue)
+        do { try await stream.startCapture() }
+        catch { await writer.cancel(); throw error }
 
         sessions[request.segmentID] = MovieSession(
-            stream: stream,
-            output: output,
-            delegate: delegate,
-            frameSize: resolved.frameSize
+            stream: stream, writer: writer, frameSize: resolved.frameSize
         )
 
         return SemanticRecordingMovieHandle(
@@ -88,7 +81,7 @@ actor ScreenCaptureKitMovieRecorder {
             target: request.target,
             startTime: request.recordingTime,
             fileType: "mov",
-            codec: "SCRecordingOutput",
+            codec: "AVAssetWriter-H264",
             frameSize: resolved.frameSize
         )
     }
@@ -98,20 +91,36 @@ actor ScreenCaptureKitMovieRecorder {
             throw ScreenCaptureKitSemanticCaptureError.missingMovieSession
         }
 
-        try session.stream.removeRecordingOutput(session.output)
-        try await session.stream.stopCapture()
-        if let failure = session.delegate.takeFailure() {
-            throw failure
-        }
+        do { try await session.stream.stopCapture() }
+        catch { await session.writer.cancel(); throw error }
+        let written = try await session.writer.finish()
         try Self.validateRecordedMovie(
             at: bundleDirectory.appendingRecordingArtifactRef(request.handle.artifactRef)
         )
 
+        let asset = AVURLAsset(url: bundleDirectory.appendingRecordingArtifactRef(request.handle.artifactRef))
+        let track = try await asset.loadTracks(withMediaType: .video).first
+        let range = try await track?.load(.timeRange)
+        let startPTS = range?.start.seconds
+        let duration = range?.duration.seconds
+        // The .mov contract maps each successfully appended T to T - sessionStart.
+        // Release those anchors only after the completed file confirms that origin.
+        let fileOriginVerified = startPTS == 0 && duration.map { $0.isFinite && $0 > 0 } == true
+        let samples = written.samples.map { sample in
+            var sample = sample
+            if !fileOriginVerified { sample.writtenVideoTime = nil }
+            return sample
+        }
+        let evidence = RecordingMovieTimingEvidence(segmentID: request.handle.segmentID,
+            samples: samples, omittedSampleCount: written.omitted,
+            fileTrackStartPTS: startPTS, fileTrackDuration: duration,
+            alignmentUnavailableReason: fileOriginVerified ? "" : "Written file origin could not be verified.")
         return SemanticRecordingMovieFinishResult(
-            duration: max(0, request.recordingTime - request.handle.startTime),
+            duration: duration.flatMap { $0.isFinite && $0 >= 0 ? $0 : nil } ?? max(0, request.recordingTime - request.handle.startTime),
             frameSize: session.frameSize,
             fileType: request.handle.fileType,
-            codec: request.handle.codec
+            codec: request.handle.codec,
+            timingEvidence: evidence
         )
     }
 
@@ -139,10 +148,18 @@ actor ScreenCaptureKitFrameSource {
 
     func capture(_ request: SemanticRecordingFrameCaptureRequest) async throws -> SemanticRecordingCapturedFrame {
         let resolved = try await ScreenCaptureKitTargetResolver.resolve(target: request.target)
-        let image = try await SCScreenshotManager.captureImage(
+        let requestedHost = CaptureHostClock.now()
+        let sampleBuffer = try await SCScreenshotManager.captureSampleBuffer(
             contentFilter: resolved.filter,
             configuration: resolved.configuration
         )
+        let receivedHost = CaptureHostClock.now()
+        guard let pixelBuffer = CMSampleBufferGetImageBuffer(sampleBuffer),
+              let image = CIContext().createCGImage(CIImage(cvPixelBuffer: pixelBuffer), from: CIImage(cvPixelBuffer: pixelBuffer).extent) else {
+            throw ScreenCaptureKitSemanticCaptureError.pngEncodingFailed
+        }
+        let evidence = RecordingTimingOutput.sample(sampleBuffer)
+        let actualHost = evidence?.displayedHostTime
         let outputURL = bundleDirectory.appendingRecordingArtifactRef(request.artifactRef)
         try FileManager.default.createDirectory(
             at: outputURL.deletingLastPathComponent(),
@@ -155,7 +172,9 @@ actor ScreenCaptureKitFrameSource {
 
         return SemanticRecordingCapturedFrame(
             imageSize: RecordingImageSize(width: image.width, height: image.height),
-            displayScale: resolved.displayScale
+            displayScale: evidence?.displayScale ?? resolved.displayScale,
+            capturedHostTime: actualHost ?? (requestedHost + receivedHost) / 2,
+            timestampUncertainty: actualHost == nil ? (receivedHost - requestedHost) / 2 : 0
         )
     }
 }
@@ -300,9 +319,8 @@ private final class LiveFrameOutput: NSObject, SCStreamOutput, @unchecked Sendab
         let contentRect = (attachments[SCStreamFrameInfo.contentRect] as? CGRect).map(RectValue.init)
         let screenRect = (attachments[SCStreamFrameInfo.screenRect] as? CGRect).map(RectValue.init)
         let presentationTime = CMSampleBufferGetPresentationTimeStamp(sampleBuffer).seconds
-        let capturedAt = presentationTime.isFinite
-            ? Date(timeIntervalSince1970: presentationTime)
-            : Date.now
+        let capturedAt = Date.now
+        _ = presentationTime // Stream PTS is not a Unix timestamp.
 
         let sample = AutomationVisualFrameSample(
             source: .screenCaptureKitStream,
@@ -355,25 +373,6 @@ private extension RectValue {
             width: rect.width,
             height: rect.height
         )
-    }
-}
-
-private final class RecordingOutputDelegate: NSObject, SCRecordingOutputDelegate, @unchecked Sendable {
-    private let lock = NSLock()
-    private var failure: Error?
-
-    func recordingOutput(_ recordingOutput: SCRecordingOutput, didFailWithError error: Error) {
-        lock.lock()
-        failure = error
-        lock.unlock()
-    }
-
-    func takeFailure() -> Error? {
-        lock.lock()
-        defer { lock.unlock() }
-        let result = failure
-        failure = nil
-        return result
     }
 }
 
@@ -447,5 +446,131 @@ private enum ScreenCaptureKitTargetResolver {
             frameSize: RecordingImageSize(width: display.width, height: display.height),
             displayScale: 1
         )
+    }
+}
+
+
+private enum CaptureHostClock {
+    static func seconds(_ ticks: UInt64) -> Double {
+        var info = mach_timebase_info_data_t()
+        mach_timebase_info(&info)
+        return Double(ticks) * Double(info.numer) / Double(info.denom) / 1_000_000_000
+    }
+    static func now() -> Double { seconds(mach_absolute_time()) }
+}
+
+/// All writer state is confined to the SCStream callback queue. Only samples
+/// accepted by the writer become file-clock evidence; backpressure drops frames.
+private final class RecordingMovieWriter: NSObject, SCStreamOutput, @unchecked Sendable {
+    struct Written: Sendable {
+        var samples: [RecordingCaptureSampleTiming]
+        var omitted: Int
+    }
+    let queue = DispatchQueue(label: "app.sparklerecorder.movie-writer")
+    private let writer: AVAssetWriter
+    private var input: AVAssetWriterInput?
+    private var firstPTS: CMTime?
+    private var lastPTS: CMTime?
+    private var failure: Error?
+    private var finishing = false
+    private var samples: [RecordingCaptureSampleTiming] = []
+    private var omitted = 0
+
+    init(url: URL) throws {
+        writer = try AVAssetWriter(outputURL: url, fileType: .mov)
+        super.init()
+    }
+
+    func stream(_ stream: SCStream, didOutputSampleBuffer buffer: CMSampleBuffer, of type: SCStreamOutputType) {
+        guard type == .screen, !finishing, failure == nil,
+              var sample = RecordingTimingOutput.sample(buffer) else { return }
+        let pts = CMSampleBufferGetPresentationTimeStamp(buffer)
+        if let lastPTS, CMTimeCompare(pts, lastPTS) <= 0 { return }
+        if input == nil {
+            let input = AVAssetWriterInput(mediaType: .video, outputSettings: [
+                AVVideoCodecKey: AVVideoCodecType.h264,
+                AVVideoWidthKey: sample.imageSize.width,
+                AVVideoHeightKey: sample.imageSize.height
+            ])
+            input.expectsMediaDataInRealTime = true
+            guard writer.canAdd(input) else {
+                failure = ScreenCaptureKitSemanticCaptureError.movieWritingFailed("Cannot add video input.")
+                return
+            }
+            writer.add(input)
+            guard writer.startWriting() else {
+                failure = writer.error ?? ScreenCaptureKitSemanticCaptureError.movieWritingFailed("Cannot start writing.")
+                return
+            }
+            writer.startSession(atSourceTime: pts)
+            firstPTS = pts
+            self.input = input
+        }
+        guard let input, let firstPTS else { return }
+        guard input.isReadyForMoreMediaData else { omitted += 1; return }
+        guard input.append(buffer) else {
+            failure = writer.error ?? ScreenCaptureKitSemanticCaptureError.movieWritingFailed("Cannot append video sample.")
+            return
+        }
+        lastPTS = pts
+        sample.writtenVideoTime = CMTimeSubtract(pts, firstPTS).seconds
+        // Keep the first bounded prefix. Never claim alignment beyond retained anchors.
+        if samples.count < 18_000 { samples.append(sample) } else { omitted += 1 }
+    }
+
+    func cancel() async {
+        await withCheckedContinuation { continuation in
+            queue.async { [self] in
+                finishing = true
+                writer.cancelWriting()
+                continuation.resume()
+            }
+        }
+    }
+
+    func finish() async throws -> Written {
+        try await withCheckedThrowingContinuation { continuation in
+            // stopCapture has returned; this barrier drains all earlier append calls.
+            queue.async { [self] in
+                finishing = true
+                if let failure {
+                    writer.cancelWriting()
+                    continuation.resume(throwing: failure)
+                    return
+                }
+                guard let input, lastPTS != nil else {
+                    writer.cancelWriting()
+                    continuation.resume(throwing: ScreenCaptureKitSemanticCaptureError.movieWritingFailed("No video samples were recorded."))
+                    return
+                }
+                input.markAsFinished()
+                writer.finishWriting { [self] in
+                    queue.async { [self] in
+                        guard writer.status == .completed else {
+                            continuation.resume(throwing: writer.error ?? ScreenCaptureKitSemanticCaptureError.movieWritingFailed("Cannot finalize video."))
+                            return
+                        }
+                        continuation.resume(returning: Written(samples: samples, omitted: omitted))
+                    }
+                }
+            }
+        }
+    }
+}
+
+private enum RecordingTimingOutput {
+    static func sample(_ buffer: CMSampleBuffer) -> RecordingCaptureSampleTiming? {
+        let attachments = (CMSampleBufferGetSampleAttachmentsArray(buffer, createIfNecessary: false) as? [[SCStreamFrameInfo: Any]])?.first ?? [:]
+        if let status = attachments[.status] as? Int, status != SCFrameStatus.complete.rawValue { return nil }
+        let pts = CMSampleBufferGetPresentationTimeStamp(buffer).seconds
+        guard pts.isFinite, let image = CMSampleBufferGetImageBuffer(buffer) else { return nil }
+        let duration = CMSampleBufferGetDuration(buffer).seconds
+        let host = (attachments[.displayTime] as? NSNumber).map { CaptureHostClock.seconds($0.uint64Value) }
+        return .init(presentationTime: pts, displayedHostTime: host, receivedHostTime: CaptureHostClock.now(),
+                     duration: duration.isFinite && duration > 0 ? duration : nil,
+                     screenRect: (attachments[.screenRect] as? CGRect).map(RectValue.init),
+                     contentRect: (attachments[.contentRect] as? CGRect).map(RectValue.init),
+                     imageSize: .init(width: CVPixelBufferGetWidth(image), height: CVPixelBufferGetHeight(image)),
+                     displayScale: (attachments[.scaleFactor] as? NSNumber)?.doubleValue)
     }
 }

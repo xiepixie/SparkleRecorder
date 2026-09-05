@@ -1,5 +1,14 @@
 # S4 CLI AI And App Knowledge
 
+Updated: 2026-09-04
+Status: Accepted reconstruction handoff; verification and live acceptance pending
+
+## Reconstruction interface request and accepted contract
+
+S4 accepts full-file `MacroCandidateDocument` output and actual playback capabilities from S1, privacy-aware evidence packages from S2, and review/test/acceptance ownership in S3. `reconstruction inspect/export/import` now has an implementation; see [../20-reconstruction-cli-guide.md](../20-reconstruction-cli-guide.md). Inspection lists action IDs with literal `candidate`; export defaults to no visual bytes and requires explicit `--include-video`; import retains a candidate without promotion. No model upload, test receipt, success, acceptance, playback or scheduling command is exposed. Direct suites: `MacroReconstructionCLITests`, `MacroReconstructionPackageTests`. Prior live catalog/App Knowledge/MCP work remains gated.
+
+Current code/test mappings are recorded in [../19-reconstruction-product-implementation-plan.md](../19-reconstruction-product-implementation-plan.md). No new tests/build/live gates are closed by this note.
+
 更新时间：2026-07-07
 状态：fixture/explicit stored-bundle/default-root explain/readiness/macro-link/artifact audit, fixture OCR/visual query, persisted stored-bundle deterministic suggestion synthesis, deterministic suggestion query/result availability contract, no-evidence suggestion low-confidence guard, retention-pruned deleted-artifact status, read-only CLI, explicit asset extraction, low-token transcript and fixture workflow draft-from-recording first passes done; product-ready live work paused until S2 live bundle evidence and S3 Review alignment are accepted
 Owner：S4, CLI / AI collaboration / later App Knowledge

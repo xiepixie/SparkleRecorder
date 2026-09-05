@@ -2,11 +2,11 @@
 
 Updated: 2026-09-04
 
-Status: Accepted design; Slice 1 pure foundation implemented; live integration and later slices remain open
+Status: Accepted design; product implementation and automated verification complete; live acceptance open
 
 Owners: Recording/Video Alignment, Macro Core, AI Collaboration, Macro Review
 
-Implementation evidence: [18-reconstruction-foundation-implementation-plan.md](18-reconstruction-foundation-implementation-plan.md) records pure clock/geometry/action/projection contracts and direct tests. This is not live alignment, video Review, AI generation, candidate testing, or revision promotion completion.
+Implementation ledger: [19-reconstruction-product-implementation-plan.md](19-reconstruction-product-implementation-plan.md) records current capture provenance, candidate validation, revision repository, playback observation, package/CLI and Review work plus direct test mappings. [18-reconstruction-foundation-implementation-plan.md](18-reconstruction-foundation-implementation-plan.md) remains the prior pure-foundation evidence. The product slice passes 829 tests and Swift 6 build. Live-product acceptance remains open because local Input Monitoring permission is unavailable. Review user flows are documented in [21-reconstruction-review-ux.md](21-reconstruction-review-ux.md).
 
 ## 1. Decision Summary
 

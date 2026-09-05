@@ -121,6 +121,32 @@ private struct RecordingCLIBundleLoad {
     }
 }
 
+if args.count >= 2, args[1] == "reconstruction" {
+    let reconstructionArguments = Array(args.dropFirst(2))
+    let wantsJSON = reconstructionArguments.contains("--json")
+    let command = "reconstruction " + (reconstructionArguments.first ?? "")
+    do {
+        let result = try waitForWorkflowCLIAsync {
+            try await MacroReconstructionCLI.execute(reconstructionArguments)
+        }
+        if wantsJSON {
+            writeWorkflowJSON(AutomationCLIResultEnvelope(ok: true, command: command, data: result))
+        } else {
+            FileHandle.standardOutput.write(Data((result.summary + "\n").utf8))
+        }
+        exit(0)
+    } catch {
+        if wantsJSON {
+            writeWorkflowJSON(AutomationCLIResultEnvelope<AutomationCLIEmptyPayload>.failure(
+                command: command, code: (error as? MacroReconstructionCLIError)?.code ?? "commandFailed",
+                message: error.localizedDescription))
+        } else {
+            FileHandle.standardError.write(Data(("SparkleRecorder: " + error.localizedDescription + "\n").utf8))
+        }
+        exit(1)
+    }
+}
+
 if args.count >= 2, args[1] == "workflow" {
     runWorkflowCLI(args)
 }

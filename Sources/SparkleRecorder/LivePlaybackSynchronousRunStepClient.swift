@@ -41,12 +41,21 @@ struct LivePlaybackSynchronousRunStepClient: Sendable {
     var pointResolver: PointResolver
     var eventPoster: EventPosterClient
     var stepExecutor: PlaybackStepExecutor
+    var textObservationClient: PlaybackTextObservationClient
+    var locatorClient: (@Sendable (RecordedEvent, PlaybackContext, PlaybackClockClient) async throws -> CGPoint)?
+    var cancelled: @Sendable () -> Bool
 
     init(
         playbackClock: PlaybackClockClient,
         pointResolver: PointResolver = PointResolver(),
-        eventPoster: EventPosterClient
+        eventPoster: EventPosterClient,
+        textObservationClient: PlaybackTextObservationClient = LivePlaybackTextObservation.client,
+        locatorClient: (@Sendable (RecordedEvent, PlaybackContext, PlaybackClockClient) async throws -> CGPoint)? = nil,
+        cancelled: @escaping @Sendable () -> Bool = { Task.isCancelled }
     ) {
+        self.locatorClient = locatorClient
+        self.cancelled = cancelled
+        self.textObservationClient = textObservationClient
         self.playbackClock = playbackClock
         self.pointResolver = pointResolver
         self.eventPoster = eventPoster
@@ -65,7 +74,10 @@ struct LivePlaybackSynchronousRunStepClient: Sendable {
                 pointResolver: pointResolver,
                 eventPoster: eventPoster,
                 stepExecutor: stepExecutor,
-                locatorCache: locatorCache
+                locatorCache: locatorCache,
+                textObservationClient: textObservationClient,
+                locatorClient: locatorClient,
+                cancelled: cancelled
             )
         }
     }
@@ -76,73 +88,26 @@ struct LivePlaybackSynchronousRunStepClient: Sendable {
         pointResolver: PointResolver,
         eventPoster: EventPosterClient,
         stepExecutor: PlaybackStepExecutor,
-        locatorCache: PlaybackLocatorCache
+        locatorCache: PlaybackLocatorCache,
+        textObservationClient: PlaybackTextObservationClient,
+        locatorClient: (@Sendable (RecordedEvent, PlaybackContext, PlaybackClockClient) async throws -> CGPoint)?,
+        cancelled: @escaping @Sendable () -> Bool
     ) -> PlaybackRunStepResult {
+        if cancelled() { return .failed(reason: "Playback cancelled") }
         let step = request.step
         let event = step.event
         let runningContext = request.context
         let targetSurfaceId = request.targetSurfaceId
-
-        if event.kind == .waitForText, let anchor = event.textAnchor {
-            let text = anchor.text
-            let timeout = event.textTimeout ?? 10.0
-            let mustExist = event.verifyMustExist ?? true
-            let startPoll = playbackClock.now()
-            var matched = false
-            if #available(macOS 14.0, *) {
-                let contextSnapshot = runningContext
-                matched = awaitSynchronously {
-                    let locator = LocatorEngine()
-                    while playbackClock.now() - startPoll < timeout {
-                        let found: Bool
-                        do {
-                            _ = try await locator.locate(
-                                event: event,
-                                context: contextSnapshot,
-                                strategies: [.ocr(anchor)]
-                            )
-                            found = true
-                        } catch {
-                            found = false
-                        }
-                        if found == mustExist {
-                            return true
-                        }
-                        await playbackClock.sleep(0.5)
-                    }
-                    return false
-                }
-            }
-            guard matched else {
-                return .failed(reason: "waitForText timeout: '\(text)' mustExist=\(mustExist)")
-            }
-            return .succeeded(.semanticWaitCompleted)
+        switch event.kind {
+        case .leftMouseUp, .rightMouseUp, .otherMouseUp,
+             .leftMouseDragged, .rightMouseDragged, .otherMouseDragged: break
+        default: locatorCache.invalidate()
         }
 
-        if event.kind == .verifyText, let anchor = event.textAnchor {
-            let text = anchor.text
-            let mustExist = event.verifyMustExist ?? true
-            var found = false
-            if #available(macOS 14.0, *) {
-                let contextSnapshot = runningContext
-                found = awaitSynchronously {
-                    let locator = LocatorEngine()
-                    do {
-                        _ = try await locator.locate(
-                            event: event,
-                            context: contextSnapshot,
-                            strategies: [.ocr(anchor)]
-                        )
-                        return true
-                    } catch {
-                        return false
-                    }
-                }
-            }
-            guard found == mustExist else {
-                return .failed(reason: "verifyText failed: '\(text)' mustExist=\(mustExist)")
-            }
-            return .succeeded(.semanticVerificationCompleted)
+        if event.kind == .waitForText || event.kind == .verifyText {
+            return Self.awaitSynchronously { await LivePlaybackTextObservation.run(
+                    event: event, context: runningContext, clock: playbackClock, client: textObservationClient, cancelled: cancelled
+                ) }
         }
 
         if #available(macOS 14.0, *), (event.coordinateStrategy == .locatorOnly || event.textAnchor != nil) {
@@ -151,25 +116,20 @@ struct LivePlaybackSynchronousRunStepClient: Sendable {
             if let cached = locatorCache.point(
                 for: cacheKey,
                 loopIndex: request.loopIndex,
-                eventTime: event.time
+                event: event
             ) {
                 point = cached
             } else {
                 let contextSnapshot = runningContext
                 let resolution = awaitSynchronously {
-                    let locator = LocatorEngine()
-                    var strategies: [LocatorStrategy] = []
-                    if let anchor = event.textAnchor {
-                        strategies.append(.ocr(anchor))
-                    }
                     do {
-                        let resolvedPoint = try await LivePlaybackRunStepClient.locateWithOptionalWait(
-                            locator: locator,
-                            event: event,
-                            context: contextSnapshot,
-                            strategies: strategies,
-                            clock: playbackClock
-                        )
+                        let resolvedPoint: CGPoint
+                        if let locatorClient {
+                            resolvedPoint = try await locatorClient(event, contextSnapshot, playbackClock)
+                        } else {
+                            resolvedPoint = try await LivePlaybackRunStepClient.locate(event: event, context: contextSnapshot,
+                                clock: playbackClock, cancelled: cancelled)
+                        }
                         return SynchronousPlaybackPointResolution.success(resolvedPoint)
                     } catch {
                         if event.locatorFallbackPolicy == .allowCoordinateFallback {
@@ -203,9 +163,10 @@ struct LivePlaybackSynchronousRunStepClient: Sendable {
                     point: point,
                     for: cacheKey,
                     loopIndex: request.loopIndex,
-                    eventTime: event.time
+                    event: event
                 )
             }
+            if cancelled() { return .failed(reason: "Playback cancelled") }
             eventPoster.post(event, point)
             return .succeeded(.postedInput)
         }

@@ -18,7 +18,7 @@ actor SemanticRecorderBridge {
 
     private var session: LiveSemanticRecordingSession?
     private var activeBundleDirectory: URL?
-    private var pendingEvents: [RecordedEvent] = []
+    private var pendingEvents: [(event: RecordedEvent, sessionTime: Double?)] = []
     private var pendingSuppressionContexts: [SemanticRecordingSuppressionContext] = []
     private var nextEventIndex = 0
     private var status: SemanticRecorderBridgeStatus = .idle
@@ -41,7 +41,7 @@ actor SemanticRecorderBridge {
         status
     }
 
-    func start(recordingTime: TimeInterval = 0) async -> SemanticRecorderBridgeStatus {
+    func start(recordingTime: TimeInterval = 0, sessionOriginHostTime: Double? = nil) async -> SemanticRecorderBridgeStatus {
         switch status {
         case .idle, .cancelled, .failed:
             break
@@ -54,7 +54,7 @@ actor SemanticRecorderBridge {
         self.session = session
 
         do {
-            switch try await session.start(recordingTime: recordingTime) {
+            switch try await session.start(recordingTime: recordingTime, sessionOriginHostTime: sessionOriginHostTime) {
             case .started(_, let bundleDirectory):
                 guard self.session === session,
                       case .starting = status else {
@@ -92,18 +92,18 @@ actor SemanticRecorderBridge {
         }
     }
 
-    func record(_ events: [RecordedEvent]) async -> SemanticRecorderBridgeStatus {
+    func record(_ events: [RecordedEvent], sessionTimeOffset: Double? = nil) async -> SemanticRecorderBridgeStatus {
         guard !events.isEmpty else {
             return status
         }
 
         switch status {
         case .idle, .starting:
-            pendingEvents.append(contentsOf: events)
+            pendingEvents.append(contentsOf: events.map { event in (event, sessionTimeOffset.map { $0 + event.time }) })
             return status
 
         case .active:
-            return await recordActiveEvents(events)
+            return await recordActiveEvents(events.map { event in (event, sessionTimeOffset.map { $0 + event.time }) })
 
         default:
             return status
@@ -202,7 +202,7 @@ actor SemanticRecorderBridge {
     }
 
     private func recordActiveEvents(
-        _ events: [RecordedEvent]
+        _ events: [(event: RecordedEvent, sessionTime: Double?)]
     ) async -> SemanticRecorderBridgeStatus {
         guard let session else {
             pendingEvents.removeAll()
@@ -212,14 +212,14 @@ actor SemanticRecorderBridge {
 
         do {
             for event in events {
-                try await session.record(event, index: nextEventIndex)
+                try await session.record(event.event, index: nextEventIndex, sessionTime: event.sessionTime)
                 nextEventIndex += 1
             }
             return status
         } catch {
             return await fail(
                 session: session,
-                recordingTime: events.last?.time ?? 0,
+                recordingTime: events.last?.sessionTime ?? events.last?.event.time ?? 0,
                 error: error
             )
         }

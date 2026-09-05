@@ -14,6 +14,7 @@ struct CompactMacroRow: View {
     let automationSummary: AutomationMacroScheduleSummary?
     let onSchedule: () -> Void
     let onShowEvidence: () -> Void
+    let onReconstruct: () -> Void
     let onSetIcon: (String?) -> Void
     let onAssignHotkey: () -> Void
 
@@ -68,6 +69,9 @@ struct CompactMacroRow: View {
             Spacer(minLength: 8)
             
             if hovered || isCurrent {
+                Button(action: onReconstruct) { Image(systemName: "wand.and.stars") }
+                    .buttonStyle(.plain)
+                    .help(String(localized: "AI-assisted reconstruction…", table: "EditorUX"))
                 Button(action: onShowEvidence) {
                     Image(systemName: "photo.on.rectangle.angled")
                         .font(.system(size: 12, weight: .semibold))

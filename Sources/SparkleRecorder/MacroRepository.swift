@@ -8,6 +8,8 @@ public actor MacroRepository {
     private let macrosDirectory: URL
     private let appSupport: URL
     private var didMigrate = false
+    var candidateTestRuns: [UUID: MacroCandidateTestRun] = [:]
+    var candidatePublicationFault: MacroCandidatePublicationFault?
     
     public init(appSupportURL: URL? = nil) {
         let appSupport = appSupportURL ?? FileManager.default
@@ -72,6 +74,12 @@ public actor MacroRepository {
         
         for url in contents {
             if url.pathExtension == "sparkrec" {
+                if let accepted = try MacroCandidateStore(package: url).accepted() {
+                    var manifest = accepted
+                    manifest.events = []
+                    macros.append(manifest)
+                    continue
+                }
                 let manifestURL = url.appendingPathComponent("macro.json")
                 if let data = try? Data(contentsOf: manifestURL) {
                     if var macro = try? decoder.decode(SavedMacro.self, from: data) {
@@ -95,6 +103,7 @@ public actor MacroRepository {
     /// Loads the heavy events array for a specific macro.
     public func loadEvents(for id: UUID) throws -> [RecordedEvent] {
         let packageURL = macrosDirectory.appendingPathComponent("\(id.uuidString).sparkrec")
+        if let accepted = try MacroCandidateStore(package: packageURL).accepted() { return accepted.events }
         let eventsURL = packageURL.appendingPathComponent("events.json")
         let data = try Data(contentsOf: eventsURL)
         let decoder = JSONDecoder()
@@ -103,6 +112,14 @@ public actor MacroRepository {
     
     /// Saves the lightweight metadata (macro.json) for a macro.
     public func saveMetadata(_ macro: SavedMacro) throws {
+        let candidateStore = MacroCandidateStore(package: packageURL(for: macro.id))
+        if let accepted = try candidateStore.accepted() {
+            var updated = macro
+            updated.events = accepted.events
+            updated.refreshCachesFromEvents()
+            try candidateStore.publish(updated)
+            return
+        }
         let packageURL = macrosDirectory.appendingPathComponent("\(macro.id.uuidString).sparkrec")
         let fm = FileManager.default
         if !fm.fileExists(atPath: packageURL.path) {
@@ -129,6 +146,13 @@ public actor MacroRepository {
     
     /// Saves the heavy events array (events.json) for a macro.
     public func saveEvents(_ events: [RecordedEvent], for id: UUID) throws {
+        let candidateStore = MacroCandidateStore(package: packageURL(for: id))
+        if var accepted = try candidateStore.accepted() {
+            accepted.events = events
+            accepted.refreshCachesFromEvents()
+            try candidateStore.publish(accepted)
+            return
+        }
         let packageURL = macrosDirectory.appendingPathComponent("\(id.uuidString).sparkrec")
         let fm = FileManager.default
         if !fm.fileExists(atPath: packageURL.path) {

@@ -5746,6 +5746,941 @@
           }
         }
       }
+    },
+    "AI-assisted reconstruction": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "AI-assisted reconstruction"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "AI 辅助优化录制"
+          }
+        }
+      }
+    },
+    "AI-assisted reconstruction…": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "AI-assisted reconstruction…"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "AI 辅助优化录制…"
+          }
+        }
+      }
+    },
+    "Refine": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Refine"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "优化录制"
+          }
+        }
+      }
+    },
+    "AI-assisted": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "AI-assisted"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "AI 辅助"
+          }
+        }
+      }
+    },
+    "Export the recording package for your AI tool, then import its complete candidate. Review and test every version before accepting it.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Export the recording package for your AI tool, then import its complete candidate. Review and test every version before accepting it."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "导出录制材料交给 AI，再导入完整的候选版本。检查并试跑后，即可接受新版本。"
+          }
+        }
+      }
+    },
+    "Prepare package": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Prepare package"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "准备材料"
+          }
+        }
+      }
+    },
+    "Compare & refine": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Compare & refine"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "对比修改"
+          }
+        }
+      }
+    },
+    "Test & accept": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Test & accept"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "试跑接受"
+          }
+        }
+      }
+    },
+    "Export AI package…": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Export AI package…"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "导出 AI 材料…"
+          }
+        }
+      }
+    },
+    "Include permitted video and frames": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Include permitted video and frames"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "包含允许导出的视频和画面"
+          }
+        }
+      }
+    },
+    "Import candidate…": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Import candidate…"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "导入候选版本…"
+          }
+        }
+      }
+    },
+    "Video unavailable": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Video unavailable"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "暂无视频"
+          }
+        }
+      }
+    },
+    "Enable visual evidence before your next recording to review it alongside video.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Enable visual evidence before your next recording to review it alongside video."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "下次录制前开启视觉证据，即可对照视频检查操作。"
+          }
+        }
+      }
+    },
+    "Precise video alignment is unavailable. Action times below belong to the macro; they are not video seek times.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Precise video alignment is unavailable. Action times below belong to the macro; they are not video seek times."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "暂时无法精确对齐视频。下方时间属于宏时间轴，不能用于定位视频。"
+          }
+        }
+      }
+    },
+    "Actions: %d": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Actions: %d"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "操作数：%d"
+          }
+        }
+      }
+    },
+    "Actions · %d → %d": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Actions · %d → %d"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "操作数 · %d → %d"
+          }
+        }
+      }
+    },
+    "Select a candidate": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Select a candidate"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "选择候选版本"
+          }
+        }
+      }
+    },
+    "Candidate": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Candidate"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "候选版本"
+          }
+        }
+      }
+    },
+    "Test completed": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Test completed"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "试跑已完成"
+          }
+        }
+      }
+    },
+    "Source coverage": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Source coverage"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "原操作的处理方式"
+          }
+        }
+      }
+    },
+    "Correct text target": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Correct text target"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "修正文字目标"
+          }
+        }
+      }
+    },
+    "Save correction": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Save correction"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "保存修正"
+          }
+        }
+      }
+    },
+    "This candidate contains uncertain or unresolved actions. Review its coverage before accepting.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This candidate contains uncertain or unresolved actions. Review its coverage before accepting."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "此版本有不确定或尚未解决的操作。接受前请检查处理说明。"
+          }
+        }
+      }
+    },
+    "I reviewed the uncertain actions": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "I reviewed the uncertain actions"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "我已检查不确定的操作"
+          }
+        }
+      }
+    },
+    "Ready for a better recording": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ready for a better recording"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "开始优化录制"
+          }
+        }
+      }
+    },
+    "Export a package, ask your AI tool to follow its instructions, then import the resulting candidate here. Your current macro stays available throughout.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Export a package, ask your AI tool to follow its instructions, then import the resulting candidate here. Your current macro stays available throughout."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "导出材料，让 AI 按材料中的说明完成修改，再将候选版本导入这里。整个过程中，当前宏始终可用。"
+          }
+        }
+      }
+    },
+    "Testing runs this macro once, without chained macros. Accepting keeps your saved repeat settings. Check the result in the target app before accepting.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Testing runs this macro once, without chained macros. Accepting keeps your saved repeat settings. Check the result in the target app before accepting."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "试跑仅执行当前宏一次，不执行后续链式宏。接受版本会保留原来的循环设置；接受前请在目标应用中检查结果。"
+          }
+        }
+      }
+    },
+    "Restore original": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Restore original"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "恢复原版"
+          }
+        }
+      }
+    },
+    "Stop test": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Stop test"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "停止试跑"
+          }
+        }
+      }
+    },
+    "Test once": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Test once"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "试跑一次"
+          }
+        }
+      }
+    },
+    "Accept tested version": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Accept tested version"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "接受已试跑版本"
+          }
+        }
+      }
+    },
+    "Source action": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Source action"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "原操作"
+          }
+        }
+      }
+    },
+    "Step %d · %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Step %d · %@"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "步骤 %d · %@"
+          }
+        }
+      }
+    },
+    "Kept": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kept"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "保留"
+          }
+        }
+      }
+    },
+    "Combined": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Combined"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "合并"
+          }
+        }
+      }
+    },
+    "Text target": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Text target"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "文字定位"
+          }
+        }
+      }
+    },
+    "Conditional wait": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Conditional wait"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "条件等待"
+          }
+        }
+      }
+    },
+    "Noise removed": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Noise removed"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "去除多余操作"
+          }
+        }
+      }
+    },
+    "Needs review": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Needs review"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "待检查"
+          }
+        }
+      }
+    },
+    "Candidate imported. Review its changes, then test it.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Candidate imported. Review its changes, then test it."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "候选版本已导入。请先检查修改，再进行试跑。"
+          }
+        }
+      }
+    },
+    "AI package exported. Follow instructions.md and import the completed candidate.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "AI package exported. Follow instructions.md and import the completed candidate."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "AI 材料已导出。按 instructions.md 完成修改后，导入候选版本。"
+          }
+        }
+      }
+    },
+    "Testing one iteration. Use Stop test or your stop hotkey to cancel.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Testing one iteration. Use Stop test or your stop hotkey to cancel."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在试跑一次。可使用“停止试跑”或停止快捷键取消。"
+          }
+        }
+      }
+    },
+    "Playback completed. Check the result before accepting this version.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Playback completed. Check the result before accepting this version."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "试跑已完成。请检查实际结果后再接受此版本。"
+          }
+        }
+      }
+    },
+    "Test stopped. Nothing was accepted. You can edit the candidate or test again.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Test stopped. Nothing was accepted. You can edit the candidate or test again."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "试跑已停止，尚未接受任何修改。可以修改候选版本或重新试跑。"
+          }
+        }
+      }
+    },
+    "Stop recording or playback before changing the accepted version.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Stop recording or playback before changing the accepted version."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "更换当前版本前，请先停止录制或播放。"
+          }
+        }
+      }
+    },
+    "Tested version accepted. The original remains available to restore.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tested version accepted. The original remains available to restore."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已接受试跑通过的版本。仍可随时恢复原版。"
+          }
+        }
+      }
+    },
+    "Original version restored.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Original version restored."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已恢复原版。"
+          }
+        }
+      }
+    },
+    "The linked recording could not be loaded. Reload it before exporting evidence.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The linked recording could not be loaded. Reload it before exporting evidence."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "无法载入关联录制。请重新载入后再导出证据。"
+          }
+        }
+      }
+    },
+    "The macro changed after candidate import. Export its current revision and import a new candidate.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The macro changed after candidate import. Export its current revision and import a new candidate."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "导入后当前宏已发生变化。请导出最新版本并重新生成候选版本。"
+          }
+        }
+      }
+    },
+    "Complete a successful playback test of this candidate before accepting it.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Complete a successful playback test of this candidate before accepting it."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "接受此候选版本前，请先完成一次成功的试跑。"
+          }
+        }
+      }
+    },
+    "This candidate test has expired or already finished. Start a new test.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This candidate test has expired or already finished. Start a new test."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "此次试跑已过期或已结束。请重新试跑。"
+          }
+        }
+      }
+    },
+    "The candidate content no longer matches its saved revision. Import and test a new candidate.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The candidate content no longer matches its saved revision. Import and test a new candidate."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "候选内容与保存的版本不一致。请重新导入并试跑。"
+          }
+        }
+      }
+    },
+    "Review and acknowledge the candidate's unresolved actions before accepting it.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Review and acknowledge the candidate's unresolved actions before accepting it."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "接受前，请检查并确认候选版本中尚未解决的操作。"
+          }
+        }
+      }
+    },
+    "This macro has no retained original revision to restore.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This macro has no retained original revision to restore."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "此宏尚无可恢复的原始版本。"
+          }
+        }
+      }
+    },
+    "Revision publication was interrupted. Reload the macro to inspect its accepted revision.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Revision publication was interrupted. Reload the macro to inspect its accepted revision."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "版本保存被中断。请重新载入宏，检查当前接受的版本。"
+          }
+        }
+      }
     }
   },
   "version": "1.1"

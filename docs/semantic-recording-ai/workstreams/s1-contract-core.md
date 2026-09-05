@@ -1,5 +1,14 @@
 # S1 Contract And Core Schema
 
+Updated: 2026-09-04
+Status: Accepted reconstruction handoff; verification and live acceptance pending
+
+## Reconstruction interface request and accepted contract
+
+S4 requests a complete authoring schema and executable capability boundary; S2/S3 request normalization and stable identity for storage/testing. Accepted: `MacroCandidateDocument`, coverage/disposition types, `MacroCandidateCapabilities.current`, `MacroCandidateValidator.decode/normalize`, and `MacroCandidateIdentity.revision`. Source metadata/configuration is protected; candidate events/surfaces are replaceable. Every source action has a reasoned disposition and real target IDs, scoped to literal candidate revision `candidate`. Unresolved/uncertain actions remain testable; promotion needs separate acknowledgement. Optional reconstruction provenance preserves old bundle decoding without invented clock anchors. Direct suites: `MacroCandidateValidatorTests`, `RecordingReconstructionProvenanceTests`, prior reconstruction clock/geometry/action/projection suites.
+
+Current code/test mappings are recorded in [../19-reconstruction-product-implementation-plan.md](../19-reconstruction-product-implementation-plan.md). No new tests/build/live gates are closed by this note.
+
 更新时间：2026-07-06
 状态：Core schema v0 first pass done; live producers/consumers pending
 Owner：S1, Contract And Core Schema

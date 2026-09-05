@@ -17,7 +17,7 @@ struct PlaybackLocatorCacheTests {
 
         let key = PlaybackLocatorCacheKey.key(for: event, surfaceId: TestFixtures.surfaceId)
 
-        #expect(key == "main|Submit|exact|10.0000,20.0000,30.0000,40.0000|50.0000,60.0000,70.0000,80.0000|90.0000,100.0000")
+        #expect(key == "main|Submit|exact|10.0000,20.0000,30.0000,40.0000|50.0000,60.0000,70.0000,80.0000|90.0000,100.0000|-")
     }
 
     @Test("Locator cache prefers content-normalized anchor fields")
@@ -35,7 +35,7 @@ struct PlaybackLocatorCacheTests {
 
         let key = PlaybackLocatorCacheKey.key(for: event, surfaceId: TestFixtures.surfaceId)
 
-        #expect(key == "main|Submit|contains|0.1000,0.2000,0.3000,0.4000|0.5000,0.6000,0.7000,0.8000|0.9000,1.0000")
+        #expect(key == "main|Submit|contains|0.1000,0.2000,0.3000,0.4000|0.5000,0.6000,0.7000,0.8000|0.9000,1.0000|-")
     }
 
     @Test("Locator cache only reuses matching entries within same loop and time window")

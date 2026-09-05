@@ -1,5 +1,14 @@
 # Parallel Workstreams
 
+Updated: 2026-09-04
+Status: Current owner contracts with historical first-pass context below
+
+## Accepted reconstruction handoff
+
+The accepted reconstruction implementation in [19-reconstruction-product-implementation-plan.md](19-reconstruction-product-implementation-plan.md) authorizes a bounded S1-S4 product slice while earlier live-product gates remain open. S1 owns candidate schema/identity/coverage/normalization and capabilities; S2 owns actual capture provenance, live text observation and repository transactions; S3 consumes timing/action projections and dispatches review/test/correction/accept/restore intents; S4 owns the local full-file package and authoring-only CLI. No Automation reducer action/effect semantics change.
+
+Requests accepted by affected owners: real source-to-session mappings and absent legacy provenance; candidate action revision literal `candidate`; full-file candidates with protected source metadata/configuration; unresolved actions remain reviewable/testable but require acknowledgement before promotion; atomic revision snapshots pin playback data; explicit visual inclusion must satisfy source sanitization and redaction clock/receipt checks. `MacroCandidateValidatorTests`, `RecordingReconstructionProvenanceTests`, `MacroCandidateRepositoryTests`, `PlaybackTextObservationTests`, `MacroReconstructionPackageTests`, `MacroReconstructionCLITests` and `MacroReconstructionReviewTests` are direct test mappings, pending current central verification. Live alignment, moved-window/variable-latency execution, correction and recovery evidence remain pending. Historical S3/S4 pause statements below apply to prior product/live gates, not a prohibition on this accepted reconstruction slice.
+
 更新时间：2026-09-01
 状态：并行工作边界草案
 Owner：Semantic Recording program coordination

@@ -37,6 +37,7 @@ final class Recorder: ObservableObject, @unchecked Sendable {
     private var semanticCaptureTarget: RecordingCaptureTarget?
     private var lastSemanticSuppressionFingerprint: SemanticSuppressionFingerprint?
     private var baseMachTicks: UInt64 = 0
+    private var sourceEventOriginNanoseconds: UInt64?
     private var isResumedSession = false
     private var resumeOffsetDuration: Double = 0
     private let surfaceTracker = RecordingSurfaceTracker()
@@ -120,6 +121,7 @@ final class Recorder: ObservableObject, @unchecked Sendable {
         liveDuration = 0
         recalculateStats()
         baseMachTicks = mach_absolute_time()
+        sourceEventOriginNanoseconds = nil
         isResumedSession = false
         resumeOffsetDuration = 0
         recordMouseMovesEnabled = UserDefaults.standard.bool(forKey: "recordMouseMoves")
@@ -194,6 +196,7 @@ final class Recorder: ObservableObject, @unchecked Sendable {
 
     private func stopRecording(shouldFinishSemanticRecording: Bool) {
         guard isRecording else { return }
+        let sessionStopTime = RecordingTimeline.liveDuration(currentMachTicks: mach_absolute_time(), baseMachTicks: baseMachTicks, resumeOffsetDuration: 0, timebase: Recorder.recordingTimebase)
         engineClient?.stop()
         engineClient = nil
         recordingTask?.cancel()
@@ -206,9 +209,9 @@ final class Recorder: ObservableObject, @unchecked Sendable {
         isRecording = false
         liveDuration = events.last?.time ?? 0
         if shouldFinishSemanticRecording {
-            finishSemanticRecording(recordingTime: liveDuration)
+            finishSemanticRecording(recordingTime: sessionStopTime)
         } else {
-            cancelSemanticRecording(recordingTime: liveDuration)
+            cancelSemanticRecording(recordingTime: sessionStopTime)
         }
     }
 
@@ -218,7 +221,7 @@ final class Recorder: ObservableObject, @unchecked Sendable {
         if activeSurfaces != snapshot.surfaces {
             activeSurfaces = snapshot.surfaces
         }
-        let semanticRecordingTime = snapshot.events.last?.time ?? liveDuration
+        let semanticRecordingTime = RecordingTimeline.liveDuration(currentMachTicks: mach_absolute_time(), baseMachTicks: baseMachTicks, resumeOffsetDuration: 0, timebase: Recorder.recordingTimebase)
         recordSemanticSuppressionContext(recordingTime: semanticRecordingTime)
         guard !snapshot.events.isEmpty else { return }
         
@@ -287,6 +290,10 @@ final class Recorder: ObservableObject, @unchecked Sendable {
     }
 
     private func processRawInput(_ input: RawInputEvent) {
+        // Match the pipeline origin: ignored key events establish it; filtered moves do not.
+        if sourceEventOriginNanoseconds == nil, input.kind != .mouseMoved || recordMouseMovesEnabled {
+            sourceEventOriginNanoseconds = input.timestamp
+        }
         sessionProcessor.record(
             input,
             recordMouseMoves: recordMouseMovesEnabled,
@@ -338,8 +345,9 @@ final class Recorder: ObservableObject, @unchecked Sendable {
         semanticRecorderBridge = bridge
         semanticCaptureTarget = captureTarget
         semanticRecordingStatus = .starting
+        let origin = RecordingTimeline.secondsFromMachTicks(baseMachTicks, timebase: Recorder.recordingTimebase)
         semanticRecordingTask = Task { [weak self, bridge] in
-            let status = await bridge.start(recordingTime: 0)
+            let status = await bridge.start(recordingTime: 0, sessionOriginHostTime: origin)
             await self?.setSemanticRecordingStatus(status)
         }
         recordSemanticSuppressionContext(initialContext)
@@ -349,8 +357,12 @@ final class Recorder: ObservableObject, @unchecked Sendable {
         guard let bridge = semanticRecorderBridge else {
             return
         }
-        Task { [weak self, bridge, events] in
-            let status = await bridge.record(events)
+        let previous = semanticRecordingTask
+        let origin = RecordingTimeline.secondsFromMachTicks(baseMachTicks, timebase: Recorder.recordingTimebase)
+        let offset = sourceEventOriginNanoseconds.map { RecordingTimeline.secondsFromNanoseconds($0) - origin - resumeOffsetDuration }
+        semanticRecordingTask = Task { [weak self, bridge, events] in
+            await previous?.value
+            let status = await bridge.record(events, sessionTimeOffset: offset)
             await self?.setSemanticRecordingStatus(status)
         }
     }
@@ -362,7 +374,9 @@ final class Recorder: ObservableObject, @unchecked Sendable {
         semanticRecorderBridge = nil
         semanticCaptureTarget = nil
         lastSemanticSuppressionFingerprint = nil
+        let previous = semanticRecordingTask
         semanticRecordingTask = Task { [weak self, bridge] in
+            await previous?.value
             let status = await bridge.finish(recordingTime: recordingTime)
             await self?.setSemanticRecordingStatus(status)
         }
@@ -416,7 +430,9 @@ final class Recorder: ObservableObject, @unchecked Sendable {
             return
         }
 
-        Task { [weak self, bridge, context] in
+        let previous = semanticRecordingTask
+        semanticRecordingTask = Task { [weak self, bridge, context] in
+            await previous?.value
             let status = await bridge.addSuppressions(for: context)
             await self?.setSemanticRecordingStatus(status)
         }

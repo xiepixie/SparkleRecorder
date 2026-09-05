@@ -62,7 +62,7 @@ actor LiveSemanticRecordingSession {
         self.dependencies = dependencies
     }
 
-    func start(recordingTime: TimeInterval = 0) async throws -> LiveSemanticRecordingStartResult {
+    func start(recordingTime: TimeInterval = 0, sessionOriginHostTime: Double? = nil) async throws -> LiveSemanticRecordingStartResult {
         guard !didFinish else {
             throw LiveSemanticRecordingSessionError.alreadyFinished
         }
@@ -70,6 +70,8 @@ actor LiveSemanticRecordingSession {
             throw LiveSemanticRecordingSessionError.alreadyStarted
         }
 
+        var configuration = self.configuration
+        configuration.sessionOriginHostTime = sessionOriginHostTime ?? configuration.sessionOriginHostTime
         let lifecycleConfiguration = SemanticRecordingLifecycleConfiguration(
             captureConfiguration: configuration
         )
@@ -113,8 +115,8 @@ actor LiveSemanticRecordingSession {
         }
     }
 
-    func record(_ event: RecordedEvent, index: Int) async throws {
-        try await requireLifecycle().record(event, index: index)
+    func record(_ event: RecordedEvent, index: Int, sessionTime: Double? = nil) async throws {
+        try await requireLifecycle().record(event, index: index, sessionTime: sessionTime)
     }
 
     func addSuppression(_ suppression: RecordingSuppressionRecord) async throws {

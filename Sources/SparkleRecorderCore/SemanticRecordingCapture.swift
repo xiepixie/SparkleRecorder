@@ -19,6 +19,7 @@ public struct SemanticRecordingCaptureIDProvider: @unchecked Sendable {
 }
 
 public struct SemanticRecordingCaptureConfiguration: Equatable, Sendable {
+    public var sessionOriginHostTime: Double?
     public var recordingID: UUID
     public var createdAt: Date
     public var capturePolicy: RecordingCapturePolicy
@@ -32,8 +33,10 @@ public struct SemanticRecordingCaptureConfiguration: Equatable, Sendable {
         capturePolicy: RecordingCapturePolicy = RecordingCapturePolicy(),
         captureTarget: RecordingCaptureTarget = RecordingCaptureTarget(),
         videoArtifactRef: RecordingArtifactRef? = nil,
-        defaultSurfaceID: String? = nil
+        defaultSurfaceID: String? = nil,
+        sessionOriginHostTime: Double? = nil
     ) {
+        self.sessionOriginHostTime = sessionOriginHostTime
         self.recordingID = recordingID
         self.createdAt = createdAt
         self.capturePolicy = capturePolicy
@@ -124,6 +127,7 @@ public struct SemanticRecordingMovieFinishRequest: Equatable, Sendable {
 }
 
 public struct SemanticRecordingMovieFinishResult: Equatable, Sendable {
+    public var timingEvidence: RecordingMovieTimingEvidence?
     public var duration: TimeInterval
     public var frameSize: RecordingImageSize?
     public var fileType: String
@@ -133,8 +137,10 @@ public struct SemanticRecordingMovieFinishResult: Equatable, Sendable {
         duration: TimeInterval,
         frameSize: RecordingImageSize? = nil,
         fileType: String = "mov",
-        codec: String = "SCRecordingOutput"
+        codec: String = "SCRecordingOutput",
+        timingEvidence: RecordingMovieTimingEvidence? = nil
     ) {
+        self.timingEvidence = timingEvidence
         self.duration = max(0, duration)
         self.frameSize = frameSize
         self.fileType = fileType
@@ -180,6 +186,8 @@ public struct SemanticRecordingFrameCaptureRequest: Equatable, Sendable {
 }
 
 public struct SemanticRecordingCapturedFrame: Equatable, Sendable {
+    public var capturedHostTime: Double?
+    public var timestampUncertainty: Double?
     public var imageSize: RecordingImageSize?
     public var windowBounds: RecordingBounds?
     public var displayScale: Double?
@@ -187,8 +195,12 @@ public struct SemanticRecordingCapturedFrame: Equatable, Sendable {
     public init(
         imageSize: RecordingImageSize? = nil,
         windowBounds: RecordingBounds? = nil,
-        displayScale: Double? = nil
+        displayScale: Double? = nil,
+        capturedHostTime: Double? = nil,
+        timestampUncertainty: Double? = nil
     ) {
+        self.capturedHostTime = capturedHostTime
+        self.timestampUncertainty = timestampUncertainty
         self.imageSize = imageSize
         self.windowBounds = windowBounds
         self.displayScale = displayScale
@@ -253,6 +265,10 @@ public actor SemanticRecordingCaptureSession {
     private var visualObservations: [RecordingVisualObservation] = []
     private var suppressions: [RecordingSuppressionRecord] = []
     private var frameOrdinal = 0
+    private var sourceEventTimes: [RecordingSourceEventTime] = []
+    private var capturedSourceEvents: [RecordedEvent] = []
+    private var sourceEventOrderValid = true
+    private var frameTimings: [RecordingFrameTimingEvidence] = []
 
     public init(
         configuration: SemanticRecordingCaptureConfiguration,
@@ -293,13 +309,24 @@ public actor SemanticRecordingCaptureSession {
         }
     }
 
-    public func record(_ event: RecordedEvent, index: Int) async throws {
+    public func record(_ event: RecordedEvent, index: Int, sessionTime: Double? = nil) async throws {
         guard didStart else {
             throw SemanticRecordingCaptureError.notStarted
         }
         guard !didFinish else {
             throw SemanticRecordingCaptureError.alreadyFinished
         }
+        // Preserve the input event before replacing its playback timestamp with
+        // session time for visual evidence. An incomplete/out-of-order sequence
+        // cannot establish the saved macro's identity.
+        if index != capturedSourceEvents.count { sourceEventOrderValid = false }
+        capturedSourceEvents.append(event)
+        var evidenceEvent = event
+        if let sessionTime, sessionTime.isFinite, sessionTime >= 0 {
+            sourceEventTimes.append(.init(sourceEventIndex: index, sourcePlaybackTime: event.time, sessionTime: sessionTime))
+            evidenceEvent.time = sessionTime
+        }
+        let event = evidenceEvent
 
         let eventID = ids.next(.timelineEvent)
         let source = RecordingFrameCaptureSource(recordedEventKind: event.kind)
@@ -355,6 +382,7 @@ public actor SemanticRecordingCaptureSession {
         }
 
         var videoSegments: [RecordingVideoSegment] = []
+        var movieEvidence: [RecordingMovieTimingEvidence] = []
         if let movieHandle {
             let result = try await client.finishMovie(SemanticRecordingMovieFinishRequest(
                 recordingID: configuration.recordingID,
@@ -362,6 +390,7 @@ public actor SemanticRecordingCaptureSession {
                 finishedAt: configuration.createdAt.addingTimeInterval(recordingTime),
                 recordingTime: recordingTime
             ))
+            movieEvidence.append(result.timingEvidence ?? .init(segmentID: movieHandle.segmentID))
             videoSegments.append(RecordingVideoSegment(
                 id: movieHandle.segmentID,
                 artifactRef: movieHandle.artifactRef,
@@ -384,7 +413,14 @@ public actor SemanticRecordingCaptureSession {
             timelineEvents: timelineEvents,
             semanticEvents: semanticEvents,
             visualObservations: visualObservations,
-            suppressions: suppressions
+            suppressions: suppressions,
+            reconstructionProvenance: configuration.sessionOriginHostTime.map { origin in
+                RecordingReconstructionProvenance(sessionOriginHostTime: origin, sessionEndTime: recordingTime,
+                    sourceEvents: sourceEventTimes, movieEvidence: movieEvidence, frameTimings: frameTimings,
+                    clockSegments: RecordingReconstructionProvenance.writtenMovieClocks(movieEvidence: movieEvidence, origin: origin),
+                    geometrySnapshots: RecordingReconstructionProvenance.measuredGeometry(movieEvidence: movieEvidence, origin: origin, surfaceID: configuration.defaultSurfaceID ?? configuration.captureTarget.surfaceID),
+                    sourceEventDigest: sourceEventOrderValid ? (try? RecordingReconstructionProvenance.digest(ofSourceEvents: capturedSourceEvents)) : nil)
+            }
         )
     }
 
@@ -421,15 +457,21 @@ public actor SemanticRecordingCaptureSession {
             artifactRef: Self.frameArtifactRef(ordinal: frameOrdinal, source: source),
             recordingTime: recordingTime,
             videoSegmentID: movieHandle?.segmentID,
-            videoTime: movieHandle == nil ? nil : recordingTime,
+            videoTime: nil,
             target: configuration.captureTarget,
             surfaceID: surfaceID ?? configuration.defaultSurfaceID,
             relatedEventIDs: relatedEventIDs
         )
         let captured = try await client.captureFrame(request)
+        let capturedTime = captured.capturedHostTime.flatMap { host in
+            configuration.sessionOriginHostTime.flatMap { origin in
+                host.isFinite && host >= origin ? host - origin : nil
+            }
+        }
+        frameTimings.append(.init(frameID: frameID, requestedSessionTime: recordingTime, capturedSessionTime: capturedTime, uncertainty: captured.timestampUncertainty))
         let frame = RecordingFrameReference(
             id: frameID,
-            recordingTime: recordingTime,
+            recordingTime: capturedTime ?? recordingTime,
             videoSegmentID: request.videoSegmentID,
             videoTime: request.videoTime,
             imageRef: request.artifactRef,

@@ -43,6 +43,7 @@ private final class LiveAutomationPlayerBox: @unchecked Sendable {
     private let readinessSleep: @Sendable (TimeInterval) async throws -> Void
     private var preparingRunIDs: Set<UUID> = []
     private var cancelledRunIDs: Set<UUID> = []
+    private var cleanupTasks: [UUID: Task<Void, Never>] = [:]
     private var targetSessions:
         [UUID: (
             session: AutomationTargetApplicationSession,
@@ -68,8 +69,8 @@ private final class LiveAutomationPlayerBox: @unchecked Sendable {
         bridge: AutomationPlayerEventBridge,
         now: @escaping @Sendable () -> Date
     ) async -> AutomationPlayerStartResult {
-        guard !player.isPlaying, preparingRunIDs.isEmpty else {
-            return .rejected(.rejected(reason: "Player is already running"))
+        guard !Task.isCancelled else {
+            return .rejected(.cancelled(reason: "Automation cancelled during startup preparation"))
         }
         guard
             !PlaybackPlanner.plan(
@@ -80,8 +81,15 @@ private final class LiveAutomationPlayerBox: @unchecked Sendable {
         else {
             return .rejected(.rejected(reason: "Macro has no playable events"))
         }
+        guard player.reserveAutomationRun(request.runID) else {
+            return .rejected(.rejected(reason: "Player is already running"))
+        }
         preparingRunIDs.insert(request.runID)
-        defer { preparingRunIDs.remove(request.runID) }
+        var startedPlayback = false
+        defer {
+            preparingRunIDs.remove(request.runID)
+            if !startedPlayback { player.releaseAutomationRun(request.runID) }
+        }
 
         let targetSession: AutomationTargetApplicationSession
         switch await targetApplications.prepare(
@@ -105,7 +113,7 @@ private final class LiveAutomationPlayerBox: @unchecked Sendable {
             request.targetApplicationForceQuitOnTimeout
         )
 
-        if cancelledRunIDs.remove(request.runID) != nil {
+        if cancelledRunIDs.remove(request.runID) != nil || Task.isCancelled || !player.canStartAutomationRun(request.runID) {
             await cleanupTargets(for: request.runID)
             return .rejected(.cancelled(reason: "Automation cancelled during startup preparation"))
         }
@@ -118,12 +126,12 @@ private final class LiveAutomationPlayerBox: @unchecked Sendable {
                     .cancelled(reason: "Automation cancelled during startup preparation"))
             }
         }
-        if cancelledRunIDs.remove(request.runID) != nil {
+        if cancelledRunIDs.remove(request.runID) != nil || Task.isCancelled || !player.canStartAutomationRun(request.runID) {
             await cleanupTargets(for: request.runID)
             return .rejected(.cancelled(reason: "Automation cancelled during startup preparation"))
         }
 
-        player.play(
+        let didStart = player.play(
             macroID: request.macro.id,
             events: request.macro.events,
             runID: request.runID,
@@ -147,6 +155,7 @@ private final class LiveAutomationPlayerBox: @unchecked Sendable {
                             ))
                     }
                     await self.cleanupTargets(for: request.runID)
+                    self.player.releaseAutomationRun(request.runID)
                     bridge.yield(completion.action(runID: request.runID, at: now()))
                 }
             },
@@ -159,6 +168,11 @@ private final class LiveAutomationPlayerBox: @unchecked Sendable {
                     ))
             }
         )
+        guard didStart else {
+            await cleanupTargets(for: request.runID)
+            return .rejected(.rejected(reason: "Player could not start the reserved run"))
+        }
+        startedPlayback = true
         return .started
     }
 
@@ -172,13 +186,12 @@ private final class LiveAutomationPlayerBox: @unchecked Sendable {
             await cleanupTargets(for: runID)
             return
         }
-        guard player.isPlaying else {
+        guard player.ownsAutomationRun(runID), player.stop(runID: runID) else {
             await cleanupTargets(for: runID)
             return
         }
-
-        player.stop()
         await cleanupTargets(for: runID)
+        player.releaseAutomationRun(runID)
         bridge.yield(
             .playerFinished(
                 runID: runID,
@@ -188,16 +201,17 @@ private final class LiveAutomationPlayerBox: @unchecked Sendable {
     }
 
     private func cleanupTargets(for runID: UUID) async {
-        guard let targetSession = targetSessions.removeValue(forKey: runID) else {
-            return
+        if let existing = cleanupTasks[runID] { await existing.value; return }
+        guard let targetSession = targetSessions.removeValue(forKey: runID) else { return }
+        let task = Task { [targetApplications] in
+            _ = await targetApplications.cleanup(targetSession.session, targetSession.cleanupPolicy,
+                targetSession.quitTimeout, targetSession.forceQuitOnTimeout)
         }
-        _ = await targetApplications.cleanup(
-            targetSession.session,
-            targetSession.cleanupPolicy,
-            targetSession.quitTimeout,
-            targetSession.forceQuitOnTimeout
-        )
+        cleanupTasks[runID] = task
+        await task.value
+        cleanupTasks[runID] = nil
     }
+
 }
 
 extension AutomationPlayerClient {

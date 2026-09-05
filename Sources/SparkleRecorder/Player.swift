@@ -144,6 +144,9 @@ final class Player: ObservableObject {
     @Published private(set) var totalLoops: Int = 1
 
     private var task: Task<Void, Never>?
+    private var reservedAutomationRunID: UUID?
+    private var reservedAutomationRunCancelled = false
+    private var activeRunID: UUID?
     private var runStateMachine = PlaybackRunStateMachine()
     private let pointResolver = PointResolver()
     private var conflictMonitor: PlaybackConflictMonitor?
@@ -162,10 +165,40 @@ final class Player: ObservableObject {
         self.evidenceClient = evidenceClient
     }
 
+    /// Shared by every automation client wrapping this Player. Reservation spans
+    /// target preparation, playback and target cleanup; it is not per client box.
+    func reserveAutomationRun(_ runID: UUID) -> Bool {
+        guard !isPlaying, reservedAutomationRunID == nil else { return false }
+        reservedAutomationRunID = runID
+        reservedAutomationRunCancelled = false
+        return true
+    }
+
+    func ownsAutomationRun(_ runID: UUID) -> Bool { reservedAutomationRunID == runID }
+
+    func canStartAutomationRun(_ runID: UUID) -> Bool {
+        reservedAutomationRunID == runID && !reservedAutomationRunCancelled
+    }
+
+    func releaseAutomationRun(_ runID: UUID) {
+        if reservedAutomationRunID == runID {
+            reservedAutomationRunID = nil
+            reservedAutomationRunCancelled = false
+        }
+    }
+
+    @discardableResult
+    func stop(runID: UUID) -> Bool {
+        guard reservedAutomationRunID == runID || activeRunID == runID else { return false }
+        stop()
+        return true
+    }
+
     /// Play the macro `loops` times. Pass `loops <= 0` for continuous (infinite) playback,
     /// which only stops on `stop()` or the configured stop hotkey.
     /// The completion receives `true` only when playback ran to natural completion —
     /// `false` for cancellation, so callers can skip chains/stats/sounds on abort.
+    @discardableResult
     func play(
         macroID: UUID? = nil,
         events: [RecordedEvent],
@@ -177,9 +210,14 @@ final class Player: ObservableObject {
         completion: ((Bool) -> Void)? = nil,
         automationCompletion: ((AutomationPlayerCompletion) -> Void)? = nil,
         automationEvidencePersistence: ((AutomationRunEvidencePersistence) -> Void)? = nil
-    ) {
+    ) -> Bool {
         let plan = PlaybackPlanner.plan(events: events, loops: loops, speed: speed)
-        guard !isPlaying, !plan.steps.isEmpty else { completion?(false); return }
+        guard !isPlaying, !plan.steps.isEmpty,
+              reservedAutomationRunID == nil || canStartAutomationRun(runID) else {
+            completion?(false)
+            return false
+        }
+        activeRunID = runID
         let total = plan.loopMode.displayLoopCount
 
         let startSnapshot = runStateMachine.start(totalLoops: total)
@@ -190,7 +228,8 @@ final class Player: ObservableObject {
         let stepClientFactory = LivePlaybackRunStepClient(
             playbackClock: playbackClock,
             pointResolver: pointResolver,
-            eventPoster: eventPoster
+            eventPoster: eventPoster,
+            cancelled: { Task.isCancelled || monitor.hasConflict }
         )
         let runState = PlayerRunState(
             player: self,
@@ -250,9 +289,12 @@ final class Player: ObservableObject {
                 terminalOutcome: terminalOutcome
             )
         }
+        return true
     }
 
     func stop() {
+        if reservedAutomationRunID != nil { reservedAutomationRunCancelled = true }
+        activeRunID = nil
         let snapshot = runStateMachine.stop()
         task?.cancel()
         task = nil
@@ -292,6 +334,7 @@ final class Player: ObservableObject {
         }
 
         if let snapshot = runStateMachine.finish(generation: expectedGeneration) {
+            activeRunID = nil
             apply(snapshot)
         }
 
@@ -341,7 +384,8 @@ final class Player: ObservableObject {
         let windowContext = Player.windowContextClient(for: windowTracker)
         let stepClientFactory = LivePlaybackSynchronousRunStepClient(
             playbackClock: playbackClock,
-            eventPoster: eventPoster
+            eventPoster: eventPoster,
+            cancelled: { monitor.hasConflict }
         )
         let runID = UUID()
         let runStartTime = Date.now

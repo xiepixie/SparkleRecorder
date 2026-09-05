@@ -9,6 +9,16 @@ public struct MacroRepositoryClient: Sendable {
     public var deleteMacro: @Sendable (_ id: UUID) async throws -> Void
     public var packageURL: @Sendable (_ id: UUID) -> URL
     public var saveRunEvidence: @Sendable (_ id: UUID, _ report: RunReport, _ screenshot: Data?) async throws -> Void
+    /// Live repositories return metadata and events from one accepted revision.
+    /// Nil preserves compatibility for existing injected clients.
+    public var loadSnapshot: (@Sendable (_ id: UUID) async throws -> SavedMacro?)? = nil
+
+    public func loadPinnedMacro(_ id: UUID) async throws -> SavedMacro? {
+        if let loadSnapshot { return try await loadSnapshot(id) }
+        guard var macro = try await loadAllManifests().first(where: { $0.id == id }) else { return nil }
+        macro.events = try await loadEvents(id)
+        return macro
+    }
 }
 
 extension MacroRepositoryClient {
@@ -20,7 +30,8 @@ extension MacroRepositoryClient {
             saveEvents: { events, id in try await MacroRepository.shared.saveEvents(events, for: id) },
             deleteMacro: { try await MacroRepository.shared.deleteMacro(id: $0) },
             packageURL: { MacroRepository.shared.packageURL(for: $0) },
-            saveRunEvidence: { id, report, screenshot in try await MacroRepository.shared.saveRunEvidence(id: id, report: report, screenshot: screenshot) }
+            saveRunEvidence: { id, report, screenshot in try await MacroRepository.shared.saveRunEvidence(id: id, report: report, screenshot: screenshot) },
+            loadSnapshot: { try await MacroRepository.shared.loadMacro(for: $0) }
         )
     }
 }
