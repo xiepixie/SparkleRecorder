@@ -272,3 +272,15 @@ Minimum accepted result:
 - S4 fixture OCR/visual/explain query, suggestion commands, metadata-only stored-bundle suggestions, fixture/review-only draft-from-recording and explicit stored-bundle/default-root read-only catalog/query/explain commands are done on top of S1 fixtures plus S2 sidecar-aware loader/catalog APIs; S4 product-ready live catalog still waits for authorized live bundle evidence, installed-app links, cleanup/missing-artifact policy and artifact status surfacing.
 
 That is enough to keep implementation moving without pretending the full AI/App Knowledge vision is already solved.
+
+
+## Reconstruction foundation handoff
+
+Updated: 2026-09-04
+Status: Pure foundation verified; no live gates closed.
+
+S1 owns additive Core contracts; S2 consumes explicit session timestamps and capture bounds; S3 consumes the pure review projection. No existing bundle or Automation runtime interface changes in this batch.
+
+Plan: [Reconstruction foundation](18-reconstruction-foundation-implementation-plan.md). Three implementation owners have disjoint new Core/test files; coordinator owns integration and this documentation.
+
+Foundation evidence: `RecordingVideoClockTests`, `RecordingGeometryProjectionTests`, `MacroActionReconstructionTests`, and `MacroReconstructionProjectionTests` passed (46 tests); full Swift Testing passed (770 tests), Swift 6 build passed. Actual capture/UI handoff remains future work.

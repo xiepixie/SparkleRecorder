@@ -2,9 +2,11 @@
 
 Updated: 2026-09-04
 
-Status: Accepted design; implementation not started
+Status: Accepted design; Slice 1 pure foundation implemented; live integration and later slices remain open
 
 Owners: Recording/Video Alignment, Macro Core, AI Collaboration, Macro Review
+
+Implementation evidence: [18-reconstruction-foundation-implementation-plan.md](18-reconstruction-foundation-implementation-plan.md) records pure clock/geometry/action/projection contracts and direct tests. This is not live alignment, video Review, AI generation, candidate testing, or revision promotion completion.
 
 ## 1. Decision Summary
 

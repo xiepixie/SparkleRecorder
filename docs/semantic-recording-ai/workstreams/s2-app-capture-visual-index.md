@@ -420,3 +420,15 @@ Follow [../15-s2-live-evidence-playbook.md](../15-s2-live-evidence-playbook.md) 
 - 2026-07-06: Wired playback-preserving playable macro sanitization into saved/exported macros. `MacroPlayableSanitizationSummary` records applied and review-required counts, `MacroLibrary.applyPlayableSanitization` updates persisted macro events and metadata after semantic bundle attachment, `MenuBarController` refreshes the current recording buffer and status copy, and text/script/file export helpers apply the same sidecar-backed playback-preserving subset before writing payloads.
 - 2026-07-06: Added first-pass user-facing suppression exclusion settings. `SemanticRecordingSuppressionSettings` normalizes app bundle IDs, window title fragments, domains and max artifact bytes; `AppState` persists the editable text fields/options to the same UserDefaults keys used by `LiveSemanticRecordingSuppressionContext`; and `SettingsPanel` exposes Privacy exclusions under the experimental visual-evidence setting. Live product evidence for excluded app/window/domain suppression remains future S2 work.
 - 2026-07-06: Added scheduled retention cleanup first pass. `SemanticRecordingScheduledRetentionCleanupPlanner` makes a pure run/skip decision from retention settings, last-run time and a default 24-hour interval; `AppState` persists the last scheduled cleanup time; and `MenuBarController` reuses the sidecar-aware `RecordingBundleStore.retentionCleanupPreview` / `applyRetentionCleanup` path on launch when cleanup is eligible. Live cleanup product evidence remains future S2 work.
+
+
+## Reconstruction foundation handoff
+
+Updated: 2026-09-04
+Status: Pure foundation verified; no live gates closed.
+
+Accepted S1 handoff: a future adapter supplies actual session event times, segment anchors with measured uncertainty, and geometry validity intervals. This batch does not change Recorder capture or bundle persistence; live timing/geometry production remains open.
+
+Plan: [Reconstruction foundation](../18-reconstruction-foundation-implementation-plan.md). Three implementation owners have disjoint new Core/test files; coordinator owns integration and this documentation.
+
+Foundation evidence: `RecordingVideoClockTests`, `RecordingGeometryProjectionTests`, `MacroActionReconstructionTests`, and `MacroReconstructionProjectionTests` passed (46 tests); full Swift Testing passed (770 tests), Swift 6 build passed. Actual capture/UI handoff remains future work.

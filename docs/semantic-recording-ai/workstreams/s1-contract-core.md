@@ -134,3 +134,15 @@ S4 can start CLI fixtures:
 
 - 2026-07-06: Added S1 core schema v0 in `SemanticRecordingBundle.swift`, added unit tests, accepted S0 preview-ref semantics as first-pass contract. No live ScreenCaptureKit, Vision, Review UI, CLI command, retention policy or asset-copy behavior is claimed complete.
 - 2026-07-06: Added `SemanticRecordingFixture` with deterministic checkout bundle, query result and suggestion fixtures for S2/S3/S4. `SemanticRecordingBundleTests` now verifies the shared fixture validates, round-trips and cites stable evidence refs.
+
+
+## Reconstruction foundation handoff
+
+Updated: 2026-09-04
+Status: Pure foundation verified; no live gates closed.
+
+Accepted S2/S3 request: implement strict video clock mapping, bounded historical geometry, stable action reconstruction, and combined projection as additive Core APIs. Direct tests are required before adapter/UI integration.
+
+Plan: [Reconstruction foundation](../18-reconstruction-foundation-implementation-plan.md). Three implementation owners have disjoint new Core/test files; coordinator owns integration and this documentation.
+
+Foundation evidence: `RecordingVideoClockTests`, `RecordingGeometryProjectionTests`, `MacroActionReconstructionTests`, and `MacroReconstructionProjectionTests` passed (46 tests); full Swift Testing passed (770 tests), Swift 6 build passed. Actual capture/UI handoff remains future work.
