@@ -6681,6 +6681,40 @@
           }
         }
       }
+    },
+    "This candidate belongs to an earlier macro version. Export the current version to continue refining.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This candidate belongs to an earlier macro version. Export the current version to continue refining."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "此候选属于较早的宏版本。请导出当前版本，再继续优化。"
+          }
+        }
+      }
+    },
+    "This step has no verified video time. Review the macro step directly or inspect the video manually.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This step has no verified video time. Review the macro step directly or inspect the video manually."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "此步骤没有经过验证的视频时间。请直接检查宏步骤，或手动查看视频。"
+          }
+        }
+      }
     }
   },
   "version": "1.1"

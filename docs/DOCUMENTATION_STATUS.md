@@ -1,6 +1,6 @@
 # SparkleRecorder Documentation Status
 
-Updated: 2026-09-04
+Updated: 2026-09-05
 
 This is the authoritative documentation index. Code and direct tests remain the source of truth for implementation claims; plans describe future work unless they link to accepted implementation evidence.
 
@@ -35,9 +35,10 @@ All new or materially updated planning documents must include an `Updated: YYYY-
 | [`automation-engine/README.md`](automation-engine/README.md) | Active engine workbench | Reducer, adapters, persistence, scheduling, UI contracts, and tests. |
 | [`workflow-page-productization/README.md`](workflow-page-productization/README.md) | Active product UX workbench | Workflow UI, scheduling/run/evidence UX, and product evidence. |
 | [`semantic-recording-ai/README.md`](semantic-recording-ai/README.md) | Active gated workbench | Semantic recording, Review, live evidence, and CLI/AI boundaries. |
-| [`semantic-recording-ai/17-ai-assisted-macro-reconstruction-design.md`](semantic-recording-ai/17-ai-assisted-macro-reconstruction-design.md) | Accepted design; product implementation in progress | Capture provenance, candidate/revision, text-observation, package/CLI and Review work map to direct tests in plan 19; current verification and live acceptance remain open. |
+| [`semantic-recording-ai/17-ai-assisted-macro-reconstruction-design.md`](semantic-recording-ai/17-ai-assisted-macro-reconstruction-design.md) | Accepted design; automated implementation verified | Capture provenance, candidate/revision, text-observation, package/CLI and Review work map to direct tests in plan 19; automated verification passes; live acceptance remains open. |
 | [`semantic-recording-ai/19-reconstruction-product-implementation-plan.md`](semantic-recording-ai/19-reconstruction-product-implementation-plan.md) | Active implementation ledger | Frozen owner contracts, current code/test mapping and remaining acceptance gaps. |
-| [`semantic-recording-ai/20-reconstruction-cli-guide.md`](semantic-recording-ai/20-reconstruction-cli-guide.md) | Current authoring interface; verification pending | Local full-file export, candidate action inspection and import; explicit visual inclusion and app-owned testing/acceptance. |
+| [`semantic-recording-ai/22-review-performance-audit.md`](semantic-recording-ai/22-review-performance-audit.md) | Current performance and acceptance audit | Indexed Review lookups, UX state fixes, 836 passing tests, Swift 6 build, and outstanding live/performance evidence. |
+| [`semantic-recording-ai/20-reconstruction-cli-guide.md`](semantic-recording-ai/20-reconstruction-cli-guide.md) | Current authoring interface; automated verification passed | Local full-file export, candidate action inspection and import; explicit visual inclusion and app-owned testing/acceptance. |
 | [`MacroEditorUserGuide.zh-Hans.md`](MacroEditorUserGuide.zh-Hans.md) | Current user guide | Macro Editor behavior that is implemented and user-facing. |
 | [`archive/README.md`](archive/README.md) | Archive index | Superseded plans, progress ledgers, and historical references. |
 
@@ -45,7 +46,7 @@ All new or materially updated planning documents must include an `Updated: YYYY-
 
 1. Continue the scheduler/run/evidence UX from its accepted activation-projection slice: capability contract and fixtures first, then quick schedule, Run Center, and evidence recovery.
 2. Keep the App-online scheduling limitation visible until a separately accepted background lifecycle implementation has live evidence.
-3. Verify the accepted reconstruction implementation while keeping S3/S4 live-product acceptance gated on authorized S2 evidence.
+3. Complete authorized S2/S3/S4 live acceptance and representative recording/review profiling; reconstruction code verification is complete, while physical product evidence remains open.
 4. Update this index when a capability changes status; do not append dated progress paragraphs here.
 
 ## Maintenance rules
@@ -56,7 +57,3 @@ All new or materially updated planning documents must include an `Updated: YYYY-
 - Archived files may contain stale paths and historical assertions; their archive banner governs.
 - A checked acceptance item needs direct evidence. An unverified plan stays unchecked.
 - When moving a document, update active Markdown links and the archive index in the same change.
-
-## Reconstruction product verification (2026-09-04)
-
-[Reconstruction product ledger](semantic-recording-ai/19-reconstruction-product-implementation-plan.md) records implemented capture provenance, full-file candidates, immutable tested promotion, Review and CLI. [Review UX](semantic-recording-ai/21-reconstruction-review-ux.md) documents the current user flow. 829 tests and Swift 6 build passed; live recording/product acceptance remains open.

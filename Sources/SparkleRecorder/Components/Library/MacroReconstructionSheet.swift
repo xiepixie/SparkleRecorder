@@ -66,14 +66,14 @@ struct MacroReconstructionSheet: View {
                     }
                     ScrollView {
                         LazyVStack(alignment: .leading, spacing: 4) {
-                            ForEach(Array(model.sourceActions.enumerated()), id: \.element.id) { index, action in
-                                actionRow(action, number: index + 1, candidate: false)
+                            ForEach(model.sourceRows) { row in
+                                actionRow(row.action, number: row.number, candidate: false)
                             }
                         }
                     }
                 }.padding(.trailing, 12).frame(minWidth: 330)
                 VStack(alignment: .leading, spacing: 8) {
-                    Picker(selection: Binding(get: { model.selectedCandidateID }, set: { model.selectCandidate($0) })) {
+                    Picker(selection: Binding(get: { model.selectedCandidateID }, set: { id in Task { await model.selectCandidate(id) } })) {
                         Text("Select a candidate", tableName: "EditorUX").tag(Optional<UUID>.none)
                         ForEach(model.candidates) { candidate in
                             Text(candidate.createdAt.formatted(date: .abbreviated, time: .standard))
@@ -81,6 +81,10 @@ struct MacroReconstructionSheet: View {
                         }
                     } label: { Text("Candidate", tableName: "EditorUX") }.disabled(model.isBusy)
                     if let candidate = model.selectedCandidate {
+                        if model.isSelectedCandidateStale {
+                            Label(String(localized: "This candidate belongs to an earlier macro version. Export the current version to continue refining.", table: "EditorUX"), systemImage: "clock.arrow.circlepath")
+                                .font(.caption).foregroundStyle(.orange)
+                        }
                         HStack {
                             Text(String(format: String(localized: "Actions · %d → %d", table: "EditorUX"), model.sourceActions.count, model.candidateActions.count))
                                 .font(.headline).monospacedDigit()
@@ -94,8 +98,8 @@ struct MacroReconstructionSheet: View {
                         Text(candidate.document.model).font(.caption).foregroundStyle(.secondary)
                         ScrollView {
                             LazyVStack(alignment: .leading, spacing: 4) {
-                                ForEach(Array(model.candidateActions.enumerated()), id: \.element.id) { index, action in
-                                    actionRow(action, number: index + 1, candidate: true)
+                                ForEach(model.candidateRows) { row in
+                                    actionRow(row.action, number: row.number, candidate: true)
                                 }
                                 Divider().padding(.vertical, 6)
                                 Text("Source coverage", tableName: "EditorUX").font(.headline)
@@ -153,7 +157,7 @@ struct MacroReconstructionSheet: View {
                     Button(role: .destructive) { model.cancelTest() } label: { Text("Stop test", tableName: "EditorUX") }
                 } else {
                     Button { Task { await model.testSelected() } } label: { Text("Test once", tableName: "EditorUX") }
-                        .disabled(model.isBusy || model.selectedCandidate == nil)
+                        .disabled(model.isBusy || model.selectedCandidate == nil || model.isSelectedCandidateStale)
                 }
                 Button { Task { await model.acceptSelected() } } label: { Text("Accept tested version", tableName: "EditorUX") }
                     .buttonStyle(.borderedProminent).disabled(!model.canAccept)
@@ -185,7 +189,7 @@ struct MacroReconstructionSheet: View {
     }
 
     private func coverageTitle(_ coverage: MacroCandidateCoverage) -> String {
-        guard let index = model.sourceActions.firstIndex(where: { $0.id == coverage.sourceActionID }) else {
+        guard let index = model.sourceActionIndices[coverage.sourceActionID] else {
             return String(localized: "Source action", table: "EditorUX")
         }
         return String(format: String(localized: "Step %d · %@", table: "EditorUX"), index + 1,
@@ -211,9 +215,17 @@ struct MacroReconstructionSheet: View {
                     Text(humanActionKindName(action.kind)).font(.callout.bold())
                     Text(String(format: "%.2f–%.2f s", action.startTime, action.endTime))
                         .font(.caption.monospacedDigit()).foregroundStyle(.secondary)
-                    if candidate, let macro = model.selectedCandidate?.macro,
-                       let text = action.sourceEventIndices.compactMap({ macro.events[$0].textAnchor?.text }).first {
-                        Text(text).font(.caption).lineLimit(2)
+                    if let macro = candidate ? model.selectedCandidate?.macro : model.source {
+                        if let text = action.sourceEventIndices.compactMap({ macro.events[$0].textAnchor?.text }).first {
+                            Text(text).font(.caption).lineLimit(2).textSelection(.enabled)
+                        } else {
+                            let typed = action.sourceEventIndices.lazy.map { macro.events[$0] }
+                                .filter { $0.kind == .keyDown }.compactMap(\.unicodeString).prefix(80)
+                                .reduce(into: "") { result, fragment in
+                                    if result.count < 160 { result.append(contentsOf: fragment.prefix(160 - result.count)) }
+                                }
+                            if !typed.isEmpty { Text(String(typed.prefix(160))).font(.caption).lineLimit(2).textSelection(.enabled) }
+                        }
                     }
                 }
                 Spacer()

@@ -293,3 +293,8 @@ S1 owns additive Core contracts; S2 consumes explicit session timestamps and cap
 Plan: [Reconstruction foundation](18-reconstruction-foundation-implementation-plan.md). Three implementation owners have disjoint new Core/test files; coordinator owns integration and this documentation.
 
 Foundation evidence: `RecordingVideoClockTests`, `RecordingGeometryProjectionTests`, `MacroActionReconstructionTests`, and `MacroReconstructionProjectionTests` passed (46 tests); full Swift Testing passed (770 tests), Swift 6 build passed. Actual capture/UI handoff remains future work.
+
+
+## Accepted Review lookup contract — 2026-09-05
+
+S3 requests and S1 supplies `MacroReconstructionVideoIndex`: immutable per-segment interval lookup and source-ID row lookup. Validated clock interpolation and historical geometry retain existing boundary/gap rules with binary lookup. Review builds projections off MainActor and only publishes changed video highlight/marker state. Direct tests: `MacroReconstructionVideoIndexTests`, `ReconstructionLookupPerformanceTests`, `MacroReconstructionReviewTests`, existing clock/geometry suites. No live acceptance is implied.

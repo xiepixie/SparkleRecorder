@@ -34,7 +34,7 @@ public struct RecordingGeometryHistory: Equatable, Sendable {
         case overlappingSnapshots(surfaceID: String)
     }
 
-    private let snapshots: [RecordingGeometrySnapshot]
+    private let snapshotsBySurface: [String: [RecordingGeometrySnapshot]]
 
     public init(snapshots: [RecordingGeometrySnapshot]) throws {
         for (index, snapshot) in snapshots.enumerated() {
@@ -68,7 +68,7 @@ public struct RecordingGeometryHistory: Equatable, Sendable {
                 throw ValidationError.overlappingSnapshots(surfaceID: current.surfaceID)
             }
         }
-        self.snapshots = sorted
+        self.snapshotsBySurface = Dictionary(grouping: sorted, by: \.surfaceID)
     }
 
     /// Returns pixels only when the requested surface and time have valid capture coverage.
@@ -80,10 +80,17 @@ public struct RecordingGeometryHistory: Equatable, Sendable {
     ) -> PointValue? {
         guard recordingTime.isFinite, recordingTime >= 0,
               point.x.isFinite, point.y.isFinite,
-              let snapshot = snapshots.first(where: {
-                  $0.surfaceID == surfaceID && $0.recordingTime <= recordingTime
-                      && recordingTime < $0.validUntil
-              }) else { return nil }
+              let snapshots = snapshotsBySurface[surfaceID] else { return nil }
+        var lower = 0
+        var upper = snapshots.count
+        while lower < upper {
+            let middle = lower + (upper - lower) / 2
+            if snapshots[middle].recordingTime <= recordingTime { lower = middle + 1 }
+            else { upper = middle }
+        }
+        guard lower > 0 else { return nil }
+        let snapshot = snapshots[lower - 1]
+        guard recordingTime < snapshot.validUntil else { return nil }
 
         let bounds = snapshot.captureBounds
         guard point.x >= bounds.x, point.x <= bounds.x + bounds.width,
