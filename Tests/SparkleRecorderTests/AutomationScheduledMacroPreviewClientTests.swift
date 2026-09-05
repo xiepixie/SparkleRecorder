@@ -67,6 +67,19 @@ struct AutomationScheduledMacroPreviewClientTests {
         pair.continuation.finish()
     }
 
+    @Test("Rejected startup never displays a playing state")
+    func rejectedStartupDoesNotAnnouncePlaying() async {
+        let player = AutomationPlayerClient(start: { _ in .rejected(.rejected(reason: "Denied")) }, cancel: { _ in })
+        do {
+            try await AutomationScheduledMacroPreviewClient(player: player).run(previewRequest(runID: UUID()), onStarted: {
+                Issue.record("Cannot announce playing before successful startup")
+            })
+            Issue.record("Expected startup rejection")
+        } catch {
+            #expect(error.localizedDescription == "Denied")
+        }
+    }
+
     private func previewRequest(runID: UUID) -> AutomationPlayerStartRequest {
         AutomationPlayerStartRequest(
             runID: runID,

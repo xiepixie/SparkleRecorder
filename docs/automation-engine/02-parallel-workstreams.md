@@ -145,3 +145,8 @@ Reducer 基本签名不再放在 Phase 0，它是 Owner A 在 Phase 1 的第一�
 ## Reconstruction test lifecycle contract (2026-09-04)
 
 Coordinator/C requests and B accepts shared Player reservation through target preparation, playback and deduplicated cleanup. Scoped cancellation identifies its own run; cancelled preparation cannot start late. Review cancels the whole test task and prevents recording entry while it is active. Tests: `AutomationPlayerReservationTests`, `MacroReconstructionReviewTests`. Candidate trial policy runs one iteration without chains; repository receipt binds policy, capability version and execution digest while accepted repeat/chain settings are preserved.
+
+
+## Accepted manual playback handoff repair (2026-09-05)
+
+UI requests the existing Owner B target-preparation/player/evidence path for manual playback; Owner B accepts a default-empty `onStarted` callback on the preview client so UI cannot announce playback before acceptance. Player uses an injected post-event permission check before starting; live automation rejects before launching targets. Reducer and persisted outcome schemas are unchanged. Direct tests are PlaybackPermissionTests and AutomationScheduledMacroPreviewClientTests, plus existing reservation/target-preparation tests. Investigation and live-evidence limits: [playback audit](../semantic-recording-ai/24-playback-reliability-audit.md).

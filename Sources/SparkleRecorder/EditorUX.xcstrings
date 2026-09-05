@@ -6919,6 +6919,125 @@
           }
         }
       }
+    },
+    "Video clock alignment is unavailable; do not assume video time equals event time.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Video clock alignment is unavailable; do not assume video time equals event time."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "视频时钟对齐不可用；请勿假设视频时间等于事件时间。"
+          }
+        }
+      }
+    },
+    "Recording source event content is unverified or differs from this macro. Alignment is withheld.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Recording source event content is unverified or differs from this macro. Alignment is withheld."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "录制源事件未验证或与当前宏不一致，已暂缓时间对齐。"
+          }
+        }
+      }
+    },
+    "Missing evidence: %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Missing evidence: %@"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "缺失证据文件：%@"
+          }
+        }
+      }
+    },
+    "Video withheld: verified redaction clock alignment unavailable.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Video withheld: verified redaction clock alignment unavailable."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "视频未导出：缺少经过验证的脱敏时钟对齐。"
+          }
+        }
+      }
+    },
+    "Video withheld: complete redaction evidence unavailable.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Video withheld: complete redaction evidence unavailable."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "视频未导出：缺少完整的脱敏证据。"
+          }
+        }
+      }
+    },
+    "Frame withheld: complete redaction evidence unavailable.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Frame withheld: complete redaction evidence unavailable."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "画面帧未导出：缺少完整的脱敏证据。"
+          }
+        }
+      }
+    },
+    "No visual bytes included. Export with explicit visual inclusion to provide permitted video/frames.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No visual bytes included. Export with explicit visual inclusion to provide permitted video/frames."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "未包含视觉证据。如需提供画面或视频，请在导出时勾选包含视觉证据。"
+          }
+        }
+      }
     }
   },
   "version": "1.1"

@@ -55,7 +55,7 @@ struct MacroRunEvidenceSheet: View {
             .padding(18)
         }
         .frame(width: 520, height: 430)
-        .task { await load() }
+        .task(id: macro.id) { await load() }
     }
 
     private func evidence(_ payload: AutomationTaskRunEvidencePayload) -> some View {
@@ -120,9 +120,13 @@ struct MacroRunEvidenceSheet: View {
     @MainActor
     private func load() async {
         isLoading = true
+        errorMessage = nil
         do {
-            payload = try await AutomationTaskRunEvidencePresenter.loadLatestEvidence(macroID: macro.id)
+            let loaded = try await AutomationTaskRunEvidencePresenter.loadLatestEvidence(macroID: macro.id)
+            guard !Task.isCancelled else { return }
+            payload = loaded
         } catch {
+            guard !Task.isCancelled else { return }
             errorMessage = error.localizedDescription
             payload = nil
         }

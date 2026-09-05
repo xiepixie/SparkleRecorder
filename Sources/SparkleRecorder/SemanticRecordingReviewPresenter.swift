@@ -23,7 +23,7 @@ struct SemanticRecordingReviewState: Identifiable {
     }
 }
 
-struct SemanticRecordingReviewArtifactStatus: Identifiable {
+struct SemanticRecordingReviewArtifactStatus: Identifiable, Sendable {
     var id: String { path }
     var path: String
     var url: URL
@@ -215,8 +215,10 @@ enum SemanticRecordingReviewPresenter {
         let directory = bundleDirectory(from: selectedURL)
         let store = RecordingBundleStore(rootDirectory: directory.deletingLastPathComponent())
         let bundle = try await store.loadBundle(from: directory)
-        let validationIssues = bundle.validate()
-        let artifactStatuses = artifactStatuses(for: bundle, directory: directory)
+        let (validationIssues, artifactStatuses) = await Task.detached(priority: .userInitiated) {
+            (bundle.validate(), Self.artifactStatuses(for: bundle, directory: directory))
+        }.value
+        try Task.checkCancellation()
 
         return SemanticRecordingReviewState(
             sourceName: directory.lastPathComponent,
@@ -241,8 +243,10 @@ enum SemanticRecordingReviewPresenter {
         let directory = appSupportRootURL.appendingRecordingArtifactRef(bundleRef)
         let store = RecordingBundleStore(rootDirectory: directory.deletingLastPathComponent())
         let bundle = try await store.loadBundle(from: directory)
-        let validationIssues = bundle.validate()
-        let artifactStatuses = artifactStatuses(for: bundle, directory: directory)
+        let (validationIssues, artifactStatuses) = await Task.detached(priority: .userInitiated) {
+            (bundle.validate(), Self.artifactStatuses(for: bundle, directory: directory))
+        }.value
+        try Task.checkCancellation()
 
         return SemanticRecordingReviewState(
             sourceName: sourceName ?? directory.lastPathComponent,
@@ -618,7 +622,7 @@ enum SemanticRecordingReviewPresenter {
             : selectedURL
     }
 
-    private static func artifactStatuses(
+    nonisolated private static func artifactStatuses(
         for bundle: SemanticRecordingBundle,
         directory: URL
     ) -> [String: SemanticRecordingReviewArtifactStatus] {
@@ -635,7 +639,7 @@ enum SemanticRecordingReviewPresenter {
         })
     }
 
-    private static func artifactRefs(in bundle: SemanticRecordingBundle) -> [RecordingArtifactRef] {
+    nonisolated private static func artifactRefs(in bundle: SemanticRecordingBundle) -> [RecordingArtifactRef] {
         var refs: [RecordingArtifactRef] = []
         refs.append(contentsOf: bundle.videoSegments.map(\.artifactRef))
         refs.append(contentsOf: bundle.frames.map(\.imageRef))

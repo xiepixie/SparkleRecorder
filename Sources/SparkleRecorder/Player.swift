@@ -153,16 +153,23 @@ final class Player: ObservableObject {
     private let playbackClock: PlaybackClockClient
     private let eventPoster: EventPosterClient
     private let evidenceClient: PlaybackEvidenceClient
+    private let canPostEvents: @Sendable () -> Bool
+
+    var playbackPermissionFailure: String? {
+        canPostEvents() ? nil : String(localized: "Playback is blocked. Enable SparkleRecorder in System Settings > Privacy & Security > Accessibility, then reopen the app and retry.", table: "Recording")
+    }
     nonisolated private static let waitStrategy = PlaybackWaitStrategy.precise
 
     init(
         playbackClock: PlaybackClockClient = .live,
         eventPoster: EventPosterClient = .live(),
-        evidenceClient: PlaybackEvidenceClient = .live
+        evidenceClient: PlaybackEvidenceClient = .live,
+        canPostEvents: @escaping @Sendable () -> Bool = { CGPreflightPostEventAccess() }
     ) {
         self.playbackClock = playbackClock
         self.eventPoster = eventPoster
         self.evidenceClient = evidenceClient
+        self.canPostEvents = canPostEvents
     }
 
     /// Shared by every automation client wrapping this Player. Reservation spans
@@ -214,6 +221,10 @@ final class Player: ObservableObject {
         let plan = PlaybackPlanner.plan(events: events, loops: loops, speed: speed)
         guard !isPlaying, !plan.steps.isEmpty,
               reservedAutomationRunID == nil || canStartAutomationRun(runID) else {
+            completion?(false)
+            return false
+        }
+        guard playbackPermissionFailure == nil else {
             completion?(false)
             return false
         }

@@ -108,7 +108,7 @@ struct AutomationTargetApplicationClientTests {
       }
     )
     let player = AutomationPlayerClient.live(
-      player: Player(),
+      player: Player(eventPoster: .none, canPostEvents: { true }),
       targetApplications: targetApplications
     )
 
@@ -139,7 +139,7 @@ struct AutomationTargetApplicationClientTests {
       name: "Prepared task",
       events: TestFixtures.clickPair()
     )
-    let playerInstance = Player()
+    let playerInstance = Player(eventPoster: .none, canPostEvents: { true })
     let waitProbe = ReadinessWaitProbe()
     let cleanupRecorder = TargetApplicationCleanupRecorder()
     let targetApplications = AutomationTargetApplicationClient(

@@ -7720,6 +7720,10 @@ if args.count >= 2, args[1] == "--self-test" {
 }
 
 if args.count >= 3, args[1] == "--play" {
+    guard CGPreflightPostEventAccess() else {
+        FileHandle.standardError.write(Data((String(localized: "Playback is blocked. Enable SparkleRecorder in System Settings > Privacy & Security > Accessibility, then reopen the app and retry.", table: "Recording") + "\n").utf8))
+        exit(1)
+    }
     let path = args[2]
     let url = URL(fileURLWithPath: path)
     do {

@@ -10,7 +10,7 @@ struct AutomationScheduledMacroPreviewFailure: Error, Equatable, LocalizedError,
 struct AutomationScheduledMacroPreviewClient: Sendable {
     var player: AutomationPlayerClient
 
-    func run(_ request: AutomationPlayerStartRequest) async throws {
+    func run(_ request: AutomationPlayerStartRequest, onStarted: @escaping @Sendable () async -> Void = {}) async throws {
         try await withTaskCancellationHandler {
             switch await player.start(request) {
             case .started:
@@ -21,6 +21,7 @@ struct AutomationScheduledMacroPreviewClient: Sendable {
                 )
             }
 
+            await onStarted()
             for await action in player.events() {
                 try Task.checkCancellation()
                 guard case .playerFinished(let completedRunID, let outcome, _) = action,

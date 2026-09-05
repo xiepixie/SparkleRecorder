@@ -7,26 +7,43 @@ struct MacroReconstructionSheet: View {
     @StateObject var model: MacroReconstructionReviewModel
     @Environment(\.dismiss) private var dismiss
     @State private var isDraggingOver = false
+    @State private var isInitialLoading = true
+
+    init(model: @autoclosure @escaping () -> MacroReconstructionReviewModel) {
+        // Keep model construction inside StateObject's retained initialization thunk.
+        _model = StateObject(wrappedValue: model())
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             headerView
-            workflowPipelineBar
-            HSplitView {
-                sourceMacroPane
-                    .frame(minWidth: 350, maxWidth: .infinity, maxHeight: .infinity)
-                    .padding(.trailing, 6)
-                candidateReviewPane
-                    .frame(minWidth: 360, maxWidth: .infinity, maxHeight: .infinity)
-                    .padding(.leading, 6)
+            if isInitialLoading {
+                ProgressView()
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else {
+                workflowPipelineBar
+                HSplitView {
+                    sourceMacroPane
+                        .frame(minWidth: 350, maxWidth: .infinity, maxHeight: .infinity)
+                        .padding(.trailing, 6)
+                    candidateReviewPane
+                        .frame(minWidth: 360, maxWidth: .infinity, maxHeight: .infinity)
+                        .padding(.leading, 6)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                footerView
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            footerView
         }
         .padding(18)
         .frame(minWidth: 900, idealWidth: 1020, minHeight: 700, idealHeight: 820)
-        .interactiveDismissDisabled(model.isBusy)
-        .task { await model.reload() }
+        .interactiveDismissDisabled(model.isBusy && !isInitialLoading)
+        .task {
+            await model.reload()
+            // A detached repository/projection load can finish after dismissal.
+            // Dispose any player observer it installed after onDisappear ran.
+            guard !Task.isCancelled else { model.close(); return }
+            isInitialLoading = false
+        }
         .onDisappear { model.close() }
     }
 
@@ -69,7 +86,7 @@ struct MacroReconstructionSheet: View {
             } label: {
                 Text("Close", tableName: "Common")
             }
-            .disabled(model.isBusy)
+            .disabled(model.isBusy && !isInitialLoading)
             .keyboardShortcut(.cancelAction)
         }
     }

@@ -13,6 +13,8 @@ final class MenuBarController: NSObject, NSPopoverDelegate {
     private var editorWC: EditorWindowController?
     private var hud: RecordingHUDController?
     private var countdown: CountdownOverlayController?
+    private var manualPlaybackTask: Task<Void, Never>?
+    private var playbackRequestGeneration: UInt64 = 0
     private var reconstructionTestActive = false
     private var recordingPreparationActive = false
     private var welcomeWC: WelcomeWindowController?
@@ -646,13 +648,14 @@ final class MenuBarController: NSObject, NSPopoverDelegate {
         // Never persist while a recording is live: the buffer holds the partial
         // in-flight recording, and writing it over the selected macro destroys it.
         guard !recorder.isRecording else { return }
-        guard let id = library.currentMacroID else { return }
+        guard let id = library.currentMacroID, recorderLoadedMacroID == id, recorderLoadingMacroID == nil else { return }
         library.updateEvents(id: id, events: recorder.events)
     }
 
     // MARK: - Actions
 
     func toggleRecording() {
+        if manualPlaybackTask != nil { stopAll() }
         // A second press during the countdown means "never mind".
         if let countdown, countdown.isActive {
             countdown.cancel()
@@ -664,6 +667,7 @@ final class MenuBarController: NSObject, NSPopoverDelegate {
             let count = recorder.eventCount
             if count > 0 {
                 let newMacro = library.add(events: recorder.events, loops: state.loops)
+                recorderLoadedMacroID = newMacro.id
                 if !recorder.activeSurfaces.isEmpty {
                     library.setSurfaces(id: newMacro.id, surfaces: recorder.activeSurfaces)
                 } else if let surface = recordedSurface {
@@ -772,6 +776,10 @@ final class MenuBarController: NSObject, NSPopoverDelegate {
     }
 
     func stopAll() {
+        playbackRequestGeneration &+= 1
+        manualPlaybackTask?.cancel()
+        manualPlaybackTask = nil
+        player.stop()
         countdown?.cancel()
         if recorder.isRecording {
             // F7 = "abort". Throw away the in-flight recording instead of saving.
@@ -1145,67 +1153,86 @@ final class MenuBarController: NSObject, NSPopoverDelegate {
     }
 
     private func play(isChained: Bool) {
-        guard !recorder.events.isEmpty else {
-            state.statusMessage = "Nothing to play. Record first."
+        guard !recorder.events.isEmpty, recorderLoadingMacroID == nil else {
+            state.statusMessage = String(localized: "No loaded actions to play. Select a macro and wait for it to load.", table: "Recording")
             return
         }
-        // A pending record countdown and playback can't coexist — the recorder
-        // would capture our own synthetic events.
-        if let countdown, countdown.isActive { countdown.cancel() }
+        guard !player.isPlaying, manualPlaybackTask == nil, !recordingPreparationActive else { return }
+        if let failure = player.playbackPermissionFailure {
+            state.statusMessage = failure
+            SoundController.shared.play(.error)
+            showSettingsWindow()
+            return
+        }
+        countdown?.cancel()
         if recorder.isRecording { toggleRecording() }
-        if player.isPlaying { return }
         if !isChained { chainVisited.removeAll() }
-        let macro = library.currentMacro
-        let name = macro?.name ?? "macro"
-        let loops = macro?.loops ?? state.loops
-        let speed = macro?.speed ?? state.speed
-
-        preparePlaybackContext(for: macro) { [weak self] context in
+        var macro = library.currentMacro ?? SavedMacro(name: "macro", events: recorder.events, loops: state.loops)
+        macro.events = recorder.events
+        if library.currentMacro == nil { macro.speed = state.speed }
+        let snapshot = macro
+        let generation = playbackRequestGeneration
+        let client = AutomationPlayerClient.live(player: player, windowTracker: WindowTracker())
+        let request = AutomationPlayerStartRequest(runID: UUID(), macro: snapshot,
+            targetApplicationPolicy: snapshot.surfaces.isEmpty ? .doNotActivate : .launchIfNeeded,
+            targetApplicationReadyDelay: 0, targetApplicationCleanupPolicy: .keepOpen,
+            targetApplicationQuitTimeout: 5, targetApplicationForceQuitOnTimeout: false)
+        state.statusMessage = String(localized: "Preparing playback…", table: "Recording")
+        if popover.isShown { popover.performClose(nil) }
+        NSApp.hide(nil)
+        manualPlaybackTask = Task { [weak self] in
             guard let self else { return }
-            self.state.statusMessage = loops <= 0
-                ? "Playing \(name) on loop…"
-                : "Playing \(name) · ×\(loops)…"
-            if self.popover.isShown { self.popover.performClose(nil) }
-            self.playStartTime = CFAbsoluteTimeGetCurrent()
-            self.playingMacroID = macro?.id
-            if let id = macro?.id { self.chainVisited.insert(id) }
-            SoundController.shared.play(.playStart)
-            // Completion arrives on the main actor. `finished` is false when the run
-            // was cancelled (stop hotkey, new playback, recording started) — in that
-            // case we skip stats, sounds, status, and most importantly the chain.
-            self.player.play(macroID: macro?.id, events: self.recorder.events, loops: loops, speed: speed, context: context, windowTracker: WindowTracker()) { [weak self] finished in
-                guard let self else { return }
-                // Look the chain up LIVE (not from the stale pre-playback copy) so
-                // clearing it mid-run is respected.
-                let chainID = self.playingMacroID.flatMap { pid in
-                    self.library.macros.first(where: { $0.id == pid })?.chainTo
+            defer {
+                if self.playbackRequestGeneration == generation {
+                    self.manualPlaybackTask = nil
+                    self.playingMacroID = nil
                 }
-                self.playingMacroID = nil
-                guard finished else { return }
-
+            }
+            do {
+                try Task.checkCancellation()
+                try await AutomationScheduledMacroPreviewClient(player: client).run(request, onStarted: { [weak self] in
+                    await MainActor.run {
+                        guard let self, self.playbackRequestGeneration == generation else { return }
+                        self.playStartTime = CFAbsoluteTimeGetCurrent()
+                        self.playingMacroID = snapshot.id
+                        self.chainVisited.insert(snapshot.id)
+                        self.state.statusMessage = "Playing \(snapshot.name) · ×\(snapshot.loops)…"
+                        SoundController.shared.play(.playStart)
+                    }
+                })
+                try Task.checkCancellation()
+                guard self.playbackRequestGeneration == generation else { return }
                 let elapsed = CFAbsoluteTimeGetCurrent() - self.playStartTime
-                if let id = macro?.id {
-                    self.library.recordPlay(id: id, runTime: elapsed)
-                }
+                self.library.recordPlay(id: snapshot.id, runTime: elapsed)
+                self.state.statusMessage = String(localized: "Playback finished.", table: "Recording")
                 SoundController.shared.play(.playEnd)
-
+                let chainID = self.library.macros.first(where: { $0.id == snapshot.id })?.chainTo
                 if let id = chainID, let next = self.library.macros.first(where: { $0.id == id }) {
                     guard !self.chainVisited.contains(id) else {
                         self.state.statusMessage = "Chain stopped (loop detected)."
                         return
                     }
-                    self.state.statusMessage = "Chaining to \(next.name)…"
-                    self.library.select(id: next.id)
-                    Task {
-                        if let evs = try? await self.library.loadEvents(for: next.id) {
-                            self.recorder.loadEvents(evs)
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-                                self.play(isChained: true)
-                            }
-                        }
+                    self.library.select(id: id)
+                    Task { [weak self] in
+                        guard let self else { return }
+                        do {
+                            let events = try await self.library.loadEvents(for: id)
+                            guard self.playbackRequestGeneration == generation, self.library.currentMacroID == id else { return }
+                            self.recorder.loadEvents(events)
+                            self.recorderLoadedMacroID = id
+                            self.state.statusMessage = "Chaining to \(next.name)…"
+                            self.play(isChained: true)
+                        } catch { self.state.statusMessage = error.localizedDescription }
                     }
-                } else {
-                    self.state.statusMessage = "Playback finished."
+                }
+            } catch {
+                guard self.playbackRequestGeneration == generation else { return }
+                self.state.statusMessage = Task.isCancelled
+                    ? String(localized: "Playback stopped.", table: "Recording") : error.localizedDescription
+                if !Task.isCancelled {
+                    NSApp.unhide(nil)
+                    NSApp.activate()
+                    SoundController.shared.play(.error)
                 }
             }
         }
@@ -1225,26 +1252,33 @@ final class MenuBarController: NSObject, NSPopoverDelegate {
 
     /// Play a specific saved macro by id (used by per-macro hotkeys + library card buttons).
     func playMacroByID(_ id: UUID) {
-        guard library.macros.contains(where: { $0.id == id }) else { return }
+        guard library.macros.contains(where: { $0.id == id }), !reconstructionTestActive else { return }
         if recorder.isRecording { toggleRecording() }
-        if player.isPlaying { player.stop() }
+        let previous = manualPlaybackTask
+        stopAll()
         persistCurrentMacroIfNeeded()
         chainVisited.removeAll()
         library.select(id: id)
-        Task {
-            if let evs = try? await library.loadEvents(for: id) {
-                recorder.loadEvents(evs)
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { [weak self] in
-                    self?.play()
-                }
-            }
+        let generation = playbackRequestGeneration
+        Task { [weak self] in
+            await previous?.value
+            guard let self, self.playbackRequestGeneration == generation else { return }
+            do {
+                let events = try await self.library.loadEvents(for: id)
+                guard self.playbackRequestGeneration == generation, self.library.currentMacroID == id else { return }
+                self.recorder.loadEvents(events)
+                self.recorderLoadedMacroID = id
+                self.recorderLoadingMacroID = nil
+                self.manualPlaybackTask = nil
+                self.play()
+            } catch { self.state.statusMessage = error.localizedDescription }
         }
     }
 
     func reconstructionReviewModel(for id: UUID) -> MacroReconstructionReviewModel {
         MacroReconstructionReviewModel(macroID: id, testMacro: { [weak self] macro in
             guard let self, !self.recorder.isRecording, !self.player.isPlaying,
-                  !self.reconstructionTestActive, !self.recordingPreparationActive, self.countdown?.isActive != true else {
+                  !self.reconstructionTestActive, self.manualPlaybackTask == nil, !self.recordingPreparationActive, self.countdown?.isActive != true else {
                 throw AutomationTargetApplicationPreparationFailure(message: String(
                     localized: "Stop recording or playback before previewing.", table: "Automation"))
             }
@@ -1259,11 +1293,16 @@ final class MenuBarController: NSObject, NSPopoverDelegate {
                 targetApplicationPolicy: macro.surfaces.isEmpty ? .doNotActivate : .launchIfNeeded,
                 targetApplicationReadyDelay: 0, targetApplicationCleanupPolicy: .keepOpen,
                 targetApplicationQuitTimeout: 5, targetApplicationForceQuitOnTimeout: false)
+            if let failure = self.player.playbackPermissionFailure {
+                throw AutomationScheduledMacroPreviewFailure(message: failure)
+            }
+            NSApp.hide(nil)
+            defer { NSApp.unhide(nil); NSApp.activate() }
             try await AutomationScheduledMacroPreviewClient(player: client).run(request)
         }, stopTest: {}, canPublish: { [weak self] in
             guard let self else { return false }
             return !self.recorder.isRecording && !self.player.isPlaying && !self.recordingPreparationActive
-                && !self.reconstructionTestActive && self.countdown?.isActive != true
+                && !self.reconstructionTestActive && self.manualPlaybackTask == nil && self.countdown?.isActive != true
         }, onRevision: { [weak self] macro in
             guard let self else { return }
             await self.library.load()
@@ -1392,6 +1431,7 @@ final class MenuBarController: NSObject, NSPopoverDelegate {
         DispatchQueue.main.async {
             let imported = self.library.add(events: events, name: name)
             self.recorder.loadEvents(imported.events)
+            self.recorderLoadedMacroID = imported.id
             if let warning {
                 self.state.statusMessage = "Imported \(imported.name) — \(warning)"
             } else {

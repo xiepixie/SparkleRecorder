@@ -7,7 +7,7 @@ import SparkleRecorderCore
 struct AutomationPlayerReservationTests {
     @Test @MainActor
     func separateClientsCannotPrepareTheSamePlayerConcurrently() async {
-        let player = Player(eventPoster: .none)
+        let player = Player(eventPoster: .none, canPostEvents: { true })
         let gate = ReservationPreparationGate()
         let targets = AutomationTargetApplicationClient(prepare: { _, _ in
             await gate.suspend()
@@ -29,7 +29,7 @@ struct AutomationPlayerReservationTests {
 
     @Test @MainActor
     func globalStopDuringPreparationPreventsLatePlayback() async {
-        let player = Player(eventPoster: .none)
+        let player = Player(eventPoster: .none, canPostEvents: { true })
         let gate = ReservationPreparationGate()
         let client = AutomationPlayerClient.live(player: player,
             targetApplications: .init(prepare: { _, _ in
@@ -47,7 +47,7 @@ struct AutomationPlayerReservationTests {
 
     @Test @MainActor
     func staleCancellationCannotReleaseAnotherRunAndManualPlayRespectsReservation() async {
-        let player = Player(eventPoster: .none)
+        let player = Player(eventPoster: .none, canPostEvents: { true })
         let oldClient = AutomationPlayerClient.live(player: player,
             targetApplications: .init(prepare: { _, _ in .success(.init()) }, cleanup: { _, _, _, _ in .init() }))
         let current = UUID()
@@ -67,7 +67,7 @@ struct AutomationPlayerReservationTests {
 
     @Test @MainActor
     func reservationSurvivesCancellationUntilCleanupFinishes() async {
-        let player = Player(eventPoster: .none)
+        let player = Player(eventPoster: .none, canPostEvents: { true })
         let preparation = ReservationPreparationGate()
         let cleanup = ReservationPreparationGate()
         let first = AutomationPlayerClient.live(player: player, targetApplications: .init(prepare: { _, _ in

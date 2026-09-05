@@ -81,6 +81,9 @@ private final class LiveAutomationPlayerBox: @unchecked Sendable {
         else {
             return .rejected(.rejected(reason: "Macro has no playable events"))
         }
+        if let failure = player.playbackPermissionFailure {
+            return .rejected(.rejected(reason: failure))
+        }
         guard player.reserveAutomationRun(request.runID) else {
             return .rejected(.rejected(reason: "Player is already running"))
         }

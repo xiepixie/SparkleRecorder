@@ -190,7 +190,13 @@ struct LibraryMainView: View {
           isRecording: state.isRecording,
           onReview: { controller.openEditor() },
           onReconstruct: { showReconstructionFor = library.currentMacro },
-          onRuns: { showRunCenter = true },
+          onRuns: {
+            if let macro = library.currentMacro {
+              showEvidenceFor = macro
+            } else {
+              showRunCenter = true
+            }
+          },
           onAutomations: { controller.showAutomationWorkspace() }
         )
         .padding(.horizontal, 12)

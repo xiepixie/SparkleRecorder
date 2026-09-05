@@ -275,8 +275,35 @@ final class MacroReconstructionReviewModel: ObservableObject {
                 try MacroReconstructionPackage.export(source: source, bundle: bundle,
                     bundleDirectory: directory, includeVisualEvidence: includeVisual, to: url)
             }.value
-            statusMessage = ([String(localized: "AI package exported. Follow instructions.md and import the completed candidate.", table: "EditorUX")] + report.warnings).joined(separator: "\n")
+            let localizedWarnings = report.warnings.map(Self.localizedPackageWarning)
+            statusMessage = ([String(localized: "AI package exported. Follow instructions.md and import the completed candidate.", table: "EditorUX")] + localizedWarnings).joined(separator: "\n")
         } catch { errorMessage = error.localizedDescription }
+    }
+
+    static func localizedPackageWarning(_ warning: String) -> String {
+        if warning.contains("Video clock alignment is unavailable") {
+            return String(localized: "Video clock alignment is unavailable; do not assume video time equals event time.", table: "EditorUX")
+        }
+        if warning.contains("Recording source event content is unverified") {
+            return String(localized: "Recording source event content is unverified or differs from this macro. Alignment is withheld.", table: "EditorUX")
+        }
+        if warning.hasPrefix("Missing evidence: ") {
+            let path = String(warning.dropFirst("Missing evidence: ".count))
+            return String(format: String(localized: "Missing evidence: %@", table: "EditorUX"), path)
+        }
+        if warning.contains("verified redaction clock alignment unavailable") {
+            return String(localized: "Video withheld: verified redaction clock alignment unavailable.", table: "EditorUX")
+        }
+        if warning.contains("Video withheld: complete redaction evidence unavailable") {
+            return String(localized: "Video withheld: complete redaction evidence unavailable.", table: "EditorUX")
+        }
+        if warning.contains("Frame withheld: complete redaction evidence unavailable") {
+            return String(localized: "Frame withheld: complete redaction evidence unavailable.", table: "EditorUX")
+        }
+        if warning.contains("No visual bytes included") {
+            return String(localized: "No visual bytes included. Export with explicit visual inclusion to provide permitted video/frames.", table: "EditorUX")
+        }
+        return warning
     }
 
     func testSelected() async {

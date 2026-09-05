@@ -1265,6 +1265,86 @@
           }
         }
       }
+    },
+    "Playback is blocked. Enable SparkleRecorder in System Settings > Privacy & Security > Accessibility, then reopen the app and retry.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Playback is blocked. Enable SparkleRecorder in System Settings > Privacy & Security > Accessibility, then reopen the app and retry."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "无法播放。请在系统设置 > 隐私与安全 > 辅助功能中启用 SparkleRecorder，然后重新打开应用并重试。"
+          }
+        }
+      }
+    },
+    "No loaded actions to play. Select a macro and wait for it to load.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No loaded actions to play. Select a macro and wait for it to load."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "没有已加载的动作。请选择宏并等待加载完成。"
+          }
+        }
+      }
+    },
+    "Preparing playback…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Preparing playback…"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在准备播放…"
+          }
+        }
+      }
+    },
+    "Playback finished.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Playback finished."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "播放已完成。"
+          }
+        }
+      }
+    },
+    "Playback stopped.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Playback stopped."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "播放已停止。"
+          }
+        }
+      }
     }
   },
   "version": "1.1"
