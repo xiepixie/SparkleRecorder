@@ -10,13 +10,21 @@ enum PlaybackTargetWindowForeground {
         guard candidates.count > 1 else { return candidates.first }
         guard let surface = surfaces.sorted(by: { $0.key < $1.key }).first?.value else { return nil }
         let processes = Set(candidates.map(\.processIdentifier))
-        let windows = visibleWindows().filter { processes.contains($0.processID) }
+        let windows = visibleWindows(onScreenOnly: false).filter { processes.contains($0.processID) }
         guard let pid = PlaybackForegroundWindowVerification.targetProcessID(
             recordedFrame: surface.recordedFrame, recordedWindowID: surface.recordedWindowId, windows: windows) else { return nil }
         return candidates.first { $0.processIdentifier == pid }
     }
 
     static func prepare(app: NSRunningApplication, surfaces: [String: PlaybackSurface]) async -> Bool {
+        guard let surface = surfaces.sorted(by: { $0.key < $1.key }).first?.value else { return false }
+        let expectedFrame: RectValue
+        if let windowID = surface.recordedWindowId {
+            guard let bound = visibleWindows(onScreenOnly: false).first(where: { $0.id == windowID && $0.processID == app.processIdentifier }) else { return false }
+            expectedFrame = bound.frame
+        } else {
+            expectedFrame = surface.recordedFrame
+        }
         let application = AXUIElementCreateApplication(app.processIdentifier)
         AXUIElementSetMessagingTimeout(application, 0.3)
         // Wake and activate before querying AX: hidden Chromium windows may
@@ -28,8 +36,7 @@ enum PlaybackTargetWindowForeground {
                 app.unhide()
                 _ = app.activate(from: .current, options: [])
                 if handles.target == nil {
-                    let frames = WindowTracker().resolveCurrentFrames(for: surfaces)
-                    handles.target = matchingWindow(application: handles.application, surfaces: surfaces, frames: frames)
+                    handles.target = matchingWindow(application: handles.application, surface: surface, frame: expectedFrame)
                 }
                 guard let target = handles.target else { return }
                 AXUIElementSetAttributeValue(target, kAXMinimizedAttribute as CFString, kCFBooleanFalse)
@@ -53,14 +60,19 @@ enum PlaybackTargetWindowForeground {
                     logger.notice("Foreground readiness: focusedStatus=\(status.rawValue, privacy: .public), matches=\(matches, privacy: .public)")
                     return false
                 }
+                if surface.recordedWindowId != nil {
+                    return PlaybackForegroundWindowVerification.isReady(active: app.isActive,
+                        targetProcessID: app.processIdentifier, recordedFrame: surface.recordedFrame,
+                        recordedWindowID: surface.recordedWindowId, windows: visibleWindows())
+                }
                 return true
             }
         }, sleep: { try await Task.sleep(for: .milliseconds(100)) })
         return await handoff.prepare()
     }
 
-    private static func visibleWindows() -> [PlaybackForegroundWindowObservation] {
-        guard let info = CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID) as? [[String: Any]] else { return [] }
+    private static func visibleWindows(onScreenOnly: Bool = true) -> [PlaybackForegroundWindowObservation] {
+        guard let info = CGWindowListCopyWindowInfo(onScreenOnly ? [.optionOnScreenOnly, .excludeDesktopElements] : [.optionAll, .excludeDesktopElements], kCGNullWindowID) as? [[String: Any]] else { return [] }
         return info.compactMap { window in
             guard (window[kCGWindowLayer as String] as? Int) == 0,
                   let id = window[kCGWindowNumber as String] as? UInt32,
@@ -73,18 +85,16 @@ enum PlaybackTargetWindowForeground {
         }
     }
 
-    private static func matchingWindow(application: AXUIElement, surfaces: [String: PlaybackSurface], frames: [String: RectValue]) -> AXUIElement? {
+    private static func matchingWindow(application: AXUIElement, surface: PlaybackSurface, frame: RectValue) -> AXUIElement? {
         var value: CFTypeRef?
         let status = AXUIElementCopyAttributeValue(application, kAXWindowsAttribute as CFString, &value)
         guard status == .success, let windows = value as? [AXUIElement] else {
             logger.notice("Window enumeration status=\(status.rawValue, privacy: .public)")
             return nil
         }
-        let entries = surfaces.sorted { $0.key < $1.key }
-        guard let entry = entries.first else { return nil }
-        let frame = frames[entry.key] ?? entry.value.recordedFrame
         var best: AXUIElement?
         var bestScore = -Double.infinity
+        var ambiguous = false
         for window in windows {
             AXUIElementSetMessagingTimeout(window, 0.3)
             var titleValue: CFTypeRef?
@@ -101,12 +111,13 @@ enum PlaybackTargetWindowForeground {
             guard AXValueGetValue(positionValue as! AXValue, .cgPoint, &point),
                   AXValueGetValue(sizeValue as! AXValue, .cgSize, &size), size.width > 0, size.height > 0 else { continue }
             let distance = abs(point.x - frame.x) + abs(point.y - frame.y) + abs(size.width - frame.width) + abs(size.height - frame.height)
-            // The resolved live window rectangle wins; title handles minimized
-            // windows which are absent from the on-screen window list.
-            let score = (distance < 8 ? 10_000.0 : 0) + (title != nil && title == entry.value.windowTitle ? 1_000.0 : 0) - Double(distance)
-            if score > bestScore { bestScore = score; best = window }
+            let titleMatches = title?.isEmpty == false && title == surface.windowTitle
+            guard distance < 8 || (surface.recordedWindowId == nil && titleMatches) else { continue }
+            let score = (distance < 8 ? 10_000.0 : 0) + (titleMatches ? 1_000.0 : 0) - Double(distance)
+            if score > bestScore { bestScore = score; best = window; ambiguous = false }
+            else if abs(score - bestScore) < 0.001 { ambiguous = true }
         }
-        return best
+        return ambiguous ? nil : best
     }
 }
 

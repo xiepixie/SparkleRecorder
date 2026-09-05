@@ -87,3 +87,12 @@ Preparation now resolves the owning process from recorded window ID/geometry
 before activation when several processes share a bundle identifier. Ambiguous
 ownership is rejected. A direct test reproduces first-process/wrong-owner,
 missing-owner and ambiguous-owner cases.
+
+Successful live playback after owner selection: the isolated two-mouse-move,
+5-second Chrome macro logged target ready → engine started → engine completed →
+success evidence saved. Its persisted play count became 1 and a run report was
+created. No clicks or text input were used. Full tests: 852/109 suites; subsequent
+AX binding hardening targeted checks: 43/4 suites. AX matching now requires
+recorded geometry or an exact nonempty legacy title; a recorded ID is resolved
+before raising and rechecked against the window server after AX focus. Process
+selection includes off-screen windows so hidden owners can be unhidden.
