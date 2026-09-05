@@ -264,8 +264,8 @@ struct MacroReconstructionSheet: View {
 
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 4) {
-                    ForEach(Array(model.sourceActions.enumerated()), id: \.element.id) { index, action in
-                        actionRow(action, number: index + 1, candidate: false)
+                    ForEach(model.sourceRows) { row in
+                        actionRow(row.action, number: row.number, candidate: false)
                     }
                 }
                 .padding(.vertical, 2)
@@ -293,7 +293,7 @@ struct MacroReconstructionSheet: View {
                 }
 
                 if !model.candidates.isEmpty {
-                    Picker("", selection: Binding(get: { model.selectedCandidateID }, set: { model.selectCandidate($0) })) {
+                    Picker("", selection: Binding(get: { model.selectedCandidateID }, set: { id in Task { await model.selectCandidate(id) } })) {
                         Text("Select a candidate", tableName: "EditorUX").tag(Optional<UUID>.none)
                         ForEach(model.candidates) { candidate in
                             Text(candidate.createdAt.formatted(date: .abbreviated, time: .standard))
@@ -376,8 +376,8 @@ struct MacroReconstructionSheet: View {
 
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 4) {
-                    ForEach(Array(model.candidateActions.enumerated()), id: \.element.id) { index, action in
-                        actionRow(action, number: index + 1, candidate: true)
+                    ForEach(model.candidateRows) { row in
+                        actionRow(row.action, number: row.number, candidate: true)
                     }
 
                     if !candidate.document.coverage.isEmpty {
@@ -416,6 +416,11 @@ struct MacroReconstructionSheet: View {
                 .padding(8)
                 .background(Color.secondary.opacity(0.06), in: RoundedRectangle(cornerRadius: 7))
                 .disabled(model.isBusy)
+            }
+
+            if model.isSelectedCandidateStale {
+                Text("This candidate belongs to an earlier macro version. Export the current version to continue refining.", tableName: "EditorUX")
+                    .font(.caption).foregroundStyle(.orange)
             }
 
             if candidate.document.requiresAttention {
@@ -502,7 +507,7 @@ struct MacroReconstructionSheet: View {
             _ = provider.loadObject(ofClass: URL.self) { url, _ in
                 guard let url else { return }
                 Task { @MainActor in
-                    await model.importCandidateFile(at: url)
+                    await model.importFile(at: url)
                 }
             }
             return true
@@ -546,7 +551,7 @@ struct MacroReconstructionSheet: View {
                         Text(humanActionKindName(action.kind))
                             .font(.callout.weight(.medium))
 
-                        if candidate, let macro = model.selectedCandidate?.macro,
+                        if let macro = candidate ? model.selectedCandidate?.macro : model.source,
                            let text = action.sourceEventIndices.compactMap({ macro.events[$0].textAnchor?.text }).first {
                             HStack(spacing: 3) {
                                 Image(systemName: "text.magnifyingglass")
@@ -559,6 +564,17 @@ struct MacroReconstructionSheet: View {
                             .padding(.vertical, 1)
                             .background(Color.purple.opacity(0.12), in: Capsule())
                             .foregroundStyle(.purple)
+                        }
+                    }
+
+                    if let macro = candidate ? model.selectedCandidate?.macro : model.source {
+                        let typed = action.sourceEventIndices.lazy.map { macro.events[$0] }
+                            .filter { $0.kind == .keyDown }.compactMap(\.unicodeString).prefix(80)
+                            .reduce(into: "") { result, fragment in
+                                if result.count < 160 { result.append(contentsOf: fragment.prefix(160 - result.count)) }
+                            }
+                        if !typed.isEmpty {
+                            Text(typed).font(.caption).lineLimit(2).textSelection(.enabled)
                         }
                     }
 
@@ -629,7 +645,7 @@ struct MacroReconstructionSheet: View {
     }
 
     private func coverageTitle(_ coverage: MacroCandidateCoverage) -> String {
-        guard let index = model.sourceActions.firstIndex(where: { $0.id == coverage.sourceActionID }) else {
+        guard let index = model.sourceActionIndices[coverage.sourceActionID] else {
             return String(localized: "Source action", table: "EditorUX")
         }
         return String(format: String(localized: "Step %d · %@", table: "EditorUX"), index + 1,
@@ -710,7 +726,7 @@ struct MacroReconstructionSheet: View {
                         Label(String(localized: "Test once", table: "EditorUX"), systemImage: "play.fill")
                     }
                     .buttonStyle(.bordered)
-                    .disabled(model.isBusy || model.selectedCandidate == nil)
+                    .disabled(model.isBusy || model.isSelectedCandidateStale || model.selectedCandidate == nil)
                 }
 
                 Button {

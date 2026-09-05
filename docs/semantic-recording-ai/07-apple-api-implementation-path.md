@@ -220,3 +220,8 @@ This means our implementation can be stronger than a generic agent recorder for 
 - Vision supports OCR and useful visual primitives, but reliable UI pattern search needs custom deterministic matching and scoring.
 - CLI should come after bundle fixtures and frame refs, not before.
 - MCP remains deferred until the CLI/shared service contract stabilizes.
+
+
+## Current writer policy supersedes the initial SCRecordingOutput choice
+
+Updated: 2026-09-05. `ScreenCaptureKitMovieRecorder` now supplies SCStream samples to an app-owned AVAssetWriter. Only successfully appended samples receive explicit movie-time receipts; the finalized file origin is validated before producing clock anchors. The earlier SCRecordingOutput recommendation in this document is design history, not the current implementation. macOS 15+, local-only default capture and event-aligned keyframes remain the baseline. See [22-review-performance-audit.md](22-review-performance-audit.md); installed-app measured alignment is still an open gate.

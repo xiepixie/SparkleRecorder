@@ -1,3 +1,4 @@
+import Combine
 import AppKit
 import SwiftUI
 import Foundation
@@ -155,6 +156,84 @@ struct MacroReconstructionReviewTests {
         view.cacheDisplay(in: view.bounds, to: bitmap)
         let data = try #require(bitmap.representation(using: .png, properties: [:]))
         try data.write(to: output.appendingPathComponent("reconstruction-review.png"))
+    }
+
+    @Test func idleVideoTicksDoNotPublishUnchangedReviewState() throws {
+        let (root, repo, source, _) = try fixture()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let model = MacroReconstructionReviewModel(macroID: source.id, repository: repo,
+            testMacro: { _ in }, stopTest: {}, onRevision: { _ in })
+        var changes = 0
+        let subscription = model.objectWillChange.sink { changes += 1 }
+        for i in 0..<1_000 { model.updateVideoPosition(Double(i) / 10, segmentID: "missing") }
+        #expect(changes == 0)
+        withExtendedLifetime(subscription) {}
+    }
+
+    @Test func importResetsCorrectionSelectionAndFileErrorsRemainRecoverable() async throws {
+        let (root, repo, source, document) = try fixture()
+        defer { try? FileManager.default.removeItem(at: root) }
+        try await repo.saveMetadata(source)
+        try await repo.saveEvents(source.events, for: source.id)
+        let model = MacroReconstructionReviewModel(macroID: source.id, repository: repo,
+            testMacro: { _ in }, stopTest: {}, onRevision: { _ in })
+        await model.reload(loadEvidence: false)
+        await model.importDocument(document)
+        model.selectAction(try #require(model.candidateActions.first).id, candidate: true)
+        model.correctedText = "stale correction"
+        await model.importDocument(document)
+        #expect(model.selectedActionID == nil)
+        #expect(model.correctedText.isEmpty)
+        let selection = model.selectedCandidateID
+        await model.importFile(at: root.appendingPathComponent("missing.json"))
+        #expect(!model.isBusy)
+        #expect(model.errorMessage != nil)
+        #expect(model.selectedCandidateID == selection)
+        #expect(model.candidateRows.map(\.id) == model.candidateActions.map(\.id))
+        #expect(model.sourceRows.map(\.id) == model.sourceActions.map(\.id))
+        await model.selectCandidate(nil)
+        #expect(model.candidateRows.isEmpty)
+        #expect(model.candidateActions.isEmpty)
+        #expect(!model.isBusy)
+    }
+
+    @Test func reloadedSourceChangesDisableStaleCandidateBeforePlayback() async throws {
+        let (root, repo, source, document) = try fixture()
+        defer { try? FileManager.default.removeItem(at: root) }
+        try await repo.saveMetadata(source)
+        try await repo.saveEvents(source.events, for: source.id)
+        var starts = 0
+        let model = MacroReconstructionReviewModel(macroID: source.id, repository: repo,
+            testMacro: { _ in starts += 1 }, stopTest: {}, onRevision: { _ in })
+        await model.reload(loadEvidence: false)
+        await model.importDocument(document)
+        var changed = source.events
+        changed[0].x += 10
+        try await repo.saveEvents(changed, for: source.id)
+        await model.reload(loadEvidence: false)
+        #expect(model.isSelectedCandidateStale)
+        await model.testSelected()
+        #expect(starts == 0)
+        #expect(!model.canAccept)
+    }
+
+    @Test func failedProjectionReloadRetainsAConsistentVisibleSnapshot() async throws {
+        let (root, repo, source, _) = try fixture()
+        defer { try? FileManager.default.removeItem(at: root) }
+        try await repo.saveMetadata(source)
+        try await repo.saveEvents(source.events, for: source.id)
+        let model = MacroReconstructionReviewModel(macroID: source.id, repository: repo,
+            testMacro: { _ in }, stopTest: {}, onRevision: { _ in })
+        await model.reload(loadEvidence: false)
+        let oldRows = model.sourceRows.map(\.id)
+        var invalid = source.events
+        invalid[0].time = -1
+        try await repo.saveEvents(invalid, for: source.id)
+        await model.reload(loadEvidence: false)
+        #expect(model.errorMessage != nil)
+        #expect(model.source?.events == source.events)
+        #expect(model.sourceRows.map(\.id) == oldRows)
+        #expect(!model.isBusy)
     }
 
 }

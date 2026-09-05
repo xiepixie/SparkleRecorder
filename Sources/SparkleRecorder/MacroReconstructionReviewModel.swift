@@ -5,6 +5,17 @@ import Foundation
 import SparkleRecorderCore
 import UniformTypeIdentifiers
 
+struct MacroReconstructionReviewRow: Identifiable, Sendable {
+    let number: Int
+    let action: MacroReconstructedAction
+    var id: String { action.id }
+}
+
+struct MacroReconstructionVideoMarker: Equatable {
+    var point: PointValue
+    var size: RecordingImageSize
+}
+
 /// Owns repository/panel/player effects. The sheet renders these projections and sends intents.
 @MainActor
 final class MacroReconstructionReviewModel: ObservableObject {
@@ -13,12 +24,18 @@ final class MacroReconstructionReviewModel: ObservableObject {
     @Published private(set) var candidates: [MacroStoredCandidate] = []
     @Published private(set) var selectedCandidateID: UUID?
     @Published private(set) var sourceActions: [MacroReconstructedAction] = []
+    @Published private(set) var sourceRows: [MacroReconstructionReviewRow] = []
+    @Published private(set) var candidateRows: [MacroReconstructionReviewRow] = []
     @Published private(set) var candidateActions: [MacroReconstructedAction] = []
     @Published private(set) var projectedActions: [MacroReconstructionProjectedAction] = []
     @Published private(set) var selectedActionID: String?
     @Published private(set) var videoPlayer: AVPlayer?
     @Published private(set) var activeSourceActionID: String?
-    @Published private(set) var videoTime: Double = 0
+    @Published private(set) var videoMarker: MacroReconstructionVideoMarker?
+    private var videoIndex = MacroReconstructionVideoIndex(rows: [])
+    private var frameSizes: [String: RecordingImageSize] = [:]
+    private(set) var sourceActionIndices: [String: Int] = [:]
+    private var currentSourceRevision: String?
     private var videoObserver: Any?
     @Published private(set) var isBusy = false
     @Published private(set) var isTesting = false
@@ -49,11 +66,15 @@ final class MacroReconstructionReviewModel: ObservableObject {
     }
 
     var selectedCandidate: MacroStoredCandidate? { candidates.first { $0.id == selectedCandidateID } }
+    var isSelectedCandidateStale: Bool {
+        guard let candidate = selectedCandidate, let currentSourceRevision else { return false }
+        return candidate.document.sourceRevision != currentSourceRevision
+    }
     var canAccept: Bool {
-        !isBusy && canPublish() && selectedCandidateID != nil && testedCandidateID == selectedCandidateID
+        !isBusy && !isSelectedCandidateStale && canPublish() && selectedCandidateID != nil && testedCandidateID == selectedCandidateID
             && (selectedCandidate?.document.requiresAttention != true || confirmUncertainties)
     }
-    var hasAlignedVideo: Bool { projectedActions.contains { $0.videoRange != nil } }
+    var hasAlignedVideo: Bool { !videoIndex.isEmpty }
     var canCorrectText: Bool {
         guard let candidate = selectedCandidate,
               let action = candidateActions.first(where: { $0.id == selectedActionID }) else { return false }
@@ -61,48 +82,74 @@ final class MacroReconstructionReviewModel: ObservableObject {
     }
 
     func reload(loadEvidence: Bool = true) async {
+        let wasBusy = isBusy
+        isBusy = true
+        defer { isBusy = wasBusy }
         do {
             let loaded = try await repository.loadMacro(for: macroID)
-            source = loaded
             candidates = try await repository.listCandidates(for: macroID)
-            sourceActions = try MacroActionReconstructor.reconstruct(events: loaded.events,
-                sourceRevision: MacroCandidateIdentity.revision(of: loaded))
             if loadEvidence, let reference = loaded.semanticRecording {
                 do { evidence = try await SemanticRecordingReviewPresenter.reviewState(from: reference, sourceName: loaded.name) }
                 catch { evidence = nil; errorMessage = error.localizedDescription }
             }
-            try rebuildProjection()
+            try await rebuildProjection(for: loaded)
         } catch { errorMessage = error.localizedDescription }
     }
 
-    private func rebuildProjection() throws {
-        guard let source else { return }
+    private func rebuildProjection(for source: SavedMacro) async throws {
         let recordedProvenance = evidence?.bundle.reconstructionProvenance
-        let provenance = recordedProvenance?.matchesSourceEvents(source.events) == true ? recordedProvenance : nil
-        var times: [Int: Double] = [:]
-        for item in provenance?.sourceEvents ?? [] {
-            guard source.events.indices.contains(item.sourceEventIndex),
-                  source.events[item.sourceEventIndex].time == item.sourcePlaybackTime,
-                  times[item.sourceEventIndex] == nil else { continue }
-            times[item.sourceEventIndex] = item.sessionTime
-        }
-        projectedActions = try MacroReconstructionProjector.project(events: source.events,
-            sourceRevision: MacroCandidateIdentity.revision(of: source), sessionTimesByEventIndex: times,
-            videoClock: RecordingVideoClockMapping(segments: provenance?.clockSegments ?? []),
-            geometry: RecordingGeometryHistory(snapshots: provenance?.geometrySnapshots ?? []))
-        if videoPlayer == nil, let first = evidence?.bundle.videoSegments.first {
-            loadVideo(segmentID: first.id.uuidString)
-        }
+        let (rows, revision, index, reviewRows, sourceIndices) = try await Task.detached(priority: .userInitiated) {
+            let provenance = recordedProvenance?.matchesSourceEvents(source.events) == true ? recordedProvenance : nil
+            var times: [Int: Double] = [:]
+            for item in provenance?.sourceEvents ?? [] {
+                guard source.events.indices.contains(item.sourceEventIndex),
+                      source.events[item.sourceEventIndex].time == item.sourcePlaybackTime,
+                      times[item.sourceEventIndex] == nil else { continue }
+                times[item.sourceEventIndex] = item.sessionTime
+            }
+            let revision = try MacroCandidateIdentity.revision(of: source)
+            let rows = try MacroReconstructionProjector.project(events: source.events,
+                sourceRevision: revision, sessionTimesByEventIndex: times,
+                videoClock: RecordingVideoClockMapping(segments: provenance?.clockSegments ?? []),
+                geometry: RecordingGeometryHistory(snapshots: provenance?.geometrySnapshots ?? []))
+            let reviewRows = rows.enumerated().map { MacroReconstructionReviewRow(number: $0.offset + 1, action: $0.element.action) }
+            let sourceIndices = Dictionary(uniqueKeysWithValues: rows.enumerated().map { ($0.element.action.id, $0.offset) })
+            return (rows, revision, MacroReconstructionVideoIndex(rows: rows), reviewRows, sourceIndices)
+        }.value
+        self.source = source
+        currentSourceRevision = revision
+        projectedActions = rows
+        sourceActions = rows.map(\.action)
+        sourceActionIndices = sourceIndices
+        sourceRows = reviewRows
+        videoIndex = index
+        frameSizes = Dictionary((evidence?.bundle.videoSegments ?? []).compactMap { segment in
+            segment.frameSize.map { (segment.id.uuidString, $0) }
+        }, uniquingKeysWith: { first, _ in first })
+        if activeSourceActionID != nil { activeSourceActionID = nil }
+        if videoMarker != nil { videoMarker = nil }
+        if videoPlayer == nil, let first = evidence?.bundle.videoSegments.first { loadVideo(segmentID: first.id.uuidString) }
     }
 
-    func selectCandidate(_ id: UUID?) {
+    func selectCandidate(_ id: UUID?) async {
         guard !isBusy else { return }
         selectedCandidateID = id; selectedActionID = nil; correctedText = ""
         errorMessage = nil; statusMessage = ""
         testedCandidateID = nil; confirmUncertainties = false
-        candidateActions = (try? selectedCandidate.map {
-            try MacroActionReconstructor.reconstruct(events: $0.macro.events, sourceRevision: "candidate")
-        }) ?? []
+        isBusy = true
+        defer { isBusy = false }
+        do { try await updateCandidateRows() }
+        catch { candidateActions = []; candidateRows = []; errorMessage = error.localizedDescription }
+    }
+
+    private func updateCandidateRows() async throws {
+        guard let candidate = selectedCandidate else { candidateActions = []; candidateRows = []; return }
+        let (actions, rows) = try await Task.detached(priority: .userInitiated) {
+            let actions = try MacroActionReconstructor.reconstruct(events: candidate.macro.events, sourceRevision: "candidate")
+            return (actions, actions.enumerated().map { MacroReconstructionReviewRow(number: $0.offset + 1, action: $0.element) })
+        }.value
+        candidateActions = actions
+        candidateRows = rows
     }
 
     func selectAction(_ id: String, candidate: Bool) {
@@ -117,8 +164,15 @@ final class MacroReconstructionReviewModel: ObservableObject {
     }
 
     private func seekSourceAction(_ id: String) {
-        guard let row = projectedActions.first(where: { $0.action.id == id }),
-              let segment = row.videoSegmentID, let range = row.videoRange else { return }
+        guard let row = videoIndex.row(actionID: id),
+              let segment = row.videoSegmentID, let range = row.videoRange else {
+            videoPlayer?.pause()
+            if activeSourceActionID != nil { activeSourceActionID = nil }
+            if videoMarker != nil { videoMarker = nil }
+            statusMessage = String(localized: "This step has no verified video time. Review the macro step directly or inspect the video manually.", table: "EditorUX")
+            return
+        }
+        statusMessage = ""
         loadVideo(segmentID: segment)
         videoPlayer?.pause()
         videoPlayer?.seek(to: CMTime(seconds: range.startTime, preferredTimescale: 600),
@@ -138,12 +192,8 @@ final class MacroReconstructionReviewModel: ObservableObject {
         videoObserver = videoPlayer?.addPeriodicTimeObserver(forInterval: CMTime(seconds: 0.1, preferredTimescale: 600), queue: .main) { [weak self] time in
             Task { @MainActor [weak self] in
                 guard let self else { return }
-                self.videoTime = time.seconds
-                self.activeSourceActionID = self.projectedActions.first {
-                    $0.videoSegmentID == self.videoSegmentID && $0.videoRange.map {
-                        time.seconds >= $0.startTime && time.seconds <= $0.startTime + max(0.1, $0.duration)
-                    } == true
-                }?.action.id
+                guard self.videoSegmentID == segmentID else { return }
+                self.updateVideoPosition(time.seconds, segmentID: segmentID)
             }
         }
     }
@@ -156,20 +206,10 @@ final class MacroReconstructionReviewModel: ObservableObject {
             let stored = try await repository.importCandidate(document, for: macroID)
             candidates = try await repository.listCandidates(for: macroID)
             selectedCandidateID = stored.id; testedCandidateID = nil; confirmUncertainties = false
-            candidateActions = try MacroActionReconstructor.reconstruct(events: stored.macro.events, sourceRevision: "candidate")
+            selectedActionID = nil; correctedText = ""
+            try await updateCandidateRows()
             statusMessage = String(localized: "Candidate imported. Review its changes, then test it.", table: "EditorUX")
         } catch { errorMessage = error.localizedDescription }
-    }
-
-    func importCandidateFile(at url: URL) async {
-        guard !isBusy else { return }
-        do {
-            let data = try Data(contentsOf: url)
-            let document = try MacroCandidateValidator.decode(data)
-            await importDocument(document)
-        } catch {
-            errorMessage = error.localizedDescription
-        }
     }
 
     func chooseCandidateFile() {
@@ -179,9 +219,22 @@ final class MacroReconstructionReviewModel: ObservableObject {
         panel.begin { [weak self] response in
             guard response == .OK, let url = panel.url else { return }
             Task { @MainActor [weak self] in
-                await self?.importCandidateFile(at: url)
+                guard let self else { return }
+                await self.importFile(at: url)
             }
         }
+    }
+
+    func importFile(at url: URL) async {
+        guard !isBusy else { return }
+        isBusy = true; errorMessage = nil; statusMessage = ""
+        do {
+            let document = try await Task.detached(priority: .userInitiated) {
+                try MacroCandidateValidator.decode(Data(contentsOf: url, options: .mappedIfSafe))
+            }.value
+            isBusy = false
+            await importDocument(document)
+        } catch { isBusy = false; errorMessage = error.localizedDescription }
     }
 
     func correctSelectedText() async {
@@ -212,7 +265,7 @@ final class MacroReconstructionReviewModel: ObservableObject {
         defer { isBusy = false }
         do {
             let source = try await repository.loadMacro(for: macroID)
-            if source.semanticRecording != nil && evidence == nil {
+            if let reference = source.semanticRecording, evidence?.bundle.id != reference.recordingID {
                 throw MacroReconstructionReviewError.recordingUnavailable
             }
             let bundle = evidence?.bundle
@@ -227,7 +280,7 @@ final class MacroReconstructionReviewModel: ObservableObject {
     }
 
     func testSelected() async {
-        guard !isBusy, let id = selectedCandidateID else { return }
+        guard !isBusy, !isSelectedCandidateStale, let id = selectedCandidateID else { return }
         isBusy = true; isTesting = true; testedCandidateID = nil; errorMessage = nil; testCancelled = false
         statusMessage = String(localized: "Testing one iteration. Use Stop test or your stop hotkey to cancel.", table: "EditorUX")
         videoPlayer?.pause()
@@ -273,6 +326,7 @@ final class MacroReconstructionReviewModel: ObservableObject {
             testedCandidateID = nil
             await onRevision(macro)
             await reload(loadEvidence: false)
+            selectedCandidateID = nil; candidateActions = []; candidateRows = []; selectedActionID = nil; correctedText = ""
             statusMessage = String(localized: "Tested version accepted. The original remains available to restore.", table: "EditorUX")
         } catch {
             // Atomic publication may have succeeded before an IO error. Refresh the complete snapshot.
@@ -298,15 +352,16 @@ final class MacroReconstructionReviewModel: ObservableObject {
         } catch { errorMessage = error.localizedDescription }
     }
 
-    /// A measured endpoint appears only at its actual mapped video time; no cursor path is invented.
-    var videoMarker: (point: PointValue, size: RecordingImageSize)? {
-        guard let row = projectedActions.first(where: { $0.action.id == activeSourceActionID }),
-              let range = row.videoRange, let evidence,
-              let segment = evidence.bundle.videoSegments.first(where: { $0.id.uuidString == videoSegmentID }),
-              let size = segment.frameSize else { return nil }
-        if abs(videoTime - range.startTime) <= 0.1, let point = row.startFramePoint { return (point, size) }
-        if abs(videoTime - range.startTime - range.duration) <= 0.1, let point = row.endFramePoint { return (point, size) }
-        return nil
+    /// Periodic ticks only invalidate SwiftUI when visible state actually changes.
+    func updateVideoPosition(_ time: Double, segmentID: String) {
+        let row = videoIndex.activeRow(at: time, segmentID: segmentID)
+        if activeSourceActionID != row?.action.id { activeSourceActionID = row?.action.id }
+        var marker: MacroReconstructionVideoMarker?
+        if let row, let range = row.videoRange, let size = frameSizes[segmentID] {
+            if abs(time - range.startTime) <= 0.1, let point = row.startFramePoint { marker = .init(point: point, size: size) }
+            else if abs(time - range.startTime - range.duration) <= 0.1, let point = row.endFramePoint { marker = .init(point: point, size: size) }
+        }
+        if videoMarker != marker { videoMarker = marker }
     }
 
     func close() {

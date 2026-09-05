@@ -315,7 +315,7 @@ struct SemanticRecordingAcceptanceChecklistTests {
         "Action preview/grouping follows the user-facing semantics from `13-direction-decision-and-remaining-slices.md`:",
         "Workflow orchestration supports explicit loop semantics without encoding loops as dependency cycles.",
         "Capture live cleanup product evidence for manual and scheduled retention cleanup.",
-        "Record target-window `.mov` during macro recording through `SCRecordingOutput`.",
+        "Record target-window `.mov` during macro recording through ScreenCaptureKit and `AVAssetWriter`.",
         "Record target-window keyframes during macro recording.",
         "Provide keyframe-only light mode only after default video path is safe and reviewable.",
         "Show recorded video/keyframes in Macro Review.",
@@ -422,7 +422,7 @@ struct SemanticRecordingAcceptanceChecklistTests {
             "live manual/scheduled cleanup evidence"
         ),
         (
-            "Record target-window `.mov` during macro recording through `SCRecordingOutput`.",
+            "Record target-window `.mov` during macro recording through ScreenCaptureKit and `AVAssetWriter`.",
             "S2 authorized live bundle",
             "target-window `.mov`"
         ),

@@ -122,4 +122,4 @@ SparkleRecorder 不应把 OpenAI 官方 Record & Replay 插件作为产品内依
 - 不用视频语义替代可测试的 reducer、locator、condition evaluator 和 playback engine。
 - 不让 semantic recording 发明一套与 Workflow `visualAssets` / artifact presenter 不兼容的 asset ref 系统。
 
-Current Review workflow and UX verification: [21-reconstruction-review-ux.md](21-reconstruction-review-ux.md). Product code passes 829 tests and Swift 6 build; live acceptance remains blocked by local Input Monitoring permission.
+Current Review workflow and UX verification: [21-reconstruction-review-ux.md](21-reconstruction-review-ux.md). Latest performance and acceptance audit: [22-review-performance-audit.md](22-review-performance-audit.md). Product code passes 836 tests and Swift 6 build; live acceptance remains blocked by local Input Monitoring permission.

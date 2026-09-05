@@ -38,6 +38,7 @@ public struct RecordingVideoClockMapping: Equatable, Sendable {
 
     public let segments: [RecordingVideoClockSegment]
     public let tolerance: Double
+    private let segmentsByID: [String: RecordingVideoClockSegment]
 
     public init(segments: [RecordingVideoClockSegment], tolerance: Double = 0.05) throws {
         guard tolerance.isFinite, tolerance >= 0 else {
@@ -78,6 +79,7 @@ public struct RecordingVideoClockMapping: Equatable, Sendable {
             }
         }
         self.segments = ordered
+        self.segmentsByID = Dictionary(uniqueKeysWithValues: ordered.map { ($0.id, $0) })
         self.tolerance = tolerance
     }
 
@@ -109,23 +111,25 @@ public struct RecordingVideoClockMapping: Equatable, Sendable {
         destination: KeyPath<RecordingVideoClockAnchor, Double>
     ) -> Double? {
         guard time.isFinite, time >= 0,
-              let segment = segments.first(where: { $0.id == segmentID }),
+              let segment = segmentsByID[segmentID],
               segment.maximumError <= tolerance else { return nil }
         let anchors = segment.anchors
         guard time >= anchors[0][keyPath: source],
               time <= anchors[anchors.count - 1][keyPath: source] else { return nil }
-        for (index, anchor) in anchors.enumerated() {
-            let upperTime = anchor[keyPath: source]
-            if time == upperTime { return anchor[keyPath: destination] }
-            if time < upperTime, index > 0 {
-                let lower = anchors[index - 1]
-                // Normalize before multiplying to avoid overflowing on large finite times.
-                let fraction = (time - lower[keyPath: source]) / (upperTime - lower[keyPath: source])
-                let lowerValue = lower[keyPath: destination]
-                let result = lowerValue + fraction * (anchor[keyPath: destination] - lowerValue)
-                return result.isFinite ? result : nil
-            }
+        var lowerIndex = 0
+        var upperIndex = anchors.count
+        while lowerIndex < upperIndex {
+            let middle = lowerIndex + (upperIndex - lowerIndex) / 2
+            if anchors[middle][keyPath: source] < time { lowerIndex = middle + 1 }
+            else { upperIndex = middle }
         }
-        return nil
+        let anchor = anchors[lowerIndex]
+        let upperTime = anchor[keyPath: source]
+        if time == upperTime { return anchor[keyPath: destination] }
+        guard lowerIndex > 0 else { return nil }
+        let lower = anchors[lowerIndex - 1]
+        let fraction = (time - lower[keyPath: source]) / (upperTime - lower[keyPath: source])
+        let result = lower[keyPath: destination] + fraction * (anchor[keyPath: destination] - lower[keyPath: destination])
+        return result.isFinite ? result : nil
     }
 }
