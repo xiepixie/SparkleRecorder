@@ -34,6 +34,7 @@ final class RecordingHUDController {
             window = nil
         }
         currentMode = mode
+        HUDApplicationPresentation.prepareToShow()
         if window == nil { create(mode: mode) }
         position()
         window?.alphaValue = 0

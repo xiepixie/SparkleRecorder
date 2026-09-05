@@ -96,3 +96,10 @@ AX binding hardening targeted checks: 43/4 suites. AX matching now requires
 recorded geometry or an exact nonempty legacy title; a recorded ID is resolved
 before raising and rechecked against the window server after AX focus. Process
 selection includes off-screen windows so hidden owners can be unhidden.
+
+HUD live verification found that NSApp.hide also suppresses newly ordered panels.
+The shared HUD presentation helper explicitly orders the app's existing windows
+out before unhideWithoutActivation, then shows only the nonactivating HUD. Both
+recording and playback use it. This preserves target activation while making
+feedback visible. Swift 6 build passed after this adjustment; panel visibility
+and target focus are checked on the installed build before delivery.

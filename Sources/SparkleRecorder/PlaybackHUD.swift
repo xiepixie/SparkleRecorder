@@ -27,6 +27,7 @@ final class PlaybackHUDController {
             panel?.orderOut(nil)
             return
         }
+        HUDApplicationPresentation.prepareToShow()
         if panel == nil {
             let panel = PlaybackFeedbackPanel(contentRect: NSRect(x: 0, y: 0, width: 310, height: 76),
                 styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
