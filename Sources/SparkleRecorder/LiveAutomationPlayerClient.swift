@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import SparkleRecorderCore
 
@@ -134,6 +135,7 @@ private final class LiveAutomationPlayerBox: @unchecked Sendable {
             return .rejected(.cancelled(reason: "Automation cancelled during startup preparation"))
         }
 
+        if request.targetApplicationPolicy != .doNotActivate { NSApp.hide(nil) }
         let didStart = player.play(
             macroID: request.macro.id,
             events: request.macro.events,

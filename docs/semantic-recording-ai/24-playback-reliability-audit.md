@@ -17,3 +17,9 @@ Performance: review bundle validation and file scans now run detached; image pre
 Validation before final packaging: 843 tests / 106 suites passed. Permission rejection and rejected-start presentation have explicit fake-client tests; existing cancellation/reservation/target preparation, recording pipelines and complete regression suites also pass. No arbitrary user macro was replayed against Chrome during diagnosis.
 
 GUI observation: the installed app’s Settings > System permissions showed Accessibility, Input Monitoring and Screen Recording all authorized. The CLI denial must not be represented as proof that GUI playback lacked permission. Missing hide/target-preparation and outcome handling are independently confirmed code defects.
+
+## Foreground correction after build 103
+
+User confirmed hiding worked but Chrome was not raised. The old preparation only called `activate()` and checked window existence. Apple documents activation as a request, not a guarantee. The revised path yields activation before hiding, restores and raises the resolved bound AX window, and waits for both active application and matching focused window before allowing playback. Failure is explicit and no playback starts. Manual and Review hide only after the prepared handoff; unbound playback keeps its prior behavior. Platform handles remain MainActor-owned; bounded readiness/cancellation sequencing has pure fake-client tests.
+
+Reference: [Apple cooperative activation](https://developer.apple.com/documentation/appkit/passing-control-from-one-app-to-another-with-cooperative-activation).

@@ -1179,7 +1179,7 @@ final class MenuBarController: NSObject, NSPopoverDelegate {
             targetApplicationQuitTimeout: 5, targetApplicationForceQuitOnTimeout: false)
         state.statusMessage = String(localized: "Preparing playback…", table: "Recording")
         if popover.isShown { popover.performClose(nil) }
-        NSApp.hide(nil)
+        if snapshot.surfaces.isEmpty { NSApp.hide(nil) }
         manualPlaybackTask = Task { [weak self] in
             guard let self else { return }
             defer {
@@ -1296,7 +1296,7 @@ final class MenuBarController: NSObject, NSPopoverDelegate {
             if let failure = self.player.playbackPermissionFailure {
                 throw AutomationScheduledMacroPreviewFailure(message: failure)
             }
-            NSApp.hide(nil)
+            if macro.surfaces.isEmpty { NSApp.hide(nil) }
             defer { NSApp.unhide(nil); NSApp.activate() }
             try await AutomationScheduledMacroPreviewClient(player: client).run(request)
         }, stopTest: {}, canPublish: { [weak self] in

@@ -160,6 +160,7 @@ struct AutomationTargetApplicationClient: Sendable {
                         appName
                     )))
                 }
+                NSApp.yieldActivation(toApplicationWithBundleIdentifier: bundleIdentifier)
                 guard NSWorkspace.shared.open(appURL) else {
                     return .failure(.init(message: String(
                         format: String(localized: "Could not open the bound application %@.", table: "Automation"),
@@ -188,7 +189,12 @@ struct AutomationTargetApplicationClient: Sendable {
             guard let app else {
                 continue
             }
-            app.activate()
+            guard await PlaybackTargetWindowForeground.prepare(app: app,
+                surfaces: Dictionary(uniqueKeysWithValues: entries.map { ($0.key, $0.value) })) else {
+                return .failure(.init(message: String(
+                    format: String(localized: "Could not bring the bound window for %@ to the front. Open that window and retry; no actions were played.", table: "Automation"), appName
+                ), session: .init(launchedApplications: launchedApplications)))
+            }
 
             if policy == .launchIfNeeded, let windowTracker {
                 let didFindWindow = await waitForWindow(
