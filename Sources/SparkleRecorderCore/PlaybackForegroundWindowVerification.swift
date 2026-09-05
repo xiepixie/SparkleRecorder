@@ -11,16 +11,30 @@ public struct PlaybackForegroundWindowObservation: Equatable, Sendable {
 }
 
 public enum PlaybackForegroundWindowVerification {
+    public static func targetProcessID(recordedFrame: RectValue, recordedWindowID: UInt32? = nil,
+                                       windows: [PlaybackForegroundWindowObservation]) -> Int32? {
+        let matches = windows.filter { window in
+            if let recordedWindowID { return window.id == recordedWindowID }
+            return abs(window.frame.x - recordedFrame.x) + abs(window.frame.y - recordedFrame.y) +
+                abs(window.frame.width - recordedFrame.width) + abs(window.frame.height - recordedFrame.height) < 8
+        }
+        let processes = Set(matches.map(\.processID))
+        return processes.count == 1 ? processes.first : nil
+    }
+
     /// Conservative fallback when an app exposes no usable AX window. App
     /// activation alone is insufficient, and coincident windows are ambiguous.
     public static func isReady(active: Bool, targetProcessID: Int32,
-                               expectedFrame: RectValue,
+                               recordedFrame: RectValue, recordedWindowID: UInt32? = nil,
                                windows: [PlaybackForegroundWindowObservation]) -> Bool {
         guard active, let front = windows.first, front.processID == targetProcessID else { return false }
+        if let recordedWindowID {
+            return front.id == recordedWindowID
+        }
         let matches = windows.filter { window in
             window.processID == targetProcessID &&
-            abs(window.frame.x - expectedFrame.x) + abs(window.frame.y - expectedFrame.y) +
-            abs(window.frame.width - expectedFrame.width) + abs(window.frame.height - expectedFrame.height) < 8
+            abs(window.frame.x - recordedFrame.x) + abs(window.frame.y - recordedFrame.y) +
+            abs(window.frame.width - recordedFrame.width) + abs(window.frame.height - recordedFrame.height) < 8
         }
         return matches.count == 1 && matches.first?.id == front.id
     }

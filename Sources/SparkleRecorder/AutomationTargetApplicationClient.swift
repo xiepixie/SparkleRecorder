@@ -151,7 +151,14 @@ struct AutomationTargetApplicationClient: Sendable {
         for bundleIdentifier in bundleIdentifiers {
             let entries = grouped[bundleIdentifier] ?? []
             let appName = entries.compactMap(\.value.appName).first ?? bundleIdentifier
-            var app = NSRunningApplication.runningApplications(withBundleIdentifier: bundleIdentifier).first
+            let candidates = NSRunningApplication.runningApplications(withBundleIdentifier: bundleIdentifier)
+            var app = PlaybackTargetWindowForeground.selectApplication(candidates: candidates,
+                surfaces: Dictionary(uniqueKeysWithValues: entries.map { ($0.key, $0.value) }))
+            if !candidates.isEmpty, app == nil {
+                return .failure(.init(message: String(
+                    format: String(localized: "Could not bring the bound window for %@ to the front. Open that window and retry; no actions were played.", table: "Automation"), appName
+                ), session: .init(launchedApplications: launchedApplications)))
+            }
 
             if app == nil, policy == .launchIfNeeded {
                 guard let appURL = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleIdentifier) else {

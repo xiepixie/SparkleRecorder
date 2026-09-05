@@ -70,3 +70,20 @@ AX-only start/stop interactions produced no physical action events, so this chec
 validates capture artifacts, not a complete event-aligned AI reconstruction.
 Temporary capture artifacts are removed after inspection. Visual capture remains
 enabled as requested. Phase logs contain no titles, typed text or coordinates.
+
+Review correction: the fallback must not validate a candidate against a rectangle
+returned by the permissive runtime matcher. It now uses the original recorded
+window ID (when present), otherwise the original recorded rectangle. A missing
+recorded ID is rejected; legacy recordings without IDs must have a unique exact
+rectangle match. A moved legacy window with unusable AX may require restoring
+its recorded geometry. This conservative limitation prevents an unrelated
+remaining window from being accepted merely because it is the only candidate.
+
+Root cause found by cross-checking process IDs: the machine runs two
+`com.google.Chrome` application processes. The original `.first` selected the
+process without the recorded windows; both visible Chrome windows belonged to
+the other process. Bundle-level frontmost checks concealed this mismatch.
+Preparation now resolves the owning process from recorded window ID/geometry
+before activation when several processes share a bundle identifier. Ambiguous
+ownership is rejected. A direct test reproduces first-process/wrong-owner,
+missing-owner and ambiguous-owner cases.

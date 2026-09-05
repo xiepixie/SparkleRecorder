@@ -6,6 +6,16 @@ import SparkleRecorderCore
 @MainActor
 enum PlaybackTargetWindowForeground {
     private static let logger = Logger(subsystem: "com.sparklerecorder.app", category: "PlaybackForeground")
+    static func selectApplication(candidates: [NSRunningApplication], surfaces: [String: PlaybackSurface]) -> NSRunningApplication? {
+        guard candidates.count > 1 else { return candidates.first }
+        guard let surface = surfaces.sorted(by: { $0.key < $1.key }).first?.value else { return nil }
+        let processes = Set(candidates.map(\.processIdentifier))
+        let windows = visibleWindows().filter { processes.contains($0.processID) }
+        guard let pid = PlaybackForegroundWindowVerification.targetProcessID(
+            recordedFrame: surface.recordedFrame, recordedWindowID: surface.recordedWindowId, windows: windows) else { return nil }
+        return candidates.first { $0.processIdentifier == pid }
+    }
+
     static func prepare(app: NSRunningApplication, surfaces: [String: PlaybackSurface]) async -> Bool {
         let application = AXUIElementCreateApplication(app.processIdentifier)
         AXUIElementSetMessagingTimeout(application, 0.3)
@@ -30,10 +40,9 @@ enum PlaybackTargetWindowForeground {
         }, isReady: {
             await MainActor.run {
                 guard app.isActive, let target = handles.target else {
-                    guard let entry = surfaces.sorted(by: { $0.key < $1.key }).first,
-                          let frame = WindowTracker().resolveCurrentFrames(for: surfaces)[entry.key] else { return false }
+                    guard let entry = surfaces.sorted(by: { $0.key < $1.key }).first else { return false }
                     let ready = PlaybackForegroundWindowVerification.isReady(active: app.isActive,
-                        targetProcessID: app.processIdentifier, expectedFrame: frame, windows: visibleWindows())
+                        targetProcessID: app.processIdentifier, recordedFrame: entry.value.recordedFrame, recordedWindowID: entry.value.recordedWindowId, windows: visibleWindows())
                     if ready { logger.notice("Foreground verified by window-server ordering") }
                     return ready
                 }
