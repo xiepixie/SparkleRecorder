@@ -4,15 +4,30 @@ import AppKit
 
 public actor EvidenceClient {
     public static let shared = EvidenceClient()
+
+    private let shouldCaptureScreenshot: @Sendable () -> Bool
+
+    private init() {
+        self.shouldCaptureScreenshot = {
+            UserDefaults.standard.object(forKey: "automationRunCaptureScreenshots") as? Bool ?? true
+        }
+    }
+
+    public init(
+        shouldCaptureScreenshot: @escaping @Sendable () -> Bool
+    ) {
+        self.shouldCaptureScreenshot = shouldCaptureScreenshot
+    }
     
-    public init() {}
-    
-    public func recordFailure(_ evidence: PlaybackFailureEvidence) async {
-        let screenshotData = await captureFailureScreenshot(
-            bundleIdentifier: evidence.bundleIdentifier,
-            title: evidence.windowTitle
-        )
-        await savePlaybackEvidence(
+    @discardableResult
+    public func recordFailure(_ evidence: PlaybackFailureEvidence) async -> AutomationRunEvidencePersistence {
+        let screenshotData = shouldCaptureScreenshot()
+            ? await captureFailureScreenshot(
+                bundleIdentifier: evidence.bundleIdentifier,
+                title: evidence.windowTitle
+            )
+            : nil
+        return await savePlaybackEvidence(
             macroID: evidence.macroID,
             report: evidence.report,
             screenshotData: screenshotData
@@ -23,13 +38,15 @@ public actor EvidenceClient {
         macroID: UUID,
         report: RunReport,
         surfaces: [String: PlaybackSurface]
-    ) async {
+    ) async -> AutomationRunEvidencePersistence {
         let preferredSurface = surfaces.values.first
-        let screenshotData = await captureWindowScreenshot(
-            bundleIdentifier: preferredSurface?.bundleIdentifier,
-            title: preferredSurface?.windowTitle
-        )
-        await savePlaybackEvidence(
+        let screenshotData = shouldCaptureScreenshot()
+            ? await captureWindowScreenshot(
+                bundleIdentifier: preferredSurface?.bundleIdentifier,
+                title: preferredSurface?.windowTitle
+            )
+            : nil
+        return await savePlaybackEvidence(
             macroID: macroID,
             report: report,
             screenshotData: screenshotData
@@ -37,7 +54,7 @@ public actor EvidenceClient {
     }
 
     /// Records the outcome of a macro playback.
-    public func recordPlayback(macroID: UUID, startTime: Date, duration: TimeInterval, success: Bool, failedEventIndex: Int?, errorMessage: String?, screenshotData: Data? = nil) async {
+    public func recordPlayback(macroID: UUID, startTime: Date, duration: TimeInterval, success: Bool, failedEventIndex: Int?, errorMessage: String?, screenshotData: Data? = nil) async -> AutomationRunEvidencePersistence {
         
         let report = RunReport(
             runID: UUID(),
@@ -47,15 +64,19 @@ public actor EvidenceClient {
             failedEventIndex: failedEventIndex,
             errorMessage: errorMessage
         )
-        await savePlaybackEvidence(macroID: macroID, report: report, screenshotData: screenshotData)
+        return await savePlaybackEvidence(macroID: macroID, report: report, screenshotData: screenshotData)
     }
 
-    private func savePlaybackEvidence(macroID: UUID, report: RunReport, screenshotData: Data?) async {
-        do {
-            try await MacroRepository.shared.saveRunEvidence(id: macroID, report: report, screenshot: screenshotData)
-        } catch {
-            NSLog("SparkleRecorder: Failed to save run evidence for macro \(macroID): \(error)")
+    private func savePlaybackEvidence(macroID: UUID, report: RunReport, screenshotData: Data?) async -> AutomationRunEvidencePersistence {
+        let persistence = await MacroRepository.shared.saveRunEvidenceWithStatus(
+            id: macroID,
+            report: report,
+            screenshot: screenshotData
+        )
+        if persistence.health == .failed {
+            NSLog("SparkleRecorder: Failed to save run evidence for macro \(macroID): \(persistence.failureMessage ?? "Unknown error")")
         }
+        return persistence
     }
 
     private func captureFailureScreenshot(bundleIdentifier: String?, title: String?) async -> Data? {

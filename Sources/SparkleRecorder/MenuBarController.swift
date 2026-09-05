@@ -20,11 +20,13 @@ final class MenuBarController: NSObject, NSPopoverDelegate {
     let state = AppState()
     let library = MacroLibrary()
     private let automationSignalStore = AutomationSignalStore.shared
+    private let automationRepository = AutomationRepositoryClient.fileBacked()
     private var automationRuntimeHost: LiveAutomationRuntimeHost?
 
     private var globalHotkeyIDs: [UInt32] = []
     private var perMacroHotkeyIDs: [UInt32: UUID] = [:]   // hotkey-id → macro id
     private var dockBadgeTimer: Timer?
+    private var automationRunRetentionTimer: Timer?
     private var dockBadgeVisible = true
     private var playStartTime: CFAbsoluteTime = 0
     private var playingMacroID: UUID?
@@ -43,6 +45,7 @@ final class MenuBarController: NSObject, NSPopoverDelegate {
 
         automationRuntimeHost = LiveAutomationRuntimeHost(
             player: player,
+            repository: automationRepository,
             externalSignal: .appSignals(automationSignalStore),
             manualApproval: AutomationManualApprovalPresenter.client(),
             ocrSearchRegionContext: Self.automationOCRSearchRegionContext
@@ -60,6 +63,7 @@ final class MenuBarController: NSObject, NSPopoverDelegate {
         loadInitialMacroIntoRecorder()
         automationRuntimeHost?.start()
         scheduleSemanticRecordingRetentionCleanupIfNeeded()
+        startAutomationRunRetentionMonitoring()
     }
 
     deinit {
@@ -68,6 +72,7 @@ final class MenuBarController: NSObject, NSPopoverDelegate {
             if let m = globalClickMonitor { NSEvent.removeMonitor(m) }
             HotkeyManager.shared.unregisterAll()
             dockBadgeTimer?.invalidate()
+            automationRunRetentionTimer?.invalidate()
         }
     }
 
@@ -247,6 +252,7 @@ final class MenuBarController: NSObject, NSPopoverDelegate {
 
         let host = LiveAutomationRuntimeHost(
             player: player,
+            repository: automationRepository,
             externalSignal: .appSignals(automationSignalStore),
             manualApproval: AutomationManualApprovalPresenter.client(),
             ocrSearchRegionContext: Self.automationOCRSearchRegionContext
@@ -991,6 +997,42 @@ final class MenuBarController: NSObject, NSPopoverDelegate {
         )
     }
 
+    func automationRunRetentionCleanupPreview() async throws -> AutomationRunRetentionCleanupPreview {
+        try await AutomationRunRetentionStore(repository: automationRepository).preview(
+            settings: state.automationRunRetentionSettings
+        )
+    }
+
+    func applyAutomationRunRetentionCleanup(
+        _ preview: AutomationRunRetentionCleanupPreview
+    ) async throws -> AutomationRunRetentionCleanupResult {
+        try await AutomationRunRetentionStore(repository: automationRepository).apply(preview)
+    }
+
+    func automationRunStorageUsage() async throws -> AutomationRunStorageUsage {
+        try await AutomationRunRetentionStore(repository: automationRepository).storageUsage()
+    }
+
+    func automationRunManualDeletionPreview(
+        runIDs: Set<UUID>,
+        scope: AutomationRunManualDeletionScope
+    ) async throws -> AutomationRunManualDeletionPreview {
+        try await AutomationRunRetentionStore(repository: automationRepository).manualDeletionPreview(
+            runIDs: runIDs,
+            scope: scope
+        )
+    }
+
+    func applyAutomationRunManualDeletion(
+        _ preview: AutomationRunManualDeletionPreview
+    ) async throws -> AutomationRunManualDeletionResult {
+        try await AutomationRunRetentionStore(repository: automationRepository).applyManualDeletion(preview)
+    }
+
+    func automationRunCleanupPreferenceDidChange() {
+        scheduleAutomationRunRetentionCleanupIfNeeded()
+    }
+
     private func scheduleSemanticRecordingRetentionCleanupIfNeeded(
         evaluatedAt: Date = Date()
     ) {
@@ -1037,6 +1079,57 @@ final class MenuBarController: NSObject, NSPopoverDelegate {
             )
         } catch {
             state.statusMessage = "Scheduled visual evidence cleanup failed: \(error.localizedDescription)"
+        }
+    }
+
+    private func startAutomationRunRetentionMonitoring() {
+        scheduleAutomationRunRetentionCleanupIfNeeded()
+        automationRunRetentionTimer = Timer.scheduledTimer(withTimeInterval: 60 * 60, repeats: true) {
+            [weak self] _ in
+            MainActor.assumeIsolated {
+                self?.scheduleAutomationRunRetentionCleanupIfNeeded()
+            }
+        }
+    }
+
+    private func scheduleAutomationRunRetentionCleanupIfNeeded(evaluatedAt: Date = Date()) {
+        guard state.automationRunAutomaticCleanupEnabled else { return }
+        let decision = AutomationRunScheduledRetentionCleanupPlanner.decision(
+            lastRunAt: state.automationRunLastScheduledRetentionCleanupAt,
+            evaluatedAt: evaluatedAt
+        )
+        guard decision.shouldRun else { return }
+        Task { @MainActor [weak self] in
+            guard let self else { return }
+            do {
+                let store = AutomationRunRetentionStore(repository: automationRepository)
+                let preview = try await store.preview(
+                    settings: state.automationRunRetentionSettings,
+                    evaluatedAt: evaluatedAt
+                )
+                if !preview.isEmpty {
+                    let result = try await store.apply(preview)
+                    state.automationRunLastCleanupEvidenceCount = result.prunedArtifactRunCount
+                    state.automationRunLastCleanupHistoryCount = result.deletedMetadataRunCount
+                    state.automationRunLastCleanupFreedByteCount = preview.estimatedByteCount
+                    state.statusMessage = String(
+                        format: String(localized: "Cleaned up evidence from %d run(s) and removed %d old history record(s).", table: "Automation"),
+                        result.prunedArtifactRunCount,
+                        result.deletedMetadataRunCount
+                    )
+                } else {
+                    state.automationRunLastCleanupEvidenceCount = 0
+                    state.automationRunLastCleanupHistoryCount = 0
+                    state.automationRunLastCleanupFreedByteCount = 0
+                }
+                state.automationRunLastScheduledRetentionCleanupAt = decision.evaluatedAt
+            } catch {
+                state.statusMessage = String(
+                    format: String(localized: "Run history cleanup failed: %@", table: "Automation"),
+                    error.localizedDescription
+                )
+                NSLog("SparkleRecorder: Run history cleanup failed: \(error)")
+            }
         }
     }
 
@@ -1141,7 +1234,10 @@ final class MenuBarController: NSObject, NSPopoverDelegate {
         }
     }
 
-    func previewScheduledMacro(_ id: UUID) async throws {
+    func previewScheduledMacro(
+        _ id: UUID,
+        taskConfiguration: AutomationTask? = nil
+    ) async throws {
         guard var macro = library.macros.first(where: { $0.id == id }) else {
             throw AutomationTargetApplicationPreparationFailure(message: String(
                 localized: "The macro is no longer available.",
@@ -1173,8 +1269,14 @@ final class MenuBarController: NSObject, NSPopoverDelegate {
         let request = AutomationPlayerStartRequest(
             runID: runID,
             macro: macro,
-            targetApplicationPolicy: macro.surfaces.isEmpty ? .doNotActivate : .launchIfNeeded,
-            targetApplicationCleanupPolicy: .quitIfLaunched
+            targetApplicationPolicy: taskConfiguration?.targetApplicationPolicy
+                ?? (macro.surfaces.isEmpty ? .doNotActivate : .launchIfNeeded),
+            targetApplicationReadyDelay: taskConfiguration?.targetApplicationReadyDelay ?? 0,
+            targetApplicationCleanupPolicy: taskConfiguration?.targetApplicationCleanupPolicy
+                ?? .quitIfLaunched,
+            targetApplicationQuitTimeout: taskConfiguration?.targetApplicationQuitTimeout ?? 5,
+            targetApplicationForceQuitOnTimeout: taskConfiguration?.targetApplicationForceQuitOnTimeout
+                ?? true
         )
 
         try await AutomationScheduledMacroPreviewClient(player: previewPlayer).run(request)
@@ -1529,6 +1631,13 @@ final class MenuBarController: NSObject, NSPopoverDelegate {
         settingsWC?.show()
     }
 
+    func showRunHistorySettings() {
+        showSettingsWindow()
+        DispatchQueue.main.async {
+            NotificationCenter.default.post(name: .sparkleShowRunHistorySettings, object: nil)
+        }
+    }
+
     func applyLanguagePreferenceAndRelaunch(_ preference: AppLanguagePreference) {
         preference.apply()
 
@@ -1619,6 +1728,12 @@ final class MenuBarController: NSObject, NSPopoverDelegate {
 
     func openScreenCapturePrefs() {
         if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture") {
+            NSWorkspace.shared.open(url)
+        }
+    }
+
+    func openAutomationPrefs() {
+        if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Automation") {
             NSWorkspace.shared.open(url)
         }
     }

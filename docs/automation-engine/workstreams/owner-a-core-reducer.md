@@ -69,6 +69,13 @@ Owner A 是状态语义 owner。目标是把 AutomationEngine 做成纯、确定
 
 ## Accepted Contracts
 
+- 2026-07-19: Explicit run-storage deletion accepts terminal run IDs only. Core validates that boundary and owns the pure mutation that changes a deleted screenshot from `persisted` to `unavailable` while retaining the report/evidence binding. File inventory and deletion remain Owner B responsibilities.
+
+- 2026-07-19: `AutomationTask.targetApplicationReadyDelay` is a backward-compatible 0...60 second persisted value carried unchanged through `AutomationEffect.startPlayer`; Core does not sleep or inspect windows.
+
+- 2026-07-18: Run recovery stores structured evidence persistence health on each run. Workflow retry creates enabled root runs under one new execution ID; execution cancellation targets every active run ID supplied by the projection/app-edge command and retains normal per-run reducer cancellation ordering.
+- 2026-07-18: Run-history scale contract accepted. `AutomationRepresentedScheduleIndex` builds represented occurrence sets once per reducer tick, and `AutomationRunRetentionPlanner` applies the default 10,000-record metadata cap only to oldest unprotected terminal runs. Pure 10,000-run index and protection tests cover the contract.
+
 - `AutomationContract.swift` is the shared Phase 0 contract.
 - All external stimuli enter as `AutomationAction`.
 - `AutomationReducer.reduce(state:action:environment:)` returns `AutomationReducerResult`.
@@ -101,6 +108,7 @@ Owner A 是状态语义 owner。目标是把 AutomationEngine 做成纯、确定
 - 2026-07-15: Single-macro automation adds backward-compatible `AutomationTask.targetApplicationCleanupPolicy` and carries it through `startPlayer` / `AutomationPlayerStartRequest`. Old tasks decode as `keepOpen`; Quick Schedule tasks use `quitIfLaunched`. Successful reports now bind `AutomationTaskRun.evidenceID` using the same run-ID contract as failures, with direct reducer coverage.
 - 2026-07-15: `AutomationTask.playbackLoops` adds a backward-compatible optional task override. Quick Schedule persists one loop and reducer effects carry it without changing legacy task behavior.
 - 2026-07-15: `AutomationTask.missedRunPolicy` preserves legacy `catchUp` behavior while Quick Schedule opts into `latestOnly`. Reducer selects the most recent due occurrence once and never walks backward through older misses after that occurrence is represented.
+- 2026-07-18: Scheduled target cleanup adds backward-compatible `targetApplicationQuitTimeout` and `targetApplicationForceQuitOnTimeout` task values. Reducer/effect contracts forward these values unchanged; process discovery, termination, and waiting remain Owner B responsibilities.
 
 ## Handoff Checklist
 

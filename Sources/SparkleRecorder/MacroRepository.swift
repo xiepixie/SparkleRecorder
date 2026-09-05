@@ -9,8 +9,8 @@ public actor MacroRepository {
     private let appSupport: URL
     private var didMigrate = false
     
-    public init() {
-        let appSupport = FileManager.default
+    public init(appSupportURL: URL? = nil) {
+        let appSupport = appSupportURL ?? FileManager.default
             .urls(for: .applicationSupportDirectory, in: .userDomainMask)
             .first!
         self.appSupport = appSupport
@@ -156,35 +156,67 @@ public actor MacroRepository {
     /// Saves a run evidence report and an optional failure screenshot to the runs directory.
     /// Writes both a stable per-run payload and the legacy latest files used by older UI.
     public func saveRunEvidence(id: UUID, report: RunReport, screenshot: Data?) throws {
+        let persistence = saveRunEvidenceWithStatus(id: id, report: report, screenshot: screenshot)
+        guard persistence.health != .failed else {
+            throw CocoaError(.fileWriteUnknown, userInfo: [
+                NSDebugDescriptionErrorKey: persistence.failureMessage ?? "Run evidence could not be saved."
+            ])
+        }
+    }
+
+    public func saveRunEvidenceWithStatus(
+        id: UUID,
+        report: RunReport,
+        screenshot: Data?
+    ) -> AutomationRunEvidencePersistence {
         let packageURL = macrosDirectory.appendingPathComponent("\(id.uuidString).sparkrec")
         let runsURL = packageURL.appendingPathComponent("runs")
         let fm = FileManager.default
-        
-        if !fm.fileExists(atPath: runsURL.path) {
-            try fm.createDirectory(at: runsURL, withIntermediateDirectories: true, attributes: nil)
+
+        do {
+            if !fm.fileExists(atPath: runsURL.path) {
+                try fm.createDirectory(at: runsURL, withIntermediateDirectories: true, attributes: nil)
+            }
+        } catch {
+            return failedEvidencePersistence(report: report, error: error)
         }
 
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted]
 
         let evidenceURL = runsURL.appendingPathComponent(report.runID.uuidString, isDirectory: true)
-        if !fm.fileExists(atPath: evidenceURL.path) {
-            try fm.createDirectory(at: evidenceURL, withIntermediateDirectories: true, attributes: nil)
+        do {
+            if !fm.fileExists(atPath: evidenceURL.path) {
+                try fm.createDirectory(at: evidenceURL, withIntermediateDirectories: true, attributes: nil)
+            }
+        } catch {
+            return failedEvidencePersistence(report: report, error: error)
         }
 
         let perRunReportURL = evidenceURL.appendingPathComponent("report.json", isDirectory: false)
-        let reportData = try encoder.encode(report)
-        try reportData.write(to: perRunReportURL, options: .atomic)
+        let reportData: Data
+        do {
+            reportData = try encoder.encode(report)
+            try reportData.write(to: perRunReportURL, options: .atomic)
+        } catch {
+            return failedEvidencePersistence(report: report, error: error)
+        }
 
         let perRunScreenshotURL = evidenceURL.appendingPathComponent("failure.png", isDirectory: false)
+        let screenshotStatus: AutomationRunEvidenceArtifactStatus
         let screenshotFilename: String?
         if let screenshot {
-            try screenshot.write(to: perRunScreenshotURL, options: .atomic)
-            screenshotFilename = "failure.png"
-        } else {
-            if fm.fileExists(atPath: perRunScreenshotURL.path) {
-                try fm.removeItem(at: perRunScreenshotURL)
+            do {
+                try screenshot.write(to: perRunScreenshotURL, options: .atomic)
+                screenshotStatus = .persisted
+                screenshotFilename = "failure.png"
+            } catch {
+                screenshotStatus = .failed
+                screenshotFilename = nil
             }
+        } else {
+            try? fm.removeItem(at: perRunScreenshotURL)
+            screenshotStatus = .unavailable
             screenshotFilename = nil
         }
 
@@ -195,17 +227,53 @@ public actor MacroRepository {
             screenshotFilename: screenshotFilename
         )
         let manifestURL = evidenceURL.appendingPathComponent("manifest.json", isDirectory: false)
-        let manifestData = try encoder.encode(manifest)
-        try manifestData.write(to: manifestURL, options: .atomic)
+        do {
+            let manifestData = try encoder.encode(manifest)
+            try manifestData.write(to: manifestURL, options: .atomic)
+        } catch {
+            return AutomationRunEvidencePersistence(
+                evidenceID: report.runID,
+                report: .persisted,
+                screenshot: screenshotStatus,
+                manifest: .failed,
+                failureMessage: error.localizedDescription
+            )
+        }
 
         let reportURL = runsURL.appendingPathComponent("latest.json", isDirectory: false)
-        try reportData.write(to: reportURL, options: .atomic)
-        
-        let screenshotURL = runsURL.appendingPathComponent("failure.png", isDirectory: false)
-        if let screenshot = screenshot {
-            try screenshot.write(to: screenshotURL, options: .atomic)
-        } else if fm.fileExists(atPath: screenshotURL.path) {
-            try fm.removeItem(at: screenshotURL)
+        do {
+            try reportData.write(to: reportURL, options: .atomic)
+            let screenshotURL = runsURL.appendingPathComponent("failure.png", isDirectory: false)
+            if let screenshot, screenshotStatus == .persisted {
+                try screenshot.write(to: screenshotURL, options: .atomic)
+            } else if fm.fileExists(atPath: screenshotURL.path) {
+                try fm.removeItem(at: screenshotURL)
+            }
+        } catch {
+            NSLog("SparkleRecorder: Per-run evidence was saved, but latest evidence aliases failed: \(error)")
         }
+
+        return AutomationRunEvidencePersistence(
+            evidenceID: report.runID,
+            report: .persisted,
+            screenshot: screenshotStatus,
+            manifest: .persisted,
+            failureMessage: screenshotStatus == .failed
+                ? "The report was saved, but the screenshot could not be written."
+                : nil
+        )
+    }
+
+    private func failedEvidencePersistence(
+        report: RunReport,
+        error: Error
+    ) -> AutomationRunEvidencePersistence {
+        AutomationRunEvidencePersistence(
+            evidenceID: report.runID,
+            report: .failed,
+            screenshot: .unavailable,
+            manifest: .failed,
+            failureMessage: error.localizedDescription
+        )
     }
 }

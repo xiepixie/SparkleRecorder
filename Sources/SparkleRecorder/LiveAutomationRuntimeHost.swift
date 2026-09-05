@@ -159,6 +159,10 @@ final class LiveAutomationRuntimeHost {
         await session.currentState()
     }
 
+    func currentSnapshot() async -> AutomationRuntimeSnapshot? {
+        await session.currentSnapshot()
+    }
+
     func refreshRepositorySnapshot() async -> AutomationRepositoryRefreshResult {
         switch await refreshClient.refresh() {
         case .loaded(let snapshot):

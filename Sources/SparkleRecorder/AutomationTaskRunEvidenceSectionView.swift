@@ -24,7 +24,7 @@ struct AutomationTaskRunEvidenceSectionView: View {
                 Button(loadButtonTitle, systemImage: "arrow.clockwise", action: onLoad)
                     .buttonStyle(.bordered)
                     .controlSize(.small)
-                    .disabled(run.macroID == nil || isLoading)
+                    .disabled(run.macroID == nil || isLoading || run.artifactRetention?.status == .pruned)
             }
 
             if let evidenceID = run.evidenceID {
@@ -39,7 +39,12 @@ struct AutomationTaskRunEvidenceSectionView: View {
                 .foregroundStyle(.tertiary)
                 .fixedSize(horizontal: false, vertical: true)
 
-            if run.macroID == nil {
+            if run.artifactRetention?.status == .pruned {
+                Label(prunedEvidenceMessage, systemImage: "clock.badge.checkmark")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            } else if run.macroID == nil {
                 Label(String(localized: "No macro package evidence for this task", table: "Common"), systemImage: "folder.badge.questionmark")
                     .font(.caption)
                     .foregroundStyle(.secondary)
@@ -89,6 +94,16 @@ struct AutomationTaskRunEvidenceSectionView: View {
         payload == nil
             ? String(localized: "Load Evidence", table: "Common")
             : String(localized: "Reload Evidence", table: "Common")
+    }
+
+    private var prunedEvidenceMessage: String {
+        guard let completedAt = run.artifactRetention?.completedAt else {
+            return String(localized: "Evidence expired and was cleaned up. The run result and failure explanation remain available.", table: "Automation")
+        }
+        return String(
+            format: String(localized: "Evidence was cleaned up on %@. The run result and failure explanation remain available.", table: "Automation"),
+            completedAt.formatted(date: .abbreviated, time: .shortened)
+        )
     }
 
     private var evidenceTitle: String {

@@ -1,6 +1,6 @@
 # AI-Assisted Macro Reconstruction From Recorded Video
 
-Updated: 2026-09-01
+Updated: 2026-09-04
 
 Status: Accepted design; implementation not started
 
@@ -54,6 +54,22 @@ The existing code already provides much of the required foundation:
 - `RecordingVideoSegment` stores the MP4 artifact, recording range, capture target, codec, and frame size.
 
 The missing product layer is not basic recording. It is a reliable clock mapping, a reconstructable operation overlay, and an AI-facing full-file rewrite contract.
+
+### 3.1 Architecture review: implementation constraints
+
+The following are current code observations, not completed reconstruction features:
+
+| Boundary | Current evidence | Required response |
+| --- | --- | --- |
+| Recording origin | `RecordingTimeline.eventTime` uses the first input; `Recorder` starts live duration at session start. | Separate session time from trimmed playback time. |
+| Recording end | `Recorder.stopRecording` passes the last event time to semantic finish. | Preserve the observation interval after the final input. |
+| Frame timing | `SemanticRecordingCaptureSession.captureFrame` labels requested frames with event time and uses `videoTime = recordingTime`. | Store actual sample time; delayed screenshots are not before frames. |
+| Input evidence | `RecordingEventPipeline` filters moves and samples drags. | Retain bounded hover/trajectory evidence independently of playable cleanup. |
+| Macro capabilities | `RecordedEvent.Kind` has text waits/verification; richer visual conditions are in `AutomationContract`. | Export an executable capability manifest, not the combined vocabulary of unrelated layers. |
+| Observation outcome | Live playback text waits catch locator failures as not found. | Distinguish non-match from unavailable observation. |
+| Persistence | `MacroRepository` saves metadata and events in separate atomic writes. | Add revision-level transactions. |
+
+The current movie adapter writes H.264 in a `.mov` container. References to MP4 here mean the canonical video evidence; packages must declare the actual container/codec and must not simply rename MOV bytes as MP4.
 
 ## 4. Product Boundary
 
@@ -155,6 +171,21 @@ Acceptance target:
 - explicit degraded status when the mapping cannot meet tolerance;
 - no silent fallback to `videoTime == recordingTime` in a live AI optimization run.
 
+### 6.4 Time domains and evidence coverage
+
+The clock contract distinguishes:
+
+- **Session time:** monotonic elapsed time from session start, including initial idle and final observation intervals.
+- **Source playback time:** cleaned event time with an explicit mapping to session time and stable source event identity.
+- **Video time:** segment-local presentation time mapped from actual samples.
+- **Candidate playback time:** rewritten execution timing; candidate edits never overwrite source alignment.
+
+Store the session origin, actual capture start/end, source event mapping, segment anchors, and observation coverage. Pause/resume and capture restarts create explicit discontinuities. Reject non-finite/non-monotonic anchors and ambiguous segments. Out-of-range queries return unavailable; never interpolate across an uncovered interval.
+
+Stopping captures actual session stop time independently of the final input. Playback can trim idle time while evidence retains it. A final result frame must use its actual capture time, not the last event timestamp.
+
+Store actual sample time separately from triggering event/request time. Prefer stream frames or indexed movie frames for before/after selection. A screenshot taken after a click cannot prove the pre-click state. Alignment quality includes local residual error, dropped frames, and timestamp uncertainty; two distant anchors alone do not prove accuracy throughout a segment.
+
 ## 7. Operation Reconstruction Layer
 
 The operation reconstruction layer turns the cleaned macro and aligned video into a synchronized explanation that AI and users can inspect.
@@ -212,6 +243,14 @@ global/window/content coordinate
 
 Current frame and surface fields are close to sufficient, but the implementation must preserve geometry history when a window moves or resizes. A single final `PlaybackSurface.recordedFrame` is not sufficient for reconstruction of a moving window. Geometry snapshots should be attached to alignment anchors, relevant timeline events, or the nearest frame reference.
 
+### 7.4 Stable actions and evidence retention
+
+Freeze reconstruction policy/version and derive stable action IDs from source revision and event identity. Editor grouping preferences and localized summaries must not change coverage identity. Derived waits carry source time ranges even without event indices.
+
+The playable track remains compact; the evidence track retains bounded, privacy-filtered cursor samples, hover intervals, and gesture timing. Mark overlay points as measured or interpolated. Missing intermediate samples cannot establish a straight drag. Path-sensitive simplification considers pauses, direction changes, and speed as well as geometry.
+
+Geometry history includes surface identity, window/content bounds, capture region, scale, and effective session time. Missing history produces degraded reconstruction, not reuse of the final window geometry.
+
 ## 8. AI Input Package
 
 The AI optimization session receives one local package:
@@ -240,6 +279,16 @@ The optimization instructions must include:
 - output path for the complete candidate macro;
 - prohibited unsupported fields;
 - instruction to retain candidate provenance and uncertainty annotations outside playback-critical fields.
+
+### 8.1 Executable capabilities and evidence access
+
+Include an app-generated, versioned manifest of schema versions, event kinds, locator fields, condition semantics, timeout/polling limits, and artifact types. Validation uses the same definition and explicitly rejects unsupported fields instead of allowing decoding to silently discard them.
+
+The first complete product slice supports text locators, bounded text waits, text verification, ordinary input cleanup, and conservative drag simplification. Text grouping may compile into existing balanced key events; it does not authorize an invented text-input event kind. Image, pixel, region-change, and window-ready conditions become available only after macro persistence and playback adapters are accepted and directly tested. Reuse existing visual evaluators through shared client contracts where appropriate.
+
+Full-file macro candidate authoring and existing Workflow draft authoring have separate contracts. Writing a candidate does not authorize editing an accepted macro or an internal Workflow package. Existing metadata-only CLI commands remain metadata-only.
+
+Materialization resolves permitted redacted artifacts and sanitized readable event fields. Complete source structure does not bypass suppression. Record evidence actually supplied/inspected separately from locally available evidence, including missing ranges.
 
 ## 9. Full-File Rewrite Contract
 
@@ -285,7 +334,7 @@ Broad rewriting is allowed, but each meaningful reconstructed source action must
 - intentionally removed as recording noise;
 - unresolved and requiring user attention.
 
-Coverage is a quality audit, not an editing mechanism. The user does not need to review every mapping. The app blocks promotion only when meaningful source actions disappear without any disposition.
+Coverage is a quality audit, not an editing mechanism. The user does not need to review every mapping. The coverage gate blocks promotion for unexplained loss, nonexistent candidate targets, or unresolved actions without explicit user correction or acceptance. Structural and test gates apply independently. A disposition explains a transformation but does not prove equivalence. Meaningful deletions, reorderings, and changed input values appear in the default summary; routine movement cleanup can be collapsed. Noise-removal claims retain source ranges and reasons.
 
 ## 10. Initial Transformation Vocabulary
 
@@ -381,6 +430,28 @@ If a label is wrong, the user edits that action's locator text. If a visual targ
 
 Testing runs the candidate through the normal playback engine and produces ordinary run evidence. It does not imply success merely because playback did not crash; observable candidate verifications and user confirmation determine acceptance.
 
+### 12.1 Recording and correction flow
+
+Show capture readiness before recording without requiring locator/timeout configuration. Input capture stays independent of OCR/model latency. Stop saves the playable macro and shows asynchronous evidence-finalization status. Missing video limits optimization, not recovery of recorded input.
+
+During a candidate test, display the current action and wait condition. On failure, show the action, recorded reference, runtime sample or observation-unavailable reason, and a focused text/region correction. Editing creates a new candidate identity and invalidates prior test eligibility.
+
+### 12.2 Execution semantics
+
+- Observations distinguish **matched**, **not matched**, and **unavailable** with a reason. Capture, permission, missing-window, and detector errors do not establish absence. Retry unavailable observations only within the deadline; they never satisfy disappearance waits.
+- Waits require valid observations under an explicit bounded polling/stability policy. A transient match must not be described as sustained readiness. Cancellation and timeout are distinct from success; polling responds to cancellation.
+- Replacing a gap also rewrites candidate event deltas. The next action follows condition completion plus an explicit settling interval, without replaying the removed delay. Playback speed must not unintentionally scale observation deadlines.
+- Text presence does not prove that a control is enabled or the task completed. Current single-observation text verification must not be advertised as bounded stability verification without adapter work.
+- Disambiguate targets by supported surface/region/context constraints. Coordinate fallback is explicit, requires valid geometry/context, and is recorded as degraded execution.
+- Scope locator reuse to a gesture/action with valid observation and geometry context. Preserve down/up consistency but invalidate across navigation, scrolling, surface changes, and relevant layout changes. Nearby source timestamps alone are insufficient.
+- Retry observation/localization within a deadline. Do not automatically repeat posted input whose outcome is unknown; repetition requires an accepted action-specific recovery policy or user choice.
+
+### 12.3 Test identity and result meaning
+
+Bind test evidence to source revision, normalized candidate digest, referenced artifact digests, capability version, and execution-affecting settings. Changes require a new test. Display execution finished, observable checks passed, and user accepted separately. A candidate without a result check may be accepted after a completed test and explicit user confirmation, but remains labeled as lacking automated result verification.
+
+Resume at a failed action only after its preconditions are verified; otherwise restart from an established checkpoint. Restoring a macro revision does not undo operations already performed in another application.
+
 ## 13. Versioning, Promotion, And Recovery
 
 The source revision remains immutable during optimization.
@@ -402,6 +473,14 @@ If generation, decoding, validation, testing, or promotion fails:
 - rollback does not depend on reconstructing the source from AI output.
 
 Promotion must atomically update the macro event file and metadata manifest or use an equivalent repository transaction. Existing schedules and workflow references continue to target the same macro identity.
+
+### 13.1 Revision transaction and concurrent runs
+
+Stage immutable normalized events, metadata, and revision-owned artifacts, then atomically publish an accepted-revision pointer or an equivalent crash-recoverable transaction. Schema version and content revision are separate identities.
+
+Compare the accepted revision with the candidate base at promotion. Concurrent edits produce a stale-candidate conflict, not overwrite. Preserve current app-owned statistics/protected metadata at commit time. Running tasks pin their selected revision; later runs resolve the newly accepted revision. Retention cannot remove artifacts still required by retained revisions or active runs.
+
+A crash before publication leaves the old revision authoritative. After publication, the new revision must be complete and loadable. Failure-injection tests cover both boundaries, stale-source rejection, and preservation of macro identity.
 
 ## 14. Privacy And Model Access
 
@@ -491,11 +570,28 @@ SwiftUI views do not call the recorder, model adapter, repository, or player dir
 
 Tests must not post real input or depend on wall-clock time. Live product evidence is a separately authorized acceptance activity.
 
+### Architecture-review regression matrix
+
+| Scenario | Required result |
+| --- | --- |
+| Idle before first input and after final click | Real session alignment and final result evidence survive playback trimming. |
+| Fast clicks with slow screenshot/OCR | No post-click frame is labeled as pre-click evidence. |
+| Window move/resize or capture restart | Correct historical geometry/segment, or explicit unavailable coverage. |
+| Hover menu or path-sensitive drag | Required intermediate behavior survives; unknown paths are not simplified. |
+| Variable loading time | State wait adapts within bounds; replaced delay is not paid again. |
+| Capture error during disappearance wait | Unavailable/timeout/failure, never false disappearance success. |
+| Duplicate labels or scrolling | Ambiguity is explicit; stale coordinates are not reused across actions. |
+| Unsupported field or dangling coverage target | Validation fails before execution. |
+| Candidate changes after a test | Fresh test evidence is required. |
+| Concurrent edit or interrupted promotion | Accepted revision remains consistent; stale overwrite is rejected. |
+
+Pure/fake tests establish semantics; authorized installed-app evidence proves alignment, moved-window execution, variable latency, cancellation, one-action correction, and recovery. Fixture tests do not close live gates.
+
 ## 17. Delivery Slices
 
 ### Slice 1: Alignment and reconstruction truth
 
-- freeze clock mapping and geometry snapshot contracts;
+- freeze session/source/candidate/video time mapping, actual frame time, and geometry history contracts;
 - add deterministic operation reconstruction;
 - prove frame-accurate event/video mapping with fixtures;
 - render a local operation overlay without AI.
@@ -503,7 +599,7 @@ Tests must not post real input or depend on wall-clock time. Live product eviden
 ### Slice 2: AI package and full-file candidate
 
 - materialize complete macro, MP4, reconstruction, alignment, and evidence package;
-- define full candidate output and app-owned metadata normalization;
+- define full candidate output, executable capability manifest, and app-owned metadata normalization;
 - decode and validate complete AI rewrites;
 - implement source-action coverage audit.
 
@@ -511,15 +607,36 @@ Tests must not post real input or depend on wall-clock time. Live product eviden
 
 - add candidate revision storage;
 - run candidate through existing playback/evidence boundaries;
-- add atomic accept and restore behavior;
+- bind tests to candidate/artifact digests; add stale-source-safe atomic accept and restore behavior;
 - preserve schedules and workflow references.
 
 ### Slice 4: Product optimization loop
 
 - add synchronized video/action review;
 - add natural-language summary and uncertain action correction;
-- prove click locator, state wait, and drag simplification with live evidence;
+- first prove text locator, text wait, and conservative drag simplification with live evidence; enable broader visual conditions only after macro capability contracts are implemented;
 - tune prompts and transformation policy from accepted/rejected candidate outcomes.
+
+### Delivery ownership and verification
+
+| Slice | Requesting / implementing boundaries | Exit evidence |
+| --- | --- | --- |
+| 1 | S1 Core defines timing/action/geometry values; S2 Capture provides actual timestamps and evidence; S3 projects the overlay. | Pure mapping/reconstruction tests, fake timestamp adapters, authorized aligned overlay evidence. |
+| 2 | S1 Core owns capability/coverage/normalization validation; S4 AI owns candidate generation; S2 App owns permitted package materialization. | Full-file candidate fixtures, unsupported-field and coverage failures, suppression-safe package tests. |
+| 3 | Macro repository and playback adapters implement revision/test transactions; Automation Owner B integrates run identity, with Owner A accepting any reducer contract change; S3 renders accepted projections. | Digest invalidation, stale-base and crash-injection tests, normal runtime/evidence handoff. |
+| 4 | S3 owns correction/test UX; S2 and S4 provide live evidence and candidate services. | Installed-app text-target/wait/drag demonstration, one-action correction, failure and acceptance evidence. |
+
+These are planned handoffs, not implemented API signatures. Before changing an interface, record the request and accepted contract in affected workstreams and `08-parallel-workstreams.md`; Automation A/B/C changes also update `../automation-engine/02-parallel-workstreams.md` and affected owner files. Do not add reconstruction side effects to SwiftUI or enlarge Recorder/Player with reusable core policy.
+
+Run focused Swift Testing suites for each changed boundary first. When implementation crosses Core/App/runtime, run:
+
+```sh
+swift test --scratch-path .build-test --enable-swift-testing --disable-xctest
+swift build -Xswiftc -swift-version -Xswiftc 6
+git diff --check
+```
+
+Implementation acceptance remains unchecked in `acceptance-checklist.md` until direct tests and required live evidence exist. Documentation-only design updates do not establish build or product readiness.
 
 ## 18. Alternatives Considered
 

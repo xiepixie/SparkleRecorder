@@ -189,13 +189,15 @@ struct AutomationTaskRunDisplay {
             }
             return String(localized: "Completed successfully", table: "Common")
         case .failed(let report):
-            var detail = report?.errorMessage ?? String(localized: "Run failed", table: "Automation")
+            var detail = report?.errorMessage.map(localizedRuntimeMessage)
+                ?? String(localized: "Run failed", table: "Automation")
             if let failedEventIndex = report?.failedEventIndex {
                 detail += " · " + String(format: String(localized: "Event #%d", table: "EditorUX"), failedEventIndex + 1)
             }
             return detail
         case .cancelled(let reason):
-            return reason ?? String(localized: "Cancelled", table: "Common")
+            return reason.map(localizedRuntimeMessage)
+                ?? String(localized: "Cancelled", table: "Common")
         case .timedOut(let deadline):
             if let deadline {
                 return String(format: String(localized: "Deadline %@", table: "Common"), deadline.formatted(date: .omitted, time: .shortened))
@@ -214,7 +216,20 @@ struct AutomationTaskRunDisplay {
         case .missingMacro:
             return String(localized: "The saved macro is not available locally.", table: "EditorUX")
         case .rejected(let reason):
-            return reason
+            return localizedRuntimeMessage(reason)
+        }
+    }
+
+    private func localizedRuntimeMessage(_ message: String) -> String {
+        switch message {
+        case "Playback aborted":
+            return String(localized: "Playback was interrupted.", table: "Automation")
+        case "Playback cancelled":
+            return String(localized: "Playback was cancelled.", table: "Automation")
+        case "Playback cancelled by user":
+            return String(localized: "Playback was cancelled by the user.", table: "Automation")
+        default:
+            return message
         }
     }
 

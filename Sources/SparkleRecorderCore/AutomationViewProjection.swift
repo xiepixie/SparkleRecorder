@@ -309,7 +309,7 @@ public enum AutomationViewProjection {
         guard let run else {
             return false
         }
-        return run.evidenceID != nil ||
+        return run.evidencePersistence?.hasReadableReport == true ||
             run.conditionEvidence != nil ||
             !(run.branchEvidence ?? []).isEmpty
     }

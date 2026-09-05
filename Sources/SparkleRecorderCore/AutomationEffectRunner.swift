@@ -1,456 +1,514 @@
 import Foundation
 
 public struct AutomationConditionEvaluationRequest: Sendable {
-    public var runID: UUID
-    public var workflowID: UUID
-    public var taskID: UUID
-    public var condition: AutomationConditionSpec
-    public var previousOutcomes: [AutomationOutcome]
+  public var runID: UUID
+  public var workflowID: UUID
+  public var taskID: UUID
+  public var condition: AutomationConditionSpec
+  public var previousOutcomes: [AutomationOutcome]
 
-    public init(
-        runID: UUID,
-        workflowID: UUID,
-        taskID: UUID,
-        condition: AutomationConditionSpec,
-        previousOutcomes: [AutomationOutcome] = []
-    ) {
-        self.runID = runID
-        self.workflowID = workflowID
-        self.taskID = taskID
-        self.condition = condition
-        self.previousOutcomes = previousOutcomes
-    }
+  public init(
+    runID: UUID,
+    workflowID: UUID,
+    taskID: UUID,
+    condition: AutomationConditionSpec,
+    previousOutcomes: [AutomationOutcome] = []
+  ) {
+    self.runID = runID
+    self.workflowID = workflowID
+    self.taskID = taskID
+    self.condition = condition
+    self.previousOutcomes = previousOutcomes
+  }
 }
 
 public struct AutomationExternalSignalClient: Sendable {
-    public var isActive: @Sendable (_ signalName: String) async -> Bool
+  public var isActive: @Sendable (_ signalName: String) async -> Bool
 
-    public init(isActive: @escaping @Sendable (_ signalName: String) async -> Bool) {
-        self.isActive = isActive
-    }
+  public init(isActive: @escaping @Sendable (_ signalName: String) async -> Bool) {
+    self.isActive = isActive
+  }
 
-    public static let inactive = AutomationExternalSignalClient { _ in false }
+  public static let inactive = AutomationExternalSignalClient { _ in false }
 
-    public static func constant(_ isActive: Bool) -> AutomationExternalSignalClient {
-        AutomationExternalSignalClient { _ in isActive }
-    }
+  public static func constant(_ isActive: Bool) -> AutomationExternalSignalClient {
+    AutomationExternalSignalClient { _ in isActive }
+  }
 }
 
 public struct AutomationManualApprovalClient: Sendable {
-    public var requestApproval: @Sendable (_ request: AutomationConditionEvaluationRequest) async -> Bool
+  public var requestApproval:
+    @Sendable (_ request: AutomationConditionEvaluationRequest) async -> Bool
 
-    public init(
-        requestApproval: @escaping @Sendable (_ request: AutomationConditionEvaluationRequest) async -> Bool
-    ) {
-        self.requestApproval = requestApproval
-    }
+  public init(
+    requestApproval:
+      @escaping @Sendable (_ request: AutomationConditionEvaluationRequest) async -> Bool
+  ) {
+    self.requestApproval = requestApproval
+  }
 
-    public static let rejecting = AutomationManualApprovalClient { _ in false }
+  public static let rejecting = AutomationManualApprovalClient { _ in false }
 }
 
 public struct AutomationConditionEvaluatorClient: Sendable {
-    public var evaluate: @Sendable (AutomationConditionEvaluationRequest) async -> AutomationOutcome
-    public var evaluateResult: @Sendable (AutomationConditionEvaluationRequest) async -> AutomationConditionEvaluationResult
+  public var evaluate: @Sendable (AutomationConditionEvaluationRequest) async -> AutomationOutcome
+  public var evaluateResult:
+    @Sendable (AutomationConditionEvaluationRequest) async -> AutomationConditionEvaluationResult
 
-    public init(
-        evaluate: @escaping @Sendable (AutomationConditionEvaluationRequest) async -> AutomationOutcome
-    ) {
-        self.evaluate = evaluate
-        self.evaluateResult = { request in
-            AutomationConditionEvaluationResult(outcome: await evaluate(request))
-        }
+  public init(
+    evaluate: @escaping @Sendable (AutomationConditionEvaluationRequest) async -> AutomationOutcome
+  ) {
+    self.evaluate = evaluate
+    self.evaluateResult = { request in
+      AutomationConditionEvaluationResult(outcome: await evaluate(request))
     }
+  }
 
-    public init(
-        evaluateResult: @escaping @Sendable (AutomationConditionEvaluationRequest) async -> AutomationConditionEvaluationResult
-    ) {
-        self.evaluateResult = evaluateResult
-        self.evaluate = { request in
-            await evaluateResult(request).outcome
-        }
+  public init(
+    evaluateResult:
+      @escaping @Sendable (AutomationConditionEvaluationRequest) async ->
+      AutomationConditionEvaluationResult
+  ) {
+    self.evaluateResult = evaluateResult
+    self.evaluate = { request in
+      await evaluateResult(request).outcome
     }
+  }
 
-    public static func constant(_ outcome: AutomationOutcome) -> AutomationConditionEvaluatorClient {
-        AutomationConditionEvaluatorClient { _ in outcome }
-    }
+  public static func constant(_ outcome: AutomationOutcome) -> AutomationConditionEvaluatorClient {
+    AutomationConditionEvaluatorClient { _ in outcome }
+  }
 
-    public static func contextual(
-        externalSignal: AutomationExternalSignalClient = .inactive,
-        manualApproval: AutomationManualApprovalClient = .rejecting,
-        ocrText: @escaping @Sendable (
-            _ request: AutomationConditionEvaluationRequest,
-            _ condition: AutomationOCRCondition
-        ) async -> AutomationOutcome = { _, _ in .conditionNotMatched },
-        visual: @escaping @Sendable (
-            _ request: AutomationConditionEvaluationRequest,
-            _ condition: AutomationVisualCondition
-        ) async -> AutomationOutcome = { _, _ in .conditionNotMatched },
-        now: @escaping @Sendable () -> Date = { Date.now }
-    ) -> AutomationConditionEvaluatorClient {
-        AutomationConditionEvaluatorClient(evaluateResult: { request in
-            let outcome: AutomationOutcome
-            switch request.condition.kind {
-            case .ocrText(let condition):
-                outcome = await ocrText(request, condition)
+  public static func contextual(
+    externalSignal: AutomationExternalSignalClient = .inactive,
+    manualApproval: AutomationManualApprovalClient = .rejecting,
+    ocrText:
+      @escaping @Sendable (
+        _ request: AutomationConditionEvaluationRequest,
+        _ condition: AutomationOCRCondition
+      ) async -> AutomationOutcome = { _, _ in .conditionNotMatched },
+    visual:
+      @escaping @Sendable (
+        _ request: AutomationConditionEvaluationRequest,
+        _ condition: AutomationVisualCondition
+      ) async -> AutomationOutcome = { _, _ in .conditionNotMatched },
+    now: @escaping @Sendable () -> Date = { Date.now }
+  ) -> AutomationConditionEvaluatorClient {
+    AutomationConditionEvaluatorClient(evaluateResult: { request in
+      let outcome: AutomationOutcome
+      switch request.condition.kind {
+      case .ocrText(let condition):
+        outcome = await ocrText(request, condition)
 
-            case .visual(let condition):
-                outcome = await visual(request, condition)
+      case .visual(let condition):
+        outcome = await visual(request, condition)
 
-            case .previousOutcome(let predicate):
-                outcome = request.previousOutcomes.contains(where: predicate.matches)
-                    ? .conditionMatched
-                    : .conditionNotMatched
+      case .previousOutcome(let predicate):
+        outcome =
+          request.previousOutcomes.contains(where: predicate.matches)
+          ? .conditionMatched
+          : .conditionNotMatched
 
-            case .externalSignal(let signalName):
-                outcome = await externalSignal.isActive(signalName)
-                    ? .conditionMatched
-                    : .conditionNotMatched
+      case .externalSignal(let signalName):
+        outcome =
+          await externalSignal.isActive(signalName)
+          ? .conditionMatched
+          : .conditionNotMatched
 
-            case .manualApproval:
-                outcome = await manualApproval.requestApproval(request)
-                    ? .conditionMatched
-                    : .conditionNotMatched
-            }
-            return AutomationConditionEvaluationResult(
-                outcome: outcome,
-                evidence: AutomationConditionEvaluationEvidence.contextual(
-                    request: request,
-                    outcome: outcome,
-                    evaluatedAt: now()
-                )
-            )
-        })
-    }
+      case .manualApproval:
+        outcome =
+          await manualApproval.requestApproval(request)
+          ? .conditionMatched
+          : .conditionNotMatched
+      }
+      return AutomationConditionEvaluationResult(
+        outcome: outcome,
+        evidence: AutomationConditionEvaluationEvidence.contextual(
+          request: request,
+          outcome: outcome,
+          evaluatedAt: now()
+        )
+      )
+    })
+  }
 }
 
-public extension AutomationConditionEvaluationEvidence {
-    static func contextual(
-        request: AutomationConditionEvaluationRequest,
-        outcome: AutomationOutcome,
-        evaluatedAt: Date
-    ) -> AutomationConditionEvaluationEvidence? {
-        switch request.condition.kind {
-        case .previousOutcome(let predicate):
-            let previousOutcomeLabels = request.previousOutcomes.map(contextualOutcomeLabel)
-            let observedSummary = outcome == .conditionMatched
-                ? "Found a matching upstream outcome"
-                : "No upstream outcome matched \(predicate.rawValue)"
-            return AutomationConditionEvaluationEvidence(
-                runID: request.runID,
-                workflowID: request.workflowID,
-                taskID: request.taskID,
-                conditionID: request.condition.id,
-                kind: .previousOutcome,
-                outcome: outcome,
-                evaluatedAt: evaluatedAt,
-                sampleCount: request.previousOutcomes.count,
-                targetDescription: "Previous outcome: \(predicate.rawValue)",
-                observedSummary: observedSummary,
-                fields: [
-                    AutomationConditionDiagnosticField(
-                        id: "predicate",
-                        title: "Predicate",
-                        value: predicate.rawValue
-                    ),
-                    AutomationConditionDiagnosticField(
-                        id: "previousOutcomeCount",
-                        title: "Previous outcome count",
-                        value: "\(request.previousOutcomes.count)"
-                    ),
-                    AutomationConditionDiagnosticField(
-                        id: "previousOutcomes",
-                        title: "Previous outcomes",
-                        value: previousOutcomeLabels.isEmpty
-                            ? "None"
-                            : previousOutcomeLabels.joined(separator: " | ")
-                    )
-                ]
-            )
+extension AutomationConditionEvaluationEvidence {
+  public static func contextual(
+    request: AutomationConditionEvaluationRequest,
+    outcome: AutomationOutcome,
+    evaluatedAt: Date
+  ) -> AutomationConditionEvaluationEvidence? {
+    switch request.condition.kind {
+    case .previousOutcome(let predicate):
+      let previousOutcomeLabels = request.previousOutcomes.map(contextualOutcomeLabel)
+      let observedSummary =
+        outcome == .conditionMatched
+        ? "Found a matching upstream outcome"
+        : "No upstream outcome matched \(predicate.rawValue)"
+      return AutomationConditionEvaluationEvidence(
+        runID: request.runID,
+        workflowID: request.workflowID,
+        taskID: request.taskID,
+        conditionID: request.condition.id,
+        kind: .previousOutcome,
+        outcome: outcome,
+        evaluatedAt: evaluatedAt,
+        sampleCount: request.previousOutcomes.count,
+        targetDescription: "Previous outcome: \(predicate.rawValue)",
+        observedSummary: observedSummary,
+        fields: [
+          AutomationConditionDiagnosticField(
+            id: "predicate",
+            title: "Predicate",
+            value: predicate.rawValue
+          ),
+          AutomationConditionDiagnosticField(
+            id: "previousOutcomeCount",
+            title: "Previous outcome count",
+            value: "\(request.previousOutcomes.count)"
+          ),
+          AutomationConditionDiagnosticField(
+            id: "previousOutcomes",
+            title: "Previous outcomes",
+            value: previousOutcomeLabels.isEmpty
+              ? "None"
+              : previousOutcomeLabels.joined(separator: " | ")
+          ),
+        ]
+      )
 
-        case .externalSignal(let signalName):
-            let isActive = outcome == .conditionMatched
-            return AutomationConditionEvaluationEvidence(
-                runID: request.runID,
-                workflowID: request.workflowID,
-                taskID: request.taskID,
-                conditionID: request.condition.id,
-                kind: .externalSignal,
-                outcome: outcome,
-                evaluatedAt: evaluatedAt,
-                sampleCount: 1,
-                targetDescription: signalName,
-                observedSummary: isActive
-                    ? "External signal '\(signalName)' was active"
-                    : "External signal '\(signalName)' was inactive",
-                fields: [
-                    AutomationConditionDiagnosticField(
-                        id: "signalName",
-                        title: "Signal",
-                        value: signalName
-                    ),
-                    AutomationConditionDiagnosticField(
-                        id: "signalState",
-                        title: "Signal state",
-                        value: isActive ? "active" : "inactive"
-                    )
-                ]
-            )
+    case .externalSignal(let signalName):
+      let isActive = outcome == .conditionMatched
+      return AutomationConditionEvaluationEvidence(
+        runID: request.runID,
+        workflowID: request.workflowID,
+        taskID: request.taskID,
+        conditionID: request.condition.id,
+        kind: .externalSignal,
+        outcome: outcome,
+        evaluatedAt: evaluatedAt,
+        sampleCount: 1,
+        targetDescription: signalName,
+        observedSummary: isActive
+          ? "External signal '\(signalName)' was active"
+          : "External signal '\(signalName)' was inactive",
+        fields: [
+          AutomationConditionDiagnosticField(
+            id: "signalName",
+            title: "Signal",
+            value: signalName
+          ),
+          AutomationConditionDiagnosticField(
+            id: "signalState",
+            title: "Signal state",
+            value: isActive ? "active" : "inactive"
+          ),
+        ]
+      )
 
-        case .manualApproval:
-            let isApproved = outcome == .conditionMatched
-            return AutomationConditionEvaluationEvidence(
-                runID: request.runID,
-                workflowID: request.workflowID,
-                taskID: request.taskID,
-                conditionID: request.condition.id,
-                kind: .manualApproval,
-                outcome: outcome,
-                evaluatedAt: evaluatedAt,
-                sampleCount: 1,
-                targetDescription: request.condition.name,
-                observedSummary: isApproved
-                    ? "Manual approval was granted"
-                    : "Manual approval was rejected",
-                fields: [
-                    AutomationConditionDiagnosticField(
-                        id: "approval",
-                        title: "Approval",
-                        value: isApproved ? "granted" : "rejected"
-                    )
-                ]
-            )
+    case .manualApproval:
+      let isApproved = outcome == .conditionMatched
+      return AutomationConditionEvaluationEvidence(
+        runID: request.runID,
+        workflowID: request.workflowID,
+        taskID: request.taskID,
+        conditionID: request.condition.id,
+        kind: .manualApproval,
+        outcome: outcome,
+        evaluatedAt: evaluatedAt,
+        sampleCount: 1,
+        targetDescription: request.condition.name,
+        observedSummary: isApproved
+          ? "Manual approval was granted"
+          : "Manual approval was rejected",
+        fields: [
+          AutomationConditionDiagnosticField(
+            id: "approval",
+            title: "Approval",
+            value: isApproved ? "granted" : "rejected"
+          )
+        ]
+      )
 
-        case .ocrText, .visual:
-            return nil
-        }
+    case .ocrText, .visual:
+      return nil
     }
+  }
 }
 
 private func contextualOutcomeLabel(_ outcome: AutomationOutcome) -> String {
-    switch outcome {
-    case .succeeded:
-        return "success"
-    case .failed:
-        return "failure"
-    case .cancelled:
-        return "cancelled"
-    case .timedOut:
-        return "timeout"
-    case .resourceConflict:
-        return "resourceConflict"
-    case .permissionDenied:
-        return "permissionDenied"
-    case .conditionMatched:
-        return "conditionMatched"
-    case .conditionNotMatched:
-        return "conditionNotMatched"
-    case .missingMacro:
-        return "missingMacro"
-    case .rejected:
-        return "rejected"
-    }
+  switch outcome {
+  case .succeeded:
+    return "success"
+  case .failed:
+    return "failure"
+  case .cancelled:
+    return "cancelled"
+  case .timedOut:
+    return "timeout"
+  case .resourceConflict:
+    return "resourceConflict"
+  case .permissionDenied:
+    return "permissionDenied"
+  case .conditionMatched:
+    return "conditionMatched"
+  case .conditionNotMatched:
+    return "conditionNotMatched"
+  case .missingMacro:
+    return "missingMacro"
+  case .rejected:
+    return "rejected"
+  }
 }
 
 public struct AutomationNotificationRequest: Sendable {
-    public var runID: UUID
-    public var workflowID: UUID
-    public var taskID: UUID
-    public var notification: AutomationNotificationSpec
+  public var runID: UUID
+  public var workflowID: UUID
+  public var taskID: UUID
+  public var notification: AutomationNotificationSpec
 
-    public init(
-        runID: UUID,
-        workflowID: UUID,
-        taskID: UUID,
-        notification: AutomationNotificationSpec
-    ) {
-        self.runID = runID
-        self.workflowID = workflowID
-        self.taskID = taskID
-        self.notification = notification
-    }
+  public init(
+    runID: UUID,
+    workflowID: UUID,
+    taskID: UUID,
+    notification: AutomationNotificationSpec
+  ) {
+    self.runID = runID
+    self.workflowID = workflowID
+    self.taskID = taskID
+    self.notification = notification
+  }
 }
 
 public struct AutomationNotificationClient: Sendable {
-    public var send: @Sendable (AutomationNotificationRequest) async throws -> Void
+  public var send: @Sendable (AutomationNotificationRequest) async throws -> Void
 
-    public init(
-        send: @escaping @Sendable (AutomationNotificationRequest) async throws -> Void
-    ) {
-        self.send = send
-    }
+  public init(
+    send: @escaping @Sendable (AutomationNotificationRequest) async throws -> Void
+  ) {
+    self.send = send
+  }
 
-    public static let noop = AutomationNotificationClient { _ in }
+  public static let noop = AutomationNotificationClient { _ in }
 }
 
 public struct AutomationEffectRunner: Sendable {
-    public var resourceArbiter: AutomationResourceArbiterClient
-    public var player: AutomationPlayerClient
-    public var conditionEvaluator: AutomationConditionEvaluatorClient
-    public var repository: AutomationRepositoryClient
-    public var notificationClient: AutomationNotificationClient
-    public var loadMacro: @Sendable (_ macroID: UUID) async throws -> SavedMacro?
-    public var now: @Sendable () -> Date
-    public var sleep: @Sendable (_ duration: TimeInterval) async -> Void
+  public var resourceArbiter: AutomationResourceArbiterClient
+  public var player: AutomationPlayerClient
+  public var conditionEvaluator: AutomationConditionEvaluatorClient
+  public var repository: AutomationRepositoryClient
+  public var notificationClient: AutomationNotificationClient
+  public var loadMacro: @Sendable (_ macroID: UUID) async throws -> SavedMacro?
+  public var now: @Sendable () -> Date
+  public var sleep: @Sendable (_ duration: TimeInterval) async -> Void
 
-    public init(
-        resourceArbiter: AutomationResourceArbiterClient,
-        player: AutomationPlayerClient = .rejecting(.rejected(reason: "Player client is not configured")),
-        conditionEvaluator: AutomationConditionEvaluatorClient = .constant(.conditionNotMatched),
-        repository: AutomationRepositoryClient = .inMemory(),
-        notificationClient: AutomationNotificationClient = .noop,
-        loadMacro: @escaping @Sendable (_ macroID: UUID) async throws -> SavedMacro? = { _ in nil },
-        now: @escaping @Sendable () -> Date = { Date() },
-        sleep: @escaping @Sendable (_ duration: TimeInterval) async -> Void = { duration in
-            guard duration > 0 else { return }
-            let nanoseconds = UInt64(duration * 1_000_000_000)
-            try? await Task.sleep(nanoseconds: nanoseconds)
-        }
-    ) {
-        self.resourceArbiter = resourceArbiter
-        self.player = player
-        self.conditionEvaluator = conditionEvaluator
-        self.repository = repository
-        self.notificationClient = notificationClient
-        self.loadMacro = loadMacro
-        self.now = now
-        self.sleep = sleep
+  public init(
+    resourceArbiter: AutomationResourceArbiterClient,
+    player: AutomationPlayerClient = .rejecting(
+      .rejected(reason: "Player client is not configured")),
+    conditionEvaluator: AutomationConditionEvaluatorClient = .constant(.conditionNotMatched),
+    repository: AutomationRepositoryClient = .inMemory(),
+    notificationClient: AutomationNotificationClient = .noop,
+    loadMacro: @escaping @Sendable (_ macroID: UUID) async throws -> SavedMacro? = { _ in nil },
+    now: @escaping @Sendable () -> Date = { Date() },
+    sleep: @escaping @Sendable (_ duration: TimeInterval) async -> Void = { duration in
+      guard duration > 0 else { return }
+      let nanoseconds = UInt64(duration * 1_000_000_000)
+      try? await Task.sleep(nanoseconds: nanoseconds)
+    }
+  ) {
+    self.resourceArbiter = resourceArbiter
+    self.player = player
+    self.conditionEvaluator = conditionEvaluator
+    self.repository = repository
+    self.notificationClient = notificationClient
+    self.loadMacro = loadMacro
+    self.now = now
+    self.sleep = sleep
+  }
+
+  public func run(_ effect: AutomationEffect) async -> [AutomationAction] {
+    switch effect {
+    case .requestResource(let runID, let requirement):
+      return await requestResources(runID: runID, requirement: requirement)
+
+    case .releaseResource(_, let lease):
+      await resourceArbiter.release(lease.id)
+      return []
+
+    case .startPlayer(
+      let runID, _, _, let macroID, let targetApplicationPolicy, let readyDelay, let cleanupPolicy,
+      let quitTimeout, let forceQuitOnTimeout, let playbackLoops):
+      return await startPlayer(
+        runID: runID,
+        macroID: macroID,
+        targetApplicationPolicy: targetApplicationPolicy,
+        readyDelay: readyDelay,
+        cleanupPolicy: cleanupPolicy,
+        quitTimeout: quitTimeout,
+        forceQuitOnTimeout: forceQuitOnTimeout,
+        playbackLoops: playbackLoops
+      )
+
+    case .cancelPlayer(let runID):
+      await player.cancel(runID)
+      return []
+
+    case .evaluateCondition(
+      let runID, let workflowID, let taskID, let condition, let previousOutcomes):
+      let request = AutomationConditionEvaluationRequest(
+        runID: runID,
+        workflowID: workflowID,
+        taskID: taskID,
+        condition: condition,
+        previousOutcomes: previousOutcomes
+      )
+      let result = await conditionEvaluator.evaluateResult(request)
+      return [.conditionEvaluationCompleted(runID: runID, result: result, at: now())]
+
+    case .wait(let runID, _, _, let duration):
+      await sleep(max(0, duration))
+      return [.taskFinished(runID: runID, outcome: .succeeded(report: nil), at: now())]
+
+    case .sendNotification(let runID, let workflowID, let taskID, let notification):
+      do {
+        try await notificationClient.send(
+          AutomationNotificationRequest(
+            runID: runID,
+            workflowID: workflowID,
+            taskID: taskID,
+            notification: notification
+          ))
+        return [.taskFinished(runID: runID, outcome: .succeeded(report: nil), at: now())]
+      } catch {
+        return [.taskFinished(runID: runID, outcome: .failed(report: nil), at: now())]
+      }
+
+    case .persistWorkflows(let workflows):
+      do {
+        try await repository.saveWorkflows(workflows)
+        return [.persistenceSucceeded(operation: .workflows, runID: nil, at: now())]
+      } catch {
+        return [
+          .persistenceFailed(
+            AutomationPersistenceIssue(
+              operation: .workflows,
+              message: String(describing: error),
+              failedAt: now()
+            ))
+        ]
+      }
+
+    case .persistRun(let run):
+      do {
+        try await repository.appendRun(run)
+        return [.persistenceSucceeded(operation: .runCheckpoint, runID: run.id, at: now())]
+      } catch {
+        return [
+          .persistenceFailed(
+            AutomationPersistenceIssue(
+              operation: .runCheckpoint,
+              runID: run.id,
+              message: String(describing: error),
+              failedAt: now()
+            ))
+        ]
+      }
+    }
+  }
+
+  public func playerActions() -> AsyncStream<AutomationAction> {
+    player.events()
+  }
+
+  private func requestResources(
+    runID: UUID,
+    requirement: AutomationResourceRequirement
+  ) async -> [AutomationAction] {
+    let resources = requirement.resources.sorted { $0.rawValue < $1.rawValue }
+    guard !resources.isEmpty else {
+      return []
     }
 
-    public func run(_ effect: AutomationEffect) async -> [AutomationAction] {
-        switch effect {
-        case .requestResource(let runID, let requirement):
-            return await requestResources(runID: runID, requirement: requirement)
+    let requestedAt = now()
+    var acquiredLeases: [AutomationResourceLease] = []
 
-        case .releaseResource(_, let lease):
-            await resourceArbiter.release(lease.id)
-            return []
-
-        case .startPlayer(let runID, _, _, let macroID, let targetApplicationPolicy, let cleanupPolicy, let playbackLoops):
-            return await startPlayer(
-                runID: runID,
-                macroID: macroID,
-                targetApplicationPolicy: targetApplicationPolicy,
-                cleanupPolicy: cleanupPolicy,
-                playbackLoops: playbackLoops
-            )
-
-        case .cancelPlayer(let runID):
-            await player.cancel(runID)
-            return []
-
-        case .evaluateCondition(let runID, let workflowID, let taskID, let condition, let previousOutcomes):
-            let request = AutomationConditionEvaluationRequest(
-                runID: runID,
-                workflowID: workflowID,
-                taskID: taskID,
-                condition: condition,
-                previousOutcomes: previousOutcomes
-            )
-            let result = await conditionEvaluator.evaluateResult(request)
-            return [.conditionEvaluationCompleted(runID: runID, result: result, at: now())]
-
-        case .wait(let runID, _, _, let duration):
-            await sleep(max(0, duration))
-            return [.taskFinished(runID: runID, outcome: .succeeded(report: nil), at: now())]
-
-        case .sendNotification(let runID, let workflowID, let taskID, let notification):
-            do {
-                try await notificationClient.send(AutomationNotificationRequest(
-                    runID: runID,
-                    workflowID: workflowID,
-                    taskID: taskID,
-                    notification: notification
-                ))
-                return [.taskFinished(runID: runID, outcome: .succeeded(report: nil), at: now())]
-            } catch {
-                return [.taskFinished(runID: runID, outcome: .failed(report: nil), at: now())]
-            }
-
-        case .persistWorkflows(let workflows):
-            try? await repository.saveWorkflows(workflows)
-            return []
-
-        case .persistRun(let run):
-            try? await repository.appendRun(run)
-            return []
+    for resource in resources {
+      let request = AutomationResourceRequest(
+        runID: runID,
+        resource: resource,
+        requestedAt: requestedAt,
+        leaseTimeout: requirement.leaseTimeout
+      )
+      let result = await resourceArbiter.acquire(request)
+      switch result {
+      case .acquired(let lease):
+        acquiredLeases.append(lease)
+      case .denied(let deniedResource):
+        for lease in acquiredLeases {
+          await resourceArbiter.release(lease.id)
         }
+        return [.resourceLeaseDenied(runID: runID, resource: deniedResource, at: requestedAt)]
+      }
     }
 
-    public func playerActions() -> AsyncStream<AutomationAction> {
-        player.events()
+    if let lease = acquiredLeases.first, acquiredLeases.count == 1 {
+      return [.resourceLeaseAcquired(runID: runID, lease: lease, at: requestedAt)]
     }
 
-    private func requestResources(
-        runID: UUID,
-        requirement: AutomationResourceRequirement
-    ) async -> [AutomationAction] {
-        let resources = requirement.resources.sorted { $0.rawValue < $1.rawValue }
-        guard !resources.isEmpty else {
-            return []
-        }
+    return [.resourceLeasesAcquired(runID: runID, leases: acquiredLeases, at: requestedAt)]
+  }
 
-        let requestedAt = now()
-        var acquiredLeases: [AutomationResourceLease] = []
+  private func startPlayer(
+    runID: UUID,
+    macroID: UUID,
+    targetApplicationPolicy: AutomationTargetApplicationPolicy,
+    readyDelay: TimeInterval,
+    cleanupPolicy: AutomationTargetApplicationCleanupPolicy,
+    quitTimeout: TimeInterval,
+    forceQuitOnTimeout: Bool,
+    playbackLoops: Int?
+  ) async -> [AutomationAction] {
+    let startedAt = now()
+    do {
+      guard var macro = try await loadMacro(macroID) else {
+        return [
+          .playerFinished(runID: runID, outcome: .missingMacro(macroID: macroID), at: startedAt)
+        ]
+      }
+      if let playbackLoops {
+        macro.loops = max(1, playbackLoops)
+      }
+      guard
+        !PlaybackPlanner.plan(events: macro.events, loops: macro.loops, speed: macro.speed).steps
+          .isEmpty
+      else {
+        return [
+          .playerFinished(
+            runID: runID,
+            outcome: .rejected(reason: "Macro has no playable events"),
+            at: startedAt
+          )
+        ]
+      }
 
-        for resource in resources {
-            let request = AutomationResourceRequest(
-                runID: runID,
-                resource: resource,
-                requestedAt: requestedAt,
-                leaseTimeout: requirement.leaseTimeout
-            )
-            let result = await resourceArbiter.acquire(request)
-            switch result {
-            case .acquired(let lease):
-                acquiredLeases.append(lease)
-            case .denied(let deniedResource):
-                for lease in acquiredLeases {
-                    await resourceArbiter.release(lease.id)
-                }
-                return [.resourceLeaseDenied(runID: runID, resource: deniedResource, at: requestedAt)]
-            }
-        }
-
-        if let lease = acquiredLeases.first, acquiredLeases.count == 1 {
-            return [.resourceLeaseAcquired(runID: runID, lease: lease, at: requestedAt)]
-        }
-
-        return [.resourceLeasesAcquired(runID: runID, leases: acquiredLeases, at: requestedAt)]
+      let request = AutomationPlayerStartRequest(
+        runID: runID,
+        macro: macro,
+        targetApplicationPolicy: targetApplicationPolicy,
+        targetApplicationReadyDelay: readyDelay,
+        targetApplicationCleanupPolicy: cleanupPolicy,
+        targetApplicationQuitTimeout: quitTimeout,
+        targetApplicationForceQuitOnTimeout: forceQuitOnTimeout
+      )
+      let result = await player.start(request)
+      return [result.action(runID: runID, at: startedAt)]
+    } catch {
+      return [
+        .playerFinished(
+          runID: runID, outcome: .rejected(reason: String(describing: error)), at: startedAt)
+      ]
     }
-
-    private func startPlayer(
-        runID: UUID,
-        macroID: UUID,
-        targetApplicationPolicy: AutomationTargetApplicationPolicy,
-        cleanupPolicy: AutomationTargetApplicationCleanupPolicy,
-        playbackLoops: Int?
-    ) async -> [AutomationAction] {
-        let startedAt = now()
-        do {
-            guard var macro = try await loadMacro(macroID) else {
-                return [.playerFinished(runID: runID, outcome: .missingMacro(macroID: macroID), at: startedAt)]
-            }
-            if let playbackLoops {
-                macro.loops = max(1, playbackLoops)
-            }
-            guard !PlaybackPlanner.plan(events: macro.events, loops: macro.loops, speed: macro.speed).steps.isEmpty else {
-                return [.playerFinished(
-                    runID: runID,
-                    outcome: .rejected(reason: "Macro has no playable events"),
-                    at: startedAt
-                )]
-            }
-
-            let request = AutomationPlayerStartRequest(
-                runID: runID,
-                macro: macro,
-                targetApplicationPolicy: targetApplicationPolicy,
-                targetApplicationCleanupPolicy: cleanupPolicy
-            )
-            let result = await player.start(request)
-            return [result.action(runID: runID, at: startedAt)]
-        } catch {
-            return [.playerFinished(runID: runID, outcome: .rejected(reason: String(describing: error)), at: startedAt)]
-        }
-    }
+  }
 }

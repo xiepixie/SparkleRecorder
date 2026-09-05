@@ -1,6 +1,6 @@
 # Semantic Recording And AI Roadmap
 
-更新时间：2026-09-01
+Updated: 2026-09-04
 状态：主动规划文档
 Owner：Recording / Vision / Workflow AI shared planning
 
@@ -16,9 +16,17 @@ SparkleRecorder 不只是录制一串 `CGEvent`。它应该把用户的一次真
 - 视频母带和关键帧负责记录当时真实上下文。
 - OCR、图像、像素、AX/window metadata 负责把画面变成可检索的语义证据。
 - AI 通过 CLI 查询本地索引、解释宏、修正等待和定位、生成 `sparkle.workflow.draft.v1`。
-- Workflow UI 让用户审阅 AI 提议，而不是让 AI 直接写内部 Swift Codable JSON 或直接运行未知动作。
+- Workflow UI 通过公开 draft 合同审阅 AI 提议；宏重建按 17 号设计允许 AI 输出完整 `SavedMacro` 候选文件，由 App 校验、试跑和晋升。AI 不直接覆盖已接受宏、写内部 Workflow 包或启动执行。
 
 目标不是复制 OpenAI Record & Replay，而是吸收它的 demo-to-skill 思想，再叠加 SparkleRecorder 自己的本地视频证据、精确回放、视觉条件和 workflow 编排能力。
+
+## Macro Reconstruction Design Boundary
+
+[17-ai-assisted-macro-reconstruction-design.md](17-ai-assisted-macro-reconstruction-design.md) 是已接受、尚未实现的完整宏重建设计。它扩展早期 suggestion-only 方向：用户明确启动优化后，AI 可接收获准的完整视频证据并重写独立候选宏；普通 CLI 查询仍默认只返回 metadata，Workflow draft 合同保持独立。
+
+2026-09-04 架构审阅补齐了 session/source/video/candidate 时间区分、实际帧时间、hover/几何证据保留、宏执行能力清单、观察不可用语义、候选摘要绑定试跑、并发版本晋升和故障恢复。首个产品闭环聚焦文字定位、文字等待、文字验证和保守拖拽简化；图像/像素/区域条件必须先贯通宏存储与播放合同。
+
+现有 S2 live evidence 门槛继续有效。设计完善不代表功能或 live gate 完成；新增验收项见 [acceptance-checklist.md](acceptance-checklist.md) 的 AI Macro Reconstruction 部分。
 
 ## Research Inputs
 
@@ -100,7 +108,7 @@ SparkleRecorder 不应把 OpenAI 官方 Record & Replay 插件作为产品内依
 ## Non-Goals
 
 - 不把 AI 放到实时录制热路径里。
-- 不让 AI 直接操作内部 `.sparkrec_workflow` 或 Swift Codable JSON。
+- 不让 AI 直接操作内部 `.sparkrec_workflow` 或已接受的宏文件；17 号设计中的独立完整宏候选属于明确允许的作者接口。
 - 不把完整视频作为每次 AI 请求的默认上下文。
 - 不承诺完全后台、不可见窗口、跨 Space 的无焦点自动化。
 - 不用视频语义替代可测试的 reducer、locator、condition evaluator 和 playback engine。

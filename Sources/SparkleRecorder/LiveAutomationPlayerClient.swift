@@ -40,19 +40,27 @@ private final class LiveAutomationPlayerBox: @unchecked Sendable {
     private let player: Player
     private let windowTracker: WindowTracker?
     private let targetApplications: AutomationTargetApplicationClient
-    private var targetSessions: [UUID: (
-        session: AutomationTargetApplicationSession,
-        cleanupPolicy: AutomationTargetApplicationCleanupPolicy
-    )] = [:]
+    private let readinessSleep: @Sendable (TimeInterval) async throws -> Void
+    private var preparingRunIDs: Set<UUID> = []
+    private var cancelledRunIDs: Set<UUID> = []
+    private var targetSessions:
+        [UUID: (
+            session: AutomationTargetApplicationSession,
+            cleanupPolicy: AutomationTargetApplicationCleanupPolicy,
+            quitTimeout: TimeInterval,
+            forceQuitOnTimeout: Bool
+        )] = [:]
 
     init(
         player: Player,
         windowTracker: WindowTracker?,
-        targetApplications: AutomationTargetApplicationClient
+        targetApplications: AutomationTargetApplicationClient,
+        readinessSleep: @escaping @Sendable (TimeInterval) async throws -> Void
     ) {
         self.player = player
         self.windowTracker = windowTracker
         self.targetApplications = targetApplications
+        self.readinessSleep = readinessSleep
     }
 
     func start(
@@ -60,25 +68,60 @@ private final class LiveAutomationPlayerBox: @unchecked Sendable {
         bridge: AutomationPlayerEventBridge,
         now: @escaping @Sendable () -> Date
     ) async -> AutomationPlayerStartResult {
-        guard !player.isPlaying else {
+        guard !player.isPlaying, preparingRunIDs.isEmpty else {
             return .rejected(.rejected(reason: "Player is already running"))
         }
-        guard !PlaybackPlanner.plan(
-            events: request.macro.events,
-            loops: request.macro.loops,
-            speed: request.macro.speed
-        ).steps.isEmpty else {
+        guard
+            !PlaybackPlanner.plan(
+                events: request.macro.events,
+                loops: request.macro.loops,
+                speed: request.macro.speed
+            ).steps.isEmpty
+        else {
             return .rejected(.rejected(reason: "Macro has no playable events"))
         }
+        preparingRunIDs.insert(request.runID)
+        defer { preparingRunIDs.remove(request.runID) }
 
         let targetSession: AutomationTargetApplicationSession
-        switch await targetApplications.prepare(request.context.surfaces, request.targetApplicationPolicy) {
+        switch await targetApplications.prepare(
+            request.context.surfaces, request.targetApplicationPolicy)
+        {
         case .success(let session):
             targetSession = session
         case .failure(let failure):
+            _ = await targetApplications.cleanup(
+                failure.session,
+                request.targetApplicationCleanupPolicy,
+                request.targetApplicationQuitTimeout,
+                request.targetApplicationForceQuitOnTimeout
+            )
             return .rejected(.rejected(reason: failure.message))
         }
-        targetSessions[request.runID] = (targetSession, request.targetApplicationCleanupPolicy)
+        targetSessions[request.runID] = (
+            targetSession,
+            request.targetApplicationCleanupPolicy,
+            request.targetApplicationQuitTimeout,
+            request.targetApplicationForceQuitOnTimeout
+        )
+
+        if cancelledRunIDs.remove(request.runID) != nil {
+            await cleanupTargets(for: request.runID)
+            return .rejected(.cancelled(reason: "Automation cancelled during startup preparation"))
+        }
+        if request.targetApplicationReadyDelay > 0 {
+            do {
+                try await readinessSleep(request.targetApplicationReadyDelay)
+            } catch {
+                await cleanupTargets(for: request.runID)
+                return .rejected(
+                    .cancelled(reason: "Automation cancelled during startup preparation"))
+            }
+        }
+        if cancelledRunIDs.remove(request.runID) != nil {
+            await cleanupTargets(for: request.runID)
+            return .rejected(.cancelled(reason: "Automation cancelled during startup preparation"))
+        }
 
         player.play(
             macroID: request.macro.id,
@@ -91,15 +134,29 @@ private final class LiveAutomationPlayerBox: @unchecked Sendable {
             automationCompletion: { completion in
                 Task { @MainActor in
                     if case .succeeded(let report?) = completion {
-                        await EvidenceClient.shared.recordSuccess(
+                        let persistence = await EvidenceClient.shared.recordSuccess(
                             macroID: request.macro.id,
                             report: report,
                             surfaces: request.context.surfaces
                         )
+                        bridge.yield(
+                            .evidencePersistenceUpdated(
+                                runID: request.runID,
+                                persistence: persistence,
+                                at: now()
+                            ))
                     }
                     await self.cleanupTargets(for: request.runID)
                     bridge.yield(completion.action(runID: request.runID, at: now()))
                 }
+            },
+            automationEvidencePersistence: { persistence in
+                bridge.yield(
+                    .evidencePersistenceUpdated(
+                        runID: request.runID,
+                        persistence: persistence,
+                        at: now()
+                    ))
             }
         )
         return .started
@@ -110,6 +167,11 @@ private final class LiveAutomationPlayerBox: @unchecked Sendable {
         bridge: AutomationPlayerEventBridge,
         now: @escaping @Sendable () -> Date
     ) async {
+        if preparingRunIDs.contains(runID) {
+            cancelledRunIDs.insert(runID)
+            await cleanupTargets(for: runID)
+            return
+        }
         guard player.isPlaying else {
             await cleanupTargets(for: runID)
             return
@@ -117,18 +179,24 @@ private final class LiveAutomationPlayerBox: @unchecked Sendable {
 
         player.stop()
         await cleanupTargets(for: runID)
-        bridge.yield(.playerFinished(
-            runID: runID,
-            outcome: .cancelled(reason: "Automation cancelled playback"),
-            at: now()
-        ))
+        bridge.yield(
+            .playerFinished(
+                runID: runID,
+                outcome: .cancelled(reason: "Automation cancelled playback"),
+                at: now()
+            ))
     }
 
     private func cleanupTargets(for runID: UUID) async {
         guard let targetSession = targetSessions.removeValue(forKey: runID) else {
             return
         }
-        await targetApplications.cleanup(targetSession.session, targetSession.cleanupPolicy)
+        _ = await targetApplications.cleanup(
+            targetSession.session,
+            targetSession.cleanupPolicy,
+            targetSession.quitTimeout,
+            targetSession.forceQuitOnTimeout
+        )
     }
 }
 
@@ -138,13 +206,17 @@ extension AutomationPlayerClient {
         player: Player,
         windowTracker: WindowTracker? = nil,
         targetApplications: AutomationTargetApplicationClient? = nil,
-        now: @escaping @Sendable () -> Date = { Date() }
+        now: @escaping @Sendable () -> Date = { Date() },
+        readinessSleep: @escaping @Sendable (TimeInterval) async throws -> Void = { duration in
+            try await Task.sleep(for: .seconds(duration))
+        }
     ) -> AutomationPlayerClient {
         let bridge = AutomationPlayerEventBridge()
         let box = LiveAutomationPlayerBox(
             player: player,
             windowTracker: windowTracker,
-            targetApplications: targetApplications ?? .live(windowTracker: windowTracker)
+            targetApplications: targetApplications ?? .live(windowTracker: windowTracker),
+            readinessSleep: readinessSleep
         )
 
         return AutomationPlayerClient(

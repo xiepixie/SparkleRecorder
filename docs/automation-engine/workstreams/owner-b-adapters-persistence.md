@@ -84,6 +84,8 @@ Owner B owns the boundary between pure AutomationEngine state and the real macOS
 
 ## Accepted Contracts
 
+- 2026-07-19: Live Player applies `targetApplicationReadyDelay` after target-window preparation and before input posting. Cancellation during this wait prevents playback and cleans the exact run-launched process through the existing target session policy.
+
 - `AutomationOutcome` is the adapter output language.
 - `AutomationTaskRun.id` is the `runID` for lease, Player, evidence, and run history correlation.
 - `AutomationResourceLeaseStore` owns foreground-input lease exclusivity; release and panic release are idempotent.
@@ -154,8 +156,14 @@ Owner B owns the boundary between pure AutomationEngine state and the real macOS
 - 2026-07-15: Target application preparation now returns a per-run session containing only bundle identifiers launched by that run. Live Player captures terminal evidence before `quitIfLaunched` cleanup; applications that were already running are never placed in the cleanup session. Draft export/import preserves the cleanup policy.
 - 2026-07-15: Effect runner applies `AutomationTask.playbackLoops` to the loaded macro before playback planning. Single-macro scheduled runs therefore terminate after one complete macro even when the Library macro is configured for multiple or infinite manual loops.
 - 2026-07-15: Preview orchestration moved into `AutomationScheduledMacroPreviewClient`; fake-client tests prove matching-run completion and cancellation forwarding without posting input. Target cleanup selection is a pure session-scoped helper covered without launching or terminating real apps.
+- 2026-07-18: Target cleanup now records the exact PID launched by each run, requests graceful termination, awaits the configured grace period, and optionally force-terminates only that PID. Live Player awaits this cleanup before emitting terminal completion, including preparation failures that already launched a target; fake process clients cover timeout/fallback paths without touching real applications.
 
 ## Handoff Checklist
+
+- 2026-07-19: Run storage inventory reports allocated bytes for report, screenshot, condition evidence, other evidence, and the run journal without exposing paths to SwiftUI. Explicit screenshot deletion is path-confined and atomically checkpoints report-only evidence health; explicit evidence/history deletion reuses the two-phase retention transaction and rejects active runs.
+
+- 2026-07-18: Evidence writing returns canonical per-run report/manifest/screenshot health. Errors are no longer reduced to `NSLog`; health is emitted to the reducer before the terminal player action and remains independently testable with fake storage clients.
+- 2026-07-18: Run checkpoints use synchronized versioned JSONL append after lazy legacy migration. Replay is last-write-wins, only a torn final line is tolerated, retention and threshold maintenance compact atomically, and long-running app sessions recheck daily cleanup eligibility hourly.
 
 - [x] ResourceArbiter fake/live behavior documented.
 - [x] Multi-resource batch handoff and partial-denial cleanup documented.

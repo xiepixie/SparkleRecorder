@@ -2,11 +2,16 @@ import Cocoa
 import SwiftUI
 import SparkleRecorderCore
 
+extension Notification.Name {
+    static let sparkleShowRunHistorySettings = Notification.Name("SparkleRecorder.ShowRunHistorySettings")
+}
+
 private enum SettingsCategory: String, CaseIterable, Identifiable {
     case general
     case shortcuts
     case recording
     case playback
+    case runHistory
     case visualEvidence
     case permissions
 
@@ -18,6 +23,7 @@ private enum SettingsCategory: String, CaseIterable, Identifiable {
         case .shortcuts: return String(localized: "Keyboard Shortcuts", table: "Settings")
         case .recording: return String(localized: "Recording", table: "Recording")
         case .playback: return String(localized: "Playback", table: "Settings")
+        case .runHistory: return String(localized: "Run History", table: "Automation")
         case .visualEvidence: return String(localized: "Visual Evidence", table: "Automation")
         case .permissions: return String(localized: "Permissions", table: "Settings")
         }
@@ -29,6 +35,7 @@ private enum SettingsCategory: String, CaseIterable, Identifiable {
         case .shortcuts: return String(localized: "Global shortcuts for recording and playback.", table: "Settings")
         case .recording: return String(localized: "Capture behavior and status feedback.", table: "Settings")
         case .playback: return String(localized: "Default repeat count and playback speed.", table: "Settings")
+        case .runHistory: return String(localized: "Control how long run evidence and history remain on this Mac.", table: "Automation")
         case .visualEvidence: return String(localized: "Optional visual context, privacy, and retention.", table: "Settings")
         case .permissions: return String(localized: "System access required to record and replay.", table: "Settings")
         }
@@ -40,6 +47,7 @@ private enum SettingsCategory: String, CaseIterable, Identifiable {
         case .shortcuts: return "keyboard"
         case .recording: return "record.circle"
         case .playback: return "play.circle"
+        case .runHistory: return "clock.arrow.circlepath"
         case .visualEvidence: return "film.stack"
         case .permissions: return "lock.shield"
         }
@@ -57,6 +65,12 @@ struct SettingsPanel: View {
     @State private var semanticRetentionCleanupPreview: SemanticRecordingRetentionCleanupPreview?
     @State private var semanticRetentionCleanupBusy = false
     @State private var showSemanticRetentionCleanupConfirmation = false
+    @State private var automationRunRetentionCleanupPreview: AutomationRunRetentionCleanupPreview?
+    @State private var automationRunRetentionCleanupBusy = false
+    @State private var showAutomationRunRetentionCleanupConfirmation = false
+    @State private var automationRunStorageUsage: AutomationRunStorageUsage?
+    @State private var automationRunStorageBusy = false
+    @State private var automationRunStorageError: String?
     @State private var languagePreferenceDraft = AppLanguagePreference.current()
     @State private var selectedCategory: SettingsCategory = .general
 
@@ -79,6 +93,7 @@ struct SettingsPanel: View {
     ]
     private let semanticRecordingRetentionDayOptions: [Int] = [0, 7, 30, 90, 180, 365]
     private let semanticRecordingMaximumArtifactMegabyteOptions: [Int] = [0, 25, 100, 500, 1024]
+    private let automationRunRetentionDayOptions: [Int] = [0, 7, 30, 90, 180, 365, 730]
 
     private var appVersion: String {
         let short = (Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String) ?? "dev"
@@ -115,6 +130,9 @@ struct SettingsPanel: View {
         )
         .onAppear {
             languagePreferenceDraft = AppLanguagePreference.current()
+            if !inWindow || selectedCategory == .runHistory {
+                Task { await refreshAutomationRunStorageUsage() }
+            }
             if state.semanticRecordingEnabled,
                state.semanticRecordingPreflightPresentation == nil {
                 controller.refreshSemanticRecordingPreflightPresentation()
@@ -140,6 +158,28 @@ struct SettingsPanel: View {
             }
         } message: {
             Text(semanticRecordingRetentionCleanupConfirmationMessage())
+        }
+        .alert(String(localized: "Clean up run history?", table: "Automation"), isPresented: $showAutomationRunRetentionCleanupConfirmation) {
+            Button(String(localized: "Cancel", table: "Common"), role: .cancel) {}
+            Button(String(localized: "Delete", table: "Common"), role: .destructive) {
+                Task { await confirmAutomationRunRetentionCleanup() }
+            }
+        } message: {
+            Text(automationRunRetentionCleanupConfirmationMessage())
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .sparkleShowRunHistorySettings)) { _ in
+            selectedCategory = .runHistory
+            Task { await refreshAutomationRunStorageUsage() }
+        }
+        .onChange(of: state.automationRunLastScheduledRetentionCleanupAt) {
+            Task { await refreshAutomationRunStorageUsage() }
+        }
+        .onChange(of: selectedCategory) {
+            guard selectedCategory == .runHistory else { return }
+            Task { await refreshAutomationRunStorageUsage() }
+        }
+        .onChange(of: state.automationRunAutomaticCleanupEnabled) {
+            controller.automationRunCleanupPreferenceDidChange()
         }
     }
 
@@ -261,6 +301,7 @@ struct SettingsPanel: View {
         case .shortcuts: hotkeySettingsGroup
         case .recording: recordingSettingsGroup
         case .playback: replaySettingsGroup
+        case .runHistory: runHistorySettingsGroup
         case .visualEvidence: visualEvidenceSettingsGroup
         case .permissions: permissionsSettingsGroup
         }
@@ -291,6 +332,7 @@ struct SettingsPanel: View {
         recordingSettingsGroup
         visualEvidenceSettingsGroup
         replaySettingsGroup
+        runHistorySettingsGroup
         permissionsSettingsGroup
     }
 
@@ -459,6 +501,178 @@ struct SettingsPanel: View {
                 .labelsHidden()
                 .frame(width: 112)
             }
+        }
+    }
+
+    private var runHistorySettingsGroup: some View {
+        settingsGroup(String(localized: "Run History", table: "Automation"), systemImage: "clock.arrow.circlepath") {
+            automationRunStorageSummary
+
+            Divider()
+
+            Toggle(isOn: $state.automationRunCaptureScreenshots) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Save ending screenshots", tableName: "Automation")
+                        .font(.system(size: 11.5))
+                    Text("Reports are still saved when screenshots are off or unavailable.", tableName: "Automation")
+                        .settingsDescriptionStyle()
+                }
+            }
+            .toggleStyle(.switch)
+            .controlSize(.mini)
+
+            Toggle(isOn: $state.automationRunAutomaticCleanupEnabled) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Automatically manage run storage", tableName: "Automation")
+                        .font(.system(size: 11.5))
+                    Text(automationRunCleanupScheduleSummary)
+                        .settingsDescriptionStyle()
+                }
+            }
+            .toggleStyle(.switch)
+            .controlSize(.mini)
+
+            Divider()
+
+            retentionPickerRow(
+                title: String(localized: "Successful run evidence", table: "Automation"),
+                selection: $state.automationRunSuccessEvidenceAgeDays
+            )
+            retentionPickerRow(
+                title: String(localized: "Failed run evidence", table: "Automation"),
+                selection: $state.automationRunAttentionEvidenceAgeDays
+            )
+            retentionPickerRow(
+                title: String(localized: "Run history metadata", table: "Automation"),
+                selection: $state.automationRunMetadataAgeDays
+            )
+
+            Text("The current run, latest workflow run, latest failure, and latest evidence for each macro are always kept.", tableName: "Automation")
+                .settingsDescriptionStyle()
+            Text("Run history keeps at most 10,000 records. Choosing Never disables the age limit, not this capacity limit.", tableName: "Automation")
+                .settingsDescriptionStyle()
+
+            Divider()
+
+            HStack {
+                if automationRunRetentionCleanupBusy {
+                    ProgressView().controlSize(.small)
+                }
+                Spacer()
+                Button {
+                    Task { await reviewAutomationRunRetentionCleanup() }
+                } label: {
+                    Label(String(localized: "Review cleanup", table: "Common"), systemImage: "trash")
+                }
+                .buttonStyle(PillButtonStyle(tint: .orange))
+                .disabled(automationRunRetentionCleanupBusy)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var automationRunStorageSummary: some View {
+        VStack(alignment: .leading, spacing: 9) {
+            HStack {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Storage used", tableName: "Automation")
+                        .font(.system(size: 11.5, weight: .semibold))
+                    if let usage = automationRunStorageUsage {
+                        Text(formattedBytes(usage.totalByteCount))
+                            .font(.system(size: 18, weight: .semibold, design: .rounded))
+                    } else if automationRunStorageBusy {
+                        ProgressView().controlSize(.small)
+                    } else {
+                        Text("Unavailable", tableName: "Common")
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                Spacer()
+                Button("", systemImage: "arrow.clockwise") {
+                    Task { await refreshAutomationRunStorageUsage() }
+                }
+                .buttonStyle(.borderless)
+                .disabled(automationRunStorageBusy)
+                .help(String(localized: "Refresh storage usage", table: "Automation"))
+                .accessibilityLabel(String(localized: "Refresh storage usage", table: "Automation"))
+            }
+
+            if let usage = automationRunStorageUsage {
+                Grid(alignment: .leading, horizontalSpacing: 24, verticalSpacing: 5) {
+                    GridRow {
+                        storageUsageMetric(String(localized: "Reports", table: "Automation"), usage.breakdown.reportByteCount)
+                        storageUsageMetric(String(localized: "Screenshots", table: "Automation"), usage.breakdown.screenshotByteCount)
+                    }
+                    GridRow {
+                        storageUsageMetric(String(localized: "Condition evidence", table: "Automation"), usage.breakdown.conditionEvidenceByteCount)
+                        storageUsageMetric(String(localized: "Other evidence", table: "Automation"), usage.breakdown.otherEvidenceByteCount)
+                    }
+                    GridRow {
+                        storageUsageMetric(String(localized: "History index", table: "Automation"), usage.historyByteCount)
+                        storageUsageMetric(
+                            String(localized: "Run records", table: "Automation"),
+                            nil,
+                            value: usage.runCount.formatted()
+                        )
+                    }
+                }
+            }
+
+            if let automationRunStorageError {
+                Label(automationRunStorageError, systemImage: "exclamationmark.triangle")
+                    .font(.caption)
+                    .foregroundStyle(Brand.sigAmber)
+            }
+        }
+    }
+
+    private func storageUsageMetric(
+        _ title: String,
+        _ bytes: Int64?,
+        value: String? = nil
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 1) {
+            Text(title)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            Text(value ?? formattedBytes(bytes ?? 0))
+                .font(.system(size: 11.5, weight: .medium, design: .monospaced))
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func formattedBytes(_ bytes: Int64) -> String {
+        ByteCountFormatter.string(fromByteCount: bytes, countStyle: .file)
+    }
+
+    private var automationRunCleanupScheduleSummary: String {
+        guard state.automationRunAutomaticCleanupEnabled else {
+            return String(localized: "Automatic cleanup is off. Manual cleanup remains available.", table: "Automation")
+        }
+        guard let lastRun = state.automationRunLastScheduledRetentionCleanupAt else {
+            return String(localized: "Automatic cleanup will check when the app is running.", table: "Automation")
+        }
+        let freed = formattedBytes(state.automationRunLastCleanupFreedByteCount)
+        let next = lastRun.addingTimeInterval(24 * 60 * 60)
+        return String(
+            format: String(localized: "Last checked %@ · removed %d evidence item(s) and %d record(s) · freed %@ · next check %@", table: "Automation"),
+            lastRun.formatted(date: .abbreviated, time: .shortened),
+            state.automationRunLastCleanupEvidenceCount,
+            state.automationRunLastCleanupHistoryCount,
+            freed,
+            next.formatted(date: .abbreviated, time: .shortened)
+        )
+    }
+
+    private func retentionPickerRow(title: String, selection: Binding<Int>) -> some View {
+        settingRow(title) {
+            Picker("", selection: selection) {
+                ForEach(automationRunRetentionDayOptions, id: \.self) { days in
+                    Text(semanticRecordingRetentionDayLabel(days)).tag(days)
+                }
+            }
+            .labelsHidden()
+            .frame(width: 150)
         }
     }
 
@@ -840,6 +1054,79 @@ struct SettingsPanel: View {
             preview.items.count,
             preview.preservedMetadataFileCount
         )
+    }
+
+    func automationRunRetentionCleanupConfirmationMessage() -> String {
+        guard let preview = automationRunRetentionCleanupPreview else { return "" }
+        let size = ByteCountFormatter.string(
+            fromByteCount: preview.estimatedByteCount,
+            countStyle: .file
+        )
+        return String(
+            format: String(localized: "This will remove evidence from %d run(s), delete %d old history record(s), and free about %@. Protected recent runs will stay available.", table: "Automation"),
+            preview.artifactRunCount,
+            preview.metadataRunCount,
+            size
+        )
+    }
+
+    @MainActor
+    func reviewAutomationRunRetentionCleanup() async {
+        automationRunRetentionCleanupBusy = true
+        defer { automationRunRetentionCleanupBusy = false }
+        do {
+            let preview = try await controller.automationRunRetentionCleanupPreview()
+            guard !preview.isEmpty else {
+                automationRunRetentionCleanupPreview = nil
+                state.statusMessage = String(localized: "No expired run evidence or history to clean up.", table: "Automation")
+                return
+            }
+            automationRunRetentionCleanupPreview = preview
+            showAutomationRunRetentionCleanupConfirmation = true
+        } catch {
+            state.statusMessage = String(
+                format: String(localized: "Run history cleanup check failed: %@", table: "Automation"),
+                error.localizedDescription
+            )
+        }
+    }
+
+    @MainActor
+    func confirmAutomationRunRetentionCleanup() async {
+        guard let preview = automationRunRetentionCleanupPreview else { return }
+        automationRunRetentionCleanupBusy = true
+        defer { automationRunRetentionCleanupBusy = false }
+        do {
+            let result = try await controller.applyAutomationRunRetentionCleanup(preview)
+            automationRunRetentionCleanupPreview = nil
+            state.statusMessage = String(
+                format: String(localized: "Cleaned up evidence from %d run(s) and removed %d old history record(s).", table: "Automation"),
+                result.prunedArtifactRunCount,
+                result.deletedMetadataRunCount
+            )
+            await refreshAutomationRunStorageUsage()
+        } catch {
+            state.statusMessage = String(
+                format: String(localized: "Run history cleanup failed: %@", table: "Automation"),
+                error.localizedDescription
+            )
+        }
+    }
+
+    @MainActor
+    func refreshAutomationRunStorageUsage() async {
+        guard !automationRunStorageBusy else { return }
+        automationRunStorageBusy = true
+        defer { automationRunStorageBusy = false }
+        do {
+            automationRunStorageUsage = try await controller.automationRunStorageUsage()
+            automationRunStorageError = nil
+        } catch {
+            automationRunStorageError = String(
+                format: String(localized: "Storage usage could not be calculated: %@", table: "Automation"),
+                error.localizedDescription
+            )
+        }
     }
 
     @MainActor

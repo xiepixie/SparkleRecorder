@@ -91,17 +91,20 @@ private final class PlayerRunState: @unchecked Sendable {
     let generation: UInt64
     let completion: ((Bool) -> Void)?
     let automationCompletion: ((AutomationPlayerCompletion) -> Void)?
+    let automationEvidencePersistence: ((AutomationRunEvidencePersistence) -> Void)?
 
     init(
         player: Player,
         generation: UInt64,
         completion: ((Bool) -> Void)?,
-        automationCompletion: ((AutomationPlayerCompletion) -> Void)?
+        automationCompletion: ((AutomationPlayerCompletion) -> Void)?,
+        automationEvidencePersistence: ((AutomationRunEvidencePersistence) -> Void)?
     ) {
         self.player = player
         self.generation = generation
         self.completion = completion
         self.automationCompletion = automationCompletion
+        self.automationEvidencePersistence = automationEvidencePersistence
     }
 
     @MainActor
@@ -126,6 +129,7 @@ private final class PlayerRunState: @unchecked Sendable {
             failureEvidence: failureEvidence,
             terminalOutcome: terminalOutcome,
             automationCompletion: automationCompletion,
+            automationEvidencePersistence: automationEvidencePersistence,
             completion: completion
         )
     }
@@ -171,7 +175,8 @@ final class Player: ObservableObject {
         context: PlaybackContext = PlaybackContext(),
         windowTracker: WindowTracker? = nil,
         completion: ((Bool) -> Void)? = nil,
-        automationCompletion: ((AutomationPlayerCompletion) -> Void)? = nil
+        automationCompletion: ((AutomationPlayerCompletion) -> Void)? = nil,
+        automationEvidencePersistence: ((AutomationRunEvidencePersistence) -> Void)? = nil
     ) {
         let plan = PlaybackPlanner.plan(events: events, loops: loops, speed: speed)
         guard !isPlaying, !plan.steps.isEmpty else { completion?(false); return }
@@ -191,7 +196,8 @@ final class Player: ObservableObject {
             player: self,
             generation: gen,
             completion: completion,
-            automationCompletion: automationCompletion
+            automationCompletion: automationCompletion,
+            automationEvidencePersistence: automationEvidencePersistence
         )
         let runStartTime = Date.now
         let runStartClock = playbackClock.now()
@@ -277,6 +283,7 @@ final class Player: ObservableObject {
         failureEvidence: PlaybackFailureEvidence?,
         terminalOutcome: PlaybackRunCompletion,
         automationCompletion: ((AutomationPlayerCompletion) -> Void)?,
+        automationEvidencePersistence: ((AutomationRunEvidencePersistence) -> Void)?,
         completion: ((Bool) -> Void)?
     ) {
         monitor.stop()
@@ -291,8 +298,11 @@ final class Player: ObservableObject {
         if let failureEvidence {
             let evidenceClient = evidenceClient
             Task(priority: .utility) {
-                await evidenceClient.recordFailure(failureEvidence)
+                let persistence = await evidenceClient.recordFailure(failureEvidence)
                 await MainActor.run {
+                    if let persistence {
+                        automationEvidencePersistence?(persistence)
+                    }
                     automationCompletion?(terminalOutcome.automationCompletion)
                     completion?(terminalOutcome.didFinishNaturally)
                 }
@@ -357,7 +367,7 @@ final class Player: ObservableObject {
         )
         let result = engine.run()
         if let failureEvidence = result.failureEvidence {
-            evidenceClient.recordFailureSynchronously(failureEvidence)
+            _ = evidenceClient.recordFailureSynchronously(failureEvidence)
         }
     }
 

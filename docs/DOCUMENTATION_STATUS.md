@@ -1,6 +1,6 @@
 # SparkleRecorder Documentation Status
 
-Updated: 2026-08-25
+Updated: 2026-09-04
 
 This is the authoritative documentation index. Code and direct tests remain the source of truth for implementation claims; plans describe future work unless they link to accepted implementation evidence.
 
@@ -35,6 +35,7 @@ All new or materially updated planning documents must include an `Updated: YYYY-
 | [`automation-engine/README.md`](automation-engine/README.md) | Active engine workbench | Reducer, adapters, persistence, scheduling, UI contracts, and tests. |
 | [`workflow-page-productization/README.md`](workflow-page-productization/README.md) | Active product UX workbench | Workflow UI, scheduling/run/evidence UX, and product evidence. |
 | [`semantic-recording-ai/README.md`](semantic-recording-ai/README.md) | Active gated workbench | Semantic recording, Review, live evidence, and CLI/AI boundaries. |
+| [`semantic-recording-ai/17-ai-assisted-macro-reconstruction-design.md`](semantic-recording-ai/17-ai-assisted-macro-reconstruction-design.md) | Accepted design; implementation not started | Full-file macro candidates, recording alignment, executable capabilities, test identity, and atomic revision promotion. |
 | [`MacroEditorUserGuide.zh-Hans.md`](MacroEditorUserGuide.zh-Hans.md) | Current user guide | Macro Editor behavior that is implemented and user-facing. |
 | [`archive/README.md`](archive/README.md) | Archive index | Superseded plans, progress ledgers, and historical references. |
 

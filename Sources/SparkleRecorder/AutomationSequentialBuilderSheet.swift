@@ -1,213 +1,1041 @@
 import Foundation
-import SwiftUI
 import SparkleRecorderCore
+import SwiftUI
+
+enum AutomationLinearContinuation: String, CaseIterable, Identifiable, Equatable {
+  case immediate
+  case delay
+  case screenText
+
+  var id: Self { self }
+
+  var title: String {
+    switch self {
+    case .immediate:
+      return String(localized: "Continue immediately", table: "Automation")
+    case .delay:
+      return String(localized: "Wait for a duration", table: "Automation")
+    case .screenText:
+      return String(localized: "Wait for screen text", table: "Automation")
+    }
+  }
+}
+
+enum AutomationLinearScheduleMode: String, CaseIterable, Identifiable, Equatable {
+  case manual
+  case daily
+  case weekly
+  case once
+  case interval
+
+  var id: Self { self }
+
+  var title: String {
+    switch self {
+    case .manual:
+      return String(localized: "Manual only", table: "Automation")
+    case .daily:
+      return String(localized: "Every day", table: "Automation")
+    case .weekly:
+      return String(localized: "Every week", table: "Automation")
+    case .once:
+      return String(localized: "Once", table: "Common")
+    case .interval:
+      return String(localized: "Interval", table: "Automation")
+    }
+  }
+}
+
+enum AutomationLinearSequenceSaveIntent: Equatable {
+  case save
+  case saveAndTest
+  case advancedEdit
+
+  var opensWorkflow: Bool { self == .advancedEdit }
+  var runsAfterSaving: Bool { self == .saveAndTest }
+}
+
+enum AutomationLinearSequenceMoveDirection: Equatable {
+  case earlier
+  case later
+}
+
+struct AutomationLinearSequenceStep: Identifiable, Equatable {
+  var id: UUID
+  var macroID: UUID
+  var macroName: String
+  var duration: TimeInterval
+  var continuation: AutomationLinearContinuation
+  var delaySeconds: TimeInterval
+  var screenText: String
+  var conditionTimeout: TimeInterval
+  var ocrMatchMode: TextMatchMode
+  var ocrSearchRegion: RectValue?
+  var ocrSearchRegionSpace: AutomationOCRSearchRegionSpace
+  var ocrRequireVisible: Bool
+
+  init(
+    id: UUID = UUID(),
+    macro: SavedMacro,
+    continuation: AutomationLinearContinuation = .immediate,
+    delaySeconds: TimeInterval = 2,
+    screenText: String = "",
+    conditionTimeout: TimeInterval = 30,
+    ocrMatchMode: TextMatchMode = .contains,
+    ocrSearchRegion: RectValue? = nil,
+    ocrSearchRegionSpace: AutomationOCRSearchRegionSpace = .automatic,
+    ocrRequireVisible: Bool = true
+  ) {
+    self.id = id
+    self.macroID = macro.id
+    self.macroName = macro.name
+    self.duration = macro.duration
+    self.continuation = continuation
+    self.delaySeconds = delaySeconds
+    self.screenText = screenText
+    self.conditionTimeout = conditionTimeout
+    self.ocrMatchMode = ocrMatchMode
+    self.ocrSearchRegion = ocrSearchRegion
+    self.ocrSearchRegionSpace = ocrSearchRegionSpace
+    self.ocrRequireVisible = ocrRequireVisible
+  }
+
+  var ocrCondition: AutomationOCRCondition {
+    AutomationOCRCondition(
+      text: screenText,
+      matchMode: ocrMatchMode,
+      searchRegion: ocrSearchRegion,
+      searchRegionSpace: ocrSearchRegionSpace,
+      requireVisible: ocrRequireVisible
+    )
+  }
+
+  mutating func apply(_ condition: AutomationOCRCondition) {
+    screenText = condition.text
+    ocrMatchMode = condition.matchMode
+    ocrSearchRegion = condition.searchRegion
+    ocrSearchRegionSpace = condition.searchRegionSpace
+    ocrRequireVisible = condition.requireVisible
+  }
+}
+
+struct AutomationLinearSequenceDraft: Equatable {
+  var name: String
+  var steps: [AutomationLinearSequenceStep]
+  var targetApplicationReadyDelay: TimeInterval
+  var scheduleMode: AutomationLinearScheduleMode
+  var startAt: Date
+  var repeatEvery: Int
+  var repeatUnit: AutomationTimelineRepeatUnit
+  var weeklyWeekday: Int
+
+  init(
+    name: String,
+    macros: [SavedMacro],
+    targetApplicationReadyDelay: TimeInterval = 2,
+    scheduleMode: AutomationLinearScheduleMode = .daily,
+    startAt: Date,
+    repeatEvery: Int = 1,
+    repeatUnit: AutomationTimelineRepeatUnit = .days,
+    weeklyWeekday: Int? = nil
+  ) {
+    self.name = name
+    self.steps = macros.map { AutomationLinearSequenceStep(macro: $0) }
+    self.targetApplicationReadyDelay = min(60, max(0, targetApplicationReadyDelay))
+    self.scheduleMode = scheduleMode
+    self.startAt = startAt
+    self.repeatEvery = repeatEvery
+    self.repeatUnit = repeatUnit
+    self.weeklyWeekday = weeklyWeekday ?? Calendar.current.component(.weekday, from: startAt)
+  }
+
+  init?(workflow: AutomationWorkflow, macros: [SavedMacro]) {
+    guard AutomationCatalogProjection.tier(for: workflow) == .linearSequence else { return nil }
+    let macroByID = Dictionary(uniqueKeysWithValues: macros.map { ($0.id, $0) })
+    let dependencies = workflow.dependencies.filter(\.isEnabled)
+    let incomingTaskIDs = Set(dependencies.map(\.toTaskID))
+    guard let entryTask = workflow.tasks.first(where: { !incomingTaskIDs.contains($0.id) }) else {
+      return nil
+    }
+    let taskByID = Dictionary(uniqueKeysWithValues: workflow.tasks.map { ($0.id, $0) })
+    let outgoingByTaskID = Dictionary(grouping: dependencies, by: \.fromTaskID)
+    let scheduleDraft = AutomationQuickScheduleDraft(
+      workflowName: workflow.name,
+      task: entryTask
+    )
+    let scheduleMode: AutomationLinearScheduleMode
+    switch entryTask.schedule {
+    case .manual, nil:
+      scheduleMode = .manual
+    case .once, .repeating:
+      scheduleMode = Self.linearScheduleMode(scheduleDraft.mode)
+    }
+
+    self.init(
+      name: workflow.name,
+      macros: [],
+      targetApplicationReadyDelay: entryTask.targetApplicationReadyDelay,
+      scheduleMode: scheduleMode,
+      startAt: scheduleDraft.startAt,
+      repeatEvery: scheduleDraft.repeatEvery,
+      repeatUnit: scheduleDraft.repeatUnit,
+      weeklyWeekday: scheduleDraft.weeklyWeekday
+    )
+
+    var cursorID: UUID? = entryTask.id
+    var visited: Set<UUID> = []
+    while let currentID = cursorID {
+      guard visited.insert(currentID).inserted,
+        let task = taskByID[currentID],
+        case .macro(let macroID) = task.kind,
+        let macro = macroByID[macroID]
+      else {
+        return nil
+      }
+      var step = AutomationLinearSequenceStep(macro: macro)
+      guard let dependency = outgoingByTaskID[currentID]?.first else {
+        steps.append(step)
+        cursorID = nil
+        continue
+      }
+      guard let nextTask = taskByID[dependency.toTaskID] else { return nil }
+
+      switch nextTask.kind {
+      case .macro:
+        if dependency.delay > 0 {
+          step.continuation = .delay
+          step.delaySeconds = dependency.delay
+        }
+        cursorID = nextTask.id
+      case .delay(let duration):
+        guard let nextDependency = outgoingByTaskID[nextTask.id]?.first else { return nil }
+        step.continuation = .delay
+        step.delaySeconds = duration + dependency.delay + nextDependency.delay
+        visited.insert(nextTask.id)
+        cursorID = nextDependency.toTaskID
+      case .condition(let condition):
+        guard case .ocrText(let ocr) = condition.kind,
+          let nextDependency = outgoingByTaskID[nextTask.id]?.first
+        else {
+          return nil
+        }
+        step.continuation = .screenText
+        step.conditionTimeout = nextTask.timeout ?? condition.timeout ?? 30
+        step.apply(ocr)
+        visited.insert(nextTask.id)
+        cursorID = nextDependency.toTaskID
+      case .notification:
+        return nil
+      }
+      steps.append(step)
+    }
+
+    guard steps.count >= 2 else { return nil }
+  }
+
+  private static func linearScheduleMode(
+    _ mode: AutomationQuickScheduleMode
+  ) -> AutomationLinearScheduleMode {
+    switch mode {
+    case .daily: .daily
+    case .weekly: .weekly
+    case .once: .once
+    case .custom: .interval
+    }
+  }
+
+  var normalizedName: String {
+    name.trimmingCharacters(in: .whitespacesAndNewlines)
+  }
+
+  mutating func add(_ macro: SavedMacro) {
+    steps.append(AutomationLinearSequenceStep(macro: macro))
+  }
+
+  mutating func addPreparationMacro(_ macro: SavedMacro) {
+    steps.insert(AutomationLinearSequenceStep(macro: macro), at: 0)
+  }
+
+  mutating func removeStep(id: UUID) {
+    steps.removeAll { $0.id == id }
+  }
+
+  mutating func moveStep(id: UUID, direction: AutomationLinearSequenceMoveDirection) {
+    guard let index = steps.firstIndex(where: { $0.id == id }) else { return }
+    let destination = direction == .earlier ? index - 1 : index + 1
+    guard steps.indices.contains(destination) else { return }
+    steps.swapAt(index, destination)
+  }
+
+  func validationMessage(onOrAfter referenceDate: Date = Date()) -> String? {
+    if normalizedName.isEmpty {
+      return String(localized: "Give the sequence a name.", table: "Automation")
+    }
+    if steps.isEmpty {
+      return String(localized: "Add at least one macro.", table: "Automation")
+    }
+    if scheduleMode == .once, startAt <= referenceDate {
+      return String(localized: "Choose a future time for a one-time run.", table: "Automation")
+    }
+    if scheduleMode == .interval, repeatEvery < 1 {
+      return String(localized: "The interval must be at least 1.", table: "Automation")
+    }
+    for step in steps.dropLast() {
+      if step.continuation == .delay, step.delaySeconds <= 0 {
+        return String(localized: "Wait durations must be greater than zero.", table: "Automation")
+      }
+      if step.continuation == .screenText {
+        if step.screenText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+          return String(localized: "Enter the screen text to wait for.", table: "Automation")
+        }
+        if step.conditionTimeout <= 0 {
+          return String(
+            localized: "Text wait timeouts must be greater than zero.", table: "Automation")
+        }
+      }
+    }
+    return nil
+  }
+
+  func resolvedSchedule(onOrAfter referenceDate: Date) -> AutomationSchedule {
+    guard scheduleMode != .manual else { return .manual }
+    let quickMode: AutomationQuickScheduleMode
+    switch scheduleMode {
+    case .manual:
+      return .manual
+    case .daily:
+      quickMode = .daily
+    case .weekly:
+      quickMode = .weekly
+    case .once:
+      quickMode = .once
+    case .interval:
+      quickMode = .custom
+    }
+    return AutomationQuickScheduleDraft(
+      workflowName: normalizedName,
+      mode: quickMode,
+      startAt: startAt,
+      repeatEvery: repeatEvery,
+      repeatUnit: repeatUnit,
+      weeklyWeekday: weeklyWeekday
+    ).resolvedSchedule(onOrAfter: referenceDate)
+  }
+
+  func nextRun(onOrAfter referenceDate: Date = Date()) -> Date? {
+    resolvedSchedule(onOrAfter: referenceDate)
+      .nextOccurrence(onOrAfter: referenceDate)?
+      .scheduledAt
+  }
+
+  func makeDocument(onOrAfter referenceDate: Date = Date()) -> AutomationWorkflowDraftDocument {
+    var tasks: [AutomationWorkflowDraftTask] = []
+    var dependencies: [AutomationWorkflowDraftDependency] = []
+    var regions: [AutomationWorkflowDraftVisualRegion] = []
+    let schedule = draftSchedule(onOrAfter: referenceDate)
+
+    for (index, step) in steps.enumerated() {
+      let macroKey = "macro_\(index + 1)"
+      tasks.append(
+        AutomationWorkflowDraftTask(
+          key: macroKey,
+          type: "macro",
+          name: step.macroName,
+          macroRef: AutomationWorkflowDraftMacroRef(id: step.macroID, name: step.macroName),
+          schedule: index == 0 ? schedule : nil,
+          resource: .foregroundInput,
+          targetApplicationPolicy: AutomationTargetApplicationPolicy.launchIfNeeded.rawValue,
+          targetApplicationReadyDelay: index == 0 ? targetApplicationReadyDelay : nil,
+          targetApplicationCleanupPolicy: AutomationTargetApplicationCleanupPolicy.keepOpen
+            .rawValue,
+          playbackLoops: 1,
+          missedRunPolicy: AutomationMissedRunPolicy.latestOnly.rawValue,
+          graphPosition: AutomationGraphPoint(x: Double(index * 260), y: 0)
+        ))
+
+      guard index < steps.count - 1 else { continue }
+      let nextMacroKey = "macro_\(index + 2)"
+      switch step.continuation {
+      case .immediate:
+        dependencies.append(
+          AutomationWorkflowDraftDependency(
+            from: macroKey,
+            to: nextMacroKey,
+            trigger: "success"
+          ))
+      case .delay:
+        dependencies.append(
+          AutomationWorkflowDraftDependency(
+            from: macroKey,
+            to: nextMacroKey,
+            trigger: "success",
+            delaySeconds: max(0, step.delaySeconds)
+          ))
+      case .screenText:
+        let conditionKey = "gate_\(index + 1)"
+        let regionKey: String?
+        if let region = step.ocrSearchRegion {
+          let key = "gate_\(index + 1)_region"
+          regions.append(
+            AutomationWorkflowDraftVisualRegion(
+              key: key,
+              label: step.screenText,
+              bounds: region,
+              space: step.ocrSearchRegionSpace
+            ))
+          regionKey = key
+        } else {
+          regionKey = nil
+        }
+        tasks.append(
+          AutomationWorkflowDraftTask(
+            key: conditionKey,
+            type: "condition",
+            name: String(localized: "Wait for screen text", table: "Automation"),
+            condition: AutomationWorkflowDraftCondition(
+              type: "ocrText",
+              text: step.screenText.trimmingCharacters(in: .whitespacesAndNewlines),
+              matchMode: step.ocrMatchMode,
+              regionRef: regionKey,
+              requireVisible: step.ocrRequireVisible
+            ),
+            resource: .screenCapture,
+            timeoutSeconds: max(0, step.conditionTimeout),
+            pollingSeconds: 0.5,
+            graphPosition: AutomationGraphPoint(x: Double(index * 260 + 130), y: 90)
+          ))
+        dependencies.append(
+          AutomationWorkflowDraftDependency(
+            from: macroKey,
+            to: conditionKey,
+            trigger: "success"
+          ))
+        dependencies.append(
+          AutomationWorkflowDraftDependency(
+            from: conditionKey,
+            to: nextMacroKey,
+            trigger: "conditionMatched"
+          ))
+      }
+    }
+
+    return AutomationWorkflowDraftDocument(
+      workflow: AutomationWorkflowDraft(
+        name: normalizedName,
+        tasks: tasks,
+        dependencies: dependencies
+      ),
+      visualAssets: regions.isEmpty ? nil : AutomationWorkflowDraftVisualAssets(regions: regions)
+    )
+  }
+
+  private func draftSchedule(onOrAfter referenceDate: Date) -> AutomationWorkflowDraftSchedule {
+    switch resolvedSchedule(onOrAfter: referenceDate) {
+    case .manual:
+      return AutomationWorkflowDraftSchedule(type: "manual")
+    case .once(let date):
+      return AutomationWorkflowDraftSchedule(type: "once", startAt: date)
+    case .repeating(let rule):
+      let values: (Int, String)
+      switch rule.interval {
+      case .minutes(let count): values = (count, "minutes")
+      case .hours(let count): values = (count, "hours")
+      case .days(let count): values = (count, "days")
+      case .weeks(let count): values = (count, "weeks")
+      }
+      return AutomationWorkflowDraftSchedule(
+        type: "repeating",
+        startAt: rule.anchor,
+        every: values.0,
+        unit: values.1,
+        timeZone: rule.timeZoneIdentifier
+      )
+    }
+  }
+}
 
 struct AutomationSequentialBuilderSheet: View {
-    @Environment(\.dismiss) private var dismiss
-    let initialMacros: [SavedMacro]
-    let onCreate: (AutomationWorkflowDraftDocument) -> Void
-    
-    @State private var sequence: [SavedMacro] = []
-    @State private var workflowName: String = ""
-    
-    @State private var scheduleType = "once"
-    @State private var startAt = Date().addingTimeInterval(3_600)
-    @State private var every = 1
-    @State private var unit = "days"
-    
-    private let scheduleTypes = ["manual", "once", "repeating"]
-    private let units = ["minutes", "hours", "days", "weeks"]
-    
-    var body: some View {
-        VStack(spacing: 0) {
-            header
-            Divider()
-            HStack(spacing: 0) {
-                sequenceList
-                Divider()
-                schedulePanel
-            }
-            Divider()
-            footer
-        }
-        .frame(width: 700, height: 450)
-        .onAppear {
-            sequence = initialMacros
-            if let first = initialMacros.first {
-                workflowName = String(localized: "Sequence: ", table: "Common") + first.name
-            } else {
-                workflowName = String(localized: "New Sequence", table: "Common")
-            }
-        }
+  @Environment(\.dismiss) private var dismiss
+
+  let availableMacros: [SavedMacro]
+  let onCreate: (AutomationWorkflowDraftDocument, Bool, Bool) -> Void
+
+  @State private var draft: AutomationLinearSequenceDraft
+  @State private var isPreviewActive = false
+
+  init(
+    initialMacros: [SavedMacro],
+    availableMacros: [SavedMacro],
+    initialDraft: AutomationLinearSequenceDraft? = nil,
+    onCreate: @escaping (AutomationWorkflowDraftDocument, Bool, Bool) -> Void
+  ) {
+    let firstName =
+      initialMacros.first?.name ?? String(localized: "New sequence", table: "Automation")
+    _draft = State(
+      initialValue: initialDraft
+        ?? AutomationLinearSequenceDraft(
+          name: String(format: String(localized: "%@ sequence", table: "Automation"), firstName),
+          macros: initialMacros,
+          startAt: Date().addingTimeInterval(3_600)
+        ))
+    self.availableMacros = availableMacros
+    self.onCreate = onCreate
+  }
+
+  var body: some View {
+    VStack(spacing: 0) {
+      header
+      Divider()
+      readinessEditor
+      Divider()
+      sequenceEditor
+      Divider()
+      scheduleEditor
+      Divider()
+      summary
+      Divider()
+      footer
     }
-    
-    private var header: some View {
-        HStack {
-            Text("Create Workflow", tableName: "Automation")
-                .font(.headline)
-            Spacer()
-            TextField(String(localized: "Workflow Name", table: "Common"), text: $workflowName)
-                .textFieldStyle(.roundedBorder)
-                .frame(width: 300)
-        }
-        .padding()
-        .background(Color(NSColor.windowBackgroundColor))
+    .frame(width: 900, height: 720)
+  }
+
+  private var header: some View {
+    HStack(spacing: 12) {
+      Image(systemName: "point.3.connected.trianglepath.dotted")
+        .font(.system(size: 21, weight: .semibold))
+        .foregroundStyle(Brand.libraryBlue)
+        .frame(width: 30, height: 30)
+      Text("Quick sequence", tableName: "Automation")
+        .font(.headline)
+      TextField(String(localized: "Sequence name", table: "Automation"), text: $draft.name)
+        .textFieldStyle(.roundedBorder)
+        .frame(maxWidth: 360)
     }
-    
-    private var sequenceList: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            Text("EXECUTION SEQUENCE", tableName: "Common")
-                .font(.system(size: 11, weight: .bold))
-                .foregroundColor(.secondary)
-                .padding(.horizontal)
-                .padding(.vertical, 8)
-            
-            List {
-                ForEach(Array(sequence.enumerated()), id: \.element.id) { index, macro in
-                    HStack {
-                        Image(systemName: "line.3.horizontal")
-                            .foregroundColor(.secondary)
-                            .imageScale(.small)
-                            .padding(.trailing, 4)
-                        
-                        Text("\(index + 1).")
-                            .font(.system(size: 11, weight: .semibold, design: .monospaced))
-                            .foregroundColor(.secondary)
-                            .frame(width: 20, alignment: .trailing)
-                        
-                        Text(macro.name)
-                            .lineLimit(1)
-                        
-                        Spacer()
-                    }
-                    .padding(.vertical, 4)
-                }
-                .onMove { indices, newOffset in
-                    sequence.move(fromOffsets: indices, toOffset: newOffset)
-                }
-            }
-            .listStyle(.inset(alternatesRowBackgrounds: true))
+    .padding(.horizontal, 18)
+    .padding(.vertical, 14)
+  }
+
+  private var sequenceEditor: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      sectionHeader(
+        title: String(localized: "Steps", table: "Automation"),
+        value: "\(draft.steps.count)"
+      )
+      ScrollView {
+        LazyVStack(spacing: 8) {
+          ForEach(draft.steps) { step in
+            stepRow(stepID: step.id)
+          }
         }
-        .frame(minWidth: 350)
-    }
-    
-    private var schedulePanel: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            Text("SCHEDULE & TRIGGER", tableName: "Common")
-                .font(.system(size: 11, weight: .bold))
-                .foregroundColor(.secondary)
-            
-            Picker(String(localized: "Type", table: "Common"), selection: $scheduleType) {
-                ForEach(scheduleTypes, id: \.self) { type in
-                    Text(LocalizedStringKey(type.capitalized), tableName: "Common").tag(type)
-                }
-            }
-            .pickerStyle(.segmented)
-            
-            if scheduleType != "manual" {
-                DatePicker(String(localized: "Start Date & Time", table: "Common"), selection: $startAt)
-                    .datePickerStyle(.compact)
-                
-                if scheduleType == "repeating" {
-                    HStack {
-                        Text("Repeat every", tableName: "Common")
-                        TextField("", value: $every, format: .number)
-                            .textFieldStyle(.roundedBorder)
-                            .frame(width: 50)
-                        Picker("", selection: $unit) {
-                            ForEach(units, id: \.self) { u in
-                                Text(LocalizedStringKey(u), tableName: "Common").tag(u)
-                            }
-                        }
-                        .labelsHidden()
-                        .frame(width: 90)
-                    }
-                }
-                
-                Text("The schedule will be attached to the first task in the sequence.", tableName: "Common")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-                    .padding(.top, 8)
-            } else {
-                Text("This workflow will only run when manually started.", tableName: "Common")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-                    .padding(.top, 8)
-            }
-            
-            Spacer()
+        .padding(12)
+      }
+      Divider()
+      Menu {
+        ForEach(availableMacros) { macro in
+          Button(macro.name) {
+            draft.add(macro)
+          }
         }
-        .padding()
-        .frame(width: 350)
-        .background(Color(NSColor.controlBackgroundColor).opacity(0.5))
+      } label: {
+        Label(String(localized: "Add macro", table: "Automation"), systemImage: "plus")
+      }
+      .menuStyle(.borderlessButton)
+      .padding(12)
     }
-    
-    private var footer: some View {
-        HStack {
-            Button(String(localized: "Cancel", table: "Common")) {
-                dismiss()
-            }
-            .keyboardShortcut(.cancelAction)
-            
-            Spacer()
-            
-            Button(String(localized: "Create workflow", table: "Automation")) {
-                generateAndCreate()
-            }
-            .keyboardShortcut(.defaultAction)
-            .buttonStyle(.borderedProminent)
-            .disabled(sequence.isEmpty)
-        }
-        .padding()
-        .background(Color(NSColor.windowBackgroundColor))
-    }
-    
-    private func generateAndCreate() {
-        var draft = AutomationWorkflowDraft(
-            name: workflowName.isEmpty ? String(localized: "New Sequence", table: "Common") : workflowName
+    .frame(minWidth: 570, maxWidth: .infinity)
+  }
+
+  private var readinessEditor: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      sectionHeader(title: String(localized: "Start preparation", table: "Automation"), value: nil)
+      HStack(spacing: 12) {
+        Label(
+          String(localized: "Open bound application", table: "Automation"),
+          systemImage: "macwindow.badge.plus"
         )
-        
-        var previousTaskKey: String? = nil
-        
-        for (index, macro) in sequence.enumerated() {
-            let taskKey = "task_\(UUID().uuidString.prefix(8).lowercased())"
-            
-            var task = AutomationWorkflowDraftTask(
-                key: taskKey,
-                type: "macro",
-                name: macro.name,
-                macroRef: AutomationWorkflowDraftMacroRef(id: macro.id),
-                graphPosition: AutomationGraphPoint(x: Double(index * 250), y: 0)
-            )
-            
-            // Attach schedule to the first task
-            if index == 0 && scheduleType != "manual" {
-                task.schedule = AutomationWorkflowDraftSchedule(
-                    type: scheduleType,
-                    startAt: startAt,
-                    every: scheduleType == "repeating" ? every : nil,
-                    unit: scheduleType == "repeating" ? unit : nil,
-                    timeZone: TimeZone.current.identifier
-                )
-            }
-            
-            draft.tasks.append(task)
-            
-            // Link to the previous task
-            if let prev = previousTaskKey {
-                let dep = AutomationWorkflowDraftDependency(
-                    from: prev,
-                    to: taskKey,
-                    trigger: "success"
-                )
-                draft.dependencies.append(dep)
-            }
-            
-            previousTaskKey = taskKey
+        .foregroundStyle(.secondary)
+
+        Picker(
+          String(localized: "Wait after window appears", table: "Automation"),
+          selection: $draft.targetApplicationReadyDelay
+        ) {
+          Text("No wait", tableName: "Automation").tag(TimeInterval(0))
+          Text("2s").tag(TimeInterval(2))
+          Text("5s").tag(TimeInterval(5))
+          Text("10s").tag(TimeInterval(10))
+          Text("20s").tag(TimeInterval(20))
         }
-        
-        let doc = AutomationWorkflowDraftDocument(workflow: draft)
-        onCreate(doc)
-        dismiss()
+        .frame(width: 250)
+
+        Spacer(minLength: 8)
+
+        Menu {
+          ForEach(availableMacros) { macro in
+            Button(macro.name) {
+              draft.addPreparationMacro(macro)
+            }
+          }
+        } label: {
+          Label(
+            String(localized: "Add login or navigation macro", table: "Automation"),
+            systemImage: "person.badge.key"
+          )
+        }
+        .menuStyle(.borderlessButton)
+      }
+      .padding(.horizontal, 16)
+      .padding(.vertical, 12)
     }
+  }
+
+  @ViewBuilder
+  private func stepRow(stepID: UUID) -> some View {
+    if let index = draft.steps.firstIndex(where: { $0.id == stepID }) {
+      let isLast = index == draft.steps.count - 1
+      VStack(alignment: .leading, spacing: 9) {
+        HStack(spacing: 10) {
+          Text("\(index + 1)")
+            .font(.system(size: 11, weight: .bold, design: .monospaced))
+            .foregroundStyle(.secondary)
+            .frame(width: 24, height: 24)
+            .background(Circle().fill(Color.primary.opacity(0.07)))
+          VStack(alignment: .leading, spacing: 2) {
+            Text(draft.steps[index].macroName)
+              .font(.subheadline.weight(.semibold))
+              .lineLimit(1)
+            Text(durationText(draft.steps[index].duration))
+              .font(.caption.monospacedDigit())
+              .foregroundStyle(.secondary)
+          }
+          Spacer(minLength: 0)
+          stepButton(
+            "arrow.up", help: String(localized: "Move earlier", table: "Automation"),
+            disabled: index == 0
+          ) {
+            draft.moveStep(id: stepID, direction: .earlier)
+          }
+          stepButton(
+            "arrow.down", help: String(localized: "Move later", table: "Automation"),
+            disabled: isLast
+          ) {
+            draft.moveStep(id: stepID, direction: .later)
+          }
+          stepButton(
+            "trash", help: String(localized: "Remove step", table: "Automation"), role: .destructive
+          ) {
+            draft.removeStep(id: stepID)
+          }
+        }
+
+        if !isLast {
+          Divider().opacity(0.55)
+          LabeledContent(String(localized: "Then", table: "Automation")) {
+            Picker("", selection: $draft.steps[index].continuation) {
+              ForEach(AutomationLinearContinuation.allCases) { continuation in
+                Text(continuation.title).tag(continuation)
+              }
+            }
+            .labelsHidden()
+            .frame(width: 220)
+          }
+
+          switch draft.steps[index].continuation {
+          case .immediate:
+            EmptyView()
+          case .delay:
+            LabeledContent(String(localized: "Wait", table: "Automation")) {
+              HStack(spacing: 6) {
+                TextField(
+                  "", value: $draft.steps[index].delaySeconds,
+                  format: .number.precision(.fractionLength(0...1))
+                )
+                .textFieldStyle(.roundedBorder)
+                .frame(width: 72)
+                Text("seconds", tableName: "Common")
+                  .foregroundStyle(.secondary)
+              }
+            }
+          case .screenText:
+            HStack(spacing: 8) {
+              TextField(
+                String(localized: "Text to find", table: "Automation"),
+                text: $draft.steps[index].screenText
+              )
+              Button {
+                pickOCRText(stepID: stepID)
+              } label: {
+                Label(
+                  String(localized: "Pick from screen", table: "Automation"),
+                  systemImage: "text.viewfinder"
+                )
+              }
+              Button {
+                drawOCRRegion(stepID: stepID)
+              } label: {
+                Label(
+                  String(localized: "Draw area", table: "Automation"),
+                  systemImage: "viewfinder.rectangular"
+                )
+              }
+            }
+            HStack(spacing: 10) {
+              Picker(
+                String(localized: "Match", table: "Automation"),
+                selection: $draft.steps[index].ocrMatchMode
+              ) {
+                Text("Contains", tableName: "Common").tag(TextMatchMode.contains)
+                Text("Exact", tableName: "Common").tag(TextMatchMode.exact)
+              }
+              .pickerStyle(.segmented)
+              .frame(width: 190)
+
+              if draft.steps[index].ocrSearchRegion != nil {
+                Label(
+                  draft.steps[index].ocrSearchRegionSpace.titleForVisualCondition,
+                  systemImage: "rectangle.dashed"
+                )
+                .font(.caption)
+                .foregroundStyle(Brand.libraryGreen)
+                Button {
+                  clearOCRRegion(stepID: stepID)
+                } label: {
+                  Image(systemName: "xmark.circle.fill")
+                }
+                .buttonStyle(.plain)
+                .help(String(localized: "Clear OCR area", table: "Automation"))
+              } else {
+                Label(
+                  String(localized: "Entire target screen", table: "Automation"),
+                  systemImage: "display"
+                )
+                .font(.caption)
+                .foregroundStyle(.secondary)
+              }
+
+              Spacer(minLength: 8)
+              Text("Timeout", tableName: "Common")
+                .foregroundStyle(.secondary)
+              Picker("", selection: $draft.steps[index].conditionTimeout) {
+                Text("10s").tag(TimeInterval(10))
+                Text("30s").tag(TimeInterval(30))
+                Text("60s").tag(TimeInterval(60))
+                Text("120s").tag(TimeInterval(120))
+              }
+              .labelsHidden()
+              .frame(width: 100)
+            }
+          }
+        }
+      }
+      .padding(12)
+      .background(
+        RoundedRectangle(cornerRadius: 7, style: .continuous)
+          .fill(Color(nsColor: .controlBackgroundColor))
+      )
+      .overlay(
+        RoundedRectangle(cornerRadius: 7, style: .continuous)
+          .strokeBorder(Color.primary.opacity(0.09), lineWidth: 1)
+      )
+    }
+  }
+
+  private var scheduleEditor: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      sectionHeader(title: String(localized: "Timing", table: "Automation"), value: nil)
+      VStack(spacing: 11) {
+        HStack(spacing: 12) {
+          Picker(String(localized: "Run", table: "Common"), selection: $draft.scheduleMode) {
+            ForEach(AutomationLinearScheduleMode.allCases) { mode in
+              Text(mode.title).tag(mode)
+            }
+          }
+          .frame(width: 180)
+
+          switch draft.scheduleMode {
+          case .manual:
+            Text("Manual", tableName: "Common")
+              .foregroundStyle(.secondary)
+          case .daily:
+            DatePicker(
+              String(localized: "At", table: "Common"),
+              selection: $draft.startAt,
+              displayedComponents: [.hourAndMinute]
+            )
+          case .weekly:
+            Picker(String(localized: "Day", table: "Common"), selection: $draft.weeklyWeekday) {
+              ForEach(1...7, id: \.self) { weekday in
+                Text(weekdayTitle(weekday)).tag(weekday)
+              }
+            }
+            .frame(width: 180)
+            DatePicker(
+              String(localized: "At", table: "Common"),
+              selection: $draft.startAt,
+              displayedComponents: [.hourAndMinute]
+            )
+          case .once:
+            DatePicker(
+              String(localized: "Start", table: "Common"),
+              selection: $draft.startAt,
+              displayedComponents: [.date, .hourAndMinute]
+            )
+          case .interval:
+            DatePicker(
+              String(localized: "Start", table: "Common"),
+              selection: $draft.startAt,
+              displayedComponents: [.date, .hourAndMinute]
+            )
+            HStack(spacing: 6) {
+              Text("Every", tableName: "Common")
+              TextField("", value: $draft.repeatEvery, format: .number)
+                .textFieldStyle(.roundedBorder)
+                .frame(width: 52)
+              Picker("", selection: $draft.repeatUnit) {
+                ForEach(AutomationTimelineRepeatUnit.allCases) { unit in
+                  Text(unit.title).tag(unit)
+                }
+              }
+              .labelsHidden()
+              .frame(width: 100)
+            }
+          }
+          Spacer(minLength: 0)
+        }
+
+        HStack(spacing: 10) {
+          Label(
+            String(localized: "Next run", table: "Automation"),
+            systemImage: "calendar.badge.clock"
+          )
+          .foregroundStyle(.secondary)
+          if let nextRun = draft.nextRun() {
+            Text(nextRun, format: .dateTime.month(.abbreviated).day().weekday().hour().minute())
+              .monospacedDigit()
+          } else {
+            Text("Manual", tableName: "Common")
+          }
+          Spacer(minLength: 16)
+          Label(
+            String(localized: "Each macro once", table: "Automation"),
+            systemImage: "play.square.stack"
+          )
+          .foregroundStyle(.secondary)
+        }
+      }
+      .padding(.horizontal, 16)
+      .padding(.vertical, 12)
+    }
+  }
+
+  private var summary: some View {
+    HStack(spacing: 10) {
+      Image(
+        systemName: validationMessage == nil
+          ? "checkmark.circle.fill" : "exclamationmark.triangle.fill"
+      )
+      .foregroundStyle(validationMessage == nil ? Brand.libraryGreen : Color.red)
+      if let validationMessage {
+        Text(validationMessage)
+          .foregroundStyle(.red)
+          .lineLimit(2)
+      } else {
+        Text(
+          String(
+            format: String(localized: "%d macros · %@", table: "Automation"),
+            draft.steps.count,
+            estimatedDurationText
+          )
+        )
+        .foregroundStyle(.secondary)
+        Spacer(minLength: 0)
+        Text("Applications remain open after the sequence", tableName: "Automation")
+          .font(.caption)
+          .foregroundStyle(.secondary)
+          .lineLimit(1)
+      }
+    }
+    .font(.caption)
+    .padding(.horizontal, 18)
+    .frame(height: 42)
+  }
+
+  private var footer: some View {
+    HStack(spacing: 10) {
+      Button(String(localized: "Cancel", table: "Common")) { dismiss() }
+        .keyboardShortcut(.cancelAction)
+      Spacer(minLength: 0)
+      Button(String(localized: "Advanced edit…", table: "Automation")) {
+        create(intent: .advancedEdit)
+      }
+      .disabled(validationMessage != nil || isPreviewActive)
+      AutomationLinearSequencePreviewButton(
+        isDisabled: validationMessage != nil,
+        onActivityChange: { isPreviewActive = $0 },
+        onRun: { create(intent: .saveAndTest) }
+      )
+      Button(String(localized: "Save sequence", table: "Automation")) {
+        create(intent: .save)
+      }
+      .keyboardShortcut(.defaultAction)
+      .buttonStyle(.borderedProminent)
+      .disabled(validationMessage != nil || isPreviewActive)
+    }
+    .padding(.horizontal, 18)
+    .padding(.vertical, 12)
+  }
+
+  private var validationMessage: String? {
+    draft.validationMessage()
+  }
+
+  private var estimatedDurationText: String {
+    let macroDuration = draft.steps.reduce(0) { $0 + $1.duration }
+    let delays = draft.steps.dropLast().reduce(0) { partial, step in
+      partial + (step.continuation == .delay ? max(0, step.delaySeconds) : 0)
+    }
+    let total = max(0, Int((macroDuration + delays).rounded()))
+    if total >= 3_600 {
+      return "\(total / 3_600)h \((total % 3_600) / 60)m"
+    }
+    return "\(total / 60)m \(total % 60)s"
+  }
+
+  private func sectionHeader(title: String, value: String?) -> some View {
+    HStack {
+      Text(title.uppercased())
+        .font(.system(size: 11, weight: .bold))
+        .foregroundStyle(.secondary)
+      Spacer(minLength: 0)
+      if let value {
+        Text(value)
+          .font(.caption.monospacedDigit())
+          .foregroundStyle(.tertiary)
+      }
+    }
+    .padding(.horizontal, 14)
+    .frame(height: 38)
+    .background(Color.primary.opacity(0.018))
+  }
+
+  private func stepButton(
+    _ systemImage: String,
+    help: String,
+    disabled: Bool = false,
+    role: ButtonRole? = nil,
+    action: @escaping () -> Void
+  ) -> some View {
+    Button(role: role, action: action) {
+      Image(systemName: systemImage)
+        .frame(width: 24, height: 22)
+    }
+    .buttonStyle(.plain)
+    .disabled(disabled)
+    .help(help)
+    .accessibilityLabel(help)
+  }
+
+  private func pickOCRText(stepID: UUID) {
+    guard let index = draft.steps.firstIndex(where: { $0.id == stepID }) else { return }
+    let currentCondition = draft.steps[index].ocrCondition
+    let targetSurface =
+      availableMacros
+      .first(where: { $0.id == draft.steps[index].macroID })?
+      .surfaces.values.first
+    AutomationOCRRegionPicker.pick(
+      currentCondition: currentCondition,
+      targetSurface: targetSurface
+    ) { condition in
+      guard let refreshedIndex = draft.steps.firstIndex(where: { $0.id == stepID }) else { return }
+      draft.steps[refreshedIndex].apply(condition)
+    }
+  }
+
+  private func drawOCRRegion(stepID: UUID) {
+    guard let index = draft.steps.firstIndex(where: { $0.id == stepID }) else { return }
+    let currentCondition = draft.steps[index].ocrCondition
+    AutomationOCRRegionPicker.pickArea(
+      currentCondition: currentCondition,
+      searchRegionSpace: currentCondition.searchRegionSpace
+    ) { condition in
+      guard let refreshedIndex = draft.steps.firstIndex(where: { $0.id == stepID }) else { return }
+      draft.steps[refreshedIndex].apply(condition)
+    }
+  }
+
+  private func clearOCRRegion(stepID: UUID) {
+    guard let index = draft.steps.firstIndex(where: { $0.id == stepID }) else { return }
+    draft.steps[index].ocrSearchRegion = nil
+    draft.steps[index].ocrSearchRegionSpace = .automatic
+  }
+
+  private func create(intent: AutomationLinearSequenceSaveIntent) {
+    guard validationMessage == nil else { return }
+    onCreate(draft.makeDocument(), intent.opensWorkflow, intent.runsAfterSaving)
+    dismiss()
+  }
+
+  private func durationText(_ duration: TimeInterval) -> String {
+    let minutes = Int(duration) / 60
+    let seconds = Int(duration) % 60
+    return String(format: "%02d:%02d", minutes, seconds)
+  }
+
+  private func weekdayTitle(_ weekday: Int) -> String {
+    let symbols = Calendar.current.weekdaySymbols
+    return symbols[min(7, max(1, weekday)) - 1]
+  }
+}
+
+private struct AutomationLinearSequencePreviewButton: View {
+  let isDisabled: Bool
+  let onActivityChange: (Bool) -> Void
+  let onRun: () -> Void
+
+  @State private var countdown: Int?
+  @State private var task: Task<Void, Never>?
+
+  var body: some View {
+    Button {
+      countdown == nil ? start() : cancel()
+    } label: {
+      Label(title, systemImage: countdown == nil ? "play.fill" : "xmark")
+    }
+    .disabled(isDisabled)
+    .onDisappear(perform: cancel)
+  }
+
+  private var title: String {
+    guard let countdown else {
+      return String(localized: "Save & test in 5 seconds", table: "Automation")
+    }
+    return countdown > 0
+      ? String(format: String(localized: "Cancel test (%d)", table: "Automation"), countdown)
+      : String(localized: "Starting test…", table: "Automation")
+  }
+
+  private func start() {
+    task?.cancel()
+    onActivityChange(true)
+    task = Task { @MainActor in
+      for remaining in stride(from: 5, through: 1, by: -1) {
+        guard !Task.isCancelled else { return }
+        countdown = remaining
+        try? await Task.sleep(for: .seconds(1))
+      }
+      guard !Task.isCancelled else { return }
+      countdown = 0
+      onRun()
+      task = nil
+      countdown = nil
+      onActivityChange(false)
+    }
+  }
+
+  private func cancel() {
+    let wasActive = task != nil || countdown != nil
+    task?.cancel()
+    task = nil
+    countdown = nil
+    if wasActive { onActivityChange(false) }
+  }
 }

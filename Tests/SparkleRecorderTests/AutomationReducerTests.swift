@@ -26,8 +26,74 @@ struct AutomationReducerTests {
         #expect(run.status == .waitingForResource)
         #expect(run.scheduledStartTime == start)
         #expect(result.effects == [
+            .persistRun(run),
             .requestResource(runID: ids.runA, requirement: .foregroundInput)
         ])
+    }
+
+    @Test("Workflow retry starts every enabled root under one execution id")
+    func manualStartWorkflowStartsAllRootsTogether() {
+        let ids = TestIDs()
+        let requestedAt = Date(timeIntervalSince1970: 150)
+        let firstRoot = delayTask(id: ids.taskA)
+        let secondRoot = delayTask(id: ids.taskB)
+        let downstream = delayTask(id: ids.taskC)
+        let workflow = AutomationWorkflow(
+            id: ids.workflow,
+            name: "Parallel roots",
+            tasks: [firstRoot, secondRoot, downstream],
+            dependencies: [AutomationDependency(
+                fromTaskID: ids.taskA,
+                toTaskID: ids.taskC,
+                trigger: .onSuccess
+            )]
+        )
+
+        let result = AutomationReducer.reduce(
+            state: AutomationRunState(workflows: [workflow]),
+            action: .manualStartWorkflow(workflowID: ids.workflow, requestedAt: requestedAt),
+            environment: environment(ids.runA, ids.runB, ids.runC)
+        )
+
+        #expect(result.state.runs.count == 2)
+        #expect(Set(result.state.runs.map(\.taskID)) == [ids.taskA, ids.taskB])
+        #expect(Set(result.state.runs.map(\.executionID)) == [ids.runA])
+        #expect(Set(result.state.runs.map(\.id)) == [ids.runB, ids.runC])
+        #expect(result.state.runs.allSatisfy { $0.status == .running })
+    }
+
+    @Test("Evidence persistence update checkpoints health before terminal outcome")
+    func evidencePersistenceUpdateCheckpointsRun() throws {
+        let ids = TestIDs()
+        let at = Date(timeIntervalSince1970: 175)
+        let run = AutomationTaskRun(
+            id: ids.runA,
+            workflowID: ids.workflow,
+            taskID: ids.taskA,
+            status: .running,
+            createdAt: at.addingTimeInterval(-1)
+        )
+        let persistence = AutomationRunEvidencePersistence(
+            evidenceID: ids.runA,
+            report: .persisted,
+            screenshot: .unavailable,
+            manifest: .persisted,
+            recordedAt: at
+        )
+
+        let result = AutomationReducer.reduce(
+            state: AutomationRunState(runs: [run]),
+            action: .evidencePersistenceUpdated(
+                runID: ids.runA,
+                persistence: persistence,
+                at: at
+            )
+        )
+        let updated = try #require(result.state.run(id: ids.runA))
+
+        #expect(updated.evidenceID == ids.runA)
+        #expect(updated.evidencePersistence == persistence)
+        #expect(result.effects == [.persistRun(updated)])
     }
 
     @Test("Clock tick creates the next due repeating scheduled run once per represented occurrence")
@@ -74,6 +140,7 @@ struct AutomationReducerTests {
         #expect(run.actualStartTime == tickAt)
         #expect(run.status == .running)
         #expect(result.effects == [
+            .persistRun(run),
             .wait(runID: ids.runB, workflowID: ids.workflow, taskID: ids.taskA, duration: 0)
         ])
 
@@ -183,7 +250,8 @@ struct AutomationReducerTests {
         let task = macroTask(
             id: ids.taskA,
             macroID: ids.macroA,
-            targetApplicationPolicy: .launchIfNeeded
+            targetApplicationPolicy: .launchIfNeeded,
+            targetApplicationReadyDelay: 5
         )
         let initial = AutomationRunState(workflows: [
             AutomationWorkflow(id: ids.workflow, name: "Workflow", tasks: [task])
@@ -203,13 +271,16 @@ struct AutomationReducerTests {
         #expect(acquired.state.leases == [lease])
         #expect(acquired.state.run(id: ids.runA)?.leaseID == ids.leaseA)
         #expect(acquired.state.run(id: ids.runA)?.status == .queued)
+        let queuedRun = try #require(acquired.state.run(id: ids.runA))
         #expect(acquired.effects == [
+            .persistRun(queuedRun),
             .startPlayer(
                 runID: ids.runA,
                 workflowID: ids.workflow,
                 taskID: ids.taskA,
                 macroID: ids.macroA,
-                targetApplicationPolicy: .launchIfNeeded
+                targetApplicationPolicy: .launchIfNeeded,
+                targetApplicationReadyDelay: 5
             )
         ])
 
@@ -222,7 +293,7 @@ struct AutomationReducerTests {
         let run = try #require(playerStarted.state.run(id: ids.runA))
         #expect(run.status == .running)
         #expect(run.actualStartTime == playerStartedAt)
-        #expect(playerStarted.effects.isEmpty)
+        #expect(playerStarted.effects == [.persistRun(run)])
     }
 
     @Test("Batch resource leases start once and release all leases on terminal outcome")
@@ -284,11 +355,17 @@ struct AutomationReducerTests {
             screenLease.id
         ].sorted { $0.uuidString < $1.uuidString }
 
-        #expect(started.effects == [.requestResource(runID: ids.runA, requirement: requirement)])
+        let waitingRun = try #require(started.state.run(id: ids.runA))
+        #expect(started.effects == [
+            .persistRun(waitingRun),
+            .requestResource(runID: ids.runA, requirement: requirement)
+        ])
         #expect(acquiredLeaseIDs == expectedLeaseIDs)
         #expect(acquired.state.run(id: ids.runA)?.leaseID == ids.leaseA)
         #expect(acquired.state.run(id: ids.runA)?.status == .queued)
+        let queuedRun = try #require(acquired.state.run(id: ids.runA))
         #expect(acquired.effects == [
+            .persistRun(queuedRun),
             .startPlayer(runID: ids.runA, workflowID: ids.workflow, taskID: ids.taskA, macroID: ids.macroA)
         ])
         #expect(completed.state.leases.isEmpty)
@@ -905,6 +982,7 @@ struct AutomationReducerTests {
             .cancelPlayer(runID: ids.runA),
             .releaseResource(runID: ids.runA, lease: lease),
             .persistRun(timedOutRun),
+            .persistRun(downstreamRun),
             .wait(runID: ids.runB, workflowID: ids.workflow, taskID: ids.taskB, duration: 0)
         ])
     }
@@ -930,7 +1008,9 @@ struct AutomationReducerTests {
 
         #expect(started.state.run(id: ids.runA)?.status == .queued)
         #expect(started.state.run(id: ids.runA)?.actualStartTime == start)
+        let queuedRun = try #require(started.state.run(id: ids.runA))
         #expect(started.effects == [
+            .persistRun(queuedRun),
             .startPlayer(runID: ids.runA, workflowID: ids.workflow, taskID: ids.taskA, macroID: ids.macroA)
         ])
 
@@ -1027,6 +1107,7 @@ struct AutomationReducerTests {
         #expect(!firstFailure.state.runs.contains { $0.taskID == ids.taskB })
         #expect(firstFailure.effects == [
             .persistRun(firstAttempt),
+            .persistRun(retryRun),
             .startPlayer(runID: ids.runB, workflowID: ids.workflow, taskID: ids.taskA, macroID: ids.macroA)
         ])
 
@@ -1046,6 +1127,7 @@ struct AutomationReducerTests {
         #expect(downstreamRun.actualStartTime == secondFailedAt)
         #expect(finalFailure.effects == [
             .persistRun(retryAttempt),
+            .persistRun(downstreamRun),
             .wait(runID: ids.runC, workflowID: ids.workflow, taskID: ids.taskB, duration: 0)
         ])
     }
@@ -1083,7 +1165,8 @@ struct AutomationReducerTests {
         #expect(retryRun.earliestStartTime == dueAt)
         #expect(retryRun.actualStartTime == nil)
         #expect(failed.effects == [
-            .persistRun(failedRun)
+            .persistRun(failedRun),
+            .persistRun(retryRun)
         ])
 
         let earlyTick = AutomationReducer.reduce(
@@ -1101,7 +1184,9 @@ struct AutomationReducerTests {
         )
         #expect(dueTick.state.run(id: ids.runB)?.status == .queued)
         #expect(dueTick.state.run(id: ids.runB)?.actualStartTime == dueAt)
+        let queuedRetryRun = try #require(dueTick.state.run(id: ids.runB))
         #expect(dueTick.effects == [
+            .persistRun(queuedRetryRun),
             .startPlayer(runID: ids.runB, workflowID: ids.workflow, taskID: ids.taskA, macroID: ids.macroA)
         ])
     }
@@ -1152,6 +1237,7 @@ struct AutomationReducerTests {
         #expect(firstTimeout.effects == [
             .cancelPlayer(runID: ids.runA),
             .persistRun(firstAttempt),
+            .persistRun(retryRun),
             .startPlayer(runID: ids.runB, workflowID: ids.workflow, taskID: ids.taskA, macroID: ids.macroA)
         ])
 
@@ -1170,6 +1256,7 @@ struct AutomationReducerTests {
         #expect(finalTimeout.effects == [
             .cancelPlayer(runID: ids.runB),
             .persistRun(finalAttempt),
+            .persistRun(downstreamRun),
             .wait(runID: ids.runC, workflowID: ids.workflow, taskID: ids.taskB, duration: 0)
         ])
     }
@@ -1398,6 +1485,7 @@ struct AutomationReducerTests {
         #expect(timeoutRun.upstreamRunIDs == [ids.runA])
         #expect(timedOut.effects == [
             .persistRun(completedRun),
+            .persistRun(timeoutRun),
             .wait(runID: ids.runB, workflowID: ids.workflow, taskID: ids.taskB, duration: 0)
         ])
     }
@@ -1860,7 +1948,8 @@ struct AutomationReducerTests {
         resourceRequirement: AutomationResourceRequirement = .foregroundInput,
         timeout: TimeInterval? = nil,
         retryPolicy: AutomationRetryPolicy = .none,
-        targetApplicationPolicy: AutomationTargetApplicationPolicy = .activateIfRunning
+        targetApplicationPolicy: AutomationTargetApplicationPolicy = .activateIfRunning,
+        targetApplicationReadyDelay: TimeInterval = 0
     ) -> AutomationTask {
         AutomationTask(
             id: id,
@@ -1870,7 +1959,8 @@ struct AutomationReducerTests {
             resourceRequirement: resourceRequirement,
             timeout: timeout,
             retryPolicy: retryPolicy,
-            targetApplicationPolicy: targetApplicationPolicy
+            targetApplicationPolicy: targetApplicationPolicy,
+            targetApplicationReadyDelay: targetApplicationReadyDelay
         )
     }
 

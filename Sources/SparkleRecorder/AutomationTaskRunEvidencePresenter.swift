@@ -8,6 +8,9 @@ enum AutomationTaskRunEvidencePresenter {
         for run: AutomationTaskRun,
         macroPackageBaseURL: URL? = nil
     ) async throws -> AutomationTaskRunEvidencePayload? {
+        guard run.artifactRetention?.status != .pruned else {
+            return nil
+        }
         guard let macroID = run.macroID else {
             return nil
         }

@@ -19,6 +19,7 @@ struct AutomationTaskInspectorView: View {
     @State private var nameDraft = ""
     @State private var isEnabledDraft = true
     @State private var targetApplicationPolicyDraft: AutomationTargetApplicationPolicy = .activateIfRunning
+    @State private var targetApplicationReadyDelayDraft: TimeInterval = 0
     @State private var scheduleMode: ScheduleMode = .manual
     @State private var onceDateDraft = Date()
     @State private var repeatStartDraft = Date()
@@ -327,6 +328,21 @@ struct AutomationTaskInspectorView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
+
+                if targetApplicationPolicyDraft != .doNotActivate {
+                    Picker(
+                        String(localized: "Wait after window appears", table: "Automation"),
+                        selection: $targetApplicationReadyDelayDraft
+                    ) {
+                        Text("No wait", tableName: "Automation").tag(TimeInterval(0))
+                        Text("2s").tag(TimeInterval(2))
+                        Text("5s").tag(TimeInterval(5))
+                        Text("10s").tag(TimeInterval(10))
+                        Text("20s").tag(TimeInterval(20))
+                        Text("30s").tag(TimeInterval(30))
+                    }
+                    .pickerStyle(.menu)
+                }
             }
         }
         .padding(.vertical, 8)
@@ -1144,6 +1160,7 @@ struct AutomationTaskInspectorView: View {
         nameDraft = task.name
         isEnabledDraft = task.isEnabled
         targetApplicationPolicyDraft = task.targetApplicationPolicy
+        targetApplicationReadyDelayDraft = task.targetApplicationReadyDelay
         resetScheduleDraft()
         hasTaskTimeoutDraft = task.timeout != nil
         taskTimeoutDraft = task.timeout ?? 60
@@ -1317,6 +1334,7 @@ struct AutomationTaskInspectorView: View {
         updated.name = trimmedName
         updated.isEnabled = isEnabledDraft
         updated.targetApplicationPolicy = targetApplicationPolicyDraft
+        updated.targetApplicationReadyDelay = targetApplicationReadyDelayDraft
         updated.schedule = schedule()
         updated.timeout = hasTaskTimeoutDraft ? max(0, taskTimeoutDraft) : nil
         updated.retryPolicy = AutomationRetryPolicy(maxAttempts: max(1, retryAttemptsDraft))

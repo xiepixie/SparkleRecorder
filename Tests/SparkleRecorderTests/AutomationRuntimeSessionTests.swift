@@ -234,6 +234,50 @@ struct AutomationRuntimeSessionTests {
         #expect(persistedRun.outcome == .cancelled(reason: "User cancelled"))
         #expect(await session.lifecycleStatus() == .stopped)
     }
+
+    @Test("Session reconciles a persisted active checkpoint as interrupted on startup")
+    func sessionReconcilesInterruptedCheckpoint() async throws {
+        let detectedAt = Date(timeIntervalSince1970: 2_300)
+        let task = AutomationTask(name: "Interrupted delay", kind: .delay(10))
+        let workflow = AutomationWorkflow(name: "Interrupted workflow", tasks: [task])
+        var activeRun = task.makeRun(
+            workflowID: workflow.id,
+            runID: UUID(),
+            createdAt: Date(timeIntervalSince1970: 2_290)
+        )
+        activeRun.status = .running
+        activeRun.actualStartTime = Date(timeIntervalSince1970: 2_291)
+        let store = AutomationInMemoryRepositoryStore(
+            workflows: [workflow],
+            runHistory: [activeRun]
+        )
+        let repository = AutomationRepositoryClient.inMemory(store: store)
+        let session = AutomationRuntimeSession(
+            repository: repository,
+            scheduler: .fixed([]),
+            effectRunner: AutomationEffectRunner(
+                resourceArbiter: .live(),
+                repository: repository,
+                sleep: { _ in }
+            ),
+            now: { detectedAt }
+        )
+
+        let state = try await session.start()
+        let reconciled = try #require(state.run(id: activeRun.id))
+        let persisted = try #require(await store.loadRunHistory().first)
+
+        #expect(reconciled.outcome == .cancelled(reason: "SparkleRecorder closed before this run completed."))
+        #expect(reconciled.completedAt == detectedAt)
+        #expect(reconciled.interruption == AutomationRunInterruption(
+            previousStatus: .running,
+            detectedAt: detectedAt,
+            reason: "SparkleRecorder closed before this run completed."
+        ))
+        #expect(persisted == reconciled)
+
+        await session.stop()
+    }
 }
 
 private func eventually(

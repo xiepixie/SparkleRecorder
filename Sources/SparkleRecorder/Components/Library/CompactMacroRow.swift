@@ -137,7 +137,6 @@ struct CompactMacroRow: View {
         .accessibilityAction(named: String(localized: "Play", table: "Common")) { onPlay() }
         .accessibilityAction(named: String(localized: "Edit", table: "Common")) { onEdit() }
         .accessibilityAction(named: automationActionTitle) { onSchedule() }
-        .animation(.spring(response: 0.2, dampingFraction: 0.8), value: hovered)
     }
     
     private var durationText: String {

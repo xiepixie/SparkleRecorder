@@ -276,7 +276,8 @@ struct SemanticRecordingAcceptanceChecklistTests {
         "S3 live Review and frame-to-condition",
         "S4 product-ready live AI",
         "App Knowledge",
-        "Workflow/UI polish not tied to S2 live bundle"
+        "Workflow/UI polish not tied to S2 live bundle",
+        "AI Macro Reconstruction"
     ]
 
     private static let requiredAuditPhrases: [String] = [
@@ -336,7 +337,18 @@ struct SemanticRecordingAcceptanceChecklistTests {
         "UI explains reused recordings and missing evidence.",
         "Recording review screenshot with video frame, event row and OCR overlay.",
         "Frame-to-condition creation clip.",
-        "AI cleanup suggestion screenshot with evidence explanation."
+        "AI cleanup suggestion screenshot with evidence explanation.",
+        "Session/source/video/candidate clocks and actual frame timestamps are distinct",
+        "Authorized live alignment meets one-frame typical / 50 ms hard tolerance",
+        "Stable source action IDs, historical geometry, hover evidence, and measured/interpolated overlay points",
+        "A versioned capability manifest and validator reject unsupported event/locator/condition fields",
+        "AI package materialization uses permitted redacted video/frames and sanitized text",
+        "Matched/non-matched/unavailable observations are distinct",
+        "Candidate text targeting handles ambiguity and explicit fallback",
+        "Candidate tests bind source revision, candidate/artifact digests, capability version",
+        "Revision promotion rejects stale bases, preserves identity/protected metadata",
+        "Installed-app evidence proves moved-window and variable-latency execution",
+        "Recovery verifies checkpoint preconditions and distinguishes macro restoration"
     ]
 
     private static let uncheckedOpenGateCoverages: [(
@@ -523,6 +535,61 @@ struct SemanticRecordingAcceptanceChecklistTests {
             "AI cleanup suggestion screenshot with evidence explanation.",
             "S4 product-ready live AI",
             "AI cleanup screenshot"
+        ),
+        (
+            "Session/source/video/candidate clocks and actual frame timestamps are distinct",
+            "AI Macro Reconstruction",
+            "clock distinction"
+        ),
+        (
+            "Authorized live alignment meets one-frame typical / 50 ms hard tolerance",
+            "AI Macro Reconstruction",
+            "authorized live alignment"
+        ),
+        (
+            "Stable source action IDs, historical geometry, hover evidence, and measured/interpolated overlay points",
+            "AI Macro Reconstruction",
+            "stable source IDs and hover geometry"
+        ),
+        (
+            "A versioned capability manifest and validator reject unsupported event/locator/condition fields",
+            "AI Macro Reconstruction",
+            "capability manifest validator"
+        ),
+        (
+            "AI package materialization uses permitted redacted video/frames and sanitized text",
+            "AI Macro Reconstruction",
+            "AI package materialization"
+        ),
+        (
+            "Matched/non-matched/unavailable observations are distinct",
+            "AI Macro Reconstruction",
+            "observation distinction"
+        ),
+        (
+            "Candidate text targeting handles ambiguity and explicit fallback",
+            "AI Macro Reconstruction",
+            "candidate text targeting"
+        ),
+        (
+            "Candidate tests bind source revision, candidate/artifact digests, capability version",
+            "AI Macro Reconstruction",
+            "candidate test binding"
+        ),
+        (
+            "Revision promotion rejects stale bases, preserves identity/protected metadata",
+            "AI Macro Reconstruction",
+            "revision promotion"
+        ),
+        (
+            "Installed-app evidence proves moved-window and variable-latency execution",
+            "AI Macro Reconstruction",
+            "installed-app evidence"
+        ),
+        (
+            "Recovery verifies checkpoint preconditions and distinguishes macro restoration",
+            "AI Macro Reconstruction",
+            "recovery preconditions"
         )
     ]
 

@@ -132,6 +132,39 @@ final class AppState: ObservableObject {
             }
         }
     }
+    @Published var automationRunSuccessEvidenceAgeDays: Int {
+        didSet { UserDefaults.standard.set(max(0, automationRunSuccessEvidenceAgeDays), forKey: Self.automationRunSuccessEvidenceAgeDaysKey) }
+    }
+    @Published var automationRunAttentionEvidenceAgeDays: Int {
+        didSet { UserDefaults.standard.set(max(0, automationRunAttentionEvidenceAgeDays), forKey: Self.automationRunAttentionEvidenceAgeDaysKey) }
+    }
+    @Published var automationRunMetadataAgeDays: Int {
+        didSet { UserDefaults.standard.set(max(0, automationRunMetadataAgeDays), forKey: Self.automationRunMetadataAgeDaysKey) }
+    }
+    @Published var automationRunCaptureScreenshots: Bool {
+        didSet { UserDefaults.standard.set(automationRunCaptureScreenshots, forKey: Self.automationRunCaptureScreenshotsKey) }
+    }
+    @Published var automationRunAutomaticCleanupEnabled: Bool {
+        didSet { UserDefaults.standard.set(automationRunAutomaticCleanupEnabled, forKey: Self.automationRunAutomaticCleanupEnabledKey) }
+    }
+    @Published var automationRunLastScheduledRetentionCleanupAt: Date? {
+        didSet {
+            if let automationRunLastScheduledRetentionCleanupAt {
+                UserDefaults.standard.set(automationRunLastScheduledRetentionCleanupAt, forKey: Self.automationRunLastScheduledRetentionCleanupAtKey)
+            } else {
+                UserDefaults.standard.removeObject(forKey: Self.automationRunLastScheduledRetentionCleanupAtKey)
+            }
+        }
+    }
+    @Published var automationRunLastCleanupEvidenceCount: Int {
+        didSet { UserDefaults.standard.set(max(0, automationRunLastCleanupEvidenceCount), forKey: Self.automationRunLastCleanupEvidenceCountKey) }
+    }
+    @Published var automationRunLastCleanupHistoryCount: Int {
+        didSet { UserDefaults.standard.set(max(0, automationRunLastCleanupHistoryCount), forKey: Self.automationRunLastCleanupHistoryCountKey) }
+    }
+    @Published var automationRunLastCleanupFreedByteCount: Int64 {
+        didSet { UserDefaults.standard.set(max(0, automationRunLastCleanupFreedByteCount), forKey: Self.automationRunLastCleanupFreedByteCountKey) }
+    }
     @Published var semanticRecordingPreflightPresentation: SemanticRecordingPreflightPresentation?
     /// Has the user finished onboarding?
     @Published var onboardingComplete: Bool {
@@ -206,6 +239,38 @@ final class AppState: ObservableObject {
         self.semanticRecordingLastScheduledRetentionCleanupAt = d.object(
             forKey: Self.semanticRecordingLastScheduledRetentionCleanupAtKey
         ) as? Date
+        self.automationRunSuccessEvidenceAgeDays = max(
+            0,
+            d.object(forKey: Self.automationRunSuccessEvidenceAgeDaysKey) as? Int
+                ?? AutomationRunRetentionSettings.defaultSuccessEvidenceAgeDays
+        )
+        self.automationRunAttentionEvidenceAgeDays = max(
+            0,
+            d.object(forKey: Self.automationRunAttentionEvidenceAgeDaysKey) as? Int
+                ?? AutomationRunRetentionSettings.defaultAttentionEvidenceAgeDays
+        )
+        self.automationRunMetadataAgeDays = max(
+            0,
+            d.object(forKey: Self.automationRunMetadataAgeDaysKey) as? Int
+                ?? AutomationRunRetentionSettings.defaultMetadataAgeDays
+        )
+        self.automationRunCaptureScreenshots = d.object(forKey: Self.automationRunCaptureScreenshotsKey) as? Bool ?? true
+        self.automationRunAutomaticCleanupEnabled = d.object(forKey: Self.automationRunAutomaticCleanupEnabledKey) as? Bool ?? true
+        self.automationRunLastScheduledRetentionCleanupAt = d.object(
+            forKey: Self.automationRunLastScheduledRetentionCleanupAtKey
+        ) as? Date
+        self.automationRunLastCleanupEvidenceCount = max(
+            0,
+            d.object(forKey: Self.automationRunLastCleanupEvidenceCountKey) as? Int ?? 0
+        )
+        self.automationRunLastCleanupHistoryCount = max(
+            0,
+            d.object(forKey: Self.automationRunLastCleanupHistoryCountKey) as? Int ?? 0
+        )
+        self.automationRunLastCleanupFreedByteCount = max(
+            0,
+            d.object(forKey: Self.automationRunLastCleanupFreedByteCountKey) as? Int64 ?? 0
+        )
         self.onboardingComplete = d.object(forKey: "onboardingComplete") as? Bool ?? false
         self.menuBarOnly = d.object(forKey: "menuBarOnly") as? Bool ?? false
 
@@ -277,6 +342,14 @@ final class AppState: ObservableObject {
         )
     }
 
+    var automationRunRetentionSettings: AutomationRunRetentionSettings {
+        AutomationRunRetentionSettings(
+            successEvidenceAgeDays: automationRunSuccessEvidenceAgeDays,
+            attentionEvidenceAgeDays: automationRunAttentionEvidenceAgeDays,
+            metadataAgeDays: automationRunMetadataAgeDays
+        )
+    }
+
     private func persistSemanticRecordingSuppressionSettings() {
         let settings = semanticRecordingSuppressionSettings
         UserDefaults.standard.set(
@@ -323,5 +396,14 @@ final class AppState: ObservableObject {
     private static let semanticRecordingExcludedDomainsKey = "semanticRecordingExcludedDomains"
     private static let semanticRecordingMaximumArtifactByteCountKey = "semanticRecordingMaximumArtifactByteCount"
     private static let semanticRecordingLastScheduledRetentionCleanupAtKey = "semanticRecordingLastScheduledRetentionCleanupAt"
+    private static let automationRunSuccessEvidenceAgeDaysKey = "automationRunSuccessEvidenceAgeDays"
+    private static let automationRunAttentionEvidenceAgeDaysKey = "automationRunAttentionEvidenceAgeDays"
+    private static let automationRunMetadataAgeDaysKey = "automationRunMetadataAgeDays"
+    private static let automationRunCaptureScreenshotsKey = "automationRunCaptureScreenshots"
+    private static let automationRunAutomaticCleanupEnabledKey = "automationRunAutomaticCleanupEnabled"
+    private static let automationRunLastScheduledRetentionCleanupAtKey = "automationRunLastScheduledRetentionCleanupAt"
+    private static let automationRunLastCleanupEvidenceCountKey = "automationRunLastCleanupEvidenceCount"
+    private static let automationRunLastCleanupHistoryCountKey = "automationRunLastCleanupHistoryCount"
+    private static let automationRunLastCleanupFreedByteCountKey = "automationRunLastCleanupFreedByteCount"
     private static let recordingHUDModeKey = "recordingHUDMode"
 }

@@ -1,7 +1,18 @@
 import Foundation
 
+public struct AutomationRuntimeSnapshot: Equatable, Sendable {
+    public var state: AutomationRunState
+    public var revision: UInt64
+
+    public init(state: AutomationRunState, revision: UInt64) {
+        self.state = state
+        self.revision = revision
+    }
+}
+
 public actor AutomationEngineRuntime {
     private var state: AutomationRunState
+    private var revision: UInt64 = 0
     private let reducerEnvironment: AutomationReducerEnvironment
     private let effectRunner: AutomationEffectRunner
 
@@ -17,6 +28,10 @@ public actor AutomationEngineRuntime {
 
     public func currentState() -> AutomationRunState {
         state
+    }
+
+    public func currentSnapshot() -> AutomationRuntimeSnapshot {
+        AutomationRuntimeSnapshot(state: state, revision: revision)
     }
 
     @discardableResult
@@ -46,11 +61,19 @@ public actor AutomationEngineRuntime {
             environment: reducerEnvironment
         )
         state = result.state
+        revision &+= 1
 
         for effect in result.effects {
             let followUpActions = await effectRunner.run(effect)
+            var persistenceFailed = false
             for followUpAction in followUpActions {
+                if case .persistenceFailed = followUpAction {
+                    persistenceFailed = true
+                }
                 await apply(followUpAction)
+            }
+            if persistenceFailed {
+                break
             }
         }
     }

@@ -26,14 +26,14 @@
       "extractionState": "manual",
       "localizations": {
         "en": { "stringUnit": { "state": "translated", "value": "Run automatically" } },
-        "zh-Hans": { "stringUnit": { "state": "translated", "value": "自动运行" } }
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "定时运行" } }
       }
     },
     "Run automatically…": {
       "extractionState": "manual",
       "localizations": {
         "en": { "stringUnit": { "state": "translated", "value": "Run automatically…" } },
-        "zh-Hans": { "stringUnit": { "state": "translated", "value": "自动运行…" } }
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "定时运行…" } }
       }
     },
     "Run every day": {
@@ -4500,14 +4500,14 @@
       "extractionState": "manual",
       "localizations": {
         "en": { "stringUnit": { "state": "translated", "value": "Latest run" } },
-        "zh-Hans": { "stringUnit": { "state": "translated", "value": "最近运行" } }
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "最近一次运行" } }
       }
     },
     "Latest run…": {
       "extractionState": "manual",
       "localizations": {
         "en": { "stringUnit": { "state": "translated", "value": "Latest run…" } },
-        "zh-Hans": { "stringUnit": { "state": "translated", "value": "最近运行…" } }
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "最近一次运行…" } }
       }
     },
     "No runs yet": {
@@ -4549,7 +4549,7 @@
       "extractionState": "manual",
       "localizations": {
         "en": { "stringUnit": { "state": "translated", "value": "Could not load the latest run" } },
-        "zh-Hans": { "stringUnit": { "state": "translated", "value": "无法载入最近运行" } }
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "无法载入最近一次运行" } }
       }
     },
     "Run result screenshot preview": {
@@ -4605,28 +4605,28 @@
       "extractionState": "manual",
       "localizations": {
         "en": { "stringUnit": { "state": "translated", "value": "Turn off automatic runs" } },
-        "zh-Hans": { "stringUnit": { "state": "translated", "value": "关闭自动运行" } }
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "关闭定时运行" } }
       }
     },
     "Automatic runs turned off.": {
       "extractionState": "manual",
       "localizations": {
         "en": { "stringUnit": { "state": "translated", "value": "Automatic runs turned off." } },
-        "zh-Hans": { "stringUnit": { "state": "translated", "value": "已关闭自动运行。" } }
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "已关闭定时运行。" } }
       }
     },
     "Edit automatic run": {
       "extractionState": "manual",
       "localizations": {
         "en": { "stringUnit": { "state": "translated", "value": "Edit automatic run" } },
-        "zh-Hans": { "stringUnit": { "state": "translated", "value": "编辑自动运行" } }
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "编辑定时运行" } }
       }
     },
     "Edit automatic run…": {
       "extractionState": "manual",
       "localizations": {
         "en": { "stringUnit": { "state": "translated", "value": "Edit automatic run…" } },
-        "zh-Hans": { "stringUnit": { "state": "translated", "value": "编辑自动运行…" } }
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "编辑定时运行…" } }
       }
     },
     "Next run": {
@@ -4654,7 +4654,7 @@
       "extractionState": "manual",
       "localizations": {
         "en": { "stringUnit": { "state": "translated", "value": "Automatic run paused" } },
-        "zh-Hans": { "stringUnit": { "state": "translated", "value": "自动运行已暂停" } }
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "定时运行已暂停" } }
       }
     },
     "Multiple schedules were found. Saving will merge them into one.": {
@@ -4668,7 +4668,7 @@
       "extractionState": "manual",
       "localizations": {
         "en": { "stringUnit": { "state": "translated", "value": "Turn off automatic runs?" } },
-        "zh-Hans": { "stringUnit": { "state": "translated", "value": "关闭自动运行？" } }
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "关闭定时运行？" } }
       }
     },
     "The macro stays in Library and can still be run manually.": {
@@ -4682,7 +4682,7 @@
       "extractionState": "manual",
       "localizations": {
         "en": { "stringUnit": { "state": "translated", "value": "Preview completed. The result was saved to Latest run." } },
-        "zh-Hans": { "stringUnit": { "state": "translated", "value": "试跑完成，结果已保存到“最近运行”。" } }
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "试跑完成，结果已保存到“最近一次运行”。" } }
       }
     },
     "Another foreground automation is running.": {
@@ -4783,6 +4783,965 @@
         "zh-Hans": { "stringUnit": { "state": "translated", "value": "试跑已结束，但没有收到运行结果。" } }
       }
     },
+    "Wait before force quit": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Wait before force quit" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "强制退出前等待" } }
+      }
+    },
+    "Force quit if the app does not close": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Force quit if the app does not close" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "应用未关闭时强制退出" } }
+      }
+    },
+    "Only the exact app process opened by this run can be force quit.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Only the exact app process opened by this run can be force quit." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "只会强制退出本次运行打开的精确应用进程。" } }
+      }
+    },
+    "The run finishes after the wait even if the app stays open.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "The run finishes after the wait even if the app stays open." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "等待结束后任务会完成，即使应用仍保持打开。" } }
+      }
+    },
+    "%d steps · %d attempts": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "%d steps · %d attempts" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "%d 个步骤 · %d 次尝试" } }
+      }
+    },
+    "All": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "All" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "全部" } }
+      }
+    },
+    "Attempts": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Attempts" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "尝试次数" } }
+      }
+    },
+    "Automatic and workflow runs will appear here.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Automatic and workflow runs will appear here." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "定时运行和工作流运行会显示在这里。" } }
+      }
+    },
+    "Available": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Available" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "可用" } }
+      }
+    },
+    "Check the target application and bound window.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Check the target application and bound window." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "检查目标应用和绑定窗口。" } }
+      }
+    },
+    "Choose another run filter.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Choose another run filter." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "请选择其他运行筛选条件。" } }
+      }
+    },
+    "Confirm why the run was cancelled before restarting it.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Confirm why the run was cancelled before restarting it." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "重新运行前先确认取消原因。" } }
+      }
+    },
+    "Failure focus": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Failure focus" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "失败卡点" } }
+      }
+    },
+    "Grant the required macOS permission, then run again.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Grant the required macOS permission, then run again." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "授予所需的 macOS 权限后重新运行。" } }
+      }
+    },
+    "Inspect the failed macro event and its saved evidence.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Inspect the failed macro event and its saved evidence." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "检查失败的宏事件及其证据。" } }
+      }
+    },
+    "Latest activity": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Latest activity" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "最近活动" } }
+      }
+    },
+    "Loading runs": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Loading runs" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "正在加载运行记录" } }
+      }
+    },
+    "Needs attention": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Needs attention" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "需要处理" } }
+      }
+    },
+    "Next action": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Next action" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "下一步" } }
+      }
+    },
+    "No action is required.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "No action is required." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "无需处理。" } }
+      }
+    },
+    "No matching runs": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "No matching runs" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "没有符合条件的运行" } }
+      }
+    },
+    "None": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "None" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "无" } }
+      }
+    },
+    "Open the saved evidence before changing the automation.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Open the saved evidence before changing the automation." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "修改自动化前先查看已保存的证据。" } }
+      }
+    },
+    "Open Workflow": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Open Workflow" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "打开工作流" } }
+      }
+    },
+    "Refresh failed": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Refresh failed" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "刷新失败" } }
+      }
+    },
+    "Refresh runs": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Refresh runs" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "刷新运行记录" } }
+      }
+    },
+    "Restore or replace the missing macro.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Restore or replace the missing macro." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "恢复或替换缺失的宏。" } }
+      }
+    },
+    "Review the failed task, then start a new run.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Review the failed task, then start a new run." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "检查失败任务后再开始新的运行。" } }
+      }
+    },
+    "Review the resource wait policy, then run again.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Review the resource wait policy, then run again." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "检查资源等待策略后重新运行。" } }
+      }
+    },
+    "Review the wait condition and timeout policy.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Review the wait condition and timeout policy." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "检查等待条件和超时策略。" } }
+      }
+    },
+    "Run filter": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Run filter" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "运行筛选" } }
+      }
+    },
+    "Run history": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Run history" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "运行历史" } }
+      }
+    },
+    "Runs": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Runs" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "运行记录" } }
+      }
+    },
+    "Select a run": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Select a run" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "选择一条运行记录" } }
+      }
+    },
+    "Showing last loaded runs": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Showing last loaded runs" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "正在显示上次加载的记录" } }
+      }
+    },
+    "Status / failures": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Status / failures" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "状态 / 失败" } }
+      }
+    },
+    "Steps": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Steps" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "步骤" } }
+      }
+    },
+    "Steps and attempts": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Steps and attempts" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "步骤与尝试" } }
+      }
+    },
+    "Succeeded": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Succeeded" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "成功" } }
+      }
+    },
+    "This active state is available from the running app and is not yet crash-recoverable.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "This active state is available from the running app and is not yet crash-recoverable." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "此活动状态来自当前运行中的应用，异常退出后暂时无法恢复。" } }
+      }
+    },
+    "Total": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Total" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "总计" } }
+      }
+    },
+    "Updated %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Updated %@" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "更新于 %@" } }
+      }
+    },
+    "Wait for completion or cancel from Workflow.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Wait for completion or cancel from Workflow." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "等待完成，或在工作流中取消。" } }
+      }
+    },
+    "Check available disk space and Application Support access, then run again.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Check available disk space and Application Support access, then run again." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "检查可用磁盘空间和 Application Support 访问权限后重新运行。" } }
+      }
+    },
+    "Live actions were stopped": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Live actions were stopped" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "实时操作已停止" } }
+      }
+    },
+    "Run data could not be saved": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Run data could not be saved" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "运行数据无法保存" } }
+      }
+    },
+    "Run History": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Run History" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "运行历史" } }
+      }
+    },
+    "Control how long run evidence and history remain on this Mac.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Control how long run evidence and history remain on this Mac." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "设置运行证据和历史记录在这台 Mac 上的保留时间。" } }
+      }
+    },
+    "Successful run evidence": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Successful run evidence" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "成功运行证据" } }
+      }
+    },
+    "Failed run evidence": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Failed run evidence" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "失败运行证据" } }
+      }
+    },
+    "Run history metadata": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Run history metadata" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "运行历史元数据" } }
+      }
+    },
+    "The current run, latest workflow run, latest failure, and latest evidence for each macro are always kept.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "The current run, latest workflow run, latest failure, and latest evidence for each macro are always kept." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "当前运行、工作流最近一次运行、最近一次失败，以及每个宏的最新证据始终保留。" } }
+      }
+    },
+    "Run history keeps at most 10,000 records. Choosing Never disables the age limit, not this capacity limit.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Run history keeps at most 10,000 records. Choosing Never disables the age limit, not this capacity limit." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "运行历史最多保留 10,000 条记录。选择“永不”只会停用按时间清理，容量上限仍然生效。" } }
+      }
+    },
+    "Clean up run history?": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Clean up run history?" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "清理运行历史？" } }
+      }
+    },
+    "This will remove evidence from %d run(s), delete %d old history record(s), and free about %@. Protected recent runs will stay available.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "This will remove evidence from %d run(s), delete %d old history record(s), and free about %@. Protected recent runs will stay available." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "将清理 %d 次运行的证据、删除 %d 条旧历史记录，预计释放 %@。受保护的近期运行仍会保留。" } }
+      }
+    },
+    "No expired run evidence or history to clean up.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "No expired run evidence or history to clean up." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "没有需要清理的过期运行证据或历史记录。" } }
+      }
+    },
+    "Run history cleanup check failed: %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Run history cleanup check failed: %@" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "运行历史清理检查失败：%@" } }
+      }
+    },
+    "Run history cleanup failed: %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Run history cleanup failed: %@" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "运行历史清理失败：%@" } }
+      }
+    },
+    "Cleaned up evidence from %d run(s) and removed %d old history record(s).": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Cleaned up evidence from %d run(s) and removed %d old history record(s)." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "已清理 %d 次运行的证据，并删除 %d 条旧历史记录。" } }
+      }
+    },
+    "Evidence expired and was cleaned up. The run result and failure explanation remain available.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Evidence expired and was cleaned up. The run result and failure explanation remain available." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "证据到期后已清理，运行结果和失败说明仍然保留。" } }
+      }
+    },
+    "Evidence was cleaned up on %@. The run result and failure explanation remain available.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Evidence was cleaned up on %@. The run result and failure explanation remain available." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "证据已于 %@ 清理，运行结果和失败说明仍然保留。" } }
+      }
+    },
+    "%@, %d runs": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "%@, %d runs" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "%@，%d 次运行" } }
+      }
+    },
+    "All runs": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "All runs" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "全部运行" } }
+      }
+    },
+    "Run ID": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Run ID" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "运行 ID" } }
+      }
+    },
+    "What happened": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "What happened" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "发生了什么" } }
+      }
+    },
+    "Recommended next step": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Recommended next step" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "建议下一步" } }
+      }
+    },
+    "Run details": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Run details" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "运行详情" } }
+      }
+    },
+    "Playback was interrupted.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Playback was interrupted." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "回放已中断。" } }
+      }
+    },
+    "Playback was cancelled.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Playback was cancelled." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "回放已取消。" } }
+      }
+    },
+    "Playback was cancelled by the user.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Playback was cancelled by the user." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "用户已取消回放。" } }
+      }
+    },
+    "Every step in this run completed successfully.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Every step in this run completed successfully." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "本次运行的所有步骤均已成功完成。" } }
+      }
+    },
+    "This run ended before all steps completed.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "This run ended before all steps completed." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "本次运行在所有步骤完成前已结束。" } }
+      }
+    },
+    "SparkleRecorder is tracking this run live. If the app closes, the run will be marked as interrupted when it reopens.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "SparkleRecorder is tracking this run live. If the app closes, the run will be marked as interrupted when it reopens." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "SparkleRecorder 正在实时跟踪本次运行。如果应用关闭，下次打开时会将本次运行标记为中断。" } }
+      }
+    },
+    "%@ sequence": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "%@ sequence" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "%@ 序列" } }
+      }
+    },
+    "%d macros · %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "%d macros · %@" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "%d 个宏 · %@" } }
+      }
+    },
+    "Add at least one macro.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Add at least one macro." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "请至少添加一个宏。" } }
+      }
+    },
+    "Add macro": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Add macro" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "添加宏" } }
+      }
+    },
+    "Advanced edit…": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Advanced edit…" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "高级编辑…" } }
+      }
+    },
+    "Applications remain open after the sequence": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Applications remain open after the sequence" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "序列结束后应用仍保持打开" } }
+      }
+    },
+    "Continue immediately": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Continue immediately" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "立即继续" } }
+      }
+    },
+    "Clear OCR area": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Clear OCR area" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "清除 OCR 区域" } }
+      }
+    },
+    "Could not create the sequence.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Could not create the sequence." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "无法创建序列。" } }
+      }
+    },
+    "Could not save the sequence.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Could not save the sequence." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "无法保存序列。" } }
+      }
+    },
+    "Each macro once": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Each macro once" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "每个宏完整运行一次" } }
+      }
+    },
+    "Draw area": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Draw area" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "框选区域" } }
+      }
+    },
+    "Entire target screen": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Entire target screen" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "整个目标屏幕" } }
+      }
+    },
+    "Enter the screen text to wait for.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Enter the screen text to wait for." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "请输入要等待出现的屏幕文字。" } }
+      }
+    },
+    "Give the sequence a name.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Give the sequence a name." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "请为序列命名。" } }
+      }
+    },
+    "Manual only": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Manual only" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "仅手动运行" } }
+      }
+    },
+    "Match": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Match" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "匹配方式" } }
+      }
+    },
+    "Move earlier": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Move earlier" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "前移" } }
+      }
+    },
+    "Move later": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Move later" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "后移" } }
+      }
+    },
+    "New sequence": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "New sequence" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "新序列" } }
+      }
+    },
+    "Quick sequence": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Quick sequence" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "快速序列" } }
+      }
+    },
+    "Pick from screen": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Pick from screen" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "从屏幕取词" } }
+      }
+    },
+    "Remove step": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Remove step" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "移除步骤" } }
+      }
+    },
+    "Save sequence": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Save sequence" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "保存序列" } }
+      }
+    },
+    "Save & test in 5 seconds": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Save & test in 5 seconds" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "保存并在 5 秒后试跑" } }
+      }
+    },
+    "Cancel test (%d)": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Cancel test (%d)" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "取消试跑（%d）" } }
+      }
+    },
+    "Starting test…": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Starting test…" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "正在开始试跑…" } }
+      }
+    },
+    "Sequence name": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Sequence name" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "序列名称" } }
+      }
+    },
+    "Sequence saved.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Sequence saved." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "序列已保存。" } }
+      }
+    },
+    "Sequence saved. Next run: %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Sequence saved. Next run: %@" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "序列已保存。下次运行：%@" } }
+      }
+    },
+    "Sequence saved. Test started.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Sequence saved. Test started." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "序列已保存，试跑已开始。" } }
+      }
+    },
+    "Sequence saved, but the test could not start.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Sequence saved, but the test could not start." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "序列已保存，但无法开始试跑。" } }
+      }
+    },
+    "Text to find": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Text to find" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "要查找的文字" } }
+      }
+    },
+    "Text wait timeouts must be greater than zero.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Text wait timeouts must be greater than zero." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "文字等待超时必须大于零。" } }
+      }
+    },
+    "Then": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Then" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "然后" } }
+      }
+    },
+    "Timing": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Timing" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "运行时间" } }
+      }
+    },
+    "Wait": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Wait" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "等待" } }
+      }
+    },
+    "Wait durations must be greater than zero.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Wait durations must be greater than zero." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "等待时间必须大于零。" } }
+      }
+    },
+    "Wait for a duration": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Wait for a duration" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "等待一段时间" } }
+      }
+    },
+    "Wait for screen text": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Wait for screen text" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "等待屏幕文字" } }
+      }
+    },
+    "Review Evidence": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Review Evidence" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "查看证据" } }
+      }
+    },
+    "Review Failure": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Review Failure" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "查看失败详情" } }
+      }
+    },
+    "Run Again": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Run Again" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "重新运行" } }
+      }
+    },
+    "Open Run History Settings": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Open Run History Settings" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "打开运行历史设置" } }
+      }
+    },
+    "Cancel this execution?": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Cancel this execution?" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "取消本次运行？" } }
+      }
+    },
+    "Every active step in this execution will be stopped. Completed steps and saved evidence will remain in history.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Every active step in this execution will be stopped. Completed steps and saved evidence will remain in history." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "本次运行中所有活动步骤都将停止。已完成步骤和已保存证据仍会保留在历史中。" } }
+      }
+    },
+    "Report only": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Report only" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "仅报告" } }
+      }
+    },
+    "Save failed": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Save failed" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "保存失败" } }
+      }
+    },
+    "Not verified": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Not verified" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "尚未验证" } }
+      }
+    },
+    "Report saved; screenshot unavailable": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Report saved; screenshot unavailable" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "报告已保存，截图不可用" } }
+      }
+    },
+    "Evidence save failed": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Evidence save failed" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "证据保存失败" } }
+      }
+    },
+    "No evidence recorded": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "No evidence recorded" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "未记录证据" } }
+      }
+    },
+    "Evidence not verified": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Evidence not verified" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "证据尚未验证" } }
+      }
+    },
+    "Run evidence": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Run evidence" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "运行证据" } }
+      }
+    },
+    "Failed at event #%d": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Failed at event #%d" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "在事件 #%d 处失败" } }
+      }
+    },
+    "The saved evidence files could not be found.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "The saved evidence files could not be found." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "找不到已保存的证据文件。" } }
+      }
+    },
+    "Evidence could not be opened.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Evidence could not be opened." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "无法打开证据。" } }
+      }
+    },
+    "Stopped %d active step(s).": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Stopped %d active step(s)." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "已停止 %d 个活动步骤。" } }
+      }
+    },
+    "The run could not be stopped: %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "The run could not be stopped: %@" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "无法停止本次运行：%@" } }
+      }
+    },
+    "A new run started.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "A new run started." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "新的运行已开始。" } }
+      }
+    },
+    "The workflow could not start: %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "The workflow could not start: %@" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "无法启动工作流：%@" } }
+      }
+    },
+    "System Settings opened.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "System Settings opened." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "已打开系统设置。" } }
+      }
+    },
+    "Stopped %d step(s); %d could not be stopped.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Stopped %d step(s); %d could not be stopped." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "已停止 %d 个步骤；%d 个步骤无法停止。" } }
+      }
+    },
+    "Wait for completion, or cancel every active step in this run.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Wait for completion, or cancel every active step in this run." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "等待运行完成，或取消本次运行中的所有活动步骤。" } }
+      }
+    },
     "AI Draft": {
       "extractionState": "manual",
       "localizations": {
@@ -4798,6 +5757,552 @@
             "value": "AI 草稿"
           }
         }
+      }
+    },
+    "%d macros · %d steps": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "%d macros · %d steps" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "%d 个宏 · %d 个步骤" } }
+      }
+    },
+    "1 macro": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "1 macro" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "1 个宏" } }
+      }
+    },
+    "All automations": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "All automations" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "所有自动化" } }
+      }
+    },
+    "Automations": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Automations" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "自动化" } }
+      }
+    },
+    "Build Automation Sequence…": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Build Automation Sequence…" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "创建线性自动化…" } }
+      }
+    },
+    "Change the search or status filter.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Change the search or status filter." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "调整搜索内容或状态筛选。" } }
+      }
+    },
+    "Create Automation": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Create Automation" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "创建自动化" } }
+      }
+    },
+    "Create Automation…": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Create Automation…" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "创建自动化…" } }
+      }
+    },
+    "Create from Macro Library": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Create from Macro Library" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "从宏库创建" } }
+      }
+    },
+    "Create one from a macro, then choose when it runs.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Create one from a macro, then choose when it runs." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "从宏创建自动化，再设置运行时间。" } }
+      }
+    },
+    "Edit automation": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Edit automation" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "编辑自动化" } }
+      }
+    },
+    "New advanced workflow": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "New advanced workflow" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "新建高级工作流" } }
+      }
+    },
+    "No automations": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "No automations" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "暂无自动化" } }
+      }
+    },
+    "No matching automations": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "No matching automations" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "没有匹配的自动化" } }
+      }
+    },
+    "Open Macro Library": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Open Macro Library" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "打开宏库" } }
+      }
+    },
+    "Open the workflow editor to preserve its advanced settings.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Open the workflow editor to preserve its advanced settings." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "请在工作流编辑器中打开，以保留高级设置。" } }
+      }
+    },
+    "Open the workflow editor to repair this automation.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Open the workflow editor to repair this automation." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "请在工作流编辑器中修复此自动化。" } }
+      }
+    },
+    "Sequence could not be opened": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Sequence could not be opened" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "无法打开线性自动化" } }
+      }
+    },
+    "Schedules / sequences": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Schedules / sequences" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "定时与序列" } }
+      }
+    },
+    "Run now": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Run now" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "立即运行" } }
+      }
+    },
+    "Search automations": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Search automations" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "搜索自动化" } }
+      }
+    },
+    "Sequence": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Sequence" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "线性" } }
+      }
+    },
+    "Single macro": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Single macro" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "单宏" } }
+      }
+    },
+    "%d executions": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "%d executions" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "%d 次运行" } }
+      }
+    },
+    "All run history": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "All run history" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "全部运行记录" } }
+      }
+    },
+    "Choose an automation to manage its schedule and runs.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Choose an automation to manage its schedule and runs." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "选择一个自动化以管理配置和运行记录。" } }
+      }
+    },
+    "Copy diagnostics": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Copy diagnostics" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "复制诊断信息" } }
+      }
+    },
+    "Current status": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Current status" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "当前状态" } }
+      }
+    },
+    "Delete automation": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Delete automation" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "删除自动化" } }
+      }
+    },
+    "Delete automation “%@”?": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Delete automation “%@”?" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "删除自动化“%@”？" } }
+      }
+    },
+    "Delete automation?": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Delete automation?" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "删除自动化？" } }
+      }
+    },
+    "Diagnostics": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Diagnostics" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "诊断信息" } }
+      }
+    },
+    "Execution ID": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Execution ID" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "运行 ID" } }
+      }
+    },
+    "No evidence": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "No evidence" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "无运行证据" } }
+      }
+    },
+    "Pause automation": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Pause automation" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "暂停自动化" } }
+      }
+    },
+    "Recent runs": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Recent runs" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "最近运行" } }
+      }
+    },
+    "Resume automation": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Resume automation" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "恢复自动化" } }
+      }
+    },
+    "Run this automation to create its first result and evidence record.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Run this automation to create its first result and evidence record." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "运行此自动化后，这里会显示首次结果和运行证据。" } }
+      }
+    },
+    "Select an automation": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Select an automation" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "选择自动化" } }
+      }
+    },
+    "The automation configuration will be removed. Its macros and saved run history will remain.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "The automation configuration will be removed. Its macros and saved run history will remain." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "将删除自动化配置；其中使用的宏和已保存的运行记录会保留。" } }
+      }
+    },
+    "Add login or navigation macro": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Add login or navigation macro" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "添加登录或导航宏" } }
+      }
+    },
+    "No wait": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "No wait" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "不等待" } }
+      }
+    },
+    "Open bound application": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Open bound application" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "打开绑定应用" } }
+      }
+    },
+    "Start preparation": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Start preparation" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "开始前准备" } }
+      }
+    },
+    "Use this for startup loading. If login or navigation is required, create a sequence with preparation macros.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Use this for startup loading. If login or navigation is required, create a sequence with preparation macros." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "此等待用于应用启动加载；如果需要登录或进入指定页面，请创建包含准备宏的序列。" } }
+      }
+    },
+    "Wait after window appears": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Wait after window appears" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "窗口出现后等待" } }
+      }
+    },
+    "Automatic cleanup is off. Manual cleanup remains available.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Automatic cleanup is off. Manual cleanup remains available." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "自动清理已关闭，仍可随时手动清理。" } }
+      }
+    },
+    "Automatic cleanup will check when the app is running.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Automatic cleanup will check when the app is running." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "应用运行时将自动检查可清理内容。" } }
+      }
+    },
+    "Automatically manage run storage": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Automatically manage run storage" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "自动管理运行存储" } }
+      }
+    },
+    "Condition evidence": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Condition evidence" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "条件证据" } }
+      }
+    },
+    "Delete Evidence": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Delete Evidence" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "删除证据" } }
+      }
+    },
+    "Delete evidence?": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Delete evidence?" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "删除证据？" } }
+      }
+    },
+    "Delete Run History": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Delete Run History" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "删除运行记录" } }
+      }
+    },
+    "Delete Screenshots": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Delete Screenshots" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "删除截图" } }
+      }
+    },
+    "Delete screenshots?": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Delete screenshots?" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "删除截图？" } }
+      }
+    },
+    "Delete this run history?": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Delete this run history?" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "删除本次运行记录？" } }
+      }
+    },
+    "Deleted %d run record(s) and associated evidence, freeing about %@.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Deleted %1$d run record(s) and associated evidence, freeing about %2$@." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "已删除 %1$d 条运行记录及关联证据，释放约 %2$@。" } }
+      }
+    },
+    "Deleted evidence from %d run(s) and freed about %@.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Deleted evidence from %1$d run(s) and freed about %2$@." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "已删除 %1$d 条运行的证据，释放约 %2$@。" } }
+      }
+    },
+    "Deleted screenshots from %d run(s) and freed about %@.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Deleted screenshots from %1$d run(s) and freed about %2$@." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "已删除 %1$d 条运行的截图，释放约 %2$@。" } }
+      }
+    },
+    "Diagnostics": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Diagnostics" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "诊断证据" } }
+      }
+    },
+    "Evidence size": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Evidence size" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "证据占用" } }
+      }
+    },
+    "History index": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "History index" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "历史索引" } }
+      }
+    },
+    "Last checked %@ · removed %d evidence item(s) and %d record(s) · freed %@ · next check %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Last checked %1$@ · removed %2$d evidence item(s) and %3$d record(s) · freed %4$@ · next check %5$@" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "上次检查 %1$@ · 清理 %2$d 份证据和 %3$d 条记录 · 释放 %4$@ · 下次检查 %5$@" } }
+      }
+    },
+    "Manage run data": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Manage run data" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "管理运行数据" } }
+      }
+    },
+    "Other evidence": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Other evidence" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "其他证据" } }
+      }
+    },
+    "Refresh storage usage": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Refresh storage usage" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "刷新存储用量" } }
+      }
+    },
+    "Reports": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Reports" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "报告" } }
+      }
+    },
+    "Reports are still saved when screenshots are off or unavailable.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Reports are still saved when screenshots are off or unavailable." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "关闭截图或截图不可用时，仍会保存运行报告。" } }
+      }
+    },
+    "Run data could not be deleted: %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Run data could not be deleted: %@" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "无法删除运行数据：%@" } }
+      }
+    },
+    "Run records": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Run records" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "运行记录" } }
+      }
+    },
+    "Save ending screenshots": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Save ending screenshots" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "保存结束截图" } }
+      }
+    },
+    "Screenshots": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Screenshots" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "截图" } }
+      }
+    },
+    "Storage usage could not be calculated: %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Storage usage could not be calculated: %@" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "无法计算存储用量：%@" } }
+      }
+    },
+    "Storage used": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Storage used" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "已用存储" } }
+      }
+    },
+    "This permanently removes %d run record(s) and about %@ of associated evidence.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "This permanently removes %1$d run record(s) and about %2$@ of associated evidence." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "这将永久删除 %1$d 条运行记录及约 %2$@ 的关联证据。" } }
+      }
+    },
+    "This removes about %@ of ending screenshots. Reports and run history stay available.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "This removes about %@ of ending screenshots. Reports and run history stay available." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "这将删除约 %@ 的结束截图，报告和运行记录仍会保留。" } }
+      }
+    },
+    "This removes about %@ of reports, screenshots, and diagnostic evidence. A lightweight run record stays in history.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "This removes about %@ of reports, screenshots, and diagnostic evidence. A lightweight run record stays in history." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "这将删除约 %@ 的报告、截图和诊断证据，同时保留轻量运行记录。" } }
+      }
+    },
+    "Workflow Editor": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Workflow Editor" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "工作流编辑器" } }
       }
     }
   },

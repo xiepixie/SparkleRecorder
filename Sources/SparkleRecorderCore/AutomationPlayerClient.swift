@@ -6,7 +6,10 @@ public struct AutomationPlayerStartRequest: Sendable {
     public var scheduledStartTime: Date?
     public var context: PlaybackContext
     public var targetApplicationPolicy: AutomationTargetApplicationPolicy
+    public var targetApplicationReadyDelay: TimeInterval
     public var targetApplicationCleanupPolicy: AutomationTargetApplicationCleanupPolicy
+    public var targetApplicationQuitTimeout: TimeInterval
+    public var targetApplicationForceQuitOnTimeout: Bool
 
     public init(
         runID: UUID,
@@ -14,14 +17,20 @@ public struct AutomationPlayerStartRequest: Sendable {
         scheduledStartTime: Date? = nil,
         context: PlaybackContext? = nil,
         targetApplicationPolicy: AutomationTargetApplicationPolicy = .activateIfRunning,
-        targetApplicationCleanupPolicy: AutomationTargetApplicationCleanupPolicy = .keepOpen
+        targetApplicationReadyDelay: TimeInterval = 0,
+        targetApplicationCleanupPolicy: AutomationTargetApplicationCleanupPolicy = .keepOpen,
+        targetApplicationQuitTimeout: TimeInterval = 5,
+        targetApplicationForceQuitOnTimeout: Bool = true
     ) {
         self.runID = runID
         self.macro = macro
         self.scheduledStartTime = scheduledStartTime
         self.context = context ?? macro.playbackContext
         self.targetApplicationPolicy = targetApplicationPolicy
+        self.targetApplicationReadyDelay = min(60, max(0, targetApplicationReadyDelay))
         self.targetApplicationCleanupPolicy = targetApplicationCleanupPolicy
+        self.targetApplicationQuitTimeout = min(60, max(1, targetApplicationQuitTimeout))
+        self.targetApplicationForceQuitOnTimeout = targetApplicationForceQuitOnTimeout
     }
 }
 
@@ -69,7 +78,8 @@ public struct AutomationPlayerClient: Sendable {
     public var events: @Sendable () -> AsyncStream<AutomationAction>
 
     public init(
-        start: @escaping @Sendable (AutomationPlayerStartRequest) async -> AutomationPlayerStartResult,
+        start:
+            @escaping @Sendable (AutomationPlayerStartRequest) async -> AutomationPlayerStartResult,
         cancel: @escaping @Sendable (_ runID: UUID) async -> Void,
         events: @escaping @Sendable () -> AsyncStream<AutomationAction> = { .finished }
     ) {

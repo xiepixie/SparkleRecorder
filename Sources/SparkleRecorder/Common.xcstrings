@@ -2180,6 +2180,23 @@
         }
       }
     },
+    "Create Sequence…": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Create Sequence…"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "创建序列…"
+          }
+        }
+      }
+    },
     "Created": {
       "extractionState": "manual",
       "localizations": {
@@ -10687,11 +10704,32 @@
         }
       }
     },
+    "Save changes": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Save changes" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "保存更改" } }
+      }
+    },
+    "Active": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Active" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "已启用" } }
+      }
+    },
     "Schedule…": {
       "extractionState": "manual",
       "localizations": {
         "en": { "stringUnit": { "state": "translated", "value": "Schedule…" } },
         "zh-Hans": { "stringUnit": { "state": "translated", "value": "设置定时…" } }
+      }
+    },
+    "Total": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Total" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "总计" } }
       }
     },
     "Waiting…": {

@@ -15,6 +15,7 @@ public actor AutomationRuntimeSession {
     private let scheduler: AutomationSchedulerClient
     private let reducerEnvironment: AutomationReducerEnvironment
     private let effectRunner: AutomationEffectRunner
+    private let now: @Sendable () -> Date
 
     private var runtime: AutomationEngineRuntime?
     private var schedulerTask: Task<Void, Never>?
@@ -25,12 +26,14 @@ public actor AutomationRuntimeSession {
         repository: AutomationRepositoryClient,
         scheduler: AutomationSchedulerClient,
         reducerEnvironment: AutomationReducerEnvironment = .live,
-        effectRunner: AutomationEffectRunner
+        effectRunner: AutomationEffectRunner,
+        now: @escaping @Sendable () -> Date = { Date() }
     ) {
         self.repository = repository
         self.scheduler = scheduler
         self.reducerEnvironment = reducerEnvironment
         self.effectRunner = effectRunner
+        self.now = now
     }
 
     public func lifecycleStatus() -> AutomationRuntimeSessionStatus {
@@ -44,6 +47,13 @@ public actor AutomationRuntimeSession {
         return await runtime.currentState()
     }
 
+    public func currentSnapshot() async -> AutomationRuntimeSnapshot? {
+        guard let runtime else {
+            return nil
+        }
+        return await runtime.currentSnapshot()
+    }
+
     @discardableResult
     public func start() async throws -> AutomationRunState {
         if status == .running, let runtime {
@@ -53,7 +63,7 @@ public actor AutomationRuntimeSession {
         stopTasks()
 
         let workflows = try await repository.loadWorkflows()
-        let runHistory = try await repository.loadRunHistory()
+        let runHistory = try await reconciledRunHistory()
         let runtime = AutomationEngineRuntime(
             initialState: AutomationRunState(workflows: workflows, runs: runHistory),
             reducerEnvironment: reducerEnvironment,
@@ -110,5 +120,25 @@ public actor AutomationRuntimeSession {
         playerEventsTask?.cancel()
         schedulerTask = nil
         playerEventsTask = nil
+    }
+
+    private func reconciledRunHistory() async throws -> [AutomationTaskRun] {
+        var runHistory = try await repository.loadRunHistory()
+        let detectedAt = now()
+        for index in runHistory.indices where !runHistory[index].isTerminal {
+            let previousStatus = runHistory[index].status
+            let reason = "SparkleRecorder closed before this run completed."
+            runHistory[index] = runHistory[index].completed(
+                with: .cancelled(reason: reason),
+                at: detectedAt
+            )
+            runHistory[index].interruption = AutomationRunInterruption(
+                previousStatus: previousStatus,
+                detectedAt: detectedAt,
+                reason: reason
+            )
+            try await repository.appendRun(runHistory[index])
+        }
+        return runHistory
     }
 }

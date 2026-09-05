@@ -4,6 +4,23 @@ import Testing
 
 @Suite("Automation Engine Runtime Tests")
 struct AutomationEngineRuntimeTests {
+    @Test("Runtime snapshot revision advances after dispatched actions")
+    func runtimeSnapshotRevisionAdvances() async {
+        let runner = AutomationEffectRunner(
+            resourceArbiter: .live(),
+            sleep: { _ in }
+        )
+        let runtime = AutomationEngineRuntime(effectRunner: runner)
+        let before = await runtime.currentSnapshot()
+
+        _ = await runtime.dispatch(.clockTick(Date(timeIntervalSince1970: 1)))
+        let after = await runtime.currentSnapshot()
+
+        #expect(before.revision == 0)
+        #expect(after.revision > before.revision)
+        #expect(after.state.now == Date(timeIntervalSince1970: 1))
+    }
+
     @Test("Runtime sends manual starts and scheduler ticks through the same reducer/effect path")
     func runtimeHandlesManualAndScheduledStarts() async {
         let workflowID = UUID()
@@ -188,6 +205,63 @@ struct AutomationEngineRuntimeTests {
         #expect(run.completedAt == finishedAt)
         #expect(persistedRun.id == expectedRunID)
         #expect(persistedRun.outcome == .succeeded(report: nil))
+    }
+
+    @Test("Runtime stops live player effects when the start checkpoint cannot be saved")
+    func runtimeStopsPlayerWhenCheckpointFails() async throws {
+        struct SaveFailure: Error, CustomStringConvertible {
+            var description: String { "disk full" }
+        }
+        let workflowID = UUID()
+        let taskID = UUID()
+        let macroID = UUID()
+        let runID = UUID()
+        let startedAt = Date(timeIntervalSince1970: 1_500)
+        let task = AutomationTask(
+            id: taskID,
+            name: "Guarded macro",
+            kind: .macro(macroID: macroID),
+            resourceRequirement: .none
+        )
+        let workflow = AutomationWorkflow(id: workflowID, name: "Guarded workflow", tasks: [task])
+        let recorder = RuntimePlayerStartRecorder()
+        let repository = AutomationRepositoryClient(
+            loadWorkflows: { [workflow] },
+            saveWorkflows: { _ in },
+            loadRunHistory: { [] },
+            appendRun: { _ in throw SaveFailure() }
+        )
+        let runner = AutomationEffectRunner(
+            resourceArbiter: .live(),
+            player: AutomationPlayerClient(
+                start: { request in
+                    await recorder.record(request)
+                    return .started
+                },
+                cancel: { _ in }
+            ),
+            repository: repository,
+            loadMacro: { _ in SavedMacro(id: macroID, name: "Macro", events: TestFixtures.clickPair()) },
+            now: { startedAt },
+            sleep: { _ in }
+        )
+        let runtime = AutomationEngineRuntime(
+            initialState: AutomationRunState(workflows: [workflow]),
+            reducerEnvironment: AutomationReducerEnvironment(makeRunID: { runID }),
+            effectRunner: runner
+        )
+
+        await runtime.dispatch(.manualStart(
+            workflowID: workflowID,
+            taskID: taskID,
+            requestedAt: startedAt
+        ))
+
+        let state = await runtime.currentState()
+        let run = try #require(state.run(id: runID))
+        #expect(await recorder.runIDs.isEmpty)
+        #expect(run.outcome == .rejected(reason: "Run data could not be saved: disk full"))
+        #expect(state.persistenceIssue?.runID == runID)
     }
 }
 

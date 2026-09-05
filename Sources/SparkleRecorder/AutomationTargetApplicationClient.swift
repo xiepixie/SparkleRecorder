@@ -1,25 +1,69 @@
 import AppKit
 import Foundation
+import os
 import SparkleRecorderCore
 
 struct AutomationTargetApplicationPreparationFailure: Error, Equatable, LocalizedError, Sendable {
     var message: String
+    var session: AutomationTargetApplicationSession = .empty
 
     var errorDescription: String? { message }
 }
 
+struct AutomationRunLaunchedApplication: Equatable, Hashable, Sendable {
+    var bundleIdentifier: String
+    var processIdentifier: pid_t
+}
+
 struct AutomationTargetApplicationSession: Equatable, Sendable {
-    var launchedBundleIdentifiers: Set<String> = []
+    var launchedApplications: Set<AutomationRunLaunchedApplication> = []
 
     static let empty = AutomationTargetApplicationSession()
 }
 
 extension AutomationTargetApplicationSession {
-    func bundleIdentifiersToQuit(
+    func applicationsToQuit(
         under policy: AutomationTargetApplicationCleanupPolicy
-    ) -> [String] {
+    ) -> [AutomationRunLaunchedApplication] {
         guard policy == .quitIfLaunched else { return [] }
-        return launchedBundleIdentifiers.sorted()
+        return launchedApplications.sorted { lhs, rhs in
+            lhs.processIdentifier < rhs.processIdentifier
+        }
+    }
+}
+
+struct AutomationTargetApplicationCleanupResult: Equatable, Sendable {
+    var gracefullyTerminated: [pid_t] = []
+    var forceTerminated: [pid_t] = []
+    var unresolved: [pid_t] = []
+}
+
+struct AutomationApplicationProcessClient: Sendable {
+    var terminate: @Sendable (pid_t) async -> Bool
+    var forceTerminate: @Sendable (pid_t) async -> Bool
+    var waitUntilTerminated: @Sendable (pid_t, TimeInterval) async -> Bool
+
+    @MainActor
+    static func live(pollInterval: TimeInterval = 0.2) -> Self {
+        Self(
+            terminate: { processIdentifier in
+                NSRunningApplication(processIdentifier: processIdentifier)?.terminate() ?? true
+            },
+            forceTerminate: { processIdentifier in
+                NSRunningApplication(processIdentifier: processIdentifier)?.forceTerminate() ?? true
+            },
+            waitUntilTerminated: { processIdentifier, timeout in
+                let deadline = Date().addingTimeInterval(max(0, timeout))
+                repeat {
+                    guard let application = NSRunningApplication(processIdentifier: processIdentifier) else {
+                        return true
+                    }
+                    if application.isTerminated { return true }
+                    try? await Task.sleep(for: .seconds(pollInterval))
+                } while Date() < deadline
+                return NSRunningApplication(processIdentifier: processIdentifier)?.isTerminated ?? true
+            }
+        )
     }
 }
 
@@ -30,8 +74,10 @@ struct AutomationTargetApplicationClient: Sendable {
     ) async -> Result<AutomationTargetApplicationSession, AutomationTargetApplicationPreparationFailure>
     var cleanup: @Sendable (
         _ session: AutomationTargetApplicationSession,
-        _ policy: AutomationTargetApplicationCleanupPolicy
-    ) async -> Void
+        _ policy: AutomationTargetApplicationCleanupPolicy,
+        _ timeout: TimeInterval,
+        _ forceQuitOnTimeout: Bool
+    ) async -> AutomationTargetApplicationCleanupResult
 
     init(
         prepare: @escaping @Sendable (
@@ -40,8 +86,10 @@ struct AutomationTargetApplicationClient: Sendable {
         ) async -> Result<AutomationTargetApplicationSession, AutomationTargetApplicationPreparationFailure>,
         cleanup: @escaping @Sendable (
             AutomationTargetApplicationSession,
-            AutomationTargetApplicationCleanupPolicy
-        ) async -> Void = { _, _ in }
+            AutomationTargetApplicationCleanupPolicy,
+            TimeInterval,
+            Bool
+        ) async -> AutomationTargetApplicationCleanupResult = { _, _, _, _ in .init() }
     ) {
         self.prepare = prepare
         self.cleanup = cleanup
@@ -53,9 +101,11 @@ struct AutomationTargetApplicationClient: Sendable {
     static func live(
         windowTracker: WindowTracker?,
         launchTimeout: TimeInterval = 10,
-        pollInterval: TimeInterval = 0.2
+        pollInterval: TimeInterval = 0.2,
+        processClient: AutomationApplicationProcessClient? = nil
     ) -> AutomationTargetApplicationClient {
-        AutomationTargetApplicationClient(prepare: { surfaces, policy in
+        let processClient = processClient ?? .live(pollInterval: pollInterval)
+        return AutomationTargetApplicationClient(prepare: { surfaces, policy in
             await prepareLive(
                 surfaces: surfaces,
                 policy: policy,
@@ -63,11 +113,14 @@ struct AutomationTargetApplicationClient: Sendable {
                 launchTimeout: launchTimeout,
                 pollInterval: pollInterval
             )
-        }, cleanup: { session, policy in
-            for bundleIdentifier in session.bundleIdentifiersToQuit(under: policy) {
-                NSRunningApplication.runningApplications(withBundleIdentifier: bundleIdentifier)
-                    .forEach { $0.terminate() }
-            }
+        }, cleanup: { session, policy, timeout, forceQuitOnTimeout in
+            await cleanupLive(
+                session: session,
+                policy: policy,
+                timeout: timeout,
+                forceQuitOnTimeout: forceQuitOnTimeout,
+                processClient: processClient
+            )
         })
     }
 
@@ -94,7 +147,7 @@ struct AutomationTargetApplicationClient: Sendable {
             )))
         }
 
-        var launchedBundleIdentifiers = Set<String>()
+        var launchedApplications = Set<AutomationRunLaunchedApplication>()
         for bundleIdentifier in bundleIdentifiers {
             let entries = grouped[bundleIdentifier] ?? []
             let appName = entries.compactMap(\.value.appName).first ?? bundleIdentifier
@@ -113,7 +166,6 @@ struct AutomationTargetApplicationClient: Sendable {
                         appName
                     )))
                 }
-                launchedBundleIdentifiers.insert(bundleIdentifier)
                 app = await waitForApplication(
                     bundleIdentifier: bundleIdentifier,
                     timeout: launchTimeout,
@@ -124,6 +176,12 @@ struct AutomationTargetApplicationClient: Sendable {
                         format: String(localized: "Timed out while opening the bound application %@.", table: "Automation"),
                         appName
                     )))
+                }
+                if let app {
+                    launchedApplications.insert(.init(
+                        bundleIdentifier: bundleIdentifier,
+                        processIdentifier: app.processIdentifier
+                    ))
                 }
             }
 
@@ -143,13 +201,47 @@ struct AutomationTargetApplicationClient: Sendable {
                     return .failure(.init(message: String(
                         format: String(localized: "The bound window for %@ did not appear in time.", table: "Automation"),
                         appName
-                    )))
+                    ), session: .init(launchedApplications: launchedApplications)))
                 }
             }
         }
         return .success(AutomationTargetApplicationSession(
-            launchedBundleIdentifiers: launchedBundleIdentifiers
+            launchedApplications: launchedApplications
         ))
+    }
+
+    private static func cleanupLive(
+        session: AutomationTargetApplicationSession,
+        policy: AutomationTargetApplicationCleanupPolicy,
+        timeout: TimeInterval,
+        forceQuitOnTimeout: Bool,
+        processClient: AutomationApplicationProcessClient
+    ) async -> AutomationTargetApplicationCleanupResult {
+        let logger = Logger(subsystem: "com.sparklerecorder.app", category: "ScheduledAppCleanup")
+        var result = AutomationTargetApplicationCleanupResult()
+        for application in session.applicationsToQuit(under: policy) {
+            let pid = application.processIdentifier
+            let accepted = await processClient.terminate(pid)
+            logger.info("Requested graceful termination for pid=\(pid, privacy: .public), accepted=\(accepted, privacy: .public)")
+            if await processClient.waitUntilTerminated(pid, timeout) {
+                result.gracefullyTerminated.append(pid)
+                continue
+            }
+            guard forceQuitOnTimeout else {
+                result.unresolved.append(pid)
+                logger.error("Graceful termination timed out for pid=\(pid, privacy: .public)")
+                continue
+            }
+            let forceAccepted = await processClient.forceTerminate(pid)
+            logger.notice("Requested force termination for pid=\(pid, privacy: .public), accepted=\(forceAccepted, privacy: .public)")
+            if await processClient.waitUntilTerminated(pid, 2) {
+                result.forceTerminated.append(pid)
+            } else {
+                result.unresolved.append(pid)
+                logger.error("Force termination did not resolve pid=\(pid, privacy: .public)")
+            }
+        }
+        return result
     }
 
     @MainActor

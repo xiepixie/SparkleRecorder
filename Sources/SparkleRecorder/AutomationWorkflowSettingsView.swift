@@ -180,10 +180,6 @@ struct AutomationWorkflowSettingsView: View {
         targetIndex: Int,
         fallback: AutomationGraphPoint?
     ) -> AutomationGraphPoint? {
-        guard let workflowProjection else {
-            return fallback
-        }
-
         let nodesByTaskID = Dictionary(uniqueKeysWithValues: workflowProjection.nodes.map { ($0.taskID, $0) })
         let previousTask = targetIndex > 0 ? remainingTasks[targetIndex - 1] : nil
         let nextTask = targetIndex < remainingTasks.count ? remainingTasks[targetIndex] : nil

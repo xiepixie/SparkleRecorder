@@ -4,6 +4,31 @@ import Testing
 
 @Suite("Automation Schedule Occurrence Tests")
 struct AutomationScheduleOccurrenceTests {
+    @Test("Represented schedule index separates many task histories in one pass")
+    func representedScheduleIndexSeparatesTasks() {
+        let workflowID = UUID()
+        let firstTaskID = UUID()
+        let secondTaskID = UUID()
+        let start = Date(timeIntervalSince1970: 6_000)
+        let runs = (0..<10_000).map { index in
+            AutomationTaskRun(
+                workflowID: workflowID,
+                taskID: index.isMultiple(of: 2) ? firstTaskID : secondTaskID,
+                scheduledStartTime: start.addingTimeInterval(TimeInterval(index)),
+                createdAt: start
+            )
+        }
+
+        let index = AutomationRepresentedScheduleIndex(runs: runs)
+        let firstStarts = index.startTimes(workflowID: workflowID, taskID: firstTaskID)
+        let secondStarts = index.startTimes(workflowID: workflowID, taskID: secondTaskID)
+
+        #expect(firstStarts.count == 5_000)
+        #expect(secondStarts.count == 5_000)
+        #expect(firstStarts.isDisjoint(with: secondStarts))
+        #expect(index.startTimes(workflowID: UUID(), taskID: firstTaskID).isEmpty)
+    }
+
     @Test("Upcoming once schedule returns its date unless already represented by a run")
     func onceScheduleReturnsDateUntilRepresented() throws {
         let scheduledAt = Date(timeIntervalSince1970: 7_000)

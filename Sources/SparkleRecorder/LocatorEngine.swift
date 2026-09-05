@@ -63,7 +63,7 @@ public final class LocatorEngine: @unchecked Sendable {
                     if let bestDetection = resolve(anchor: anchor, detections: detections, detectionFrame: prepared.detectionFrame, contentFrame: contentFrame) {
                         let screenX = bestDetection.screenRect.midX
                         let screenY = bestDetection.screenRect.midY
-                        logger.info("OCR successfully found text '\(anchor.text)' at (\(screenX), \(screenY))")
+                        logger.debug("OCR successfully found text '\(anchor.text)' at (\(screenX), \(screenY))")
                         return CGPoint(x: screenX, y: screenY)
                     } else {
                         throw VisionDetectorError.textNotMatched
@@ -95,7 +95,7 @@ public final class LocatorEngine: @unchecked Sendable {
                     let screenX = currentFrame.x + (normalizedRect.midX * currentFrame.width)
                     let screenY = currentFrame.y + (normalizedRect.midY * currentFrame.height)
                     
-                    logger.info("Template successfully matched at (\(screenX), \(screenY))")
+                    logger.debug("Template successfully matched at (\(screenX), \(screenY))")
                     return CGPoint(x: screenX, y: screenY)
                 } catch {
                     lastError = error

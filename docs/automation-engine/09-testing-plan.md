@@ -112,4 +112,6 @@
 - 测试能覆盖 App-host handoff payload/status 语义，包括 pending/dispatched/failed/missing、receipt run IDs、repository-backed `runs` snapshots / `workflowStatus` readback，以及旧 status JSON 缺少这些新字段时的兼容解码。
 - 测试能覆盖 bound-window acceptance payload 的 workflow/task/macro/surface context、coordinate mode、activation summary 和 handoff next-action 语义；真实 activation/playback 只由 reviewed live acceptance 执行。
 - 测试能覆盖目标应用策略的旧 JSON 默认值、workflow/draft round-trip、reducer/effect handoff 和 fake preflight failure；单元测试不得启动真实应用或等待真实窗口。
+- 测试能覆盖 Quick Sequence 的 immediate、fixed-delay、OCR-text gate 编译结果、首任务 schedule 所有权、宏播放次数/目标应用/遗漏运行策略和输入校验；UI 倒计时不得在单元测试中等待墙上时钟。
+- 测试能覆盖本次运行启动的精确 PID 选择、正常关闭等待、超时不强退、超时后强退，以及关闭超时/强退配置的 reducer/effect/draft handoff；单元测试必须使用 fake process client，不得关闭真实应用或等待墙上时钟。
 - 测试能覆盖 `SavedMacro` 与 `AutomationTaskRun` 分离。

@@ -10,6 +10,35 @@ public struct AutomationScheduledOccurrence: Codable, Equatable, Sendable {
     }
 }
 
+struct AutomationScheduledTaskIdentity: Hashable, Sendable {
+    var workflowID: UUID
+    var taskID: UUID
+}
+
+struct AutomationRepresentedScheduleIndex: Sendable {
+    private var startsByTask: [AutomationScheduledTaskIdentity: Set<Date>]
+
+    init(runs: [AutomationTaskRun]) {
+        var startsByTask: [AutomationScheduledTaskIdentity: Set<Date>] = [:]
+        for run in runs {
+            guard let scheduledStartTime = run.scheduledStartTime else { continue }
+            let identity = AutomationScheduledTaskIdentity(
+                workflowID: run.workflowID,
+                taskID: run.taskID
+            )
+            startsByTask[identity, default: []].insert(scheduledStartTime)
+        }
+        self.startsByTask = startsByTask
+    }
+
+    func startTimes(workflowID: UUID, taskID: UUID) -> Set<Date> {
+        startsByTask[AutomationScheduledTaskIdentity(
+            workflowID: workflowID,
+            taskID: taskID
+        )] ?? []
+    }
+}
+
 public extension AutomationSchedule {
     func nextOccurrence(
         onOrAfter referenceDate: Date,

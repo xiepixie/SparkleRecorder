@@ -43,10 +43,6 @@ struct PopoverContentView: View {
         !isWindow && state.isRecording
     }
 
-    private var filteredMacroCountForAnimation: Int {
-        usesRecordingPopover ? 0 : filteredMacros.count
-    }
-
     var body: some View {
         ZStack {
             VisualEffectBackground(material: isWindow ? .windowBackground : .popover, blendingMode: .behindWindow)
@@ -140,12 +136,7 @@ struct PopoverContentView: View {
             idealHeight: usesRecordingPopover ? 276 : (isWindow ? 620 : 540),
             maxHeight: usesRecordingPopover ? 276 : (isWindow ? .infinity : 540)
         )
-        .animation(.spring(response: 0.35, dampingFraction: 0.85), value: state.accessibilityGranted)
-        .animation(.spring(response: 0.35, dampingFraction: 0.85), value: state.inputMonitoringGranted)
         .animation(.spring(response: 0.25, dampingFraction: 0.9), value: usesRecordingPopover)
-        .animation(.spring(response: 0.3, dampingFraction: 0.85), value: filteredMacroCountForAnimation)
-        .animation(.spring(response: 0.3, dampingFraction: 0.85), value: filter)
-        .animation(.spring(response: 0.3, dampingFraction: 0.85), value: state.workspace)
         .onChange(of: filter) { selection.removeAll() }
         .sheet(item: $showAssignHotkey) { macro in
             HotkeyAssignmentSheet(

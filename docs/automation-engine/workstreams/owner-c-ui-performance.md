@@ -74,6 +74,8 @@ Owner C owns how users understand and edit automation. The first UI goal is not 
 
 ## Accepted Contracts
 
+- 2026-07-19: Quick Schedule, Quick Sequence, and advanced task editing expose bounded startup readiness without calling live adapters. Quick Sequence can insert existing login/navigation macros first and uses the existing OCR continuation for observable page readiness.
+
 - UI only dispatches `AutomationAction` or view-intent actions translated by the reducer layer.
 - First milestone is read-only projection; node-position drag editing is limited to `AutomationAction.moveTask`.
 - Read-only UI should use `AutomationViewProjection.overview(from:)`.
@@ -128,9 +130,17 @@ Owner C owns how users understand and edit automation. The first UI goal is not 
 - 2026-07-15: Library owns the single-macro automation surface: daily/weekly/interval/once timing, exact next-run preview, cancellable five-second trial run, target lifecycle choices, and a latest-run report/screenshot sheet. The UI calls injected controller/presenter boundaries and does not invoke scheduler, repository, or file IO directly.
 - 2026-07-15: Library cards now project configured/paused automatic-run state and next occurrence, refresh it while visible, and reopen a prefilled edit sheet. The sheet confirms destructive disable, reports preview success inline, identifies duplicate schedules for save-time consolidation, and keeps accessibility summaries aligned with visible state.
 - 2026-07-15: Quick Schedule discloses that SparkleRecorder must remain open for on-time execution and that missed occurrences do not stack; this copy corresponds to the accepted `latestOnly` reducer policy rather than a UI-only promise.
+- 2026-07-18: Quick Schedule exposes close grace period and force-quit fallback only when run-launched targets should close. Preview countdown state lives in a leaf control, while schedule occurrences and validation refresh only on draft changes. Library cards avoid full-card implicit animation, and their right-click menus omit library-wide customization lists retained in the ellipsis menu.
+- 2026-07-18: Library/Automation workspace switching no longer places spring animation on the shared root hierarchy. Run Center uses native sheet presentation/dismissal, leaf-scoped filter animations, and silent unchanged polling; its dismissal cancels polling. Library menu and scheduled-run terminology now have direct English/zh-Hans catalog tests.
+- 2026-07-18: Library Quick Sequence now owns the straight-line authoring tier between single-macro scheduling and Workflow. It edits an ordered macro list, immediate/fixed-delay/OCR-text continuations, and manual/daily/weekly/once/interval timing, then emits a draft document through the existing import boundary. Save remains in Library; save-and-test uses reducer manual start after a cancellable leaf-scoped countdown; advanced edit alone opens Workflow.
+- 2026-07-18: Quick Sequence screen-text waits now reuse `AutomationOCRRegionPicker` and `AutomationScreenRegionPicker`, persist picked bounds through draft visual assets, and expose contains/exact matching without adding a second evaluator. The editor uses a full-width step list beneath a compact schedule band so OCR authoring remains visible without a large empty inspector column.
+- 2026-07-18: Owner C accepted the Automation catalog as the primary workspace projection. Catalog rows represent whole `AutomationWorkflow` user goals and classify single-macro, linear, and advanced structures outside SwiftUI; the existing graph remains the advanced editor reached from a catalog item. Library remains macro-first and Runs remains execution-first.
+- 2026-07-18: Run Center live snapshots carry a volatile monotonic revision. Silent polls with an unchanged revision skip projection entirely; changed projection work runs off `MainActor`, publishes only unequal values, and has a direct 10,000-execution projection test.
+- 2026-07-18: Run Center recovery UX maps the semantic action to a context-specific primary command. Exact evidence navigation stays in an app-edge presenter; cancel targets the selected execution's active runs; retry requests a workflow-level restart; permissions/settings use app-shell commands; Workflow remains a secondary focused edit action.
 
 ## Handoff Checklist
 
+- [x] Run History settings shows allocated storage by artifact class, automatic-cleanup state, last result, and next eligible check; Run Center offers size-aware terminal-execution deletion without direct file IO.
 - [x] Static projection fixture renders.
 - [x] FlowGraph line layer uses Canvas.
 - [x] Resource Timeline labels reviewed for user clarity.
