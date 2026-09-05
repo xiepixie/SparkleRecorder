@@ -34,17 +34,21 @@ struct MacroReconstructionCLIResult: Codable, Equatable, Sendable {
     var candidateID: UUID?
     var normalizedDigest: String?
     var requiresAttention: Bool?
+    var usage: String?
 
     var summary: String {
         switch command {
+        case "help":
+            return usage ?? MacroReconstructionCLI.usage
         case "inspect":
             return (["Candidate action IDs (revision: candidate):"] + (actions ?? []).map {
                 "\($0.actionID)  \($0.kind)  events \($0.eventIndices)"
             }).joined(separator: "\n")
         case "export":
-            return (["Exported reconstruction package: \(outputPath ?? "")"] + (packageReport?.warnings ?? [])).joined(separator: "\n")
+            return (["Exported reconstruction package: \(outputPath ?? "")", "Next: read instructions.md in this package, edit candidate-template.json with your AI tool, then import the complete candidate."] + (packageReport?.warnings ?? [])).joined(separator: "\n")
         default:
-            return "Imported candidate \(candidateID?.uuidString ?? ""). Review and test it in the app before acceptance."
+            return "Imported candidate \(candidateID?.uuidString ?? ""). The accepted macro is unchanged.\nNext: open this macro in the library, choose Refine, select this candidate, and Test once before accepting it."
+                + (requiresAttention == true ? "\nReview the candidate’s uncertainties; correct them or explicitly acknowledge them before acceptance." : "")
         }
     }
 }
@@ -52,7 +56,25 @@ struct MacroReconstructionCLIResult: Codable, Equatable, Sendable {
 /// Authoring-only CLI boundary. This exposes no test receipt, playback, schedule,
 /// success or acceptance operation; the app owns those user-driven transitions.
 enum MacroReconstructionCLI {
+    static let usage = """
+    Refine a recorded macro with an external AI tool:
+      1. Find your macro: SparkleRecorder workflow macros --json
+      2. Export: SparkleRecorder reconstruction export --macro-id <UUID> [--output <new-directory>] [--include-video]
+      3. Read instructions.md and edit the complete candidate-template.json.
+      4. Inspect action IDs: SparkleRecorder reconstruction inspect --macro <candidate.json>
+      5. Import: SparkleRecorder reconstruction import --macro-id <UUID> --candidate <candidate.json>
+      6. In the app library, open Refine, select the imported candidate, Test once, and review the result before accepting.
+    --json returns structured results. Export stays local; visual bytes require --include-video.
+    Import keeps the accepted macro unchanged. Inspection checks structure; import validates source coverage.
+    Testing controls the target app. Restoring a macro does not undo actions in other apps.
+    """
+
     static func parse(_ arguments: [String]) throws -> MacroReconstructionCLIRequest {
+        let helpArguments = arguments.filter { $0 != "--json" }
+        if arguments.filter({ $0 == "--json" }).count <= 1,
+           helpArguments.isEmpty || [["help"], ["--help"], ["-h"], ["inspect", "--help"], ["export", "--help"], ["import", "--help"]].contains(helpArguments) {
+            return MacroReconstructionCLIRequest(command: "help")
+        }
         guard let command = arguments.first, ["inspect", "export", "import"].contains(command) else {
             throw MacroReconstructionCLIError(code: "unsupportedCommand", message:
                 "Expected reconstruction inspect --macro <file>, export --macro-id <UUID> [--output <directory>] [--include-video], or import --macro-id <UUID> --candidate <file>.")
@@ -113,6 +135,7 @@ enum MacroReconstructionCLI {
     static func execute(_ arguments: [String], appSupportURL: URL? = nil,
                         recordingsRoot: URL? = nil) async throws -> MacroReconstructionCLIResult {
         let request = try parse(arguments)
+        if request.command == "help" { return MacroReconstructionCLIResult(command: "help", usage: usage) }
         if request.command == "inspect", let path = request.macroPath {
             let data = try Data(contentsOf: URL(fileURLWithPath: path))
             let macro = try inspectMacro(data)

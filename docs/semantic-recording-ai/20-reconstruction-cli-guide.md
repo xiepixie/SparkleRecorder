@@ -52,3 +52,7 @@ Import returns a candidate UUID and normalized digest. It retains source and can
 Open **Refine** for the current library macro (or its reconstruction menu action). Review and test the candidate through the app. Test once executes one iteration without chained macros; acceptance retains the original repetition/chaining settings. Receipts bind that policy and exact tested content. Correcting a locator creates another immutable candidate and requires a fresh test. Playback completion, observable checks and user acceptance are separate decisions. This command family exposes no playback, success-receipt, acceptance, scheduling or restore command. Restoring the macro in the app does not undo external application actions.
 
 `--json` uses the existing `sparkle.cli.result.v1` envelope; failures exit nonzero. Default output is a short text summary. `MacroReconstructionCLITests` supplies parser, literal candidate-ID, export/import and acceptance-gate fixtures; execution results remain in the central verification ledger.
+
+## Help and verification
+
+Run `SparkleRecorder reconstruction --help` for the complete authoring-to-Refine flow; `--help --json` returns the same guide in `data.usage` without opening the library. Export and import text output now explain the next step and uncertainty review. See [CLI guidance and user flow](23-cli-user-flow.md) for CLI coverage and its live-acceptance limits.

@@ -298,3 +298,7 @@ Foundation evidence: `RecordingVideoClockTests`, `RecordingGeometryProjectionTes
 ## Accepted Review lookup contract — 2026-09-05
 
 S3 requests and S1 supplies `MacroReconstructionVideoIndex`: immutable per-segment interval lookup and source-ID row lookup. Validated clock interpolation and historical geometry retain existing boundary/gap rules with binary lookup. Review builds projections off MainActor and only publishes changed video highlight/marker state. Direct tests: `MacroReconstructionVideoIndexTests`, `ReconstructionLookupPerformanceTests`, `MacroReconstructionReviewTests`, existing clock/geometry suites. No live acceptance is implied.
+
+## S4 CLI guidance and verification (2026-09-05)
+
+Accepted S4-only additive help/usage contract and next-step guidance are recorded in [23-cli-user-flow.md](23-cli-user-flow.md). S1 execution semantics and S3 test/accept policy remain unchanged; live acceptance requires separate evidence.

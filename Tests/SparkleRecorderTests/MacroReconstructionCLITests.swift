@@ -52,6 +52,28 @@ struct MacroReconstructionCLITests {
         }
     }
 
+    @Test func helpIsDiscoverableWithoutAccessingTheLibrary() async throws {
+        for arguments in [[], ["--help"], ["help", "--json"], ["export", "--help"]] {
+            let result = try await MacroReconstructionCLI.execute(arguments)
+            #expect(result.command == "help")
+            #expect(result.usage?.contains("reconstruction import") == true)
+            #expect(result.summary.contains("workflow macros --json"))
+            #expect(result.summary.contains("Refine"))
+        }
+        #expect(throws: MacroReconstructionCLIError.self) {
+            try MacroReconstructionCLI.parse(["accept", "--help"])
+        }
+    }
+
+    @Test func summariesGuideTheNextUserDecision() {
+        let exported = MacroReconstructionCLIResult(command: "export", outputPath: "/tmp/package")
+        #expect(exported.summary.contains("instructions.md"))
+        let imported = MacroReconstructionCLIResult(command: "import", candidateID: UUID(), requiresAttention: true)
+        #expect(imported.summary.contains("Refine"))
+        #expect(imported.summary.contains("uncertainties"))
+        #expect(imported.summary.contains("unchanged"))
+    }
+
     private func macro() -> SavedMacro {
         SavedMacro(name: "CLI source", events: [RecordedEvent(kind: .mouseMoved, time: 0, x: 10, y: 20,
             keyCode: 0, flags: 0, mouseButton: 0, clickCount: 0, scrollDeltaY: 0, scrollDeltaX: 0)])
