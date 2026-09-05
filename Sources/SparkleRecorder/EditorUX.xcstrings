@@ -6681,6 +6681,210 @@
           }
         }
       }
+    },
+    "No visual evidence recorded · Action times reflect macro playback timing.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No visual evidence recorded · Action times reflect macro playback timing."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "本次未录制视觉证据 · 动作时间反映宏回放时间轴。"
+          }
+        }
+      }
+    },
+    "Drop candidate .json file here": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Drop candidate .json file here"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "可将候选 .json 文件直接拖拽至此处"
+          }
+        }
+      }
+    },
+    "You must run 'Test once' before accepting.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "You must run 'Test once' before accepting."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "采纳新版本前必须先完成一次单次试跑。"
+          }
+        }
+      }
+    },
+    "Export instructions & recording data": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Export instructions & recording data"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "导出提示词与录制数据"
+          }
+        }
+      }
+    },
+    "Review & adjust AI candidate": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Review & adjust AI candidate"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "审查并微调 AI 候选版本"
+          }
+        }
+      }
+    },
+    "Verify in target app & accept": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Verify in target app & accept"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "在目标应用验证并采纳"
+          }
+        }
+      }
+    },
+    "Export package for AI": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Export package for AI"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "导出 AI 材料包"
+          }
+        }
+      }
+    },
+    "Send package to AI (Claude, GPT, etc.)": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Send package to AI (Claude, GPT, etc.)"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "将材料包交给 AI 工具（Claude、GPT 等）处理"
+          }
+        }
+      }
+    },
+    "Import candidate JSON to test and accept": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Import candidate JSON to test and accept"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "导入生成的候选 JSON，试跑并采纳"
+          }
+        }
+      }
+    },
+    "Include visual frames": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Include visual frames"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "包含关键帧画面"
+          }
+        }
+      }
+    },
+    "Frames": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Frames"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "画面帧"
+          }
+        }
+      }
+    },
+    "Testing…": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Testing…"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在试跑…"
+          }
+        }
+      }
     }
   },
   "version": "1.1"

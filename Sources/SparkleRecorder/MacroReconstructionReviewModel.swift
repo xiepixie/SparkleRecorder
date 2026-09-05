@@ -161,6 +161,17 @@ final class MacroReconstructionReviewModel: ObservableObject {
         } catch { errorMessage = error.localizedDescription }
     }
 
+    func importCandidateFile(at url: URL) async {
+        guard !isBusy else { return }
+        do {
+            let data = try Data(contentsOf: url)
+            let document = try MacroCandidateValidator.decode(data)
+            await importDocument(document)
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
     func chooseCandidateFile() {
         guard !isBusy else { return }
         let panel = NSOpenPanel(); panel.allowedContentTypes = [.json]; panel.canChooseDirectories = false
@@ -168,9 +179,7 @@ final class MacroReconstructionReviewModel: ObservableObject {
         panel.begin { [weak self] response in
             guard response == .OK, let url = panel.url else { return }
             Task { @MainActor [weak self] in
-                guard let self else { return }
-                do { await self.importDocument(try MacroCandidateValidator.decode(Data(contentsOf: url))) }
-                catch { self.errorMessage = error.localizedDescription }
+                await self?.importCandidateFile(at: url)
             }
         }
     }
