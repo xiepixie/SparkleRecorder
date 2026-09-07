@@ -41,12 +41,16 @@ struct AutomationViewProjectionScalingTests {
         var runs: [AutomationTaskRun] = []
         runs.reserveCapacity(10_002)
         for index in 0..<10_000 {
+            let completedAt = base.addingTimeInterval(TimeInterval(index))
             runs.append(
                 AutomationTaskRun(
                     executionID: UUID(),
                     workflowID: workflowID,
                     taskID: index.isMultiple(of: 2) ? sourceTaskID : targetTaskID,
-                    createdAt: base.addingTimeInterval(TimeInterval(index))
+                    completedAt: completedAt,
+                    status: .completed,
+                    outcome: .succeeded(report: nil),
+                    createdAt: completedAt
                 )
             )
         }
@@ -96,6 +100,6 @@ struct AutomationViewProjectionScalingTests {
         #expect(edge.branchDecision?.sourceRunID == latestSource.id)
         #expect(edge.branchDecision?.targetRunID == downstreamTarget.id)
         #expect(edge.branchDecision?.executionID == executionID)
-        #expect(projection.timelineItems.count == runs.count)
+        #expect(projection.timelineItems.map(\.runID) == [latestSource.id, downstreamTarget.id])
     }
 }

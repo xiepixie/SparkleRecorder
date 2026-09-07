@@ -6,31 +6,31 @@ public enum AutomationViewProjection {
         var taskID: UUID
     }
 
-    private struct RunTaskInfo {
-        var task: AutomationTask
-
-        var taskID: UUID { task.id }
-        var title: String { task.name }
-    }
-
     public static func overview(from state: AutomationRunState) -> AutomationOverviewProjection {
         let generatedAt = state.now ?? Date.now
-        let taskInfoByRunID = taskInfoByRunID(from: state)
+        let taskByWorkflowAndTaskID = taskByWorkflowAndTaskID(from: state.workflows)
+        let taskByLeaseRunID = taskByLeaseRunID(
+            runs: state.runs,
+            leases: state.leases,
+            taskByWorkflowAndTaskID: taskByWorkflowAndTaskID
+        )
         let runHistory = AutomationRunHistoryIndex(runs: state.runs)
         let workflows = state.workflows.map { workflow in
             workflowProjection(
                 for: workflow,
                 runHistory: runHistory,
                 leases: state.leases,
-                taskInfoByRunID: taskInfoByRunID,
+                taskByLeaseRunID: taskByLeaseRunID,
                 generatedAt: generatedAt
             )
         }
-        let timelineItems = state.runs.compactMap { run in
+        let timelineRuns = AutomationResourceTimelineRunSelection.currentContextRuns(from: state.runs)
+        let timelineItems = timelineRuns.compactMap { run in
             timelineItem(
                 for: run,
                 leases: state.leases,
-                taskInfoByRunID: taskInfoByRunID,
+                taskByWorkflowAndTaskID: taskByWorkflowAndTaskID,
+                taskByLeaseRunID: taskByLeaseRunID,
                 generatedAt: generatedAt
             )
         }.sorted { left, right in
@@ -55,10 +55,10 @@ public enum AutomationViewProjection {
         for workflow: AutomationWorkflow,
         runHistory: AutomationRunHistoryIndex,
         leases: [AutomationResourceLease],
-        taskInfoByRunID: [UUID: RunTaskInfo],
+        taskByLeaseRunID: [UUID: AutomationTask],
         generatedAt: Date
     ) -> AutomationWorkflowProjection {
-        let levels = levelsByTaskID(for: workflow)
+        let levels = AutomationWorkflowGraphLevels.levelsByTaskID(for: workflow)
         let positions = positionsByTaskID(for: workflow, levels: levels)
         let incomingDependencyCounts = incomingDependencyCountsByTaskID(for: workflow)
         let nodes = workflow.tasks.map { task in
@@ -71,7 +71,7 @@ public enum AutomationViewProjection {
                     taskID: task.id
                 ),
                 leases: leases,
-                taskInfoByRunID: taskInfoByRunID,
+                taskByLeaseRunID: taskByLeaseRunID,
                 generatedAt: generatedAt,
                 incomingDependencyCount: incomingDependencyCounts[task.id, default: 0],
                 position: positions[task.id] ?? AutomationGraphPoint(x: graphInset, y: graphInset)
@@ -111,24 +111,42 @@ public enum AutomationViewProjection {
         )
     }
 
-    private static func taskInfoByRunID(from state: AutomationRunState) -> [UUID: RunTaskInfo] {
-        var taskByWorkflowAndTaskID: [WorkflowTaskKey: AutomationTask] = [:]
-        for workflow in state.workflows {
+    private static func taskByWorkflowAndTaskID(
+        from workflows: [AutomationWorkflow]
+    ) -> [WorkflowTaskKey: AutomationTask] {
+        var result: [WorkflowTaskKey: AutomationTask] = [:]
+        result.reserveCapacity(workflows.reduce(0) { $0 + $1.tasks.count })
+        for workflow in workflows {
             for task in workflow.tasks {
-                taskByWorkflowAndTaskID[
+                result[
                     WorkflowTaskKey(workflowID: workflow.id, taskID: task.id)
                 ] = task
             }
         }
+        return result
+    }
 
-        return Dictionary(uniqueKeysWithValues: state.runs.compactMap { run in
+    private static func taskByLeaseRunID(
+        runs: [AutomationTaskRun],
+        leases: [AutomationResourceLease],
+        taskByWorkflowAndTaskID: [WorkflowTaskKey: AutomationTask]
+    ) -> [UUID: AutomationTask] {
+        let leaseRunIDs = Set(leases.map(\.runID))
+        guard !leaseRunIDs.isEmpty else {
+            return [:]
+        }
+
+        var result: [UUID: AutomationTask] = [:]
+        result.reserveCapacity(leaseRunIDs.count)
+        for run in runs where leaseRunIDs.contains(run.id) {
             guard let task = taskByWorkflowAndTaskID[
                 WorkflowTaskKey(workflowID: run.workflowID, taskID: run.taskID)
             ] else {
-                return nil
+                continue
             }
-            return (run.id, RunTaskInfo(task: task))
-        })
+            result[run.id] = task
+        }
+        return result
     }
 
     private static func nodeProjection(
@@ -137,7 +155,7 @@ public enum AutomationViewProjection {
         run: AutomationTaskRun?,
         scheduledStartTimes: Set<Date>,
         leases: [AutomationResourceLease],
-        taskInfoByRunID: [UUID: RunTaskInfo],
+        taskByLeaseRunID: [UUID: AutomationTask],
         generatedAt: Date,
         incomingDependencyCount: Int,
         position: AutomationGraphPoint
@@ -164,7 +182,7 @@ public enum AutomationViewProjection {
                 for: task,
                 run: run,
                 leases: leases,
-                taskInfoByRunID: taskInfoByRunID,
+                taskByLeaseRunID: taskByLeaseRunID,
                 generatedAt: generatedAt
             ),
             timeoutCountdown: timeoutCountdown(for: task, run: run, generatedAt: generatedAt),
@@ -242,10 +260,13 @@ public enum AutomationViewProjection {
     private static func timelineItem(
         for run: AutomationTaskRun,
         leases: [AutomationResourceLease],
-        taskInfoByRunID: [UUID: RunTaskInfo],
+        taskByWorkflowAndTaskID: [WorkflowTaskKey: AutomationTask],
+        taskByLeaseRunID: [UUID: AutomationTask],
         generatedAt: Date
     ) -> AutomationResourceTimelineItem? {
-        guard let task = taskInfoByRunID[run.id]?.task else {
+        guard let task = taskByWorkflowAndTaskID[
+            WorkflowTaskKey(workflowID: run.workflowID, taskID: run.taskID)
+        ] else {
             return nil
         }
 
@@ -270,7 +291,7 @@ public enum AutomationViewProjection {
                 for: task,
                 run: run,
                 leases: leases,
-                taskInfoByRunID: taskInfoByRunID,
+                taskByLeaseRunID: taskByLeaseRunID,
                 generatedAt: generatedAt
             ),
             timeoutCountdown: timeoutCountdown(for: task, run: run, generatedAt: generatedAt),
@@ -370,7 +391,7 @@ public enum AutomationViewProjection {
         for task: AutomationTask,
         run: AutomationTaskRun?,
         leases: [AutomationResourceLease],
-        taskInfoByRunID: [UUID: RunTaskInfo],
+        taskByLeaseRunID: [UUID: AutomationTask],
         generatedAt: Date
     ) -> AutomationResourceWaitingProjection? {
         guard
@@ -401,7 +422,7 @@ public enum AutomationViewProjection {
             for: task.resourceRequirement,
             waitingRunID: run.id,
             leases: leases,
-            taskInfoByRunID: taskInfoByRunID
+            taskByLeaseRunID: taskByLeaseRunID
         )
         let detail = resourceWaitingDetail(
             for: task.resourceRequirement,
@@ -432,7 +453,7 @@ public enum AutomationViewProjection {
         for requirement: AutomationResourceRequirement,
         waitingRunID: UUID,
         leases: [AutomationResourceLease],
-        taskInfoByRunID: [UUID: RunTaskInfo]
+        taskByLeaseRunID: [UUID: AutomationTask]
     ) -> [AutomationResourceBlockerProjection] {
         let requiredResources = Set(requirement.resources)
         guard !requiredResources.isEmpty else {
@@ -453,13 +474,13 @@ public enum AutomationViewProjection {
                 return left.id.uuidString < right.id.uuidString
             }
             .map { lease in
-                let info = taskInfoByRunID[lease.runID]
+                let task = taskByLeaseRunID[lease.runID]
                 return AutomationResourceBlockerProjection(
                     resource: lease.resource,
                     resourceLabel: resourceLabel(for: lease.resource),
                     runID: lease.runID,
-                    taskID: info?.taskID,
-                    taskTitle: info?.title,
+                    taskID: task?.id,
+                    taskTitle: task?.name,
                     leaseExpiresAt: lease.expiresAt
                 )
             }
@@ -1001,27 +1022,6 @@ public enum AutomationViewProjection {
         case .completed:
             return .completed
         }
-    }
-
-    private static func levelsByTaskID(for workflow: AutomationWorkflow) -> [UUID: Int] {
-        let taskIDs = Set(workflow.tasks.map(\.id))
-        var levels = Dictionary(uniqueKeysWithValues: workflow.tasks.map { ($0.id, 0) })
-        guard !workflow.tasks.isEmpty else {
-            return levels
-        }
-
-        for _ in workflow.tasks.indices {
-            for dependency in workflow.dependencies where dependency.isEnabled {
-                guard taskIDs.contains(dependency.fromTaskID),
-                      taskIDs.contains(dependency.toTaskID) else {
-                    continue
-                }
-                let nextLevel = min(workflow.tasks.count - 1, (levels[dependency.fromTaskID] ?? 0) + 1)
-                levels[dependency.toTaskID] = max(levels[dependency.toTaskID] ?? 0, nextLevel)
-            }
-        }
-
-        return levels
     }
 
     private static func positionsByTaskID(

@@ -1,6 +1,6 @@
 # Owner C: UI / Performance Workstream
 
-Updated: 2026-09-04
+Updated: 2026-09-07
 
 ## Accepted reconstruction boundary (verification pending)
 
@@ -143,6 +143,7 @@ Owner C owns how users understand and edit automation. The first UI goal is not 
 - 2026-07-18: Owner C accepted the Automation catalog as the primary workspace projection. Catalog rows represent whole `AutomationWorkflow` user goals and classify single-macro, linear, and advanced structures outside SwiftUI; the existing graph remains the advanced editor reached from a catalog item. Library remains macro-first and Runs remains execution-first.
 - 2026-07-18: Run Center live snapshots carry a volatile monotonic revision. Silent polls with an unchanged revision skip projection entirely; changed projection work runs off `MainActor`, publishes only unequal values, and has a direct 10,000-execution projection test.
 - 2026-07-18: Run Center recovery UX maps the semantic action to a context-specific primary command. Exact evidence navigation stays in an app-edge presenter; cancel targets the selected execution's active runs; retry requests a workflow-level restart; permissions/settings use app-shell commands; Workflow remains a secondary focused edit action.
+- 2026-09-07: Owner C deepened Workflow Editor projection performance without changing reducer/runtime semantics. `AutomationRunHistoryIndex` centralizes latest Task, represented schedule-start, and same-Execution downstream lookups; Resource Timeline projects only the current execution context while Run Center/Task Run History keep complete history; graph levels use O(T + D) DAG traversal with a bounded corrupt-cycle fallback. Direct coverage includes large Run History, simultaneous active Executions, Timeline conflict semantics, and a 1,000-Task linear Workflow.
 
 ## Handoff Checklist
 

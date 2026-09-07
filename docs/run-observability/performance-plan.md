@@ -1,6 +1,6 @@
 # Run History Performance Optimization
 
-Updated: 2026-07-18
+Updated: 2026-09-07
 
 ## Baseline Before This Slice
 
@@ -21,6 +21,9 @@ Updated: 2026-07-18
 8. Metadata retention has both age and a default 10,000-record count limit. Protected/active evidence remains protected; oldest unprotected terminal metadata is removed first.
 9. The app performs the retention cleanup once on startup when eligible and rechecks eligibility hourly while it remains open; the pure planner still limits actual cleanup to once per day.
 10. Successful OCR/template locator diagnostics use debug logging; failures and lifecycle checkpoints retain their existing visibility.
+11. Workflow Editor projection builds one lightweight run-history index per refresh for latest Task state, represented schedule starts, and same-Execution downstream lookup instead of rescanning the complete Run History per Task or dependency.
+12. Resource Timeline is a current execution-context projection, not a second history browser. For each Workflow it keeps every active Execution and its completed upstream/retry Runs; when nothing is active it keeps the latest completed Execution. Run Center and Task Run History retain the complete historical Interface.
+13. Workflow graph levels use a linear DAG traversal for valid Workflows. A bounded relaxation fallback exists only to keep corrupt or legacy cyclic data renderable, so ordinary graph projection stays O(T + D).
 
 ## Risks And Recovery
 
@@ -39,4 +42,7 @@ Updated: 2026-07-18
 - An unchanged two-second Runs poll does not replace the projection or toggle visible loading state.
 - A changed runtime revision rebuilds projection outside `MainActor` and updates selection deterministically.
 - Scheduler tests prove one pre-indexed represented-start lookup across many tasks.
+- Workflow projection tests prove indexed latest/downstream/schedule semantics across large Run History without changing branch outcomes.
+- Resource Timeline selection tests prove active Execution context is complete while old terminal history remains in Run Center rather than Timeline projection.
+- Graph-level tests prove longest-path DAG layout semantics, ignored disabled/broken links, bounded corrupt-cycle fallback, and a 1,000-Task linear Workflow without repeated graph relaxation.
 - Retention tests prove the metadata count cap while preserving active/latest/failure/evidence protections.
