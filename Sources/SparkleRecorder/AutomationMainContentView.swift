@@ -50,13 +50,9 @@ struct AutomationMainContentView: View {
   let visualAssetPackageRootAssociation: AutomationVisualAssetPackageRootAssociation
   let onShowLibrary: () -> Void
 
-  @State private var selectedWorkflowID: UUID?
-  @State private var selection: AutomationAuthoringSelection = .workflow
-  @State private var pendingDependencySourceID: UUID?
-  @State private var pendingDependencyTrigger: AutomationDependencyTriggerDraft = .onSuccess
+  @State private var authoringState: AutomationWorkflowAuthoringState
   @State private var draftPreviewState: AutomationWorkflowDraftPreviewState?
   @State private var importNoticeState: AutomationWorkflowImportNoticeState?
-  @State private var selectedInspectorRunID: UUID?
   @State private var workflowRecordingHandoff = AutomationWorkflowRecordingHandoff()
   @State private var recordedTaskReviewDraft: AutomationRecordedTaskReviewDraft?
   @State private var editingQuickScheduleWorkflow: AutomationWorkflow?
@@ -124,14 +120,42 @@ struct AutomationMainContentView: View {
     self.onSetMacroLoops = onSetMacroLoops
     self.visualAssetPackageRootAssociation = visualAssetPackageRootAssociation
     self.onShowLibrary = onShowLibrary
-    _selectedWorkflowID = State(initialValue: initialSelectedWorkflowID)
-    _selection = State(initialValue: initialSelection)
-    _pendingDependencySourceID = State(initialValue: initialPendingDependencySourceID)
-    _pendingDependencyTrigger = State(initialValue: initialPendingDependencyTrigger)
-    _selectedInspectorRunID = State(initialValue: initialSelectedRunID)
+    _authoringState = State(
+      initialValue: AutomationWorkflowAuthoringState(
+        selectedWorkflowID: initialSelectedWorkflowID,
+        selection: initialSelection,
+        pendingDependencySourceID: initialPendingDependencySourceID,
+        pendingDependencyTrigger: initialPendingDependencyTrigger,
+        selectedInspectorRunID: initialSelectedRunID
+      )
+    )
     _workspaceSurface = State(
       initialValue: initialSelectedWorkflowID == nil ? .catalog : .editor
     )
+  }
+
+  private var selectedWorkflowID: UUID? {
+    authoringState.selectedWorkflowID
+  }
+
+  private var selection: AutomationAuthoringSelection {
+    authoringState.selection
+  }
+
+  private var pendingDependencySourceID: UUID? {
+    authoringState.pendingDependencySourceID
+  }
+
+  private var pendingDependencyTrigger: AutomationDependencyTriggerDraft {
+    authoringState.pendingDependencyTrigger
+  }
+
+  private var selectedInspectorRunID: UUID? {
+    authoringState.selectedInspectorRunID
+  }
+
+  private var authoringRepairSignature: AutomationWorkflowAuthoringRepairSignature {
+    AutomationWorkflowAuthoringRepairSignature(workflows: state.workflows)
   }
 
   private var selectedWorkflow: AutomationWorkflowProjection? {
@@ -146,8 +170,7 @@ struct AutomationMainContentView: View {
   }
 
   private var pendingDependencyTriggerOptions: [AutomationDependencyTriggerDraft] {
-    let sourceTask = pendingDependencySourceID.flatMap { selectedRawWorkflow?.task(id: $0) }
-    return AutomationDependencyTriggerDraft.options(for: sourceTask)
+    authoringState.dependencyTriggerOptions(in: selectedRawWorkflow)
   }
 
   private var selectedTimelineItems: [AutomationResourceTimelineItem] {
@@ -314,7 +337,7 @@ struct AutomationMainContentView: View {
               AutomationWorkflowListView(
                 projection: projection,
                 macros: macros,
-                selectedWorkflowID: $selectedWorkflowID,
+                selectedWorkflowID: selectedWorkflowID,
                 selectedWorkflow: selectedRawWorkflow,
                 onSelectWorkflow: selectWorkflow,
                 onCreateWorkflow: createWorkflow,
@@ -451,17 +474,22 @@ struct AutomationMainContentView: View {
       }
     }
     .onAppear {
-      _ = applyRequestedWorkspaceDestination()
+      if !applyRequestedWorkspaceDestination() {
+        repairSelection()
+      }
     }
     .onChange(of: projection.workflows.map(\.id)) { old, new in
       if !applyRequestedWorkspaceDestination(), new.count > old.count {
         let addedIDs = Set(new).subtracting(old)
         if let newID = addedIDs.first {
-          selectedWorkflowID = newID
+          authoringState.selectWorkflow(newID)
         }
       }
       repairSelection()
       repairImportNotice()
+    }
+    .onChange(of: authoringRepairSignature) {
+      repairSelection()
     }
     .onChange(of: requestedWorkspaceDestination) {
       _ = applyRequestedWorkspaceDestination()
@@ -581,24 +609,15 @@ struct AutomationMainContentView: View {
   }
 
   private var selectedTaskID: UUID? {
-    if case .task(let taskID) = selection {
-      return taskID
-    }
-    return nil
+    authoringState.selectedTaskID
   }
 
   private var selectedDependencyID: UUID? {
-    if case .dependency(let dependencyID) = selection {
-      return dependencyID
-    }
-    return nil
+    authoringState.selectedDependencyID
   }
 
   private func selectWorkflow(_ workflowID: UUID?) {
-    selectedWorkflowID = workflowID
-    selection = .workflow
-    pendingDependencySourceID = nil
-    selectedInspectorRunID = nil
+    authoringState.selectWorkflow(workflowID)
   }
 
   private func openAutomation(_ workflowID: UUID) {
@@ -776,21 +795,15 @@ struct AutomationMainContentView: View {
   }
 
   private func selectTask(_ taskID: UUID) {
-    selection = .task(taskID)
-    selectedInspectorRunID = nil
+    authoringState.selectTask(taskID)
   }
 
   private func selectDependency(_ dependencyID: UUID) {
-    selection = .dependency(dependencyID)
-    pendingDependencySourceID = nil
-    selectedInspectorRunID = nil
+    authoringState.selectDependency(dependencyID)
   }
 
   private func selectTimelineItem(_ item: AutomationResourceTimelineItem) {
-    selectedWorkflowID = item.workflowID
-    selection = .task(item.taskID)
-    pendingDependencySourceID = nil
-    selectedInspectorRunID = item.runID
+    authoringState.selectTimelineItem(item)
   }
 
   private func createWorkflow() {
@@ -800,10 +813,7 @@ struct AutomationMainContentView: View {
       createdAt: date,
       modifiedAt: date
     )
-    selectedWorkflowID = workflow.id
-    selection = .workflow
-    pendingDependencySourceID = nil
-    selectedInspectorRunID = nil
+    authoringState.selectWorkflow(workflow.id)
     workspaceSurface = .editor
     onAction(.upsertWorkflow(workflow, at: date))
   }
@@ -824,25 +834,19 @@ struct AutomationMainContentView: View {
         perform: onCommitAction,
         at: date
       )
-      selectedWorkflowID = workflows.first?.id
-      selection = .workflow
-      pendingDependencySourceID = nil
-      selectedInspectorRunID = nil
+      authoringState.selectWorkflow(workflows.first?.id)
     }
   }
 
   private func deleteWorkflow(_ workflowID: UUID) {
     let date = Date()
-    if selectedWorkflowID == workflowID {
-      selectedWorkflowID = state.workflows.first { $0.id != workflowID }?.id
-      selection = .workflow
-    }
+    authoringState.didDeleteWorkflow(
+      workflowID,
+      remainingWorkflows: state.workflows.filter { $0.id != workflowID }
+    )
     if importNoticeState?.workflowID == workflowID {
       importNoticeState = nil
     }
-    pendingDependencySourceID = nil
-    pendingDependencyTrigger = .onSuccess
-    selectedInspectorRunID = nil
     onAction(.deleteWorkflow(workflowID: workflowID, at: date))
   }
 
@@ -920,11 +924,7 @@ struct AutomationMainContentView: View {
       )
     }
 
-    selectedWorkflowID = workflowToImport.id
-    selection = .workflow
-    pendingDependencySourceID = nil
-    pendingDependencyTrigger = .onSuccess
-    selectedInspectorRunID = nil
+    authoringState.selectWorkflow(workflowToImport.id)
     importNoticeState = AutomationWorkflowImportNoticeState(
       workflowID: workflowToImport.id,
       workflowName: workflowToImport.name,
@@ -1004,11 +1004,7 @@ struct AutomationMainContentView: View {
     importNoticeState = nil
     let date = Date()
     if let previousWorkflow = notice.previousWorkflow {
-      selectedWorkflowID = previousWorkflow.id
-      selection = .workflow
-      pendingDependencySourceID = nil
-      pendingDependencyTrigger = .onSuccess
-      selectedInspectorRunID = nil
+      authoringState.selectWorkflow(previousWorkflow.id)
       onAction(.upsertWorkflow(previousWorkflow, at: date))
     } else {
       deleteWorkflow(notice.workflowID)
@@ -1078,7 +1074,7 @@ struct AutomationMainContentView: View {
     }
 
     if let targetWorkflowID {
-      selectedWorkflowID = targetWorkflowID
+      authoringState.selectWorkflow(targetWorkflowID)
     }
     if let insertion = commitMacroTask(recordedMacro, position: nil, insertionIndex: nil) {
       recordedTaskReviewDraft = AutomationRecordedTaskReviewDraft(
@@ -1145,8 +1141,7 @@ struct AutomationMainContentView: View {
     )
 
     if let workflow = selectedRawWorkflow {
-      selection = .task(task.id)
-      selectedInspectorRunID = nil
+      authoringState.selectCreatedTask(task.id, workflowID: workflow.id)
       if let insertionIndex {
         var updatedWorkflow = workflow
         let index = min(max(0, insertionIndex), updatedWorkflow.tasks.count)
@@ -1163,9 +1158,7 @@ struct AutomationMainContentView: View {
         createdAt: date,
         modifiedAt: date
       )
-      selectedWorkflowID = workflow.id
-      selection = .task(task.id)
-      selectedInspectorRunID = nil
+      authoringState.selectCreatedTask(task.id, workflowID: workflow.id)
       onAction(.upsertWorkflow(workflow, at: date))
       return AutomationInsertedMacroTask(workflowID: workflow.id, task: task)
     }
@@ -1188,9 +1181,7 @@ struct AutomationMainContentView: View {
       ?? draft.task
     updatedTask.name = trimmedName
 
-    selection = .task(updatedTask.id)
-    selectedWorkflowID = draft.workflowID
-    selectedInspectorRunID = nil
+    authoringState.selectCreatedTask(updatedTask.id, workflowID: draft.workflowID)
     onAction(.upsertTask(workflowID: draft.workflowID, task: updatedTask, at: Date()))
     onRenameMacro?(draft.macroID, trimmedName)
     onSetMacroLoops?(draft.macroID, max(0, draft.loopsDraft))
@@ -1260,8 +1251,7 @@ struct AutomationMainContentView: View {
       resourceRequirement: conditionTaskResourceRequirement(for: kind),
       graphPosition: defaultGraphPosition()
     )
-    selection = .task(task.id)
-    selectedInspectorRunID = nil
+    authoringState.selectCreatedTask(task.id, workflowID: workflow.id)
     onAction(.upsertTask(workflowID: workflow.id, task: task, at: Date()))
   }
 
@@ -1290,69 +1280,40 @@ struct AutomationMainContentView: View {
   }
 
   private func startDependency(from taskID: UUID) {
-    pendingDependencySourceID = taskID
-    let sourceTask = selectedRawWorkflow?.task(id: taskID)
-    pendingDependencyTrigger =
-      AutomationDependencyTriggerDraft.options(for: sourceTask).first ?? .onSuccess
-    selection = .task(taskID)
+    guard let workflow = selectedRawWorkflow else {
+      authoringState.cancelDependency()
+      return
+    }
+    _ = authoringState.beginDependency(from: taskID, in: workflow)
   }
 
   private func setPendingDependencyTrigger(_ trigger: AutomationDependencyTriggerDraft) {
-    pendingDependencyTrigger =
-      pendingDependencyTriggerOptions.contains(trigger)
-      ? trigger
-      : pendingDependencyTriggerOptions.first ?? .onSuccess
+    authoringState.setPendingDependencyTrigger(trigger, in: selectedRawWorkflow)
   }
 
   private func completeDependency(to taskID: UUID) {
-    guard let workflow = selectedRawWorkflow,
-      let sourceID = pendingDependencySourceID,
-      sourceID != taskID
-    else {
-      pendingDependencySourceID = nil
-      pendingDependencyTrigger = .onSuccess
+    guard let workflow = selectedRawWorkflow else {
+      authoringState.cancelDependency()
       return
     }
 
-    if let existing = workflow.dependencies.first(where: {
-      $0.fromTaskID == sourceID && $0.toTaskID == taskID
-    }) {
-      selection = .dependency(existing.id)
-      pendingDependencySourceID = nil
-      pendingDependencyTrigger = .onSuccess
+    switch authoringState.completeDependency(to: taskID, in: workflow) {
+    case .invalid, .existing:
       return
+    case .create(let dependency):
+      onAction(.upsertDependency(workflowID: workflow.id, dependency: dependency, at: Date()))
     }
-
-    let trigger =
-      pendingDependencyTriggerOptions.contains(pendingDependencyTrigger)
-      ? pendingDependencyTrigger
-      : pendingDependencyTriggerOptions.first ?? .onSuccess
-
-    let dependency = AutomationDependency(
-      fromTaskID: sourceID,
-      toTaskID: taskID,
-      trigger: trigger.trigger
-    )
-    pendingDependencySourceID = nil
-    pendingDependencyTrigger = .onSuccess
-    selection = .dependency(dependency.id)
-    onAction(.upsertDependency(workflowID: workflow.id, dependency: dependency, at: Date()))
   }
 
   private func cancelDependency() {
-    pendingDependencySourceID = nil
-    pendingDependencyTrigger = .onSuccess
+    authoringState.cancelDependency()
   }
 
   private func deleteDependencyFromGraph(_ dependencyID: UUID) {
     guard let workflow = selectedRawWorkflow else {
       return
     }
-    pendingDependencySourceID = nil
-    pendingDependencyTrigger = .onSuccess
-    if selectedDependencyID == dependencyID {
-      selection = .workflow
-    }
+    authoringState.didDeleteDependency(dependencyID)
     onAction(.deleteDependency(workflowID: workflow.id, dependencyID: dependencyID, at: Date()))
   }
 
@@ -1367,39 +1328,14 @@ struct AutomationMainContentView: View {
       return false
     }
 
-    selectedWorkflowID = resolution.workflowID
-    selection = resolution.selection
-    pendingDependencySourceID = nil
-    pendingDependencyTrigger = .onSuccess
-    selectedInspectorRunID = nil
+    authoringState.applyNavigation(resolution)
     workspaceSurface = .editor
     onConsumeWorkspaceDestination()
     return true
   }
 
   private func repairSelection() {
-    if selectedWorkflowID == nil {
-      selectedWorkflowID = projection.workflows.first?.id
-    }
-    guard let workflow = selectedRawWorkflow else {
-      selection = .workflow
-      pendingDependencySourceID = nil
-      pendingDependencyTrigger = .onSuccess
-      return
-    }
-
-    switch selection {
-    case .workflow:
-      return
-    case .task(let taskID):
-      if !workflow.tasks.contains(where: { $0.id == taskID }) {
-        selection = .workflow
-      }
-    case .dependency(let dependencyID):
-      if !workflow.dependencies.contains(where: { $0.id == dependencyID }) {
-        selection = .workflow
-      }
-    }
+    authoringState.repair(workflows: state.workflows)
   }
 
   private func autoArrangeTasks() {

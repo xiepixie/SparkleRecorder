@@ -4,7 +4,7 @@ import SparkleRecorderCore
 struct AutomationWorkflowListView: View {
     let projection: AutomationOverviewProjection
     let macros: [SavedMacro]
-    @Binding var selectedWorkflowID: UUID?
+    let selectedWorkflowID: UUID?
     let selectedWorkflow: AutomationWorkflow?
     let onSelectWorkflow: (UUID?) -> Void
     let onCreateWorkflow: () -> Void
