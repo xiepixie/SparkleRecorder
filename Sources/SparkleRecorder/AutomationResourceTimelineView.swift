@@ -20,6 +20,10 @@ struct AutomationResourceTimelineView: View {
     private let connectorHeight = 2.0
 
     var body: some View {
+        let presentation = AutomationResourceTimelinePresentation.make(items: items)
+        let displayItems = presentation.items
+        let conflictIDs = presentation.conflictIDs
+
         VStack(alignment: .leading, spacing: 8) {
             if nextScheduledOccurrence != nil || nextScheduledTaskName != nil {
                 AutomationTimelineSchedulePreview(
@@ -38,7 +42,7 @@ struct AutomationResourceTimelineView: View {
                 .padding(.top, 10)
             }
 
-            if items.isEmpty {
+            if displayItems.isEmpty {
                 AutomationEmptyState(
                     systemImage: "clock.badge.questionmark",
                     title: String(localized: "No runs yet", table: "Common"),
@@ -49,7 +53,7 @@ struct AutomationResourceTimelineView: View {
                 .padding(.bottom, 10)
             } else {
                 ScrollView(.horizontal) {
-                    HStack(alignment: .top, spacing: 0) {
+                    LazyHStack(alignment: .top, spacing: 0) {
                         ForEach(Array(displayItems.enumerated()), id: \.element.id) { index, item in
                             AutomationTimelineColumn(
                                 item: item,
@@ -75,66 +79,6 @@ struct AutomationResourceTimelineView: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .topLeading)
-    }
-
-    private var displayItems: [AutomationResourceTimelineItem] {
-        items.sorted { left, right in
-            let leftStart = left.timelineStart ?? .distantPast
-            let rightStart = right.timelineStart ?? .distantPast
-            if leftStart == rightStart {
-                return left.title < right.title
-            }
-            return leftStart < rightStart
-        }
-    }
-
-    private var conflictIDs: Set<UUID> {
-        var ids = Set<UUID>()
-        for leftIndex in displayItems.indices {
-            for rightIndex in displayItems.indices where rightIndex > leftIndex {
-                let left = displayItems[leftIndex]
-                let right = displayItems[rightIndex]
-                guard sharesExclusiveResource(left, right), intervalsOverlap(left, right) else {
-                    continue
-                }
-                ids.insert(left.id)
-                ids.insert(right.id)
-            }
-        }
-        return ids
-    }
-
-    private func sharesExclusiveResource(
-        _ left: AutomationResourceTimelineItem,
-        _ right: AutomationResourceTimelineItem
-    ) -> Bool {
-        let leftKeys = Set(left.resourceKeys ?? [])
-        let rightKeys = Set(right.resourceKeys ?? [])
-        return !leftKeys.isEmpty && !leftKeys.intersection(rightKeys).isEmpty
-    }
-
-    private func intervalsOverlap(
-        _ left: AutomationResourceTimelineItem,
-        _ right: AutomationResourceTimelineItem
-    ) -> Bool {
-        guard let leftInterval = interval(for: left),
-              let rightInterval = interval(for: right) else {
-            return false
-        }
-        let startsTogether = abs(leftInterval.start.timeIntervalSince(rightInterval.start)) < 1
-        let overlaps = leftInterval.start < rightInterval.end && rightInterval.start < leftInterval.end
-        return startsTogether || overlaps
-    }
-
-    private func interval(for item: AutomationResourceTimelineItem) -> (start: Date, end: Date)? {
-        guard let start = item.timelineStart else {
-            return nil
-        }
-        if item.status == .running {
-            return (start, .distantFuture)
-        }
-        let end = item.completedAt ?? start
-        return (start, max(start, end))
     }
 }
 
