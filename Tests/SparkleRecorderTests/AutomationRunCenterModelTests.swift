@@ -109,6 +109,77 @@ struct AutomationRunCenterModelTests {
         #expect(model.projection.executions.first?.workflowName == "New")
     }
 
+    @Test("Forced refresh supersedes an in-flight loading refresh")
+    func forcedRefreshSupersedesLoadingRefresh() async {
+        let oldState = refreshStateFixture(workflowName: "Old")
+        let newState = refreshStateFixture(workflowName: "New")
+        let gate = AutomationRunCenterRefreshGate(
+            oldResult: .loadedVersioned(
+                AutomationRuntimeSnapshot(state: oldState, revision: 1)
+            ),
+            newResult: .loadedVersioned(
+                AutomationRuntimeSnapshot(state: newState, revision: 2)
+            )
+        )
+        let model = AutomationRunCenterModel(initialState: oldState) {
+            await gate.load()
+        }
+
+        let staleRefresh = Task { @MainActor in
+            await model.refresh(showsLoading: true, forceProjection: true)
+        }
+        await gate.waitUntilOldRefreshStarts()
+        #expect(model.loadState.isLoading)
+
+        await model.refresh(showsLoading: false, forceProjection: true)
+        #expect(model.projection.executions.first?.workflowName == "New")
+        #expect(!model.loadState.isLoading)
+
+        await gate.releaseOldRefresh()
+        await staleRefresh.value
+
+        #expect(model.projection.executions.first?.workflowName == "New")
+        #expect(!model.loadState.isLoading)
+    }
+
+    @Test("A forced refresh clears inherited loading state even when projection is unchanged")
+    func forcedUnchangedRefreshClearsLoadingState() async {
+        let state = refreshStateFixture(workflowName: "Stable")
+        let snapshot = AutomationRuntimeSnapshot(state: state, revision: 1)
+        let gate = AutomationRunCenterThreePhaseRefreshGate(
+            initialResult: .loadedVersioned(snapshot),
+            blockedResult: .loadedVersioned(snapshot),
+            replacementResult: .loadedVersioned(
+                AutomationRuntimeSnapshot(state: state, revision: 2)
+            )
+        )
+        let loadedAt = Date(timeIntervalSince1970: 1_100)
+        let model = AutomationRunCenterModel(
+            initialState: state,
+            now: { loadedAt }
+        ) {
+            await gate.load()
+        }
+
+        await model.refresh()
+        #expect(model.loadState == .loaded(at: loadedAt))
+
+        let blockedRefresh = Task { @MainActor in
+            await model.refresh(showsLoading: true, forceProjection: true)
+        }
+        await gate.waitUntilBlockedRefreshStarts()
+        #expect(model.loadState.isLoading)
+
+        await model.refresh(showsLoading: false, forceProjection: true)
+        #expect(model.projection.executions.first?.workflowName == "Stable")
+        #expect(model.loadState == .loaded(at: loadedAt))
+
+        await gate.releaseBlockedRefresh()
+        await blockedRefresh.value
+
+        #expect(model.loadState == .loaded(at: loadedAt))
+    }
+
     @Test("Versioned polling skips projection work when runtime revision is unchanged")
     func versionedPollingSkipsUnchangedRevision() async {
         let firstLoadedAt = Date(timeIntervalSince1970: 900)
@@ -167,6 +238,65 @@ struct AutomationRunCenterModelTests {
             AutomationRunState(workflows: [workflow], runs: [run], now: startedAt),
             workflow
         )
+    }
+}
+
+private actor AutomationRunCenterThreePhaseRefreshGate {
+    private let initialResult: AutomationRunCenterLoadResult
+    private let blockedResult: AutomationRunCenterLoadResult
+    private let replacementResult: AutomationRunCenterLoadResult
+    private var loadCount = 0
+    private var blockedRefreshStarted = false
+    private var startWaiters: [CheckedContinuation<Void, Never>] = []
+    private var blockedReleaseContinuation: CheckedContinuation<Void, Never>?
+    private var blockedRefreshReleased = false
+
+    init(
+        initialResult: AutomationRunCenterLoadResult,
+        blockedResult: AutomationRunCenterLoadResult,
+        replacementResult: AutomationRunCenterLoadResult
+    ) {
+        self.initialResult = initialResult
+        self.blockedResult = blockedResult
+        self.replacementResult = replacementResult
+    }
+
+    func load() async -> AutomationRunCenterLoadResult {
+        loadCount += 1
+        switch loadCount {
+        case 1:
+            return initialResult
+        case 2:
+            blockedRefreshStarted = true
+            let waiters = startWaiters
+            startWaiters.removeAll()
+            for waiter in waiters {
+                waiter.resume()
+            }
+            if !blockedRefreshReleased {
+                await withCheckedContinuation { continuation in
+                    blockedReleaseContinuation = continuation
+                }
+            }
+            return blockedResult
+        default:
+            return replacementResult
+        }
+    }
+
+    func waitUntilBlockedRefreshStarts() async {
+        if blockedRefreshStarted {
+            return
+        }
+        await withCheckedContinuation { continuation in
+            startWaiters.append(continuation)
+        }
+    }
+
+    func releaseBlockedRefresh() {
+        blockedRefreshReleased = true
+        blockedReleaseContinuation?.resume()
+        blockedReleaseContinuation = nil
     }
 }
 

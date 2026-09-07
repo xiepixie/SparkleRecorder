@@ -110,7 +110,9 @@ final class AutomationRunCenterModel {
         showsLoading: Bool = true,
         forceProjection: Bool = false
     ) async {
-        guard !loadState.isLoading else { return }
+        if loadState.isLoading && !forceProjection {
+            return
+        }
         refreshGeneration &+= 1
         let generation = refreshGeneration
         let lastLoadedAt = loadState.lastLoadedAt
@@ -172,7 +174,7 @@ final class AutomationRunCenterModel {
             projection = refreshedProjection
         }
         lastRuntimeRevision = revision
-        if showsLoading || projectionChanged || loadState.failureMessage != nil || lastLoadedAt == nil {
+        if showsLoading || loadState.isLoading || projectionChanged || loadState.failureMessage != nil || lastLoadedAt == nil {
             loadState = .loaded(at: loadedAt)
         }
     }
