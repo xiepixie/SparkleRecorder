@@ -105,7 +105,7 @@ enum AutomationWorkflowPackagePresenter {
 
     static func importWorkflows(
         currentWorkflows: @escaping @MainActor () -> [AutomationWorkflow],
-        currentAvailableMacroIDs: @escaping @MainActor () -> Set<UUID>,
+        currentMacros: @escaping @MainActor () -> [SavedMacro],
         onImport: @escaping @MainActor ([AutomationWorkflow]) async throws -> Void
     ) {
         let panel = NSOpenPanel()
@@ -136,7 +136,7 @@ enum AutomationWorkflowPackagePresenter {
                 let plan = AutomationWorkflowPackageImportConflictPlan.make(
                     importItems: importItems,
                     currentWorkflows: currentWorkflows(),
-                    availableMacroIDs: currentAvailableMacroIDs()
+                    availableMacroIDs: Set(currentMacros().map(\.id))
                 )
                 guard let prepared = prepareForImport(importItems, plan: plan) else {
                     return

@@ -6,23 +6,39 @@ import UniformTypeIdentifiers
 @MainActor
 enum AutomationWorkflowDraftPreviewPresenter {
     static func openDraft(
-        macros: [SavedMacro],
+        currentMacros: @escaping @MainActor () -> [SavedMacro],
         onPreview: @escaping (AutomationWorkflowDraftPreviewState) -> Void
     ) {
-        let panel = NSOpenPanel()
-        panel.title = String(localized: "Open Workflow Draft", table: "Automation")
-        panel.allowsMultipleSelection = false
-        panel.canChooseDirectories = false
-        panel.allowedContentTypes = [.json]
+        openDraft(
+            currentMacros: currentMacros,
+            selectURL: { completion in
+                let panel = NSOpenPanel()
+                panel.title = String(localized: "Open Workflow Draft", table: "Automation")
+                panel.allowsMultipleSelection = false
+                panel.canChooseDirectories = false
+                panel.allowedContentTypes = [.json]
 
-        NSApp.activate(ignoringOtherApps: true)
-        panel.begin { response in
-            guard response == .OK, let url = panel.url else {
+                NSApp.activate(ignoringOtherApps: true)
+                panel.begin { response in
+                    completion(response == .OK ? panel.url : nil)
+                }
+            },
+            onPreview: onPreview
+        )
+    }
+
+    static func openDraft(
+        currentMacros: @escaping @MainActor () -> [SavedMacro],
+        selectURL: (@escaping @MainActor (URL?) -> Void) -> Void,
+        onPreview: @escaping (AutomationWorkflowDraftPreviewState) -> Void
+    ) {
+        selectURL { url in
+            guard let url else {
                 return
             }
 
             do {
-                let state = try previewState(from: url, macros: macros)
+                let state = try previewState(from: url, macros: currentMacros())
                 onPreview(state)
             } catch {
                 showError(
