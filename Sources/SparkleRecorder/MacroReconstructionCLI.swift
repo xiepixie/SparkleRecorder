@@ -45,7 +45,7 @@ struct MacroReconstructionCLIResult: Codable, Equatable, Sendable {
                 "\($0.actionID)  \($0.kind)  events \($0.eventIndices)"
             }).joined(separator: "\n")
         case "export":
-            return (["Exported reconstruction package: \(outputPath ?? "")", "Next: read instructions.md in this package, edit candidate-template.json with your AI tool, then import the complete candidate."] + (packageReport?.warnings ?? [])).joined(separator: "\n")
+            return (["Exported reconstruction package: \(outputPath ?? "")", "Next: start with harness.json, follow its staged reading plan, have your AI tool write candidate.json, then import either the package directory or candidate.json."] + (packageReport?.warnings ?? [])).joined(separator: "\n")
         default:
             return "Imported candidate \(candidateID?.uuidString ?? ""). The accepted macro is unchanged.\nNext: open this macro in the library, choose Refine, select this candidate, and Test once before accepting it."
                 + (requiresAttention == true ? "\nReview the candidate’s uncertainties; correct them or explicitly acknowledge them before acceptance." : "")
@@ -60,12 +60,14 @@ enum MacroReconstructionCLI {
     Refine a recorded macro with an external AI tool:
       1. Find your macro: SparkleRecorder workflow macros --json
       2. Export: SparkleRecorder reconstruction export --macro-id <UUID> [--output <new-directory>] [--include-video]
-      3. Read instructions.md and edit the complete candidate-template.json.
+      3. Start with harness.json. Follow its staged reading plan and have your AI tool write candidate.json into the exported package.
       4. Inspect action IDs: SparkleRecorder reconstruction inspect --macro <candidate.json>
-      5. Import: SparkleRecorder reconstruction import --macro-id <UUID> --candidate <candidate.json>
+      5. Import either the package or candidate file: SparkleRecorder reconstruction import --macro-id <UUID> --candidate <package-directory-or-candidate.json>
       6. In the app library, open Refine, select the imported candidate, Test once, and review the result before accepting.
     --json returns structured results. Export stays local; visual bytes require --include-video.
     Import keeps the accepted macro unchanged. Inspection checks structure; import validates source coverage.
+    harness.json is the small entry point; reconstruction.json is the primary action inventory; authoring-contract.json and candidate-template.json are intended for the draft/self-check stage.
+    External candidates preserve package Playback Surfaces; every text action explicitly references its intended surface. Live window rebinding stays in the app.
     Testing controls the target app. Restoring a macro does not undo actions in other apps.
     """
 
@@ -77,7 +79,7 @@ enum MacroReconstructionCLI {
         }
         guard let command = arguments.first, ["inspect", "export", "import"].contains(command) else {
             throw MacroReconstructionCLIError(code: "unsupportedCommand", message:
-                "Expected reconstruction inspect --macro <file>, export --macro-id <UUID> [--output <directory>] [--include-video], or import --macro-id <UUID> --candidate <file>.")
+                "Expected reconstruction inspect --macro <file>, export --macro-id <UUID> [--output <directory>] [--include-video], or import --macro-id <UUID> --candidate <package-directory-or-candidate.json>.")
         }
         var request = MacroReconstructionCLIRequest(command: command)
         var seen = Set<String>()
@@ -149,8 +151,17 @@ enum MacroReconstructionCLI {
         }
         let repository = MacroRepository(appSupportURL: appSupportURL)
         if request.command == "import", let path = request.candidatePath {
-            let document = try MacroCandidateValidator.decode(Data(contentsOf: URL(fileURLWithPath: path)))
-            let candidate = try await repository.importCandidate(document, for: macroID)
+            let input = URL(fileURLWithPath: path)
+            let source = try await repository.loadMacro(for: macroID)
+            let decoded = try MacroReconstructionCandidateInputResolver.decodeInput(
+                at: input,
+                source: source
+            )
+            let candidate = try await repository.importCandidate(
+                decoded.document,
+                for: macroID,
+                importProvenance: decoded.importProvenance
+            )
             return MacroReconstructionCLIResult(command: "import", macroID: macroID, candidateID: candidate.id,
                 normalizedDigest: candidate.normalizedDigest, requiresAttention: candidate.document.requiresAttention)
         }
@@ -180,13 +191,13 @@ enum MacroReconstructionCLI {
         guard data.count <= 100_000_000 else {
             throw MacroReconstructionCLIError(code: "fileTooLarge", message: "Macro file exceeds 100 MB.")
         }
-        guard let object = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
-            throw MacroReconstructionCLIError(code: "invalidMacro", message: "Expected a SavedMacro or candidate document JSON object.")
+        guard let object = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+              object["macro"] != nil else {
+            throw MacroReconstructionCLIError(
+                code: "invalidMacro",
+                message: "Expected a candidate document JSON object produced from the reconstruction authoring interface."
+            )
         }
-        if object["macro"] != nil { return try MacroCandidateValidator.decode(data).macro }
-        // Reuse strict playback-field decoding for a standalone SavedMacro too.
-        let wrapped: [String: Any] = ["macro": object, "sourceRevision": "candidate", "summary": "",
-                                     "coverage": [], "uncertainActionIDs": [], "model": ""]
-        return try MacroCandidateValidator.decode(JSONSerialization.data(withJSONObject: wrapped)).macro
+        return try MacroReconstructionCandidateInputResolver.decodeCandidate(data).macro
     }
 }

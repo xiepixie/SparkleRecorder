@@ -9,6 +9,7 @@ struct MacroRunEvidenceSheet: View {
     @State private var payload: AutomationTaskRunEvidencePayload?
     @State private var isLoading = true
     @State private var errorMessage: String?
+    @State private var actionFeedback: AutomationTaskRunEvidenceActionFeedback?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -99,20 +100,30 @@ struct MacroRunEvidenceSheet: View {
             }
 
             Spacer()
-            HStack {
-                Button {
-                    _ = AutomationTaskRunEvidencePresenter.revealReport(payload.reportURL)
-                } label: {
-                    Label(String(localized: "Show report", table: "Automation"), systemImage: "doc.text.magnifyingglass")
-                }
-                if let screenshotURL = payload.screenshotURL {
+            VStack(alignment: .leading, spacing: 8) {
+                HStack {
                     Button {
-                        _ = AutomationTaskRunEvidencePresenter.openScreenshot(screenshotURL)
+                        actionFeedback = AutomationTaskRunEvidencePresenter.revealReport(payload.reportURL)
                     } label: {
-                        Label(String(localized: "Open screenshot", table: "Common"), systemImage: "photo")
+                        Label(String(localized: "Show report", table: "Automation"), systemImage: "doc.text.magnifyingglass")
                     }
+                    if let screenshotURL = payload.screenshotURL {
+                        Button {
+                            actionFeedback = AutomationTaskRunEvidencePresenter.openScreenshot(screenshotURL)
+                        } label: {
+                            Label(String(localized: "Open screenshot", table: "Common"), systemImage: "photo")
+                        }
+                    }
+                    Spacer()
                 }
-                Spacer()
+
+                if let actionFeedback {
+                    let presentation = AutomationTaskRunEvidenceActionPresentation.make(actionFeedback)
+                    Label(presentation.message, systemImage: presentation.systemImage)
+                        .font(.caption)
+                        .foregroundStyle(presentation.isError ? Brand.sigAmber : Brand.libraryGreen)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
             }
         }
     }
@@ -121,6 +132,7 @@ struct MacroRunEvidenceSheet: View {
     private func load() async {
         isLoading = true
         errorMessage = nil
+        actionFeedback = nil
         do {
             let loaded = try await AutomationTaskRunEvidencePresenter.loadLatestEvidence(macroID: macro.id)
             guard !Task.isCancelled else { return }

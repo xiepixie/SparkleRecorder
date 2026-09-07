@@ -77,7 +77,7 @@ extension Array where Element == RecordedEvent {
         } else {
             let bid = surface.bundleIdentifier
             let pid = bid.flatMap { b in NSWorkspace.shared.runningApplications.first(where: { $0.bundleIdentifier == b })?.processIdentifier }
-            let resolved = CoordinateMapper.resolveContentFrame(for: pid, outerFrame: frame)
+            let resolved = WindowContentFrameResolver.resolveContentFrame(for: pid, outerFrame: frame)
             contentFrame = resolved.frame
         }
         
@@ -108,7 +108,7 @@ extension Array where Element == RecordedEvent {
                 } else {
                     let bid = surface.bundleIdentifier
                     let pid = bid.flatMap { b in NSWorkspace.shared.runningApplications.first(where: { $0.bundleIdentifier == b })?.processIdentifier }
-                    contentFrames[sId] = CoordinateMapper.resolveContentFrame(for: pid, outerFrame: surface.recordedFrame).frame
+                    contentFrames[sId] = WindowContentFrameResolver.resolveContentFrame(for: pid, outerFrame: surface.recordedFrame).frame
                 }
             }
         }
@@ -217,13 +217,18 @@ extension Array where Element == RecordedEvent {
     /// Update coordinate strategy and optional OCR text of events at indices.
     public mutating func updateCoordinateStrategy(at indices: [Int], strategy: CoordinateStrategy, textAnchor: TextAnchor? = nil, fallbackPolicy: LocatorFallbackPolicy? = nil, textTimeout: TimeInterval? = nil) {
         var newEvents = self
+        let sharedTextAnchor: TextAnchor? = textAnchor.map { anchor in
+            guard strategy == .locatorOnly else { return anchor }
+            let fallbackEvent = indices.lazy.compactMap { index in
+                newEvents.indices.contains(index) ? newEvents[index] : nil
+            }.first
+            return TextTargetAnchorFactory.clickableAnchor(anchor, fallbackEvent: fallbackEvent)
+        }
         for idx in indices {
             guard idx >= 0 && idx < newEvents.count else { continue }
             newEvents[idx].coordinateStrategy = strategy
-            if let t = textAnchor {
-                newEvents[idx].textAnchor = strategy == .locatorOnly
-                    ? TextTargetAnchorFactory.clickableAnchor(t, fallbackEvent: newEvents[idx])
-                    : t
+            if let sharedTextAnchor {
+                newEvents[idx].textAnchor = sharedTextAnchor
             }
             if let fallbackPolicy {
                 newEvents[idx].locatorFallbackPolicy = fallbackPolicy

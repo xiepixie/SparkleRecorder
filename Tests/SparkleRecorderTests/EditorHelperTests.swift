@@ -95,7 +95,7 @@ struct EditorHelperTests {
         #expect(ActionGroupKind.longPress.canConvertClickType)
         #expect(!ActionGroupKind.multiPointClick.canConvertClickType)
         #expect(ActionGroupKind.multiPointClick.previewsPointSequence)
-        #expect(!ActionGroupKind.multiPointClick.canUseLocatorStrategy)
+        #expect(!ActionGroupKind.multiPointClick.canUseTextLocator)
     }
 
     @Test("Multi click point removal readiness keeps at least two points")

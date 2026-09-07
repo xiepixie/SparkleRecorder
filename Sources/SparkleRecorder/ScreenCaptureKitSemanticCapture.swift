@@ -365,17 +365,6 @@ private final class LiveFrameOutput: NSObject, SCStreamOutput, @unchecked Sendab
     }
 }
 
-private extension RectValue {
-    init(_ rect: CGRect) {
-        self.init(
-            x: rect.origin.x,
-            y: rect.origin.y,
-            width: rect.width,
-            height: rect.height
-        )
-    }
-}
-
 private struct ScreenCaptureKitResolvedTarget {
     var filter: SCContentFilter
     var configuration: SCStreamConfiguration
@@ -404,17 +393,15 @@ private enum ScreenCaptureKitTargetResolver {
 
     private static func matchingWindow(target: RecordingCaptureTarget, windows: [SCWindow]) -> SCWindow? {
         windows.first { window in
-            if let windowID = target.windowID, window.windowID != windowID {
-                return false
-            }
-            if let bundleIdentifier = target.appBundleIdentifier,
-               window.owningApplication?.bundleIdentifier != bundleIdentifier {
-                return false
-            }
-            if let title = target.windowTitle, !title.isEmpty, window.title != title {
-                return false
-            }
-            return window.owningApplication != nil
+            guard window.owningApplication != nil else { return false }
+            return RecordingCaptureTargetMatcher.matches(
+                RecordingCaptureWindowIdentity(
+                    windowID: window.windowID,
+                    bundleIdentifier: window.owningApplication?.bundleIdentifier,
+                    title: window.title
+                ),
+                target: target
+            )
         }
     }
 

@@ -91,12 +91,4 @@ public final class PermissionCenter {
         return AXIsProcessTrustedWithOptions(options)
     }
     
-    // MARK: - Convenience methods
-    
-    public func checkAllRequiredPermissions() -> Bool {
-        return checkListenEventAccess() == .authorized &&
-               checkPostEventAccess() == .authorized &&
-               checkAccessibilityAccess() == .authorized &&
-               checkScreenCaptureAccess() == .authorized
-    }
 }

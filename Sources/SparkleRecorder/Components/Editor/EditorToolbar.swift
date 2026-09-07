@@ -11,7 +11,7 @@ struct EditorToolbar: View {
     @Binding var showAllPaths: Bool
     @Binding var showOverlayPreview: Bool
     @Binding var smartMergeGestures: Bool
-    let onExport: () -> Void
+    let onExport: (() -> Void)?
 
 	    var body: some View {
 	        VStack(spacing: 0) {
@@ -57,14 +57,14 @@ struct EditorToolbar: View {
 	                    )
 	                    EditorToolbarToggle(
 	                        isOn: $hideMouseMoves,
-	                        title: String(localized: "Moves", table: "Common"),
+	                        title: String(localized: "Hide Moves", table: "EditorUX"),
 	                        help: String(localized: "Hide raw mouse-move rows in the action list", table: "EditorUX"),
 	                        icon: "eye.slash.fill",
 	                        tint: Brand.sigAmber
 	                    )
 	                    EditorToolbarToggle(
 	                        isOn: $smartMergeGestures,
-	                        title: String(localized: "Merge", table: "Common"),
+	                        title: String(localized: "Smart Merge", table: "EditorUX"),
 	                        help: String(localized: "Merge raw events into editable semantic actions", table: "EditorUX"),
 	                        icon: "arrow.triangle.merge",
 	                        tint: Brand.libraryGreen
@@ -72,8 +72,9 @@ struct EditorToolbar: View {
 	                }
 	                .padding(.horizontal, 8)
 	
-	                // Export
-	                EditorExportButton(action: onExport)
+	                if let onExport {
+	                    EditorExportButton(action: onExport)
+	                }
 
             }
             .padding(.horizontal, 16)

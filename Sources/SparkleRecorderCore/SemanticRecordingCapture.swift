@@ -264,10 +264,14 @@ public actor SemanticRecordingCaptureSession {
     private var semanticEvents: [RecordingSemanticEvent] = []
     private var visualObservations: [RecordingVisualObservation] = []
     private var suppressions: [RecordingSuppressionRecord] = []
+    private var captureIssues: [RecordingCaptureIssue] = []
     private var frameOrdinal = 0
     private var sourceEventTimes: [RecordingSourceEventTime] = []
     private var capturedSourceEvents: [RecordedEvent] = []
     private var sourceEventOrderValid = true
+    private var inputEvidenceSamples: [RecordingEvidenceSample] = []
+    private var playableEvidenceLinks: [RecordingPlayableEvidenceLink] = []
+    private var omittedEvidenceSampleCount = 0
     private var frameTimings: [RecordingFrameTimingEvidence] = []
 
     public init(
@@ -290,18 +294,26 @@ public actor SemanticRecordingCaptureSession {
         didStart = true
 
         if configuration.capturePolicy.recordsVideo {
-            movieHandle = try await client.startMovie(SemanticRecordingMovieStartRequest(
-                recordingID: configuration.recordingID,
-                segmentID: ids.next(.videoSegment),
-                artifactRef: configuration.videoArtifactRef,
-                target: configuration.captureTarget,
-                startedAt: configuration.createdAt,
-                recordingTime: recordingTime
-            ))
+            do {
+                movieHandle = try await client.startMovie(SemanticRecordingMovieStartRequest(
+                    recordingID: configuration.recordingID,
+                    segmentID: ids.next(.videoSegment),
+                    artifactRef: configuration.videoArtifactRef,
+                    target: configuration.captureTarget,
+                    startedAt: configuration.createdAt,
+                    recordingTime: recordingTime
+                ))
+            } catch {
+                recordCaptureIssue(
+                    kind: .movieStartFailed,
+                    recordingTime: recordingTime,
+                    message: String(describing: error)
+                )
+            }
         }
 
         if configuration.capturePolicy.recordsKeyframes {
-            _ = try await captureFrame(
+            _ = await captureFrameIfPossible(
                 source: .recordingStart,
                 recordingTime: recordingTime,
                 relatedEventIDs: []
@@ -329,10 +341,17 @@ public actor SemanticRecordingCaptureSession {
         let event = evidenceEvent
 
         let eventID = ids.next(.timelineEvent)
-        let source = RecordingFrameCaptureSource(recordedEventKind: event.kind)
+        let frameCaptureMode: RecordingCaptureMode =
+            configuration.capturePolicy.mode == .videoAndKeyframes && movieHandle == nil
+                ? .keyframesOnly
+                : configuration.capturePolicy.mode
+        let source = RecordingFrameCaptureSource(
+            recordedEventKind: event.kind,
+            mode: frameCaptureMode
+        )
         let frame: RecordingFrameReference?
         if let source {
-            frame = try await captureFrame(
+            frame = await captureFrameIfPossible(
                 source: source,
                 recordingTime: event.time,
                 surfaceID: event.surfaceId,
@@ -359,12 +378,31 @@ public actor SemanticRecordingCaptureSession {
         }
     }
 
+    public func recordEvidence(
+        samples: [RecordingEvidenceSample],
+        playableLinks: [RecordingPlayableEvidenceLink],
+        omittedSampleCount: Int = 0
+    ) throws {
+        guard didStart else {
+            throw SemanticRecordingCaptureError.notStarted
+        }
+        guard !didFinish else {
+            throw SemanticRecordingCaptureError.alreadyFinished
+        }
+        inputEvidenceSamples.append(contentsOf: samples)
+        playableEvidenceLinks.append(contentsOf: playableLinks)
+        omittedEvidenceSampleCount += max(0, omittedSampleCount)
+    }
+
     public func addSuppression(_ suppression: RecordingSuppressionRecord) {
         suppressions.append(suppression)
         applySemanticRedaction(for: suppression)
     }
 
-    public func finish(recordingTime: TimeInterval) async throws -> SemanticRecordingBundle {
+    public func finish(
+        recordingTime: TimeInterval,
+        finalPlayableEvents: [RecordedEvent]? = nil
+    ) async throws -> SemanticRecordingBundle {
         guard didStart else {
             throw SemanticRecordingCaptureError.notStarted
         }
@@ -374,7 +412,7 @@ public actor SemanticRecordingCaptureSession {
         didFinish = true
 
         if configuration.capturePolicy.recordsKeyframes {
-            _ = try await captureFrame(
+            _ = await captureFrameIfPossible(
                 source: .recordingStop,
                 recordingTime: recordingTime,
                 relatedEventIDs: []
@@ -384,42 +422,71 @@ public actor SemanticRecordingCaptureSession {
         var videoSegments: [RecordingVideoSegment] = []
         var movieEvidence: [RecordingMovieTimingEvidence] = []
         if let movieHandle {
-            let result = try await client.finishMovie(SemanticRecordingMovieFinishRequest(
-                recordingID: configuration.recordingID,
-                handle: movieHandle,
-                finishedAt: configuration.createdAt.addingTimeInterval(recordingTime),
-                recordingTime: recordingTime
-            ))
-            movieEvidence.append(result.timingEvidence ?? .init(segmentID: movieHandle.segmentID))
-            videoSegments.append(RecordingVideoSegment(
-                id: movieHandle.segmentID,
-                artifactRef: movieHandle.artifactRef,
-                startTime: movieHandle.startTime,
-                duration: result.duration,
-                target: movieHandle.target,
-                fileType: result.fileType,
-                codec: result.codec,
-                frameSize: result.frameSize ?? movieHandle.frameSize
-            ))
+            do {
+                let result = try await client.finishMovie(SemanticRecordingMovieFinishRequest(
+                    recordingID: configuration.recordingID,
+                    handle: movieHandle,
+                    finishedAt: configuration.createdAt.addingTimeInterval(recordingTime),
+                    recordingTime: recordingTime
+                ))
+                movieEvidence.append(result.timingEvidence ?? .init(segmentID: movieHandle.segmentID))
+                videoSegments.append(RecordingVideoSegment(
+                    id: movieHandle.segmentID,
+                    artifactRef: movieHandle.artifactRef,
+                    startTime: movieHandle.startTime,
+                    duration: result.duration,
+                    target: movieHandle.target,
+                    fileType: result.fileType,
+                    codec: result.codec,
+                    frameSize: result.frameSize ?? movieHandle.frameSize
+                ))
+            } catch {
+                recordCaptureIssue(
+                    kind: .movieFinishFailed,
+                    recordingTime: recordingTime,
+                    message: String(describing: error)
+                )
+            }
         }
+
+        let finalSourceEvents = finalPlayableEvents ?? capturedSourceEvents
+        let finalSourceEventTimes = sourceEventTimes.filter { item in
+            guard finalSourceEvents.indices.contains(item.sourceEventIndex) else { return false }
+            return finalSourceEvents[item.sourceEventIndex].time == item.sourcePlaybackTime
+        }
+        let finalPlayableEvidenceLinks = playableEvidenceLinks.filter {
+            finalSourceEvents.indices.contains($0.playableEventIndex)
+        }
+        let finalDigest: String? = {
+            if finalPlayableEvents != nil {
+                return try? RecordingReconstructionProvenance.digest(ofSourceEvents: finalSourceEvents)
+            }
+            return sourceEventOrderValid
+                ? (try? RecordingReconstructionProvenance.digest(ofSourceEvents: capturedSourceEvents))
+                : nil
+        }()
 
         return SemanticRecordingBundle(
             id: configuration.recordingID,
             createdAt: configuration.createdAt,
             capturePolicy: configuration.capturePolicy,
             captureTarget: configuration.captureTarget,
+            captureIssues: captureIssues,
             videoSegments: videoSegments,
             frames: frames,
             timelineEvents: timelineEvents,
             semanticEvents: semanticEvents,
             visualObservations: visualObservations,
             suppressions: suppressions,
+            inputEvidenceSamples: inputEvidenceSamples,
             reconstructionProvenance: configuration.sessionOriginHostTime.map { origin in
                 RecordingReconstructionProvenance(sessionOriginHostTime: origin, sessionEndTime: recordingTime,
-                    sourceEvents: sourceEventTimes, movieEvidence: movieEvidence, frameTimings: frameTimings,
+                    sourceEvents: finalSourceEventTimes, movieEvidence: movieEvidence, frameTimings: frameTimings,
                     clockSegments: RecordingReconstructionProvenance.writtenMovieClocks(movieEvidence: movieEvidence, origin: origin),
                     geometrySnapshots: RecordingReconstructionProvenance.measuredGeometry(movieEvidence: movieEvidence, origin: origin, surfaceID: configuration.defaultSurfaceID ?? configuration.captureTarget.surfaceID),
-                    sourceEventDigest: sourceEventOrderValid ? (try? RecordingReconstructionProvenance.digest(ofSourceEvents: capturedSourceEvents)) : nil)
+                    sourceEventDigest: finalDigest,
+                    playableEvidenceLinks: finalPlayableEvidenceLinks,
+                    omittedEvidenceSampleCount: omittedEvidenceSampleCount)
             }
         )
     }
@@ -440,6 +507,31 @@ public actor SemanticRecordingCaptureSession {
         }
 
         movieHandle = nil
+    }
+
+    private func captureFrameIfPossible(
+        source: RecordingFrameCaptureSource,
+        recordingTime: TimeInterval,
+        surfaceID: String? = nil,
+        relatedEventIDs: [UUID]
+    ) async -> RecordingFrameReference? {
+        do {
+            return try await captureFrame(
+                source: source,
+                recordingTime: recordingTime,
+                surfaceID: surfaceID,
+                relatedEventIDs: relatedEventIDs
+            )
+        } catch {
+            recordCaptureIssue(
+                kind: .keyframeCaptureFailed,
+                recordingTime: recordingTime,
+                frameSource: source,
+                surfaceID: surfaceID,
+                message: String(describing: error)
+            )
+            return nil
+        }
     }
 
     private func captureFrame(
@@ -484,14 +576,40 @@ public actor SemanticRecordingCaptureSession {
         )
         frames.append(frame)
 
-        let indexed = try await client.indexFrame(SemanticRecordingFrameIndexRequest(
-            recordingID: configuration.recordingID,
-            frame: frame,
-            target: configuration.captureTarget,
-            createdAt: configuration.createdAt.addingTimeInterval(recordingTime)
-        ))
-        visualObservations.append(contentsOf: indexed.map(redactedVisualObservationIfNeeded))
+        do {
+            let indexed = try await client.indexFrame(SemanticRecordingFrameIndexRequest(
+                recordingID: configuration.recordingID,
+                frame: frame,
+                target: configuration.captureTarget,
+                createdAt: configuration.createdAt.addingTimeInterval(recordingTime)
+            ))
+            visualObservations.append(contentsOf: indexed.map(redactedVisualObservationIfNeeded))
+        } catch {
+            recordCaptureIssue(
+                kind: .frameIndexFailed,
+                recordingTime: recordingTime,
+                frameSource: source,
+                surfaceID: request.surfaceID,
+                message: String(describing: error)
+            )
+        }
         return frame
+    }
+
+    private func recordCaptureIssue(
+        kind: RecordingCaptureIssueKind,
+        recordingTime: TimeInterval,
+        frameSource: RecordingFrameCaptureSource? = nil,
+        surfaceID: String? = nil,
+        message: String
+    ) {
+        captureIssues.append(RecordingCaptureIssue(
+            kind: kind,
+            recordingTime: recordingTime,
+            frameSource: frameSource,
+            surfaceID: surfaceID,
+            message: message
+        ))
     }
 
     private func semanticEvent(
@@ -717,7 +835,35 @@ public actor SemanticRecordingCaptureSession {
 }
 
 public extension RecordingFrameCaptureSource {
-    init?(recordedEventKind kind: RecordedEvent.Kind) {
+    init?(
+        recordedEventKind kind: RecordedEvent.Kind,
+        mode: RecordingCaptureMode = .diagnosticRich
+    ) {
+        if mode == .videoAndKeyframes {
+            // The movie already preserves continuous before/after state. Keep PNG
+            // checkpoints sparse so typing and sampled drags cannot create hundreds
+            // of synchronous screenshots and OCR jobs.
+            switch kind {
+            case .leftMouseUp, .rightMouseUp, .otherMouseUp:
+                self = .mouseUp
+            case .waitForText:
+                self = .longWaitAfter
+            case .verifyText:
+                self = .manual
+            case .leftMouseDown, .rightMouseDown, .otherMouseDown,
+                 .leftMouseDragged, .rightMouseDragged, .otherMouseDragged,
+                 .keyDown, .keyUp, .mouseMoved, .flagsChanged, .scrollWheel:
+                // The movie already preserves scroll progression. A discrete
+                // wheel burst can contain dozens of events; treating each one as
+                // "scroll settled" creates synchronous screenshot/OCR backlog and
+                // captures stale post-stop frames rather than historical state.
+                return nil
+            }
+            return
+        }
+
+        // Keyframe-only recordings need event checkpoints because no movie exists.
+        // Diagnostic-rich mode deliberately keeps the same dense evidence.
         switch kind {
         case .leftMouseDown, .rightMouseDown, .otherMouseDown:
             self = .mouseDown

@@ -129,7 +129,7 @@ public enum PlaybackPlanner {
         if let surfaceId = event.surfaceId, context.surfaces[surfaceId] != nil {
             return surfaceId
         }
-        if let firstKey = context.surfaces.keys.first {
+        if let firstKey = context.surfaces.keys.sorted().first {
             return firstKey
         }
         return event.surfaceId ?? "surface-1"

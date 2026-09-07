@@ -113,8 +113,12 @@ enum PlaybackFeedbackLabel {
     }
 
     private static func modifiers(_ flags: UInt64) -> String {
-        [(UInt64(1 << 18), "⌃"), (UInt64(1 << 19), "⌥"), (UInt64(1 << 17), "⇧"), (UInt64(1 << 20), "⌘")]
-            .filter { flags & $0.0 != 0 }.map(\.1).joined()
+        var label = ""
+        if flags & UInt64(1 << 18) != 0 { label += "⌃" }
+        if flags & UInt64(1 << 19) != 0 { label += "⌥" }
+        if flags & UInt64(1 << 17) != 0 { label += "⇧" }
+        if flags & UInt64(1 << 20) != 0 { label += "⌘" }
+        return label
     }
 
     private static func key(_ code: UInt16) -> String {

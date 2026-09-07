@@ -39,13 +39,18 @@ struct AutomationMainContentView: View {
   let currentMacroID: UUID?
   let refreshState: AutomationRepositoryRefreshState
   let isRecordingMacro: Bool
+  let recordingFlowActive: Bool
   let recordHotkeyName: String?
+  let requestedWorkspaceDestination: AutomationWorkspaceDestination?
+  let onConsumeWorkspaceDestination: () -> Void
   let initialSelectedRunID: UUID?
   let initialFlowGraphLinkPreview: AutomationFlowGraphLinkPreviewState?
   let initialTaskListPreviewState: AutomationWorkflowTaskListPreviewState?
   let onRefresh: () -> Void
   let onAction: (AutomationAction) -> Void
+  let onCommitAction: @MainActor (AutomationAction) async throws -> Void
   let onRecordMacro: (() -> Void)?
+  let onPreviewScheduledMacro: @MainActor (UUID, AutomationTask?) async throws -> Void
   let onRenameMacro: ((UUID, String) -> Void)?
   let onSetMacroLoops: ((UUID, Int) -> Void)?
   let onShowLibrary: () -> Void
@@ -76,7 +81,10 @@ struct AutomationMainContentView: View {
     currentMacroID: UUID? = nil,
     refreshState: AutomationRepositoryRefreshState,
     isRecordingMacro: Bool = false,
+    recordingFlowActive: Bool = false,
     recordHotkeyName: String? = nil,
+    requestedWorkspaceDestination: AutomationWorkspaceDestination? = nil,
+    onConsumeWorkspaceDestination: @escaping () -> Void = {},
     initialSelectedWorkflowID: UUID? = nil,
     initialSelection: AutomationAuthoringSelection = .workflow,
     initialSelectedRunID: UUID? = nil,
@@ -86,7 +94,9 @@ struct AutomationMainContentView: View {
     initialTaskListPreviewState: AutomationWorkflowTaskListPreviewState? = nil,
     onRefresh: @escaping () -> Void,
     onAction: @escaping (AutomationAction) -> Void,
+    onCommitAction: @escaping @MainActor (AutomationAction) async throws -> Void = { _ in },
     onRecordMacro: (() -> Void)? = nil,
+    onPreviewScheduledMacro: @escaping @MainActor (UUID, AutomationTask?) async throws -> Void = { _, _ in },
     onRenameMacro: ((UUID, String) -> Void)? = nil,
     onSetMacroLoops: ((UUID, Int) -> Void)? = nil,
     onShowLibrary: @escaping () -> Void = {}
@@ -102,13 +112,18 @@ struct AutomationMainContentView: View {
     self.currentMacroID = currentMacroID
     self.refreshState = refreshState
     self.isRecordingMacro = isRecordingMacro
+    self.recordingFlowActive = recordingFlowActive
     self.recordHotkeyName = recordHotkeyName
+    self.requestedWorkspaceDestination = requestedWorkspaceDestination
+    self.onConsumeWorkspaceDestination = onConsumeWorkspaceDestination
     self.initialSelectedRunID = initialSelectedRunID
     self.initialFlowGraphLinkPreview = initialFlowGraphLinkPreview
     self.initialTaskListPreviewState = initialTaskListPreviewState
     self.onRefresh = onRefresh
     self.onAction = onAction
+    self.onCommitAction = onCommitAction
     self.onRecordMacro = onRecordMacro
+    self.onPreviewScheduledMacro = onPreviewScheduledMacro
     self.onRenameMacro = onRenameMacro
     self.onSetMacroLoops = onSetMacroLoops
     self.onShowLibrary = onShowLibrary
@@ -325,50 +340,7 @@ struct AutomationMainContentView: View {
 
             if let workflow {
               VStack(spacing: 0) {
-                HStack {
-                  Button(
-                    String(localized: "Toggle Left Sidebar", table: "Common"),
-                    systemImage: "sidebar.left",
-                    action: { withAnimation { isLeftSidebarVisible.toggle() } }
-                  )
-                  .labelStyle(.iconOnly)
-                  .buttonStyle(.plain)
-                  .padding(.horizontal, 8)
-                  .opacity(isLeftSidebarVisible ? 1.0 : 0.6)
-
-                  Spacer()
-
-                  Picker("", selection: $centralTab) {
-                    Text("Canvas", tableName: "Common").tag(AutomationCentralTab.editor)
-                    Text("Workflow", tableName: "Automation").tag(AutomationCentralTab.settings)
-                  }
-                  .pickerStyle(.segmented)
-                  .frame(width: 250)
-
-                  Spacer()
-
-                  Button(
-                    String(localized: "Toggle Right Sidebar", table: "Common"),
-                    systemImage: "sidebar.right",
-                    action: { withAnimation { isRightSidebarVisible.toggle() } }
-                  )
-                  .labelStyle(.iconOnly)
-                  .buttonStyle(.plain)
-                  .padding(.horizontal, 8)
-                  .opacity(isRightSidebarVisible ? 1.0 : 0.6)
-
-                  Button(
-                    String(localized: "Auto Arrange", table: "Common"),
-                    systemImage: "wand.and.stars"
-                  ) {
-                    autoArrangeTasks()
-                  }
-                  .labelStyle(.iconOnly)
-                  .buttonStyle(.plain)
-                  .padding(.horizontal, 8)
-                }
-                .padding(8)
-                .background(Material.bar)
+                workflowEditorToolbar
 
                 Divider().opacity(0.5)
 
@@ -431,40 +403,7 @@ struct AutomationMainContentView: View {
                     .frame(maxWidth: .infinity)
                   }
                 case .settings:
-                  if let rawWorkflow = selectedRawWorkflow {
-                    ScrollView {
-                      AutomationWorkflowSettingsView(
-                        workflow: rawWorkflow,
-                        status: workflow.status,
-                        statusDetail: workflow.statusDetail,
-                        nextScheduledOccurrence: workflow.nextScheduledOccurrence,
-                        nextScheduledTaskName: selectedNextScheduledTaskName,
-                        workflowProjection: workflow,
-                        taskListPreviewState: initialTaskListPreviewState,
-                        onInsertMacroTask: insertMacroTask,
-                        onSelectTask: selectTask,
-                        onSelectDependency: selectDependency,
-                        onImportWorkflowPackage: importWorkflowPackage,
-                        onExportWorkflowPackage: exportWorkflowPackage,
-                        onExportWorkflowDraft: exportWorkflowDraft,
-                        onShareWorkflowPackage: shareWorkflowPackage,
-                        onDeleteWorkflow: deleteWorkflow,
-                        onAction: onAction
-                      )
-                      .frame(maxWidth: 800)
-                      .padding()
-                    }
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                  } else {
-                    AutomationEmptyState(
-                      systemImage: "gearshape",
-                      title: String(localized: "No workflow selected", table: "Automation"),
-                      subtitle: String(
-                        localized: "Create a workflow to view workflow details.",
-                        table: "Automation")
-                    )
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                  }
+                  workflowSettingsContent(workflowProjection: workflow)
                 }
               }
               .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -494,6 +433,7 @@ struct AutomationMainContentView: View {
                   onDeleteWorkflow: deleteWorkflow,
                   onImportWorkflowFromDraftPreview: importWorkflowFromDraftPreview,
                   onAction: onAction,
+                  onCommitAction: onCommitAction,
                   onCancelLink: cancelDependency
                 )
                 .frame(width: 356)
@@ -513,8 +453,11 @@ struct AutomationMainContentView: View {
         }
       }
     }
+    .onAppear {
+      _ = applyRequestedWorkspaceDestination()
+    }
     .onChange(of: projection.workflows.map(\.id)) { old, new in
-      if new.count > old.count {
+      if !applyRequestedWorkspaceDestination(), new.count > old.count {
         let addedIDs = Set(new).subtracting(old)
         if let newID = addedIDs.first {
           selectedWorkflowID = newID
@@ -523,8 +466,15 @@ struct AutomationMainContentView: View {
       repairSelection()
       repairImportNotice()
     }
+    .onChange(of: requestedWorkspaceDestination) {
+      _ = applyRequestedWorkspaceDestination()
+    }
     .onChange(of: isRecordingMacro) {
       handleWorkflowRecordingStateChange()
+    }
+    .onChange(of: recordingFlowActive) { _, active in
+      guard !active else { return }
+      handleWorkflowRecordingFlowEnded()
     }
     .onChange(of: macros.map(\.id)) {
       completeWorkflowRecordingIntent(clearIfMissing: false)
@@ -542,6 +492,92 @@ struct AutomationMainContentView: View {
     .sheet(item: $editingSequenceWorkflow) { workflow in
       sequenceEditor(for: workflow)
     }
+  }
+
+  @ViewBuilder
+  private func workflowSettingsContent(
+    workflowProjection: AutomationWorkflowProjection
+  ) -> some View {
+    if let rawWorkflow = selectedRawWorkflow {
+      ScrollView {
+        AutomationWorkflowSettingsView(
+          workflow: rawWorkflow,
+          status: workflowProjection.status,
+          statusDetail: workflowProjection.statusDetail,
+          nextScheduledOccurrence: workflowProjection.nextScheduledOccurrence,
+          nextScheduledTaskName: selectedNextScheduledTaskName,
+          workflowProjection: workflowProjection,
+          taskListPreviewState: initialTaskListPreviewState,
+          onInsertMacroTask: insertMacroTask,
+          onSelectTask: selectTask,
+          onSelectDependency: selectDependency,
+          onImportWorkflowPackage: importWorkflowPackage,
+          onExportWorkflowPackage: exportWorkflowPackage,
+          onExportWorkflowDraft: exportWorkflowDraft,
+          onShareWorkflowPackage: shareWorkflowPackage,
+          onDeleteWorkflow: deleteWorkflow,
+          onAction: onAction
+        )
+        .frame(maxWidth: 800)
+        .padding()
+      }
+      .frame(maxWidth: .infinity, maxHeight: .infinity)
+    } else {
+      AutomationEmptyState(
+        systemImage: "gearshape",
+        title: String(localized: "No workflow selected", table: "Automation"),
+        subtitle: String(
+          localized: "Create a workflow to view workflow details.",
+          table: "Automation")
+      )
+      .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+  }
+
+  private var workflowEditorToolbar: some View {
+    HStack {
+      Button(
+        String(localized: "Toggle Left Sidebar", table: "Common"),
+        systemImage: "sidebar.left",
+        action: { withAnimation { isLeftSidebarVisible.toggle() } }
+      )
+      .labelStyle(.iconOnly)
+      .buttonStyle(.plain)
+      .padding(.horizontal, 8)
+      .opacity(isLeftSidebarVisible ? 1.0 : 0.6)
+
+      Spacer()
+
+      Picker("", selection: $centralTab) {
+        Text("Canvas", tableName: "Common").tag(AutomationCentralTab.editor)
+        Text("Workflow", tableName: "Automation").tag(AutomationCentralTab.settings)
+      }
+      .pickerStyle(.segmented)
+      .frame(width: 250)
+
+      Spacer()
+
+      Button(
+        String(localized: "Toggle Right Sidebar", table: "Common"),
+        systemImage: "sidebar.right",
+        action: { withAnimation { isRightSidebarVisible.toggle() } }
+      )
+      .labelStyle(.iconOnly)
+      .buttonStyle(.plain)
+      .padding(.horizontal, 8)
+      .opacity(isRightSidebarVisible ? 1.0 : 0.6)
+
+      Button(
+        String(localized: "Auto Arrange", table: "Common"),
+        systemImage: "wand.and.stars",
+        action: autoArrangeTasks
+      )
+      .labelStyle(.iconOnly)
+      .buttonStyle(.plain)
+      .padding(.horizontal, 8)
+    }
+    .padding(8)
+    .background(Material.bar)
   }
 
   private var selectedTaskID: UUID? {
@@ -616,20 +652,14 @@ struct AutomationMainContentView: View {
         macro: macro,
         existingSummary: quickScheduleSummary(workflow: workflow, task: task),
         onPreview: { replacement in
-          var updated = replacement
-          updated.id = workflow.id
-          updated.createdAt = workflow.createdAt
-          updated.modifiedAt = Date()
-          if !updated.tasks.isEmpty {
-            updated.tasks[0].id = task.id
-          }
-          onAction(.upsertWorkflow(updated, at: updated.modifiedAt))
-          onAction(.manualStartWorkflow(workflowID: workflow.id, requestedAt: Date()))
+          try await onPreviewScheduledMacro(macroID, replacement.tasks.first)
         },
         onDisable: {
           var pausedTask = task
           pausedTask.isEnabled = false
-          onAction(.upsertTask(workflowID: workflow.id, task: pausedTask, at: Date()))
+          try await onCommitAction(
+            .upsertTask(workflowID: workflow.id, task: pausedTask, at: Date())
+          )
         },
         onCreate: { replacement, _ in
           var updated = replacement
@@ -639,7 +669,7 @@ struct AutomationMainContentView: View {
           if !updated.tasks.isEmpty {
             updated.tasks[0].id = task.id
           }
-          onAction(.upsertWorkflow(updated, at: updated.modifiedAt))
+          try await onCommitAction(.upsertWorkflow(updated, at: updated.modifiedAt))
         }
       )
     } else {
@@ -689,7 +719,7 @@ struct AutomationMainContentView: View {
         availableMacros: macros,
         initialDraft: draft
       ) { document, openInWorkflow, runAfterSaving in
-        replaceLinearAutomation(
+        try await replaceLinearAutomation(
           workflow,
           with: document,
           openInWorkflow: openInWorkflow,
@@ -708,12 +738,13 @@ struct AutomationMainContentView: View {
     }
   }
 
+  @MainActor
   private func replaceLinearAutomation(
     _ existing: AutomationWorkflow,
     with document: AutomationWorkflowDraftDocument,
     openInWorkflow: Bool,
     runAfterSaving: Bool
-  ) {
+  ) async throws {
     var options = AutomationWorkflowDraftImportOptions(mode: .confirm)
     options.stableIDNamespace = existing.id.uuidString
     let catalog = macros.map {
@@ -724,15 +755,22 @@ struct AutomationMainContentView: View {
       context: AutomationWorkflowDraftValidationContext(macroCatalog: catalog),
       options: options
     )
-    guard var updated = result.workflow else { return }
+    guard var updated = result.workflow else {
+      throw AutomationTargetApplicationPreparationFailure(
+        message: String(localized: "Could not save the sequence.", table: "Automation")
+      )
+    }
     updated.id = existing.id
     updated.createdAt = existing.createdAt
     updated.modifiedAt = Date()
-    onAction(.upsertWorkflow(updated, at: updated.modifiedAt))
+    try await onCommitAction(.upsertWorkflow(updated, at: updated.modifiedAt))
 
     if openInWorkflow {
       openWorkflowEditor(updated.id)
     } else if runAfterSaving {
+      // The workflow is already durably saved. Runtime start is a secondary
+      // action, so a start failure must not keep a save sheet open and invite a
+      // duplicate save attempt.
       onAction(.manualStartWorkflow(workflowID: updated.id, requestedAt: Date()))
     }
   }
@@ -780,13 +818,16 @@ struct AutomationMainContentView: View {
       }
 
       let date = Date()
+      try await AutomationWorkflowImportTransaction.commit(
+        workflows,
+        replacing: state.workflows,
+        perform: onCommitAction,
+        at: date
+      )
       selectedWorkflowID = workflows.first?.id
       selection = .workflow
       pendingDependencySourceID = nil
       selectedInspectorRunID = nil
-      for workflow in workflows {
-        onAction(.upsertWorkflow(workflow, at: date))
-      }
     }
   }
 
@@ -844,8 +885,11 @@ struct AutomationMainContentView: View {
     return state.workflows.first { $0.id == workflow.id }?.name
   }
 
-  private func importWorkflowFromDraftPreview(_ workflow: AutomationWorkflow, sourceDirectory: URL?)
-  {
+  @MainActor
+  private func importWorkflowFromDraftPreview(
+    _ workflow: AutomationWorkflow,
+    sourceDirectory: URL?
+  ) async throws {
     let date = Date()
     var workflowToImport = workflow
     let existingWorkflow = state.workflows.first { $0.id == workflow.id }
@@ -853,6 +897,23 @@ struct AutomationMainContentView: View {
       workflowToImport.createdAt = existingWorkflow.createdAt
     } else {
       workflowToImport.createdAt = date
+    }
+
+    try await onCommitAction(.upsertWorkflow(workflowToImport, at: date))
+    do {
+      try await persistVisualAssetPackageRoot(
+        for: workflowToImport,
+        sourceDirectory: sourceDirectory,
+        source: .aiDraftImport,
+        associatedAt: date
+      )
+    } catch {
+      throw AutomationTargetApplicationPreparationFailure(
+        message: String(
+          localized: "The workflow was saved, but its visual assets could not be linked. Try importing again.",
+          table: "Automation"
+        )
+      )
     }
 
     selectedWorkflowID = workflowToImport.id
@@ -868,13 +929,6 @@ struct AutomationMainContentView: View {
       isReplacement: existingWorkflow != nil,
       previousWorkflow: existingWorkflow
     )
-    onAction(.upsertWorkflow(workflowToImport, at: date))
-    persistVisualAssetPackageRoot(
-      for: workflowToImport,
-      sourceDirectory: sourceDirectory,
-      source: .aiDraftImport,
-      associatedAt: date
-    )
   }
 
   private func persistVisualAssetPackageRoot(
@@ -882,7 +936,7 @@ struct AutomationMainContentView: View {
     sourceDirectory: URL?,
     source: AutomationVisualAssetPackageRootSource,
     associatedAt: Date
-  ) {
+  ) async throws {
     let roots: [AutomationVisualAssetPackageRoot]
     if let sourceDirectory {
       roots = AutomationVisualAssetPackageRoot.roots(
@@ -896,16 +950,10 @@ struct AutomationMainContentView: View {
     }
 
     let client = AutomationVisualAssetPackageRootClient.fileBacked()
-    Task {
-      do {
-        if roots.isEmpty {
-          try await client.removeRoots(Set([workflow.id]))
-        } else {
-          try await client.upsertRoots(roots)
-        }
-      } catch {
-        NSLog("SparkleRecorder: Failed to persist workflow visual asset package root: \(error)")
-      }
+    if roots.isEmpty {
+      try await client.removeRoots(Set([workflow.id]))
+    } else {
+      try await client.upsertRoots(roots)
     }
   }
 
@@ -998,7 +1046,7 @@ struct AutomationMainContentView: View {
       return
     }
 
-    if !isRecordingMacro {
+    if !isRecordingMacro && !recordingFlowActive {
       recordedTaskReviewDraft = nil
       workflowRecordingIntent = AutomationWorkflowRecordingIntent(
         targetWorkflowID: selectedRawWorkflow?.id ?? selectedWorkflowID,
@@ -1017,6 +1065,15 @@ struct AutomationMainContentView: View {
       workflowRecordingIntent = intent
     } else {
       scheduleWorkflowRecordingCompletionCheck()
+    }
+  }
+
+  private func handleWorkflowRecordingFlowEnded() {
+    guard let intent = workflowRecordingIntent else { return }
+    if intent.didStartRecording {
+      scheduleWorkflowRecordingCompletionCheck()
+    } else {
+      workflowRecordingIntent = nil
     }
   }
 
@@ -1329,6 +1386,27 @@ struct AutomationMainContentView: View {
       selection = .workflow
     }
     onAction(.deleteDependency(workflowID: workflow.id, dependencyID: dependencyID, at: Date()))
+  }
+
+  @discardableResult
+  private func applyRequestedWorkspaceDestination() -> Bool {
+    guard let requestedWorkspaceDestination,
+      let resolution = AutomationWorkspaceNavigation.resolve(
+        requestedWorkspaceDestination,
+        workflows: state.workflows
+      )
+    else {
+      return false
+    }
+
+    selectedWorkflowID = resolution.workflowID
+    selection = resolution.selection
+    pendingDependencySourceID = nil
+    pendingDependencyTrigger = .onSuccess
+    selectedInspectorRunID = nil
+    workspaceSurface = .editor
+    onConsumeWorkspaceDestination()
+    return true
   }
 
   private func repairSelection() {

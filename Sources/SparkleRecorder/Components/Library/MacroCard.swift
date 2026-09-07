@@ -45,6 +45,7 @@ struct MacroCard: View {
   @State private var customSpeedText = ""
   @State private var clearButtonHovered = false
   @State private var moreButtonHovered = false
+  @State private var confirmDelete = false
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
   @FocusState private var cardFocused: Bool
   @FocusState private var renameFocused: Bool
@@ -104,7 +105,7 @@ struct MacroCard: View {
       .focusable(!isRenaming)
       .focused($cardFocused)
       .disableFocusEffect()
-      .onDeleteCommand { onDelete() }
+      .onDeleteCommand { confirmDelete = true }
       .onExitCommand {
         if isRenaming { onCommitRename() }
       }
@@ -121,8 +122,21 @@ struct MacroCard: View {
           : String(localized: "Add favorite", table: "Common")
       ) { onToggleFavorite() }
       .accessibilityAction(named: String(localized: "Rename", table: "Common")) { onStartRename() }
-      .accessibilityAction(named: String(localized: "Delete", table: "Common")) { onDelete() }
+      .accessibilityAction(named: String(localized: "Delete", table: "Common")) { confirmDelete = true }
       .contextMenu { cardMenuItems(includePlayEdit: true) }
+      .confirmationDialog(
+        String(
+          format: String(localized: "Delete %@?", table: "Common"),
+          macro.name
+        ),
+        isPresented: $confirmDelete,
+        titleVisibility: .visible
+      ) {
+        Button(String(localized: "Delete", table: "Common"), role: .destructive) { onDelete() }
+        Button(String(localized: "Cancel", table: "Common"), role: .cancel) {}
+      } message: {
+        Text("This can't be undone.", tableName: "Common")
+      }
       .alert(
         String(localized: "Custom playback speed", table: "Common"), isPresented: $showCustomSpeed
       ) {
@@ -287,24 +301,28 @@ struct MacroCard: View {
     Divider()
 
     Button {
-      controller.bindCurrentWindow(to: macro.id)
+      controller.chooseTargetWindow(for: macro.id)
     } label: {
       Label(
-        String(localized: "Bind Active Window", table: "Common"), systemImage: "window.badge.key")
+        macro.surfaces.values.first == nil
+          ? String(localized: "Choose Target Window…", table: "Recording")
+          : String(localized: "Change Target Window…", table: "Recording"),
+        systemImage: "window.badge.key"
+      )
     }
     if macro.surfaces.values.first != nil {
       Button(action: {
         controller.library.setFollowWindowOffset(id: macro.id, enabled: !macro.followWindowOffset)
       }) {
         Label(
-          String(localized: "Follow Window Position", table: "Common"),
+          String(localized: "Follow Target Window Position", table: "Recording"),
           systemImage: macro.followWindowOffset ? "checkmark.circle" : "circle")
       }
       Button {
         controller.clearWindowBinding(for: macro.id)
       } label: {
         Label(
-          String(localized: "Clear Window Binding", table: "Common"), systemImage: "xmark.rectangle"
+          String(localized: "Remove Target Window", table: "Recording"), systemImage: "xmark.rectangle"
         )
       }
     }
@@ -339,7 +357,7 @@ struct MacroCard: View {
     }
     Divider()
     Button(role: .destructive) {
-      onDelete()
+      confirmDelete = true
     } label: {
       Label(String(localized: "Delete", table: "Common"), systemImage: "trash")
     }
@@ -454,8 +472,8 @@ struct MacroCard: View {
             .foregroundStyle(Brand.sigTeal)
           Text(
             String(
-              format: String(localized: "Bound: %@ (%dx%d)", table: "Common"),
-              surface.appName ?? String(localized: "Window", table: "Common"),
+              format: String(localized: "Target: %@ · %dx%d", table: "Recording"),
+              targetWindowLabel(surface),
               Int(surface.recordedFrame.width), Int(surface.recordedFrame.height))
           )
           .font(.system(size: 9.5, weight: .medium))
@@ -465,17 +483,28 @@ struct MacroCard: View {
             Text("·")
               .font(.system(size: 9.5))
               .foregroundStyle(.tertiary)
-            Text("Offset dx/dy enabled", tableName: "Common")
+            Text("Follows window movement", tableName: "Recording")
               .font(.system(size: 9))
               .foregroundStyle(.secondary)
           }
           Spacer()
+          Button {
+            controller.chooseTargetWindow(for: macro.id)
+          } label: {
+            Image(systemName: "arrow.triangle.2.circlepath")
+              .font(.system(size: 9.5, weight: .semibold))
+              .foregroundStyle(.secondary)
+              .frame(width: 19, height: 19)
+              .contentShape(Circle())
+          }
+          .buttonStyle(.plain)
+          .help(String(localized: "Change Target Window…", table: "Recording"))
           Button(action: {
             withAnimation(stateAnimation) {
               controller.clearWindowBinding(for: macro.id)
             }
           }) {
-            Label(String(localized: "Clear window binding", table: "Common"), systemImage: "xmark")
+            Label(String(localized: "Remove Target Window", table: "Recording"), systemImage: "xmark")
               .labelStyle(.iconOnly)
               .font(.system(size: 9.5, weight: .bold))
               .foregroundStyle(
@@ -494,7 +523,7 @@ struct MacroCard: View {
                   Color.red.opacity(clearButtonHovered ? 0.22 : 0.0), lineWidth: 0.5))
           )
           .animation(hoverAnimation, value: clearButtonHovered)
-          .help(String(localized: "Clear window binding", table: "Common"))
+          .help(String(localized: "Remove Target Window", table: "Recording"))
           .onHover { clearButtonHovered = $0 }
         }
         .padding(.vertical, 1)
@@ -618,6 +647,15 @@ struct MacroCard: View {
       parts.append(automationSummary.statusText)
     }
     return parts.joined(separator: ", ")
+  }
+
+  private func targetWindowLabel(_ surface: PlaybackSurface) -> String {
+    let appName = surface.appName ?? String(localized: "Window", table: "Common")
+    guard let title = surface.windowTitle?.trimmingCharacters(in: .whitespacesAndNewlines),
+          !title.isEmpty else {
+      return appName
+    }
+    return "\(appName) — \(title)"
   }
 
   // MARK: - Meta row

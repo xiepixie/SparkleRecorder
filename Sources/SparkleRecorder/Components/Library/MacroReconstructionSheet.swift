@@ -1,4 +1,3 @@
-import AVKit
 import SparkleRecorderCore
 import SwiftUI
 import UniformTypeIdentifiers
@@ -22,6 +21,7 @@ struct MacroReconstructionSheet: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 workflowPipelineBar
+                reconstructionEvidenceStatus
                 HSplitView {
                     sourceMacroPane
                         .frame(minWidth: 350, maxWidth: .infinity, maxHeight: .infinity)
@@ -113,12 +113,25 @@ struct MacroReconstructionSheet: View {
                         .disabled(model.isBusy)
 
                         Toggle(isOn: $model.includeVisualEvidence) {
-                            Text("Frames", tableName: "EditorUX")
+                            Text("Video & images", tableName: "EditorUX")
                                 .font(.caption2)
                         }
                         .toggleStyle(.checkbox)
+                        .disabled(model.isBusy || !model.canIncludeVisualEvidence)
+                        .help(framesToggleHelp)
+
+                        Picker("", selection: $model.optimizationObjective) {
+                            Text("Robust", tableName: "EditorUX")
+                                .tag(MacroReconstructionObjective.robust)
+                            Text("Faithful", tableName: "EditorUX")
+                                .tag(MacroReconstructionObjective.faithful)
+                        }
+                        .labelsHidden()
+                        .pickerStyle(.menu)
+                        .controlSize(.small)
+                        .frame(width: 88)
                         .disabled(model.isBusy)
-                        .help(String(localized: "Include permitted video and frames", table: "EditorUX"))
+                        .help(optimizationObjectiveHelp)
                     }
                 }
                 Spacer(minLength: 0)
@@ -143,7 +156,7 @@ struct MacroReconstructionSheet: View {
                         Button {
                             model.chooseCandidateFile()
                         } label: {
-                            Label(String(localized: "Import candidate…", table: "EditorUX"), systemImage: "square.and.arrow.down")
+                            Label(String(localized: "Import result…", table: "EditorUX"), systemImage: "square.and.arrow.down")
                         }
                         .buttonStyle(.borderedProminent)
                         .controlSize(.small)
@@ -152,7 +165,7 @@ struct MacroReconstructionSheet: View {
                         Button {
                             model.chooseCandidateFile()
                         } label: {
-                            Label(String(localized: "Import candidate…", table: "EditorUX"), systemImage: "square.and.arrow.down")
+                            Label(String(localized: "Import result…", table: "EditorUX"), systemImage: "square.and.arrow.down")
                         }
                         .buttonStyle(.bordered)
                         .controlSize(.small)
@@ -211,6 +224,102 @@ struct MacroReconstructionSheet: View {
         .padding(.horizontal, 2)
     }
 
+    private var reconstructionEvidenceStatus: some View {
+        let mode = model.evidenceMode
+        return HStack(alignment: .center, spacing: 8) {
+            Image(systemName: reconstructionEvidenceIcon(mode))
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(reconstructionEvidenceTint(mode))
+                .frame(width: 16)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(reconstructionEvidenceTitle(mode))
+                    .font(.caption.weight(.semibold))
+                Text(reconstructionEvidenceDetail(mode))
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer(minLength: 8)
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 7)
+        .background(reconstructionEvidenceTint(mode).opacity(0.06), in: RoundedRectangle(cornerRadius: 8))
+        .overlay(
+            RoundedRectangle(cornerRadius: 8)
+                .strokeBorder(reconstructionEvidenceTint(mode).opacity(0.16), lineWidth: 0.5)
+        )
+    }
+
+    private var optimizationObjectiveHelp: String {
+        switch model.optimizationObjective {
+        case .robust:
+            return String(
+                localized: "Prefer evidence-backed text locators, bounded waits, verification, and relative coordinates when supported.",
+                table: "EditorUX"
+            )
+        case .faithful:
+            return String(
+                localized: "Preserve the demonstrated timing and targeting unless a correction is required.",
+                table: "EditorUX"
+            )
+        }
+    }
+
+    private var framesToggleHelp: String {
+        switch model.evidenceMode {
+        case .actionsOnly:
+            return String(localized: "AI can analyze actions, but this recording has no screen frames.", table: "EditorUX")
+        case .visualEvidenceUnavailable:
+            return String(localized: "The linked visual evidence is unavailable. AI can analyze actions, but it must not infer the recorded screen state.", table: "EditorUX")
+        case .visualEvidenceAvailable:
+            return String(
+                localized: "Include the recorded video and key images. AI can use its own tools to seek, screenshot, crop, and zoom.",
+                table: "EditorUX"
+            )
+        }
+    }
+
+    private func reconstructionEvidenceTitle(_ mode: MacroReconstructionEvidenceMode) -> String {
+        switch mode {
+        case .actionsOnly:
+            return String(localized: "Action recording", table: "Recording")
+        case .visualEvidenceUnavailable:
+            return String(localized: "Evidence issue", table: "Automation")
+        case .visualEvidenceAvailable:
+            return String(localized: "Evidence ready", table: "Automation")
+        }
+    }
+
+    private func reconstructionEvidenceDetail(_ mode: MacroReconstructionEvidenceMode) -> String {
+        switch mode {
+        case .actionsOnly:
+            return String(localized: "AI can analyze actions, but this recording has no screen frames.", table: "EditorUX")
+        case .visualEvidenceUnavailable:
+            return String(localized: "The linked visual evidence is unavailable. AI can analyze actions, but it must not infer the recorded screen state.", table: "EditorUX")
+        case .visualEvidenceAvailable:
+            return String(
+                localized: "Visual evidence is ready. Include it to give AI the recording plus an action-linked map for seeking, cropping, and checking coordinates.",
+                table: "EditorUX"
+            )
+        }
+    }
+
+    private func reconstructionEvidenceIcon(_ mode: MacroReconstructionEvidenceMode) -> String {
+        switch mode {
+        case .actionsOnly: return "video.slash"
+        case .visualEvidenceUnavailable: return "exclamationmark.triangle.fill"
+        case .visualEvidenceAvailable: return "film.stack.fill"
+        }
+    }
+
+    private func reconstructionEvidenceTint(_ mode: MacroReconstructionEvidenceMode) -> Color {
+        switch mode {
+        case .actionsOnly: return .secondary
+        case .visualEvidenceUnavailable: return .orange
+        case .visualEvidenceAvailable: return .green
+        }
+    }
+
     private func stepBadge(_ number: Int, active: Bool) -> some View {
         Text("\(number)")
             .font(.caption.bold())
@@ -242,7 +351,7 @@ struct MacroReconstructionSheet: View {
             }
 
             if let player = model.videoPlayer {
-                VideoPlayer(player: player)
+                MacroReconstructionVideoSurface(player: player)
                     .frame(minHeight: 160, idealHeight: 200, maxHeight: 240)
                     .clipShape(RoundedRectangle(cornerRadius: 8))
                     .overlay {
@@ -256,10 +365,24 @@ struct MacroReconstructionSheet: View {
                         }
                     }
 
-                if !model.hasAlignedVideo {
+                if model.videoAlignmentState == .sourceChangedWithoutLineage {
+                    HStack(spacing: 5) {
+                        Image(systemName: "exclamationmark.circle")
+                        Text("This macro changed after recording, but no verified source revision is available to realign it. Action times below are not video seek times.", tableName: "EditorUX")
+                    }
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                } else if !model.hasAlignedVideo {
                     HStack(spacing: 5) {
                         Image(systemName: "exclamationmark.circle")
                         Text("Precise video alignment is unavailable. Action times below belong to the macro; they are not video seek times.", tableName: "EditorUX")
+                    }
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                } else if model.hasPartialVideoAlignment {
+                    HStack(spacing: 5) {
+                        Image(systemName: "exclamationmark.circle")
+                        Text("Some edited steps cannot be aligned to the original video. Verified steps can still seek precisely.", tableName: "EditorUX")
                     }
                     .font(.caption2)
                     .foregroundStyle(.secondary)
@@ -391,6 +514,8 @@ struct MacroReconstructionSheet: View {
             .padding(8)
             .background(Color.secondary.opacity(0.04), in: RoundedRectangle(cornerRadius: 6))
 
+            candidateProvenanceView(candidate)
+
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 4) {
                     ForEach(model.candidateRows) { row in
@@ -462,6 +587,30 @@ struct MacroReconstructionSheet: View {
         }
     }
 
+    private func candidateProvenanceView(_ candidate: MacroStoredCandidate) -> some View {
+        let presentation = MacroReconstructionCandidateProvenancePresentation.make(
+            from: candidate.importProvenance
+        )
+        return HStack(alignment: .top, spacing: 8) {
+            Image(systemName: presentation.systemImage)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.secondary)
+                .frame(width: 16)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(presentation.title)
+                    .font(.caption.weight(.semibold))
+                Text(presentation.detail)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 6)
+        .background(Color.secondary.opacity(0.04), in: RoundedRectangle(cornerRadius: 6))
+    }
+
     private var emptyCandidateView: some View {
         VStack(spacing: 16) {
             Spacer()
@@ -488,7 +637,7 @@ struct MacroReconstructionSheet: View {
             VStack(alignment: .leading, spacing: 8) {
                 guideRow(number: "1", title: String(localized: "Export package for AI", table: "EditorUX"))
                 guideRow(number: "2", title: String(localized: "Send package to AI (Claude, GPT, etc.)", table: "EditorUX"))
-                guideRow(number: "3", title: String(localized: "Import candidate JSON to test and accept", table: "EditorUX"))
+                guideRow(number: "3", title: String(localized: "Import the reconstruction package or candidate.json to review and test", table: "EditorUX"))
             }
             .padding(12)
             .background(Color.secondary.opacity(0.05), in: RoundedRectangle(cornerRadius: 8))
@@ -496,7 +645,7 @@ struct MacroReconstructionSheet: View {
             Button {
                 model.chooseCandidateFile()
             } label: {
-                Label(String(localized: "Import candidate…", table: "EditorUX"), systemImage: "square.and.arrow.down")
+                Label(String(localized: "Import result…", table: "EditorUX"), systemImage: "square.and.arrow.down")
                     .font(.subheadline.weight(.semibold))
                     .padding(.horizontal, 6)
                     .padding(.vertical, 2)
@@ -505,7 +654,7 @@ struct MacroReconstructionSheet: View {
             .controlSize(.regular)
             .disabled(model.isBusy)
 
-            Text("Drop candidate .json file here", tableName: "EditorUX")
+            Text("Drop reconstruction package or candidate.json here", tableName: "EditorUX")
                 .font(.caption2)
                 .foregroundStyle(.tertiary)
 
@@ -547,15 +696,32 @@ struct MacroReconstructionSheet: View {
     // MARK: - Action Rows & Badges
 
     private func actionRow(_ action: MacroReconstructedAction, number: Int, candidate: Bool) -> some View {
-        let isSelected = model.selectedActionID == action.id || (!candidate && model.activeSourceActionID == action.id)
+        let isSelected = model.selectedActionID == action.id
+        let isVideoActive = !candidate && model.activeSourceActionID == action.id
+        let macro = candidate ? model.selectedCandidate?.macro : model.source
+        let keyboardLabel = macro.flatMap {
+            KeyboardActionPresentation.label(
+                kind: action.kind,
+                eventIndices: action.sourceEventIndices,
+                events: $0.events
+            )
+        }
         return Button {
             model.selectAction(action.id, candidate: candidate)
         } label: {
             HStack(alignment: .center, spacing: 10) {
-                Text("\(number)")
-                    .font(.caption2.bold().monospacedDigit())
-                    .foregroundStyle(.secondary)
-                    .frame(width: 24, alignment: .trailing)
+                HStack(spacing: 3) {
+                    Image(systemName: "play.fill")
+                        .font(.system(size: 7, weight: .bold))
+                        .foregroundStyle(Color.accentColor)
+                        .opacity(isVideoActive ? 1 : 0)
+                        .frame(width: 7)
+                    Text("\(number)")
+                        .font(.caption2.bold().monospacedDigit())
+                        .foregroundStyle(.secondary)
+                        .frame(width: 22, alignment: .trailing)
+                }
+                .frame(width: 32, alignment: .trailing)
 
                 Image(systemName: actionIconName(action.kind))
                     .font(.caption)
@@ -568,7 +734,17 @@ struct MacroReconstructionSheet: View {
                         Text(humanActionKindName(action.kind))
                             .font(.callout.weight(.medium))
 
-                        if let macro = candidate ? model.selectedCandidate?.macro : model.source,
+                        if action.kind != .textInput, let keyboardLabel {
+                            Text(keyboardLabel)
+                                .font(.caption2.bold().monospaced())
+                                .lineLimit(1)
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 1)
+                                .background(Color.blue.opacity(0.12), in: Capsule())
+                                .foregroundStyle(Color.blue)
+                        }
+
+                        if let macro,
                            let text = action.sourceEventIndices.compactMap({ macro.events[$0].textAnchor?.text }).first {
                             HStack(spacing: 3) {
                                 Image(systemName: "text.magnifyingglass")
@@ -584,15 +760,11 @@ struct MacroReconstructionSheet: View {
                         }
                     }
 
-                    if let macro = candidate ? model.selectedCandidate?.macro : model.source {
-                        let typed = action.sourceEventIndices.lazy.map { macro.events[$0] }
-                            .filter { $0.kind == .keyDown }.compactMap(\.unicodeString).prefix(80)
-                            .reduce(into: "") { result, fragment in
-                                if result.count < 160 { result.append(contentsOf: fragment.prefix(160 - result.count)) }
-                            }
-                        if !typed.isEmpty {
-                            Text(typed).font(.caption).lineLimit(2).textSelection(.enabled)
-                        }
+                    if action.kind == .textInput, let keyboardLabel, !keyboardLabel.isEmpty {
+                        Text(String(keyboardLabel.prefix(160)))
+                            .font(.caption)
+                            .lineLimit(2)
+                            .textSelection(.enabled)
                     }
 
                     Text(String(format: "%.2f–%.2f s (%.2f s)", action.startTime, action.endTime, max(0.01, action.endTime - action.startTime)))
@@ -699,16 +871,33 @@ struct MacroReconstructionSheet: View {
             }
 
             if !model.statusMessage.isEmpty {
-                HStack(spacing: 8) {
+                HStack(alignment: .top, spacing: 8) {
                     Image(systemName: "info.circle.fill")
-                        .foregroundStyle(.blue)
-                    Text(model.statusMessage)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .textSelection(.enabled)
+                        .foregroundStyle(Brand.libraryBlue)
+                        .padding(.top, 2)
+                    VStack(alignment: .leading, spacing: 4) {
+                        let lines = model.statusMessage.components(separatedBy: "\n").filter { !$0.isEmpty }
+                        ForEach(Array(lines.enumerated()), id: \.offset) { idx, line in
+                            if idx == 0 {
+                                Text(line)
+                                    .font(.system(size: 11.5, weight: .medium))
+                                    .foregroundStyle(.primary)
+                            } else {
+                                HStack(alignment: .top, spacing: 4) {
+                                    Text("•")
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                    Text(line)
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                }
+                            }
+                        }
+                    }
+                    .textSelection(.enabled)
                     Spacer()
                 }
-                .padding(8)
+                .padding(10)
                 .background(Color.blue.opacity(0.06), in: RoundedRectangle(cornerRadius: 6))
             }
 
@@ -730,6 +919,25 @@ struct MacroReconstructionSheet: View {
                     .multilineTextAlignment(.trailing)
                     .frame(maxWidth: 420, alignment: .trailing)
 
+                Button {
+                    model.editSelectedCandidate()
+                } label: {
+                    Label(
+                        model.hasSuccessfulTestForSelectedCandidate
+                            ? String(localized: "Edit tested version", table: "EditorUX")
+                            : String(localized: "Edit candidate", table: "EditorUX"),
+                        systemImage: "slider.horizontal.3"
+                    )
+                }
+                .buttonStyle(.bordered)
+                .disabled(!model.canEditSelectedCandidate)
+
+                if model.hasSuccessfulTestForSelectedCandidate && !model.isTesting {
+                    Label(String(localized: "Test passed", table: "EditorUX"), systemImage: "checkmark.circle.fill")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.green)
+                }
+
                 if model.isTesting {
                     Button(role: .destructive) {
                         model.cancelTest()
@@ -749,11 +957,11 @@ struct MacroReconstructionSheet: View {
                 Button {
                     Task { await model.acceptSelected() }
                 } label: {
-                    Label(String(localized: "Accept tested version", table: "EditorUX"), systemImage: "checkmark")
+                    Label(String(localized: "Accept this version", table: "EditorUX"), systemImage: "checkmark")
                 }
                 .buttonStyle(.borderedProminent)
                 .disabled(!model.canAccept)
-                .help(!model.canAccept ? String(localized: "You must run 'Test once' before accepting.", table: "EditorUX") : "")
+                .help(model.canAccept ? "" : model.acceptanceBlockedReason)
             }
         }
     }

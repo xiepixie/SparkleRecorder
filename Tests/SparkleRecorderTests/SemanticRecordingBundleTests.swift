@@ -422,6 +422,49 @@ struct SemanticRecordingBundleTests {
         )))
     }
 
+    @Test("Bundle validation reports broken playable-to-evidence provenance")
+    func bundleValidationReportsBrokenPlayableEvidenceProvenance() {
+        let event = RecordedEvent(
+            kind: .mouseMoved,
+            time: 0,
+            x: 10,
+            y: 20,
+            keyCode: 0,
+            flags: 0,
+            mouseButton: 0,
+            clickCount: 0,
+            scrollDeltaY: 0,
+            scrollDeltaX: 0
+        )
+        let sample = RecordingEvidenceSample(index: 0, event: event)
+        var invalidRange = RecordingPlayableEvidenceLink(
+            playableEventIndex: 1,
+            evidenceSampleRange: 0...0
+        )
+        invalidRange.evidenceSampleStartIndex = 2
+        invalidRange.evidenceSampleEndIndex = 1
+        let provenance = RecordingReconstructionProvenance(
+            sessionOriginHostTime: 100,
+            sessionEndTime: 1,
+            playableEvidenceLinks: [
+                RecordingPlayableEvidenceLink(playableEventIndex: 0, evidenceSampleRange: 0...1),
+                invalidRange
+            ]
+        )
+        let bundle = SemanticRecordingBundle(
+            inputEvidenceSamples: [sample, sample],
+            reconstructionProvenance: provenance
+        )
+        let issues = bundle.validate()
+
+        #expect(issues.contains(.duplicateInputEvidenceSampleIndex(0)))
+        #expect(issues.contains(.playableEvidenceLinkReferencesMissingSample(
+            playableEventIndex: 0,
+            evidenceSampleIndex: 1
+        )))
+        #expect(issues.contains(.invalidPlayableEvidenceLinkRange(playableEventIndex: 1)))
+    }
+
     @Test("Bundle validation reports duplicate IDs and unsupported schema")
     func bundleValidationReportsDuplicateIDsAndUnsupportedSchema() throws {
         #expect(!RecordingCapturePolicy(mode: .keyframesOnly).recordsVideo)

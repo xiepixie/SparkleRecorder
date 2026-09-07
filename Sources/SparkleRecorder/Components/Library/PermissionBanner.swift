@@ -7,6 +7,29 @@ struct PermissionBanner: View {
     let accessibilityGranted: Bool
     let inputMonitoringGranted: Bool
     let screenCaptureGranted: Bool
+    let visualEvidenceEnabled: Bool
+
+    private var readiness: RecordingPermissionReadiness {
+        RecordingPermissionReadiness(
+            accessibilityGranted: accessibilityGranted,
+            inputMonitoringGranted: inputMonitoringGranted,
+            screenCaptureGranted: screenCaptureGranted,
+            visualEvidenceEnabled: visualEvidenceEnabled
+        )
+    }
+
+    private var detailText: String {
+        if !readiness.canRecordAndReplay {
+            return String(
+                localized: "Grant Accessibility & Input Monitoring to record and replay.",
+                table: "Recording"
+            )
+        }
+        return String(
+            localized: "Screen Recording is required while visual evidence is enabled.",
+            table: "Recording"
+        )
+    }
 
     var body: some View {
         HStack(spacing: 10) {
@@ -18,7 +41,7 @@ struct PermissionBanner: View {
                 Text("Permissions required", tableName: "Settings")
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundStyle(.primary)
-                Text("Grant Accessibility, Input Monitoring & Screen Recording to record and replay.", tableName: "Recording")
+                Text(detailText)
                     .font(.system(size: 10.5))
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -31,7 +54,7 @@ struct PermissionBanner: View {
                     controller.openAccessibilityPrefs()
                 } else if !inputMonitoringGranted {
                     controller.openInputMonitoringPrefs()
-                } else if !screenCaptureGranted {
+                } else if visualEvidenceEnabled && !screenCaptureGranted {
                     controller.openScreenCapturePrefs()
                 }
             }

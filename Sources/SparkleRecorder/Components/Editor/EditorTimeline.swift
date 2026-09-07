@@ -17,7 +17,7 @@ struct EditorTimeline: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
-                Text(NSLocalizedString("TIMELINE", tableName: "EditorUX", comment: ""))
+                Text("TIMELINE", tableName: "EditorUX")
                     .font(.system(size: 10.5, weight: .semibold))
                     .tracking(0.7)
                     .foregroundStyle(.secondary)
@@ -137,8 +137,8 @@ struct EditorTimeline: View {
                     .padding(.horizontal, 8).padding(.vertical, 3)
                     .background(Capsule().fill(themeColor.opacity(0.12)))
                 }
-	                Text(NSLocalizedString("Drag on timeline to select a range; a tiny range selects the nearest action.", tableName: "EditorUX", comment: ""))
-	                    .font(.system(size: 10))
+                Text("Drag on timeline to select a range; a tiny range selects the nearest action.", tableName: "EditorUX")
+                    .font(.system(size: 10))
 	                    .foregroundStyle(.secondary)
                 Spacer()
             }

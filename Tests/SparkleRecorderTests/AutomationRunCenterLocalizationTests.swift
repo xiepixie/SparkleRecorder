@@ -32,6 +32,33 @@ struct AutomationRunCenterLocalizationTests {
         #expect(missingSimplifiedChinese.isEmpty, "Missing Simplified Chinese run-center translations: \(missingSimplifiedChinese)")
     }
 
+    @Test("Persistence diagnostics stay behind user-facing copy")
+    func persistenceDiagnosticsStayBehindUserFacingCopy() {
+        let rawMessage = "disk full at /private/var/..."
+        let workflowsIssue = AutomationPersistenceIssue(
+            operation: .workflows,
+            message: rawMessage,
+            failedAt: Date(timeIntervalSince1970: 100)
+        )
+        let checkpointIssue = AutomationPersistenceIssue(
+            operation: .runCheckpoint,
+            runID: UUID(),
+            message: rawMessage,
+            failedAt: Date(timeIntervalSince1970: 100)
+        )
+
+        let workflows = AutomationRunCenterIssuePresenter.persistenceIssue(workflowsIssue)
+        let checkpoint = AutomationRunCenterIssuePresenter.persistenceIssue(checkpointIssue)
+        let loadFailure = AutomationRunCenterIssuePresenter.loadFailure(rawMessage)
+
+        #expect(!workflows.detail.contains(rawMessage))
+        #expect(!checkpoint.detail.contains(rawMessage))
+        #expect(!loadFailure.detail.contains(rawMessage))
+        #expect(workflows.detail.contains("Workflow changes"))
+        #expect(checkpoint.detail.contains("Run progress"))
+        #expect(loadFailure.detail.contains("Run history"))
+    }
+
     @Test("Known internal playback errors use user-facing localized copy")
     func playbackAbortUsesLocalizedCopy() {
         let completedAt = Date(timeIntervalSince1970: 100)
@@ -81,7 +108,11 @@ struct AutomationRunCenterLocalizationTests {
         "Recommended next step",
         "Run details",
         "Run ID",
-        "Run history keeps at most 10,000 records. Choosing Never disables the age limit, not this capacity limit.",
+        "Run evidence needing attention",
+        "Run history records",
+        "Evidence includes reports, ending screenshots, condition evidence, and other run files. When evidence expires, the run result stays in history until its history retention period ends.",
+        "Automatic cleanup keeps active runs, the latest execution for each workflow, the latest run needing attention, and the latest evidence for each macro.",
+        "Run history targets at most 10,000 records. Protected or active runs may temporarily exceed this limit. Choosing Never disables only the age limit.",
         "Review Evidence",
         "Review Failure",
         "Run Again",
@@ -128,7 +159,9 @@ struct AutomationRunCenterLocalizationTests {
         "Diagnostics",
         "Evidence size",
         "History index",
-        "Last checked %@ · removed %d evidence item(s) and %d record(s) · freed %@ · next check %@",
+        "Last checked %@ · nothing expired · earliest next check %@",
+        "Last checked %@ · updated %d expired evidence record(s) and removed %d history record(s) · no local files to free · earliest next check %@",
+        "Last checked %@ · cleaned evidence from %d run(s) and removed %d history record(s) · freed %@ · earliest next check %@",
         "Manage run data",
         "Other evidence",
         "Refresh storage usage",
@@ -138,10 +171,16 @@ struct AutomationRunCenterLocalizationTests {
         "Run records",
         "Save ending screenshots",
         "Screenshots",
+        "Ending screenshots use most of this storage. Turn off Save ending screenshots to reduce future growth; cleanup removes existing evidence only after its retention period expires.",
         "Storage used",
         "Storage usage could not be calculated: %@",
+        "This will mark expired evidence from %d run(s) as cleaned and delete %d old history record(s). No local evidence files are currently taking space. Protected recent runs will stay available.",
+        "Updated %d expired evidence record(s) and removed %d old history record(s). No local evidence files needed deletion.",
         "This permanently removes %d run record(s) and about %@ of associated evidence.",
         "This removes about %@ of ending screenshots. Reports and run history stay available.",
-        "This removes about %@ of reports, screenshots, and diagnostic evidence. A lightweight run record stays in history."
+        "This removes about %@ of reports, screenshots, and diagnostic evidence. A lightweight run record stays in history.",
+        "Workflow changes could not be saved. Check available disk space and file permissions, then try again.",
+        "Run progress could not be saved. Check available disk space and file permissions before running again.",
+        "Run history could not be refreshed. Try again in a moment."
     ]
 }

@@ -71,15 +71,13 @@ public struct RecordingGeometryHistory: Equatable, Sendable {
         self.snapshotsBySurface = Dictionary(grouping: sorted, by: \.surfaceID)
     }
 
-    /// Returns pixels only when the requested surface and time have valid capture coverage.
-    /// Capture bounds include all edges; the temporal upper bound is excluded.
-    public func framePoint(
-        forGlobalPoint point: PointValue,
+    /// Returns the measured capture geometry only when the requested surface and
+    /// recording time are covered by one validated half-open interval.
+    public func snapshot(
         surfaceID: String,
         recordingTime: Double
-    ) -> PointValue? {
+    ) -> RecordingGeometrySnapshot? {
         guard recordingTime.isFinite, recordingTime >= 0,
-              point.x.isFinite, point.y.isFinite,
               let snapshots = snapshotsBySurface[surfaceID] else { return nil }
         var lower = 0
         var upper = snapshots.count
@@ -90,7 +88,18 @@ public struct RecordingGeometryHistory: Equatable, Sendable {
         }
         guard lower > 0 else { return nil }
         let snapshot = snapshots[lower - 1]
-        guard recordingTime < snapshot.validUntil else { return nil }
+        return recordingTime < snapshot.validUntil ? snapshot : nil
+    }
+
+    /// Returns pixels only when the requested surface and time have valid capture coverage.
+    /// Capture bounds include all edges; the temporal upper bound is excluded.
+    public func framePoint(
+        forGlobalPoint point: PointValue,
+        surfaceID: String,
+        recordingTime: Double
+    ) -> PointValue? {
+        guard point.x.isFinite, point.y.isFinite,
+              let snapshot = snapshot(surfaceID: surfaceID, recordingTime: recordingTime) else { return nil }
 
         let bounds = snapshot.captureBounds
         guard point.x >= bounds.x, point.x <= bounds.x + bounds.width,

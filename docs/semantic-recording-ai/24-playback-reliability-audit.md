@@ -1,6 +1,6 @@
 # Playback and presentation reliability audit
 
-Updated: 2026-09-05
+Updated: 2026-09-06
 Role: Active bugfix ledger; live user-reported playback failure is not yet declared resolved.
 
 Evidence: selected macro has 23 keyboard/flags events, one Chrome surface and an empty runs directory. The editor and Review can decode its actions. Manual playback only closes NSPopover, does not hide the standalone library, bypasses the shared target application preparation client, and never saves successful run evidence. Aborted completion returns without replacing the Playing status. Post-event permission is defined in PermissionCenter but unused by playback. Installed CLI preflight reports denied Accessibility/Input Monitoring; this is supporting evidence, not proof of the GUI process's effective post-event permission.
@@ -103,3 +103,109 @@ out before unhideWithoutActivation, then shows only the nonactivating HUD. Both
 recording and playback use it. This preserves target activation while making
 feedback visible. Swift 6 build passed after this adjustment; panel visibility
 and target focus are checked on the installed build before delivery.
+
+## Window identity, manual visibility, and operation feedback follow-up
+
+A later user report reproduced a bound Chrome failure with production-shaped data. The saved
+macro had no `recordedWindowId`, two processes shared `com.google.Chrome`, and the selected
+process currently exposed two AX windows with the same 2056×1290 geometry while both titles
+had changed since recording. Refusing to guess between those windows is intentional: no input
+is posted when the target is ambiguous. The failure copy now points users to **Bind Active
+Window** when the intended window has changed.
+
+New captures and manual rebinding now resolve the focused surface to the frontmost matching
+layer-zero window-server ID and persist it in `PlaybackSurface.recordedWindowId`. Window-server
+parsing is shared by recording and playback through `WindowServerObservationAdapter`. During
+playback a still-live recorded ID remains strong identity. If multiple AX windows share the
+same geometry, foreground preparation cycles eligible AX candidates and verifies the exact
+recorded ID at the window-server Seam before any macro input may start. If a recorded ID is no
+longer present, Core falls back to the recorded geometry; ambiguity still fails closed.
+
+User-initiated playback now owns one `ManualPlaybackVisibilitySession` across the entire chain.
+The original SparkleRecorder visibility/focus snapshot is restored on normal completion,
+preparation failure, playback failure, chain-cycle termination, chain-load failure, and Stop.
+Scheduled/background automation keeps its separate visibility semantics and is not forced to
+open the SparkleRecorder window after every background run.
+
+The old untyped `statusMessage` surface was replaced by `AppStatusFeedback` with semantic
+info/success/warning/error/progress tones, tone-owned dismissal policy, multiline presentation,
+and explicit dismissal. The same bottom-center presentation Seam is mounted on the main
+window/menu popover, Settings, and Editor. Progress feedback persists until replaced, and
+errors remain visible until the user dismisses them or a later operation replaces them; long
+messages are no longer truncated into a single-line black capsule. Library mutations now route
+through `MenuBarController` instead of SwiftUI writing `MacroLibrary` directly, so rename,
+duplicate, delete, favorite/tag, shortcut, repeat/speed, notes, chain and reorder operations all
+share the same interaction lock and feedback path. Duplicate waits for the full repository event
+snapshot before reporting success, and chain mutation reports self/cycle/missing-target rejection
+instead of silently ignoring it. Direct regression coverage includes status lifecycle, Library
+mutation ordering/results, manual visibility ownership, stale-window-ID fallback, frontmost
+capture identity, and existing target-preparation fail-closed behavior. Live replay of an
+arbitrary user macro remains outside automated verification.
+
+## Text-locator window identity correction (2026-09-06)
+
+A reconstruction trial exposed a separate locator seam after the candidate correctly used an
+exact `New chat` text anchor. `WindowTracker` could resolve the intended Chrome window while
+`ScreenCaptureService` independently required the *recorded title* to still match. Browser titles
+are mutable, so OCR capture could select another same-bundle window with the stale title or fail
+entirely; `LivePlaybackRunStepClient` would then use the coordinate fallback. The candidate still
+looked like an exact text click even though the posted point came from the old recorded coordinate.
+
+Locator capture now receives the surface's recorded WindowServer ID and the already-resolved
+current window frame. A still-live recorded ID is strongest identity; if that ID is gone, the
+resolved current frame is preferred before historical title matching. `WindowTracker` likewise
+weights a still-live recorded window ID above title/size heuristics. Pure matcher regressions cover
+title drift with a live recorded ID, stale ID plus current-frame recovery, stale old-title windows,
+and legacy title-only capture. Locator-cache and playback-engine regressions remain green. No
+arbitrary click macro is replayed as automated verification.
+
+### Unified text-target resolution follow-up
+
+The same audit found that runtime semantics were already closer than the old naming suggested:
+`waitForText` and `verifyText` called `LocatorEngine` for OCR, so they inherited the same stable
+window capture fix. The remaining architecture problem was that presence checks were expressed
+through a point-returning locator Interface, while normalized anchor geometry was independently
+reimplemented by playback fallback and Macro Editor preview code.
+
+`PlaybackTextTargetResolver` now owns the live meaning of a `TextAnchor`: explicit Playback Surface
+selection, stable WindowServer identity, current content-frame geometry, OCR capture/cropping and
+conversion of Vision output into Core candidates. `TextAnchorMatchRanking` owns exact/contains,
+fuzzy tolerance, observed-position scoring and occurrence selection in pure Core. `LocatorEngine`
+now has one narrow job: bounded polling for a text-backed mouse target; `LivePlaybackTextObservation`
+consumes the same resolver as a presence observation. The old unused locator strategy array and
+coordinate branch were removed.
+
+`TextAnchorGeometryProjection` is the shared Core Module for content-normalized observed/search/
+fallback geometry. `PlaybackLocatorFallback` owns coordinate fallback for both async and synchronous
+live playback, and Macro Editor preview uses the same geometry projection. A content-normalized
+`TextAnchor` now requires an explicit `surfaceId` at candidate validation and fails closed at runtime,
+so a multi-window macro never guesses an arbitrary surface. Legacy surface fallback remains only for
+legacy/non-content-relative input and is deterministic by surface ID.
+
+The same cleanup moved macOS Accessibility/screen content-frame resolution out of
+`SparkleRecorderCore`. Core no longer imports AppKit/Cocoa for coordinate resolution;
+`WindowContentFrameResolver` is the App-edge Adapter that supplies live content geometry to
+`PlaybackContext`. `PointResolver` uses only context and persisted geometry, including recorded
+content insets for compatibility when live content metadata is unavailable. This also fixes
+normalized-only AI search regions being executable but previously missing from Editor preview when
+no absolute `searchRegion` was stored.
+
+### Text-picker display-fallback geometry correction
+
+A later trial exposed a different source of vertical drift in locally edited Candidates. When
+`TextPickerOverlay` could not capture the intended window, it fell back to a full-display screenshot
+but still wrote `observedContentNormalizedFrame`, `searchContentNormalizedRegion`, and
+`coordinateFallbackContentNormalized`. Those values were normalized against the display frame even
+though playback interprets them relative to the event's Playback Surface content frame. On the
+reproducing Chrome macro, an absolute fallback near y=203 became normalized y≈0.1528 against the
+1329-point display; replaying that value against the 1290-point window beginning at y=39 produced a
+point near y=236, matching the reported downward offset.
+
+Display fallback now preserves only absolute Text Anchor geometry. Content-normalized fields are
+written only when the picker actually has a window/content normalization frame. Window capture from
+the picker also supplies the recorded WindowServer ID and resolved current frame, so browser title
+drift no longer unnecessarily forces display fallback. `MacroCandidateValidator` additionally
+rejects simultaneous absolute/content-normalized Text Anchor geometry when both forms disagree with
+the Candidate's recorded content frame beyond a small pixel tolerance. Direct regressions cover the
+real failing geometry and verify that ordinary full-window normalized Chrome coordinates still
+round-trip without vertical drift.

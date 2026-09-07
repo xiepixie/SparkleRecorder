@@ -41,7 +41,10 @@ enum AutomationWorkflowDraftExportPresenter {
             } catch {
                 showError(
                     title: String(localized: "Export failed", table: "Common"),
-                    message: String(describing: error)
+                    message: String(
+                        localized: "The workflow draft could not be exported. Check the destination and try again.",
+                        table: "Automation"
+                    )
                 )
             }
         }
@@ -97,7 +100,9 @@ enum AutomationWorkflowDraftExportPresenter {
     private static func issueMessage(_ message: String, issues: [AutomationWorkflowDraftIssue]) -> String {
         let preview = issues
             .prefix(3)
-            .map { issue in "- \(issue.message)" }
+            .map { issue in
+                "- \(AutomationWorkflowDraftIssuePresentation.message(for: issue))"
+            }
             .joined(separator: "\n")
         guard !preview.isEmpty else {
             return message

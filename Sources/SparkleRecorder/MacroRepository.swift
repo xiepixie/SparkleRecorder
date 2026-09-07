@@ -96,8 +96,20 @@ public actor MacroRepository {
             }
         }
         
-        // Sort by creation date descending
-        return macros.sorted { $0.createdAt > $1.createdAt }
+        // Preserve explicit Library order when present. Legacy manifests without
+        // an order retain the previous newest-first behavior until the next save.
+        return macros.sorted { lhs, rhs in
+            switch (lhs.libraryOrder, rhs.libraryOrder) {
+            case let (.some(left), .some(right)) where left != right:
+                return left < right
+            case (.some, .none):
+                return true
+            case (.none, .some):
+                return false
+            default:
+                return lhs.createdAt > rhs.createdAt
+            }
+        }
     }
     
     /// Loads the heavy events array for a specific macro.

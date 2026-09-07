@@ -40,7 +40,7 @@ struct AutomationRunRetentionTests {
         #expect(eligible.shouldRun)
     }
 
-    @Test("Planner uses separate success and failure ages while protecting latest runs")
+    @Test("Planner uses separate success and attention ages while protecting latest runs")
     func plannerSeparatesAgesAndProtectsLatest() throws {
         let now = date(days: 400)
         let workflowID = UUID()
@@ -96,6 +96,60 @@ struct AutomationRunRetentionTests {
         #expect(plan.protectedRunReasons[recentFailure.id]?.contains(.latestWorkflowExecution) == true)
         #expect(plan.protectedRunReasons[recentFailure.id]?.contains(.latestWorkflowFailure) == true)
         #expect(plan.protectedRunReasons[recentSuccess.id]?.contains(.latestMacroEvidence) == true)
+    }
+
+    @Test("Attention outcomes use the longer evidence window, not the success window")
+    func plannerUsesAttentionWindowForPermissionFailures() {
+        let now = date(days: 400)
+        let workflowID = UUID()
+        let taskID = UUID()
+        let successMacroID = UUID()
+        let attentionMacroID = UUID()
+        let oldSuccess = completedRun(
+            workflowID: workflowID,
+            taskID: taskID,
+            macroID: successMacroID,
+            evidenceID: UUID(),
+            completedAt: now.addingTimeInterval(-60 * day),
+            outcome: .succeeded(report: nil)
+        )
+        let oldPermissionFailure = completedRun(
+            workflowID: workflowID,
+            taskID: taskID,
+            macroID: attentionMacroID,
+            evidenceID: UUID(),
+            completedAt: now.addingTimeInterval(-60 * day),
+            outcome: .permissionDenied(permission: .accessibility, message: "Permission required")
+        )
+        let recentFailure = completedRun(
+            workflowID: workflowID,
+            taskID: taskID,
+            macroID: attentionMacroID,
+            evidenceID: UUID(),
+            completedAt: now.addingTimeInterval(-day),
+            outcome: .failed(report: nil)
+        )
+        let latestSuccess = completedRun(
+            workflowID: workflowID,
+            taskID: taskID,
+            macroID: successMacroID,
+            evidenceID: UUID(),
+            completedAt: now,
+            outcome: .succeeded(report: nil)
+        )
+
+        let plan = AutomationRunRetentionPlanner.plan(
+            runs: [oldSuccess, oldPermissionFailure, recentFailure, latestSuccess],
+            settings: AutomationRunRetentionSettings(
+                successEvidenceAgeDays: 30,
+                attentionEvidenceAgeDays: 90,
+                metadataAgeDays: 365
+            ),
+            evaluatedAt: now
+        )
+
+        #expect(plan.items.contains { $0.runID == oldSuccess.id })
+        #expect(!plan.items.contains { $0.runID == oldPermissionFailure.id })
     }
 
     @Test("Active checkpoints are always protected")

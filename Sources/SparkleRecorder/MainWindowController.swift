@@ -51,6 +51,11 @@ final class SettingsWindowController: NSWindowController {
     init(controller: MenuBarController) {
         let host = NSHostingController(
             rootView: SettingsPanel(controller: controller, inWindow: true)
+                .appStatusFeedbackOverlay(
+                    state: controller.state,
+                    isWindow: true,
+                    bottomPadding: 18
+                )
                 .environmentObject(controller.state)
                 .environmentObject(controller.library)
         )

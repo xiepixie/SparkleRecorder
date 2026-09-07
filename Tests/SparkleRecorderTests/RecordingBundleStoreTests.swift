@@ -36,6 +36,7 @@ struct RecordingBundleStoreTests {
             "frames/index.jsonl",
             "timeline.jsonl",
             "events.jsonl",
+            "input-evidence.jsonl",
             "ocr/observations.jsonl",
             "suppressed.jsonl"
         ]
@@ -63,10 +64,57 @@ struct RecordingBundleStoreTests {
         #expect(tolerant.sidecarDiagnostics.loadedKinds.contains(.videoSegments))
         #expect(tolerant.sidecarDiagnostics.loadedKinds.contains(.frames))
         #expect(tolerant.sidecarDiagnostics.loadedKinds.contains(.semanticEvents))
+        #expect(tolerant.sidecarDiagnostics.loadedKinds.contains(.inputEvidenceSamples))
 
         let catalog = try await store.listBundleCatalog()
         #expect(catalog.map(\.recordingID) == [bundle.id])
         #expect(catalog.first?.directory.standardizedFileURL == directory.standardizedFileURL)
+    }
+
+    @Test("High-resolution input evidence lives in its sidecar and reloads with provenance")
+    func inputEvidenceUsesSidecar() async throws {
+        let root = scratchRoot()
+        try? FileManager.default.removeItem(at: root)
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let event = RecordedEvent(
+            kind: .scrollWheel,
+            time: 0.1,
+            x: 10,
+            y: 20,
+            keyCode: 0,
+            flags: 0,
+            mouseButton: 0,
+            clickCount: 0,
+            scrollDeltaY: -2,
+            scrollDeltaX: 0,
+            scrollPayload: ScrollPayload(deltaX: 0, deltaY: -2, phase: 1, momentumPhase: 0, isContinuous: true)
+        )
+        let sample = RecordingEvidenceSample(index: 0, event: event)
+            .projectingSessionTime(offset: 1)
+        let provenance = RecordingReconstructionProvenance(
+            sessionOriginHostTime: 100,
+            sessionEndTime: 2,
+            playableEvidenceLinks: [
+                RecordingPlayableEvidenceLink(playableEventIndex: 0, evidenceSampleRange: 0...0)
+            ]
+        )
+        let bundle = SemanticRecordingBundle(
+            inputEvidenceSamples: [sample],
+            reconstructionProvenance: provenance
+        )
+        let store = RecordingBundleStore(rootDirectory: root)
+        let directory = try await store.createBundleDirectory(recordingID: bundle.id)
+        try await store.write(bundle, to: directory)
+
+        let manifestData = try Data(contentsOf: directory.appendingPathComponent("manifest.json"))
+        let manifestRoot = try #require(JSONSerialization.jsonObject(with: manifestData) as? [String: Any])
+        #expect((manifestRoot["inputEvidenceSamples"] as? [Any])?.isEmpty == true)
+
+        let loaded = try await store.loadBundle(recordingID: bundle.id)
+        #expect(loaded.inputEvidenceSamples == [sample])
+        #expect(loaded.reconstructionProvenance?.playableEvidenceLinks == provenance.playableEvidenceLinks)
+        #expect(loaded.validate().isEmpty)
     }
 
     @Test("Store rejects explicit bundle loads outside its configured root")

@@ -19,6 +19,9 @@ actor SemanticRecorderBridge {
     private var session: LiveSemanticRecordingSession?
     private var activeBundleDirectory: URL?
     private var pendingEvents: [(event: RecordedEvent, sessionTime: Double?)] = []
+    private var pendingEvidenceSamples: [RecordingEvidenceSample] = []
+    private var pendingPlayableEvidenceLinks: [RecordingPlayableEvidenceLink] = []
+    private var pendingOmittedEvidenceSampleCount = 0
     private var pendingSuppressionContexts: [SemanticRecordingSuppressionContext] = []
     private var nextEventIndex = 0
     private var status: SemanticRecorderBridgeStatus = .idle
@@ -64,6 +67,7 @@ actor SemanticRecorderBridge {
                 activeBundleDirectory = bundleDirectory
                 status = .active(bundleDirectory: bundleDirectory)
                 _ = await recordPendingEvents()
+                _ = await recordPendingEvidence()
                 return await recordPendingSuppressions()
 
             case .blocked(let preflight):
@@ -74,8 +78,7 @@ actor SemanticRecorderBridge {
                 }
                 self.session = nil
                 activeBundleDirectory = nil
-                pendingEvents.removeAll()
-                pendingSuppressionContexts.removeAll()
+                clearPendingRecordingData()
                 status = .blocked(preflight: preflight)
                 return status
             }
@@ -110,6 +113,36 @@ actor SemanticRecorderBridge {
         }
     }
 
+    func recordEvidence(
+        samples: [RecordingEvidenceSample],
+        playableLinks: [RecordingPlayableEvidenceLink],
+        omittedSampleCount: Int = 0,
+        sessionTimeOffset: Double? = nil
+    ) async -> SemanticRecorderBridgeStatus {
+        guard !samples.isEmpty || !playableLinks.isEmpty || omittedSampleCount > 0 else {
+            return status
+        }
+        let projectedSamples = samples.map { $0.projectingSessionTime(offset: sessionTimeOffset) }
+
+        switch status {
+        case .idle, .starting:
+            pendingEvidenceSamples.append(contentsOf: projectedSamples)
+            pendingPlayableEvidenceLinks.append(contentsOf: playableLinks)
+            pendingOmittedEvidenceSampleCount += max(0, omittedSampleCount)
+            return status
+
+        case .active:
+            return await recordActiveEvidence(
+                samples: projectedSamples,
+                playableLinks: playableLinks,
+                omittedSampleCount: omittedSampleCount
+            )
+
+        default:
+            return status
+        }
+    }
+
     func addSuppressions(
         for context: SemanticRecordingSuppressionContext
     ) async -> SemanticRecorderBridgeStatus {
@@ -126,10 +159,12 @@ actor SemanticRecorderBridge {
         }
     }
 
-    func finish(recordingTime: TimeInterval) async -> SemanticRecorderBridgeStatus {
+    func finish(
+        recordingTime: TimeInterval,
+        finalPlayableEvents: [RecordedEvent]
+    ) async -> SemanticRecorderBridgeStatus {
         guard let session else {
-            pendingEvents.removeAll()
-            pendingSuppressionContexts.removeAll()
+            clearPendingRecordingData()
             return status
         }
 
@@ -138,11 +173,13 @@ actor SemanticRecorderBridge {
         }
 
         do {
-            let result = try await session.finish(recordingTime: recordingTime)
+            let result = try await session.finish(
+                recordingTime: recordingTime,
+                finalPlayableEvents: finalPlayableEvents
+            )
             self.session = nil
             activeBundleDirectory = nil
-            pendingEvents.removeAll()
-            pendingSuppressionContexts.removeAll()
+            clearPendingRecordingData()
             status = .finished(
                 bundleID: result.bundle.id,
                 bundleDirectory: result.bundleDirectory,
@@ -159,8 +196,7 @@ actor SemanticRecorderBridge {
     }
 
     func cancel(recordingTime: TimeInterval) async -> SemanticRecorderBridgeStatus {
-        pendingEvents.removeAll()
-        pendingSuppressionContexts.removeAll()
+        clearPendingRecordingData()
         guard let session else {
             activeBundleDirectory = nil
             status = .cancelled
@@ -178,8 +214,7 @@ actor SemanticRecorderBridge {
         recordingTime: TimeInterval,
         message: String
     ) async -> SemanticRecorderBridgeStatus {
-        pendingEvents.removeAll()
-        pendingSuppressionContexts.removeAll()
+        clearPendingRecordingData()
         if let session {
             await session.cancel(recordingTime: recordingTime)
         }
@@ -193,6 +228,20 @@ actor SemanticRecorderBridge {
         let events = pendingEvents
         pendingEvents.removeAll()
         return await recordActiveEvents(events)
+    }
+
+    private func recordPendingEvidence() async -> SemanticRecorderBridgeStatus {
+        let samples = pendingEvidenceSamples
+        let links = pendingPlayableEvidenceLinks
+        let omitted = pendingOmittedEvidenceSampleCount
+        pendingEvidenceSamples.removeAll()
+        pendingPlayableEvidenceLinks.removeAll()
+        pendingOmittedEvidenceSampleCount = 0
+        return await recordActiveEvidence(
+            samples: samples,
+            playableLinks: links,
+            omittedSampleCount: omitted
+        )
     }
 
     private func recordPendingSuppressions() async -> SemanticRecorderBridgeStatus {
@@ -220,6 +269,36 @@ actor SemanticRecorderBridge {
             return await fail(
                 session: session,
                 recordingTime: events.last?.sessionTime ?? events.last?.event.time ?? 0,
+                error: error
+            )
+        }
+    }
+
+    private func recordActiveEvidence(
+        samples: [RecordingEvidenceSample],
+        playableLinks: [RecordingPlayableEvidenceLink],
+        omittedSampleCount: Int
+    ) async -> SemanticRecorderBridgeStatus {
+        guard let session else {
+            clearPendingRecordingData()
+            status = .failed(message: "Semantic recording session is missing.")
+            return status
+        }
+
+        do {
+            try await session.recordEvidence(
+                samples: samples,
+                playableLinks: playableLinks,
+                omittedSampleCount: omittedSampleCount
+            )
+            return status
+        } catch {
+            let recordingTime = samples.last?.sessionTime
+                ?? samples.last?.sourcePlaybackTime
+                ?? 0
+            return await fail(
+                session: session,
+                recordingTime: recordingTime,
                 error: error
             )
         }
@@ -261,9 +340,16 @@ actor SemanticRecorderBridge {
             session = nil
         }
         activeBundleDirectory = nil
-        pendingEvents.removeAll()
-        pendingSuppressionContexts.removeAll()
+        clearPendingRecordingData()
         status = .failed(message: String(describing: error))
         return status
+    }
+
+    private func clearPendingRecordingData() {
+        pendingEvents.removeAll()
+        pendingEvidenceSamples.removeAll()
+        pendingPlayableEvidenceLinks.removeAll()
+        pendingOmittedEvidenceSampleCount = 0
+        pendingSuppressionContexts.removeAll()
     }
 }

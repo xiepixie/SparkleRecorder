@@ -43,9 +43,6 @@ import Foundation
             flags: 0, mouseButton: 0, clickCount: 1, scrollDeltaY: 0, scrollDeltaX: 0
         ))
         
-        // Group before copy
-        let initialGroups = EventGrouper().group(events, liveDuration: 6.0)
-        
         // Duplicate the Sequence
         events.duplicateEvents(at: [0, 1, 2])
         

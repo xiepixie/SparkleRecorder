@@ -614,6 +614,7 @@ public struct AutomationWorkflowDraftPreviewProjection: Codable, Equatable, Send
                 message.dependencyKey ?? ""
             ].joined(separator: ":")
         }
+
     }
 
     public struct SimulationRow: Codable, Equatable, Identifiable, Sendable {

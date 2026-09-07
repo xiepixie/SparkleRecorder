@@ -62,6 +62,68 @@ import Testing
         #expect(!provenance.matchesSourceEvents([event]))
     }
 
+    @Test func finalPlayableSequenceOwnsDigestAndEvidenceMapping() async throws {
+        let client = SemanticRecordingCaptureClient(
+            startMovie: { .init(segmentID: $0.segmentID, artifactRef: $0.artifactRef, target: $0.target, startTime: $0.recordingTime) },
+            finishMovie: { .init(duration: $0.recordingTime) },
+            captureFrame: { _ in .init() }
+        )
+        let session = SemanticRecordingCaptureSession(
+            configuration: .init(sessionOriginHostTime: 100),
+            client: client
+        )
+        try await session.start()
+
+        let kept = RecordedEvent(
+            kind: .mouseMoved,
+            time: 0,
+            x: 10,
+            y: 20,
+            keyCode: 0,
+            flags: 0,
+            mouseButton: 0,
+            clickCount: 0,
+            scrollDeltaY: 0,
+            scrollDeltaX: 0
+        )
+        var removedTail = kept
+        removedTail.kind = .flagsChanged
+        removedTail.time = 0.1
+        removedTail.flags = ModFlag.option
+        try await session.record(kept, index: 0, sessionTime: 1)
+        try await session.record(removedTail, index: 1, sessionTime: 1.1)
+
+        let sample0 = RecordingEvidenceSample(index: 0, event: kept)
+            .projectingSessionTime(offset: 1)
+        var sample1Event = kept
+        sample1Event.time = 0.05
+        let sample1 = RecordingEvidenceSample(index: 1, event: sample1Event)
+            .projectingSessionTime(offset: 1)
+        try await session.recordEvidence(
+            samples: [sample0, sample1],
+            playableLinks: [
+                .init(playableEventIndex: 0, evidenceSampleRange: 0...1),
+                .init(playableEventIndex: 1, evidenceSampleRange: 1...1)
+            ],
+            omittedSampleCount: 3
+        )
+
+        let bundle = try await session.finish(
+            recordingTime: 2,
+            finalPlayableEvents: [kept]
+        )
+        let provenance = try #require(bundle.reconstructionProvenance)
+
+        #expect(provenance.matchesSourceEvents([kept]))
+        #expect(!provenance.matchesSourceEvents([kept, removedTail]))
+        #expect(provenance.sourceEvents.map(\.sourceEventIndex) == [0])
+        #expect(provenance.playableEvidenceLinks.map(\.playableEventIndex) == [0])
+        #expect(provenance.playableEvidenceLinks.first?.evidenceSampleRange == 0...1)
+        #expect(provenance.omittedEvidenceSampleCount == 3)
+        #expect(bundle.inputEvidenceSamples.map(\.index) == [0, 1])
+        #expect(bundle.validate().isEmpty)
+    }
+
     @Test func provenanceSurvivesManifestAndSidecars() throws {
         let evidence = RecordingReconstructionProvenance(sessionOriginHostTime: 99, sessionEndTime: 11,
             sourceEvents: [.init(sourceEventIndex: 0, sourcePlaybackTime: 0, sessionTime: 2)],

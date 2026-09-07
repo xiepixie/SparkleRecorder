@@ -48,6 +48,34 @@ struct MacroTransformerTimingTests {
         #expect(!groups.contains { $0.kind == .waitForText })
     }
 
+    @Test("Applying a text locator to a pointer gesture shares one anchor across down and up")
+    func coordinateStrategyUsesOneSharedTextAnchorForGesture() {
+        var down = RecordedEvent.make(.leftMouseDown, time: 0, x: 100, y: 200, mouseButton: 0)
+        down.contentNormalizedX = 0.2
+        down.contentNormalizedY = 0.3
+        var up = RecordedEvent.make(.leftMouseUp, time: 0.1, x: 103, y: 202, mouseButton: 0)
+        up.contentNormalizedX = 0.21
+        up.contentNormalizedY = 0.31
+        var events = [down, up]
+        let anchor = TextAnchor(
+            text: "Continue",
+            observedFrame: RectValue(x: 80, y: 180, width: 100, height: 30)
+        )
+
+        events.updateCoordinateStrategy(
+            at: [0, 1],
+            strategy: .locatorOnly,
+            textAnchor: anchor,
+            fallbackPolicy: .allowCoordinateFallback,
+            textTimeout: 5
+        )
+        events.updateSurfaceId(at: [0, 1], surfaceId: "main")
+
+        #expect(events[0].textAnchor == events[1].textAnchor)
+        #expect(events[0].textAnchor?.coordinateFallback == PointValue(x: 100, y: 200))
+        #expect(events[0].textAnchor?.coordinateFallbackContentNormalized == PointValue(x: 0.2, y: 0.3))
+    }
+
     @Test("Live duration stretch preserves trailing wait beyond last event")
     func liveDurationStretchPreservesTrailingWaitBeyondLastEvent() {
         let events = [

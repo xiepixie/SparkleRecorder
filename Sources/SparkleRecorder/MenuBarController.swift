@@ -4,6 +4,18 @@ import Combine
 import UniformTypeIdentifiers
 import SparkleRecorderCore
 
+private struct RecordingPreparationVisibility {
+    var appWasHidden: Bool
+    var appWasActive: Bool
+    var popoverWasShown: Bool
+}
+
+private enum RecordingStopContext {
+    case normal
+    case inputMonitoringRevoked
+    case appBecameActive
+}
+
 @MainActor
 final class MenuBarController: NSObject, NSPopoverDelegate {
     private let statusItem: NSStatusItem
@@ -11,13 +23,19 @@ final class MenuBarController: NSObject, NSPopoverDelegate {
     private var globalClickMonitor: Any?
     private var cancellables: Set<AnyCancellable> = []
     private var editorWC: EditorWindowController?
+    private var candidateEditorWC: EditorWindowController?
+    private var candidateEditorSession: MacroCandidateEditorSession?
+    private var candidateEditorRecorder: Recorder?
     private var hud: RecordingHUDController?
     private var playbackHUD: PlaybackHUDController?
     private var countdown: CountdownOverlayController?
+    private let windowTargetPicker = ScreenPointPickerOverlay()
     private var manualPlaybackTask: Task<Void, Never>?
+    private let manualPlaybackVisibilitySession = ManualPlaybackVisibilitySession()
     private var playbackRequestGeneration: UInt64 = 0
     private var reconstructionTestActive = false
     private var recordingPreparationActive = false
+    private var recordingPreparationTask: Task<Void, Never>?
     private var welcomeWC: WelcomeWindowController?
 
     let recorder = Recorder()
@@ -42,7 +60,14 @@ final class MenuBarController: NSObject, NSPopoverDelegate {
     private var recorderLoadedMacroID: UUID?
     private var recorderLoadingMacroID: UUID?
     private var pendingSemanticRecordingMacroID: UUID?
+    private var semanticSanitizationTask: Task<Void, Never>?
+    private var recordingFinalizationTask: Task<Void, Never>?
+    private var macroImportTail: Task<Void, Never>?
     private var pendingRecordingStartMessage: String?
+    private var recordingPreparationVisibility: RecordingPreparationVisibility?
+    private var pendingRelaunchRequest: ApplicationRelaunchRequest?
+    private let auxiliaryCaptureActivityCenter = AuxiliaryCaptureActivityCenter.shared
+    private var appInputSessionWasOwned = false
 
     override init() {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
@@ -53,7 +78,13 @@ final class MenuBarController: NSObject, NSPopoverDelegate {
             repository: automationRepository,
             externalSignal: .appSignals(automationSignalStore),
             manualApproval: AutomationManualApprovalPresenter.client(),
-            ocrSearchRegionContext: Self.automationOCRSearchRegionContext
+            ocrSearchRegionContext: Self.automationOCRSearchRegionContext,
+            foregroundInputAvailable: { [weak self] in
+                await MainActor.run {
+                    guard let self else { return false }
+                    return !self.appInputSessionActivity.blocksForegroundInputStart
+                }
+            }
         )
         configureStatusItem()
         configurePopover()
@@ -61,10 +92,12 @@ final class MenuBarController: NSObject, NSPopoverDelegate {
         playbackHUD = PlaybackHUDController(player: player)
         countdown = CountdownOverlayController()
         observeStateForIcon()
+        observeAppInputSessionOwnership()
         observeSemanticRecordingStatus()
         observeLibraryForHotkeys()
+        observeLibraryIssues()
         observeLibrarySelectionForInitialEventLoad()
-        observeAccessibilityRevocation()
+        observeRecordingPermissionRevocation()
         registerAllHotkeys()
         loadInitialMacroIntoRecorder()
         automationRuntimeHost?.start()
@@ -129,6 +162,45 @@ final class MenuBarController: NSObject, NSPopoverDelegate {
                 self.showRecordingHUDIfNeeded()
             }
             .store(in: &cancellables)
+        state.$recordingFinalizationActive
+            .removeDuplicates()
+            .receive(on: RunLoop.main)
+            .sink { [weak self] _ in
+                self?.refreshIcon()
+                self?.updateDockBadge()
+            }
+            .store(in: &cancellables)
+    }
+
+    private func observeAppInputSessionOwnership() {
+        let signals: [AnyPublisher<Void, Never>] = [
+            state.$recordingFlowActive.map { _ in () }.eraseToAnyPublisher(),
+            state.$recordingFinalizationActive.map { _ in () }.eraseToAnyPublisher(),
+            state.$playbackFlowActive.map { _ in () }.eraseToAnyPublisher(),
+            recorder.$isRecording.map { _ in () }.eraseToAnyPublisher(),
+            player.$isPlaybackTargetReserved.map { _ in () }.eraseToAnyPublisher(),
+            player.$isPlaying.map { _ in () }.eraseToAnyPublisher(),
+            auxiliaryCaptureActivityCenter.$isActive.map { _ in () }.eraseToAnyPublisher(),
+        ]
+
+        Publishers.MergeMany(signals)
+            // @Published emits from willSet. Hop through the main queue so the
+            // projection reads the committed values from every owner.
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] in
+                self?.refreshAppInputSessionOwnership()
+            }
+            .store(in: &cancellables)
+    }
+
+    private func refreshAppInputSessionOwnership() {
+        let isOwned = appInputSessionActivity.ownsInputOrCaptureTarget
+        let wasOwned = appInputSessionWasOwned
+        appInputSessionWasOwned = isOwned
+        state.setAppInteractionLocked(isOwned)
+        if wasOwned && !isOwned {
+            automationRuntimeHost?.foregroundInputBecameAvailable()
+        }
     }
 
     private func refreshIcon() {
@@ -137,6 +209,10 @@ final class MenuBarController: NSObject, NSPopoverDelegate {
             button.image = SparkleIcons.recording
             button.title = state.recordingHUDMode == .menuBar ? recordingMenuBarTitle : " REC"
             button.setAccessibilityLabel(recordingMenuBarAccessibilityLabel)
+        } else if state.recordingFinalizationActive {
+            button.image = SparkleIcons.finalizing
+            button.title = ""
+            button.setAccessibilityLabel("SparkleRecorder — finishing recording")
         } else if player.isPlaying {
             button.image = SparkleIcons.playing
             button.title = ""
@@ -171,6 +247,9 @@ final class MenuBarController: NSObject, NSPopoverDelegate {
         if recorder.isRecording {
             tile.badgeLabel = "●"
             startBadgePulse()
+        } else if state.recordingFinalizationActive {
+            stopBadgePulse()
+            tile.badgeLabel = "…"
         } else if player.isPlaying {
             stopBadgePulse()
             tile.badgeLabel = "▶"
@@ -223,12 +302,23 @@ final class MenuBarController: NSObject, NSPopoverDelegate {
 
     private func showPopover() {
         guard let button = statusItem.button else { return }
-        popover.animates = !recorder.isRecording
-        popover.contentSize = recorder.isRecording
-            ? NSSize(width: 320, height: 276)
-            : NSSize(width: 400, height: 540)
+        let inputSessionActive = state.recordingFlowActive || recorder.isRecording
+            || state.recordingFinalizationActive
+            || state.playbackFlowActive || player.isPlaybackTargetReserved || player.isPlaying
+        popover.animates = !inputSessionActive
+        if recorder.isRecording {
+            popover.contentSize = NSSize(width: 320, height: 276)
+        } else if state.recordingFinalizationActive {
+            popover.contentSize = NSSize(width: 320, height: 150)
+        } else if state.recordingFlowActive {
+            popover.contentSize = NSSize(width: 320, height: 150)
+        } else if state.playbackFlowActive || player.isPlaybackTargetReserved || player.isPlaying {
+            popover.contentSize = NSSize(width: 320, height: 176)
+        } else {
+            popover.contentSize = NSSize(width: 400, height: 540)
+        }
         popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
-        if !recorder.isRecording {
+        if !inputSessionActive {
             popover.contentViewController?.view.window?.becomeKey()
         }
         installGlobalClickMonitor()
@@ -363,19 +453,24 @@ final class MenuBarController: NSObject, NSPopoverDelegate {
     }
 
     /// Stop recording and throw away the captured events without saving.
+    /// The input tap stops immediately, but the app remains in Finalizing until
+    /// semantic capture cancellation has removed its temporary bundle.
     func cancelRecording() {
         guard recorder.isRecording else { return }
         recorder.cancelRecording()
+        state.isRecording = false
+        state.recordingFlowActive = false
         recorder.clearAll()
         recorderLoadedMacroID = nil
-        // Restore the previously-active macro (if any) into the recorder buffer
-        // so we don't leave the editor pointing at nothing.
-        if let m = library.currentMacro {
-            loadMacroEventsIntoRecorder(m.id)
-        }
         hud?.hide()
-        state.statusMessage = "Recording discarded."
         SoundController.shared.play(.error)
+        beginRecordingFinalization(
+            savedMacroID: nil,
+            eventCount: 0,
+            completionMessage: String(localized: "Recording discarded.", table: "Recording"),
+            completionTone: .info,
+            restoreSelectedMacroAfterward: true
+        )
     }
 
     // MARK: - Hotkeys
@@ -390,11 +485,48 @@ final class MenuBarController: NSObject, NSPopoverDelegate {
             .debounce(for: .milliseconds(200), scheduler: DispatchQueue.main)
             .sink { [weak self] _ in
                 self?.refreshPerMacroHotkeys()
-                self?.refreshIgnoredKeyCodes()
+                self?.refreshIgnoredHotkeyChords()
             }
             .store(in: &cancellables)
         // Global-hotkey changes go through reapplyHotkeys() explicitly from the
         // settings UI — no state-wide sink needed.
+    }
+
+    private func observeLibraryIssues() {
+        library.$issue
+            .compactMap { $0 }
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] issue in
+                guard let self else { return }
+                switch issue {
+                case .loadLibrary(let message):
+                    self.state.presentStatus(
+                        String(
+                            format: String(localized: "Could not load the macro library: %@", table: "Common"),
+                            message
+                        ),
+                        tone: .error
+                    )
+                case .readMacro(let message):
+                    self.state.presentStatus(
+                        String(
+                            format: String(localized: "Could not read the macro data: %@", table: "Common"),
+                            message
+                        ),
+                        tone: .error
+                    )
+                case .saveChanges(let message):
+                    self.state.presentStatus(
+                        String(
+                            format: String(localized: "Could not save library changes: %@", table: "Common"),
+                            message
+                        ),
+                        tone: .error
+                    )
+                }
+                SoundController.shared.play(.error)
+            }
+            .store(in: &cancellables)
     }
 
     private func observeLibrarySelectionForInitialEventLoad() {
@@ -408,38 +540,88 @@ final class MenuBarController: NSObject, NSPopoverDelegate {
             .store(in: &cancellables)
     }
 
-    /// If macOS Accessibility is revoked while a recording is live, the event tap
-    /// goes dead but our UI would keep "recording" forever. Stop cleanly, keep the
-    /// partial capture in the buffer (no silent auto-save), and tell the user.
-    private func observeAccessibilityRevocation() {
-        state.$accessibilityGranted
+    /// Input Monitoring owns the live event tap. While recording, AppState keeps
+    /// polling permissions so a revocation cannot leave the UI pretending that
+    /// capture is still active. Preserve every event captured before revocation as
+    /// a normal new macro instead of leaving an orphaned in-memory buffer.
+    private func observeRecordingPermissionRevocation() {
+        state.$inputMonitoringGranted
             .removeDuplicates()
             .receive(on: DispatchQueue.main)
             .sink { [weak self] granted in
                 guard let self, !granted, self.recorder.isRecording else { return }
-                self.recorder.stopRecording()
-                self.hud?.hide()
-                self.state.statusMessage = "Recording stopped — Accessibility permission was revoked."
+                _ = self.stopRecordingAndSave(context: .inputMonitoringRevoked)
                 SoundController.shared.play(.error)
             }
             .store(in: &cancellables)
     }
 
+    /// AppKit can activate SparkleRecorder independently of our own window guards
+    /// (Dock click, Cmd-Tab, system reopen). Once the app itself is frontmost, a
+    /// foreground input session can no longer trust the target application. Stop
+    /// immediately instead of letting subsequent input land in SparkleRecorder.
+    func handleApplicationDidBecomeActive() {
+        state.refreshPermissions()
+
+        switch AppActivationInterruptionPolicy.resolve(
+            activity: appInputSessionActivity,
+            recordingTargetHandoffArmed: recordingPreparationVisibility != nil
+        ) {
+        case .none:
+            return
+
+        case .cancelRecordingPreparation:
+            stopAll()
+            state.presentStatus(
+                String(
+                    localized: "Recording preparation was cancelled because SparkleRecorder became active. Return to the target app and start recording again.",
+                    table: "Recording"
+                ),
+                tone: .warning
+            )
+            SoundController.shared.play(.error)
+
+        case .saveInterruptedRecording:
+            _ = stopRecordingAndSave(context: .appBecameActive)
+            SoundController.shared.play(.error)
+
+        case .stopPlayback:
+            stopAll()
+            state.presentStatus(
+                String(
+                    localized: "Playback stopped because SparkleRecorder became active. Return to the target app and start again.",
+                    table: "Recording"
+                ),
+                tone: .warning
+            )
+            SoundController.shared.play(.error)
+        }
+    }
+
     private func registerAllHotkeys() {
         registerGlobalHotkeys()
         refreshPerMacroHotkeys()
-        refreshIgnoredKeyCodes()
+        refreshIgnoredHotkeyChords()
     }
 
     private func registerGlobalHotkeys() {
         for id in globalHotkeyIDs { HotkeyManager.shared.unregister(id) }
         globalHotkeyIDs.removeAll()
 
-        let recordH: () -> Void = { [weak self] in self?.toggleRecording() }
+        let recordH: () -> Void = { [weak self] in
+            guard let self else { return }
+            self.toggleRecording(triggeredBy: self.state.recordHotkey)
+        }
         let stopH:   () -> Void = { [weak self] in self?.stopAll() }
         let playH:   () -> Void = { [weak self] in
-            guard let self = self else { return }
-            if self.player.isPlaying { self.stopAll() } else { self.play() }
+            guard let self else { return }
+            if self.state.playbackFlowActive || self.player.isPlaybackTargetReserved
+                || self.player.isPlaying || self.manualPlaybackTask != nil
+                || self.reconstructionTestActive {
+                self.stopAll()
+            } else {
+                self.play(triggeredBy: self.state.playHotkey)
+            }
         }
 
         if let id = HotkeyManager.shared.register(keyCode: state.recordHotkey.keyCode, modifiers: state.recordHotkey.modifiers, handler: recordH) {
@@ -466,10 +648,12 @@ final class MenuBarController: NSObject, NSPopoverDelegate {
             let macroID = macro.id
             if let id = HotkeyManager.shared.register(keyCode: hk.keyCode, modifiers: hk.modifiers, handler: { [weak self] in
                 guard let self = self else { return }
-                if self.player.isPlaying {
+                if self.state.playbackFlowActive || self.player.isPlaybackTargetReserved
+                    || self.player.isPlaying || self.manualPlaybackTask != nil
+                    || self.reconstructionTestActive {
                     self.stopAll()
                 } else {
-                    self.playMacroByID(macroID)
+                    self.playMacroByID(macroID, triggeredBy: hk)
                 }
             }) {
                 perMacroHotkeyIDs[id] = macroID
@@ -477,24 +661,24 @@ final class MenuBarController: NSObject, NSPopoverDelegate {
         }
     }
 
-    private func refreshIgnoredKeyCodes() {
-        var ignore: Set<UInt16> = [
-            UInt16(state.recordHotkey.keyCode),
-            UInt16(state.stopHotkey.keyCode),
-            UInt16(state.playHotkey.keyCode),
+    private func refreshIgnoredHotkeyChords() {
+        var ignored: Set<RecordingIgnoredKeyChord> = [
+            state.recordHotkey.recordingIgnoredKeyChord,
+            state.stopHotkey.recordingIgnoredKeyChord,
+            state.playHotkey.recordingIgnoredKeyChord,
         ]
         for macro in library.macros {
-            if let hk = macro.hotkey {
-                ignore.insert(UInt16(hk.keyCode))
+            if let hotkey = macro.hotkey {
+                ignored.insert(hotkey.recordingIgnoredKeyChord)
             }
         }
-        recorder.ignoredKeyCodes = ignore
+        recorder.ignoredKeyChords = ignored
     }
 
     func reapplyHotkeys() {
         registerGlobalHotkeys()
         refreshPerMacroHotkeys()
-        refreshIgnoredKeyCodes()
+        refreshIgnoredHotkeyChords()
     }
 
     // MARK: - Library glue
@@ -506,10 +690,10 @@ final class MenuBarController: NSObject, NSPopoverDelegate {
     }
 
     func selectMacro(_ id: UUID) {
+        guard requireMacroLibraryInteractionAvailable() else { return }
         persistCurrentMacroIfNeeded()
         library.select(id: id)
         if let m = library.currentMacro {
-            state.statusMessage = "Loading \(m.name)..."
             loadMacroEventsIntoRecorder(m.id, statusName: m.name)
         }
     }
@@ -519,6 +703,15 @@ final class MenuBarController: NSObject, NSPopoverDelegate {
         guard recorderLoadedMacroID != id, recorderLoadingMacroID != id else { return }
 
         recorderLoadingMacroID = id
+        if let statusName {
+            state.presentStatus(
+                String(
+                    format: String(localized: "Loading %@...", table: "Recording"),
+                    statusName
+                ),
+                tone: .progress
+            )
+        }
         Task { [weak self] in
             guard let self else { return }
             defer {
@@ -529,121 +722,504 @@ final class MenuBarController: NSObject, NSPopoverDelegate {
 
             do {
                 let events = try await self.library.loadEvents(for: id)
-                guard self.library.currentMacroID == id else { return }
+                guard !self.macroLibraryInteractionLocked,
+                      self.library.currentMacroID == id else { return }
                 self.recorder.loadEvents(events)
                 self.recorderLoadedMacroID = id
                 if let statusName {
-                    self.state.statusMessage = "Loaded \(statusName)."
+                    self.state.presentStatus(
+                        String(
+                            format: String(localized: "Loaded %@.", table: "Recording"),
+                            statusName
+                        ),
+                        tone: .success
+                    )
                 }
             } catch {
+                if self.library.currentMacroID == id, !self.recorder.isRecording {
+                    self.recorderLoadedMacroID = nil
+                    self.recorder.clearAll()
+                }
                 if let statusName {
-                    self.state.statusMessage = "Failed to load \(statusName)."
+                    self.state.presentStatus(
+                        String(
+                            format: String(localized: "Failed to load %@.", table: "Recording"),
+                            statusName
+                        ),
+                        tone: .error
+                    )
                 }
             }
         }
     }
 
     func renameMacro(_ id: UUID, to name: String) {
+        guard requireMacroLibraryInteractionAvailable() else { return }
+        guard library.macros.contains(where: { $0.id == id }) else { return }
         library.rename(id: id, to: name)
+        guard let updatedName = library.macros.first(where: { $0.id == id })?.name else { return }
+        state.presentStatus(
+            String(
+                format: String(localized: "Renamed macro to %@.", table: "Common"),
+                updatedName
+            ),
+            tone: .success
+        )
     }
 
     func duplicateMacro(_ id: UUID) {
-        library.duplicate(id: id)
+        guard requireMacroLibraryInteractionAvailable() else { return }
+        guard let sourceName = library.macros.first(where: { $0.id == id })?.name else { return }
+        state.presentStatus(
+            String(
+                format: String(localized: "Duplicating %@…", table: "Common"),
+                sourceName
+            ),
+            tone: .progress
+        )
+        Task { @MainActor [weak self] in
+            guard let self else { return }
+            do {
+                guard let copy = try await self.library.duplicate(id: id) else {
+                    self.state.presentStatus(
+                        String(localized: "The macro is no longer available.", table: "Automation"),
+                        tone: .error
+                    )
+                    return
+                }
+                self.state.presentStatus(
+                    String(
+                        format: String(localized: "Created %@.", table: "Common"),
+                        copy.name
+                    ),
+                    tone: .success
+                )
+            } catch {
+                self.state.presentStatus(
+                    String(
+                        format: String(localized: "Could not duplicate %@. The original was not changed.", table: "Common"),
+                        sourceName
+                    ),
+                    tone: .error
+                )
+            }
+        }
     }
 
     func deleteMacro(_ id: UUID) {
+        guard requireMacroLibraryInteractionAvailable() else { return }
+        guard let deletedName = library.macros.first(where: { $0.id == id })?.name else { return }
         // Only reload the recorder buffer when the CURRENT macro was deleted;
         // otherwise we'd wipe unsaved editor edits to an unrelated macro.
         let wasCurrent = (id == library.currentMacroID)
         library.delete(id: id)
         if wasCurrent {
-            if let m = library.currentMacro {
-                Task {
-                    if let evs = try? await library.loadEvents(for: m.id) {
-                        recorder.loadEvents(evs)
-                    }
-                }
+            recorderLoadedMacroID = nil
+            if let macro = library.currentMacro {
+                loadMacroEventsIntoRecorder(macro.id)
             } else {
                 recorder.clearAll()
             }
         }
+        state.presentStatus(
+            String(
+                format: String(localized: "Deleted %@.", table: "Common"),
+                deletedName
+            ),
+            tone: .success
+        )
     }
 
     func deleteMacros(_ ids: Set<UUID>) {
-        let wasCurrent = library.currentMacroID.map { ids.contains($0) } ?? false
-        library.deleteMany(ids: ids)
+        guard requireMacroLibraryInteractionAvailable() else { return }
+        let existingIDs = Set(library.macros.lazy.map(\.id)).intersection(ids)
+        guard !existingIDs.isEmpty else { return }
+        let wasCurrent = library.currentMacroID.map { existingIDs.contains($0) } ?? false
+        library.deleteMany(ids: existingIDs)
         if wasCurrent {
-            if let m = library.currentMacro {
-                Task {
-                    if let evs = try? await library.loadEvents(for: m.id) {
-                        recorder.loadEvents(evs)
-                    }
-                }
+            recorderLoadedMacroID = nil
+            if let macro = library.currentMacro {
+                loadMacroEventsIntoRecorder(macro.id)
             } else {
                 recorder.clearAll()
             }
         }
+        state.presentStatus(
+            String(localized: "Selected macros deleted.", table: "Common"),
+            tone: .success
+        )
     }
 
     func setMacroLoops(_ id: UUID, to loops: Int) {
+        guard requireMacroLibraryInteractionAvailable() else { return }
+        guard let name = library.macros.first(where: { $0.id == id })?.name else { return }
         library.setLoops(id: id, loops: loops)
+        state.presentStatus(
+            String(
+                format: String(localized: "Repeat setting updated for %@.", table: "Common"),
+                name
+            ),
+            tone: .success
+        )
     }
 
     func setMacroSpeed(_ id: UUID, to speed: Double) {
+        guard requireMacroLibraryInteractionAvailable() else { return }
+        guard let name = library.macros.first(where: { $0.id == id })?.name else { return }
         library.setSpeed(id: id, speed: speed)
+        state.presentStatus(
+            String(
+                format: String(localized: "Playback speed updated for %@.", table: "Common"),
+                name
+            ),
+            tone: .success
+        )
     }
 
     func setMacroIcon(_ id: UUID, to icon: String?) {
+        guard requireMacroLibraryInteractionAvailable() else { return }
+        guard let name = library.macros.first(where: { $0.id == id })?.name else { return }
         library.setIcon(id: id, icon: icon)
+        state.presentStatus(
+            String(
+                format: String(localized: "Icon updated for %@.", table: "Common"),
+                name
+            ),
+            tone: .success
+        )
     }
 
     func setMacroAccent(_ id: UUID, to color: String?) {
+        guard requireMacroLibraryInteractionAvailable() else { return }
+        guard let name = library.macros.first(where: { $0.id == id })?.name else { return }
         library.setAccent(id: id, accent: color)
+        state.presentStatus(
+            String(
+                format: String(localized: "Color updated for %@.", table: "Common"),
+                name
+            ),
+            tone: .success
+        )
     }
 
     func setMacroHotkey(_ id: UUID, to hotkey: HotkeyBinding?) {
+        guard requireMacroLibraryInteractionAvailable() else { return }
+        guard let name = library.macros.first(where: { $0.id == id })?.name else { return }
         library.setHotkey(id: id, hotkey: hotkey)
         refreshPerMacroHotkeys()
-        refreshIgnoredKeyCodes()
+        refreshIgnoredHotkeyChords()
+        state.presentStatus(
+            hotkey == nil
+                ? String(
+                    format: String(localized: "Shortcut removed from %@.", table: "Common"),
+                    name
+                )
+                : String(
+                    format: String(localized: "Shortcut assigned to %@.", table: "Common"),
+                    name
+                ),
+            tone: .success
+        )
     }
 
     func toggleFavorite(_ id: UUID) {
+        guard requireMacroLibraryInteractionAvailable() else { return }
+        guard let macro = library.macros.first(where: { $0.id == id }) else { return }
         library.toggleFavorite(id: id)
+        state.presentStatus(
+            macro.favorite
+                ? String(
+                    format: String(localized: "Removed %@ from Favorites.", table: "Common"),
+                    macro.name
+                )
+                : String(
+                    format: String(localized: "Added %@ to Favorites.", table: "Common"),
+                    macro.name
+                ),
+            tone: .success
+        )
     }
 
     func addTag(_ id: UUID, _ tag: String) {
-        library.addTag(id: id, tag)
+        guard requireMacroLibraryInteractionAvailable() else { return }
+        guard let macro = library.macros.first(where: { $0.id == id }) else { return }
+        let normalized = tag.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !normalized.isEmpty else {
+            state.presentStatus(
+                String(localized: "Enter a tag before adding it.", table: "Common"),
+                tone: .warning
+            )
+            return
+        }
+        let alreadyPresent = macro.tags.contains(normalized)
+        library.addTag(id: id, normalized)
+        state.presentStatus(
+            alreadyPresent
+                ? String(
+                    format: String(localized: "%@ already has that tag.", table: "Common"),
+                    macro.name
+                )
+                : String(
+                    format: String(localized: "Tag added to %@.", table: "Common"),
+                    macro.name
+                ),
+            tone: alreadyPresent ? .info : .success
+        )
     }
 
     func removeTag(_ id: UUID, _ tag: String) {
+        guard requireMacroLibraryInteractionAvailable() else { return }
+        guard let macro = library.macros.first(where: { $0.id == id }) else { return }
         library.removeTag(id: id, tag)
+        state.presentStatus(
+            String(
+                format: String(localized: "Tag removed from %@.", table: "Common"),
+                macro.name
+            ),
+            tone: .success
+        )
     }
 
     func setMacroNotes(_ id: UUID, to notes: String) {
+        guard requireMacroLibraryInteractionAvailable() else { return }
+        guard let name = library.macros.first(where: { $0.id == id })?.name else { return }
         library.setNotes(id: id, notes: notes)
+        state.presentStatus(
+            String(
+                format: String(localized: "Notes updated for %@.", table: "Common"),
+                name
+            ),
+            tone: .success
+        )
     }
 
     func setChain(_ id: UUID, to target: UUID?) {
-        library.setChainTo(id: id, target: target)
-    }
+        guard requireMacroLibraryInteractionAvailable() else { return }
+        guard let sourceName = library.macros.first(where: { $0.id == id })?.name else { return }
+        let targetName = target.flatMap { targetID in
+            library.macros.first(where: { $0.id == targetID })?.name
+        }
 
-    func bindCurrentWindow(to id: UUID) {
-        do {
-            let capture = WindowSurfaceCapture()
-            let surface = try capture.captureFrontmostWindow()
-            library.setSurface(id: id, surface: surface)
-            state.statusMessage = "Bound to \(surface.appName ?? "active window")."
-            SoundController.shared.play(.tick)
-        } catch {
-            state.statusMessage = "Binding failed: \(error.localizedDescription)"
-            SoundController.shared.play(.error)
+        switch library.setChainTo(id: id, target: target) {
+        case .applied:
+            if let targetName {
+                state.presentStatus(
+                    String(
+                        format: String(localized: "%@ will continue with %@ after playback.", table: "Common"),
+                        sourceName,
+                        targetName
+                    ),
+                    tone: .success
+                )
+            } else {
+                state.presentStatus(
+                    String(
+                        format: String(localized: "Playback chain removed from %@.", table: "Common"),
+                        sourceName
+                    ),
+                    tone: .success
+                )
+            }
+        case .selfReference, .cycle:
+            state.presentStatus(
+                String(localized: "That chain would create a playback loop. Choose a different macro.", table: "Common"),
+                tone: .warning
+            )
+        case .targetMissing:
+            state.presentStatus(
+                String(localized: "The selected next macro is no longer available.", table: "Common"),
+                tone: .warning
+            )
+        case .sourceMissing:
+            state.presentStatus(
+                String(localized: "The macro is no longer available.", table: "Automation"),
+                tone: .error
+            )
         }
     }
 
-    func clearWindowBinding(for id: UUID) {
-        library.setSurface(id: id, surface: nil)
-        state.statusMessage = "Cleared window binding."
+    func moveMacro(_ id: UUID, before targetID: UUID) {
+        guard requireMacroLibraryInteractionAvailable() else { return }
+        guard id != targetID,
+              library.macros.contains(where: { $0.id == id }),
+              library.macros.contains(where: { $0.id == targetID }) else { return }
+        library.move(id: id, before: targetID)
+        state.presentStatus(
+            String(localized: "Macro order updated.", table: "Common"),
+            tone: .success
+        )
+    }
+
+    func chooseTargetWindow(for id: UUID) {
+        guard let macro = library.macros.first(where: { $0.id == id }) else {
+            state.presentStatus(
+                String(localized: "The macro is no longer available.", table: "Automation"),
+                tone: .error
+            )
+            return
+        }
+        let existingID = MacroPlaybackSurfaceEditing.orderedSurfaceIDs(macro.surfaces).first
+        chooseTargetWindow(for: id, surfaceID: existingID)
+    }
+
+    func chooseTargetWindow(for id: UUID, surfaceID: String?) {
+        guard requireMacroLibraryInteractionAvailable() else { return }
+        guard let macro = library.macros.first(where: { $0.id == id }) else {
+            state.presentStatus(
+                String(localized: "The macro is no longer available.", table: "Automation"),
+                tone: .error
+            )
+            return
+        }
+        chooseTargetWindow(named: macro.name) { [weak self] surface in
+            guard let self else { return false }
+            if let surfaceID {
+                return self.library.rebindSurface(id: id, surfaceID: surfaceID, surface: surface)
+            }
+            return self.library.addSurface(id: id, surface: surface) != nil
+        }
+    }
+
+    func chooseTargetWindow(for session: MacroCandidateEditorSession) {
+        let existingID = MacroPlaybackSurfaceEditing.orderedSurfaceIDs(session.draftMacro.surfaces).first
+        chooseTargetWindow(for: session, surfaceID: existingID)
+    }
+
+    func chooseTargetWindow(for session: MacroCandidateEditorSession, surfaceID: String?) {
+        guard requireScreenPickingAvailable() else { return }
+        chooseTargetWindow(named: session.draftMacro.name) { [weak session] surface in
+            guard let session else { return false }
+            if let surfaceID {
+                return session.rebindSurface(surfaceID, to: surface)
+            }
+            _ = session.addSurface(surface)
+            return true
+        }
+    }
+
+    private func chooseTargetWindow(
+        named macroName: String,
+        apply: @escaping @MainActor (PlaybackSurface) -> Bool
+    ) {
+        let visibility = ApplicationWindowVisibilitySnapshot.capture()
+        windowTargetPicker.onPicked = { [weak self] point in
+            guard let self else { return }
+            defer { visibility.restore() }
+            do {
+                let surface = try WindowSurfaceCapture().captureWindow(at: point)
+                guard apply(surface) else {
+                    self.state.presentStatus(
+                        String(localized: "The Playback Surface changed before it could be updated. Try again.", table: "EditorUX"),
+                        tone: .warning
+                    )
+                    SoundController.shared.play(.error)
+                    return
+                }
+                let appName = surface.appName ?? String(localized: "Target window", table: "Recording")
+                let detail = surface.windowTitle?.trimmingCharacters(in: .whitespacesAndNewlines)
+                let target = detail.flatMap { $0.isEmpty ? nil : "\(appName) — \($0)" } ?? appName
+                self.state.presentStatus(
+                    String(
+                        format: String(localized: "Target window set: %@.", table: "Recording"),
+                        target
+                    ),
+                    tone: .success
+                )
+                SoundController.shared.play(.tick)
+            } catch WindowCaptureError.noWindowAtPoint {
+                self.state.presentStatus(
+                    String(
+                        localized: "No app window was found there. Try again and click inside the window this macro should control.",
+                        table: "Recording"
+                    ),
+                    tone: .warning
+                )
+                SoundController.shared.play(.error)
+            } catch WindowCaptureError.noAccessibilityPermission {
+                self.state.presentStatus(
+                    String(
+                        localized: "Accessibility permission is required to choose a target window. Enable it in Settings, then try again.",
+                        table: "Recording"
+                    ),
+                    tone: .error
+                )
+                SoundController.shared.play(.error)
+                self.showSettingsWindow()
+            } catch {
+                self.state.presentStatus(
+                    String(localized: "Could not set the target window. Try again.", table: "Recording"),
+                    tone: .error
+                )
+                SoundController.shared.play(.error)
+            }
+        }
+        windowTargetPicker.onCancelled = { [weak self] in
+            guard let self else { return }
+            visibility.restore()
+            self.state.presentStatus(
+                String(localized: "Window selection cancelled.", table: "Recording"),
+                tone: .info
+            )
+        }
+        let didStartPicker = windowTargetPicker.start(
+            configuration: .init(
+                title: String(
+                    format: String(localized: "Choose a target window for %@", table: "Recording"),
+                    macroName
+                ),
+                subtitle: String(
+                    localized: "Click the window to bind it. SparkleRecorder will not run any actions. Press ESC to cancel.",
+                    table: "Recording"
+                ),
+                systemImage: "window.badge.key",
+                requiredClickCount: 1
+            )
+        )
+        guard didStartPicker else {
+            state.presentStatus(
+                String(localized: "No display is available for window selection.", table: "Recording"),
+                tone: .error
+            )
+            return
+        }
+        state.presentStatus(
+            String(localized: "Choose the window this macro should control.", table: "Recording"),
+            tone: .progress
+        )
+        visibility.concealCapturedWindows()
+    }
+
+    func removeTargetWindow(for id: UUID, surfaceID: String) {
+        guard requireMacroLibraryInteractionAvailable() else { return }
+        guard library.removeSurface(id: id, surfaceID: surfaceID) else {
+            state.presentStatus(
+                String(localized: "Reassign every action that uses this Playback Surface before removing it.", table: "EditorUX"),
+                tone: .warning
+            )
+            SoundController.shared.play(.error)
+            return
+        }
+        state.presentStatus(
+            String(localized: "Target window removed.", table: "Recording"),
+            tone: .success
+        )
         SoundController.shared.play(.tick)
+    }
+
+    func clearWindowBinding(for id: UUID) {
+        guard requireMacroLibraryInteractionAvailable() else { return }
+        guard let macro = library.macros.first(where: { $0.id == id }) else { return }
+        let ids = MacroPlaybackSurfaceEditing.orderedSurfaceIDs(macro.surfaces)
+        guard ids.count == 1, let surfaceID = ids.first else {
+            state.presentStatus(
+                ids.isEmpty
+                    ? String(localized: "No target window is set.", table: "Recording")
+                    : String(localized: "This macro uses multiple Playback Surfaces. Open the editor to manage them individually.", table: "EditorUX"),
+                tone: .info
+            )
+            return
+        }
+        removeTargetWindow(for: id, surfaceID: surfaceID)
     }
 
     private func persistCurrentMacroIfNeeded() {
@@ -656,57 +1232,297 @@ final class MenuBarController: NSObject, NSPopoverDelegate {
 
     // MARK: - Actions
 
-    func toggleRecording() {
-        if manualPlaybackTask != nil { stopAll() }
+    func toggleRecording(triggeredBy hotkey: HotkeyBinding? = nil) {
+        if auxiliaryCaptureActive {
+            stopAll()
+            return
+        }
+        guard !state.recordingFinalizationActive else {
+            state.presentStatus(
+                String(
+                    localized: "Wait for the current recording to finish saving before starting another recording or playback.",
+                    table: "Recording"
+                ),
+                tone: .warning
+            )
+            return
+        }
+        if state.playbackFlowActive || player.isPlaybackTargetReserved || player.isPlaying
+            || manualPlaybackTask != nil || reconstructionTestActive {
+            stopAll()
+            state.presentStatus(
+                String(
+                    localized: "Playback stopped. Start recording again when you are ready.",
+                    table: "Recording"
+                ),
+                tone: .info
+            )
+            return
+        }
         // A second press during the countdown means "never mind".
         if let countdown, countdown.isActive {
             countdown.cancel()
-            state.statusMessage = "Recording cancelled."
+            state.recordingFlowActive = false
+            restoreVisibilityAfterAbortedRecordingPreparation()
+            state.presentStatus(
+                String(localized: "Recording cancelled.", table: "Recording"),
+                tone: .info
+            )
             return
         }
         if recorder.isRecording {
-            recorder.stopRecording()
-            let count = recorder.eventCount
-            if count > 0 {
-                let newMacro = library.add(events: recorder.events, loops: state.loops)
-                recorderLoadedMacroID = newMacro.id
-                if !recorder.activeSurfaces.isEmpty {
-                    library.setSurfaces(id: newMacro.id, surfaces: recorder.activeSurfaces)
-                } else if let surface = recordedSurface {
-                    library.setSurface(id: newMacro.id, surface: surface)
-                }
-                pendingSemanticRecordingMacroID = newMacro.id
-                attachSemanticRecordingIfFinished(recorder.semanticRecordingStatus)
-                state.statusMessage = "Saved \(newMacro.name) · \(count) events."
-                SoundController.shared.play(.recordStop)
-            } else {
-                state.statusMessage = "No events captured."
-                // Don't leave an empty buffer that a later persist would write
-                // over the selected macro — restore it.
-                if let m = library.currentMacro {
-                    Task {
-                        if let evs = try? await library.loadEvents(for: m.id) {
-                            recorder.loadEvents(evs)
-                        }
-                    }
-                }
-            }
-            hud?.hide()
+            _ = stopRecordingAndSave(triggeredBy: hotkey?.recordingIgnoredKeyChord)
         } else {
             beginRecordingFlow()
         }
     }
 
+    @discardableResult
+    private func stopRecordingAndSave(
+        triggeredBy hotkeyChord: RecordingIgnoredKeyChord? = nil,
+        context: RecordingStopContext = .normal
+    ) -> UUID? {
+        guard recorder.isRecording else { return nil }
+
+        recorder.stopRecording(
+            ignoringTrailingHotkeyArtifactsFor: hotkeyChord
+        )
+        state.isRecording = false
+        let count = recorder.eventCount
+        let savedMacroID: UUID?
+        if count > 0 {
+            let newMacro = library.add(events: recorder.events, loops: state.loops)
+            savedMacroID = newMacro.id
+            recorderLoadedMacroID = newMacro.id
+            if !recorder.activeSurfaces.isEmpty {
+                library.setSurfaces(id: newMacro.id, surfaces: recorder.activeSurfaces)
+            } else if let surface = recordedSurface {
+                library.setSingleRecordedSurface(id: newMacro.id, surface: surface)
+            }
+            pendingSemanticRecordingMacroID = newMacro.id
+            attachSemanticRecordingIfFinished(recorder.semanticRecordingStatus)
+            SoundController.shared.play(.recordStop)
+        } else {
+            savedMacroID = nil
+        }
+        state.recordingFlowActive = false
+        hud?.hide()
+
+        let completionMessage: String
+        switch (context, savedMacroID.flatMap { id in library.macros.first(where: { $0.id == id }) }) {
+        case (.inputMonitoringRevoked, .some(let macro)):
+            completionMessage = String(
+                format: String(
+                    localized: "Input Monitoring was revoked. Saved the partial recording as %@.",
+                    table: "Recording"
+                ),
+                macro.name
+            )
+        case (.inputMonitoringRevoked, .none):
+            completionMessage = String(
+                localized: "Input Monitoring was revoked before any events were captured.",
+                table: "Recording"
+            )
+        case (.appBecameActive, .some(let macro)):
+            completionMessage = String(
+                format: String(
+                    localized: "SparkleRecorder became active. Saved the interrupted recording as %@.",
+                    table: "Recording"
+                ),
+                macro.name
+            )
+        case (.appBecameActive, .none):
+            completionMessage = String(
+                localized: "SparkleRecorder became active before any events were captured.",
+                table: "Recording"
+            )
+        case (.normal, .some(let macro)):
+            completionMessage = String(
+                format: String(localized: "Saved %@ · %d events.", table: "Recording"),
+                macro.name,
+                count
+            )
+        case (.normal, .none):
+            completionMessage = String(localized: "No events captured.", table: "Recording")
+        }
+
+        let completionTone: AppStatusFeedback.Tone = switch context {
+        case .normal:
+            savedMacroID == nil ? .info : .success
+        case .inputMonitoringRevoked, .appBecameActive:
+            .warning
+        }
+        beginRecordingFinalization(
+            savedMacroID: savedMacroID,
+            eventCount: count,
+            completionMessage: completionMessage,
+            completionTone: completionTone,
+            restoreSelectedMacroAfterward: savedMacroID == nil
+        )
+        return savedMacroID
+    }
+
+    private func beginRecordingFinalization(
+        savedMacroID: UUID?,
+        eventCount: Int,
+        completionMessage: String,
+        completionTone: AppStatusFeedback.Tone,
+        restoreSelectedMacroAfterward: Bool
+    ) {
+        guard recordingFinalizationTask == nil else {
+            assertionFailure("Recording finalization must be serialized")
+            return
+        }
+        let finalizingMessage = String(localized: "Finishing recording…", table: "Recording")
+        state.recordingFinalizationActive = true
+        state.presentStatus(finalizingMessage, tone: .progress)
+        let finalizingFeedbackID = state.statusFeedback?.id
+        refreshIcon()
+        updateDockBadge()
+
+        recordingFinalizationTask = Task { @MainActor [weak self] in
+            guard let self else { return }
+            let status = await self.recorder.waitForSemanticRecordingCompletion()
+            self.attachSemanticRecordingIfFinished(status)
+            if case .finished = status {
+                // attachSemanticRecordingIfFinished owns the pending reference.
+            } else {
+                self.pendingSemanticRecordingMacroID = nil
+            }
+            let sanitizationTask = self.semanticSanitizationTask
+            await sanitizationTask?.value
+
+            if let savedMacroID {
+                // library.add() already queued the event payload and ordered
+                // metadata for this Macro. Normal stop only needs a scoped
+                // durability barrier; termination performs the stronger full
+                // repository flush separately.
+                await self.library.flushPendingPersistence(for: savedMacroID)
+            }
+
+            if restoreSelectedMacroAfterward {
+                if let macro = self.library.currentMacro {
+                    self.recorderLoadedMacroID = nil
+                    do {
+                        let events = try await self.library.loadEvents(for: macro.id)
+                        if self.library.currentMacroID == macro.id {
+                            self.recorder.loadEvents(events)
+                            self.recorderLoadedMacroID = macro.id
+                        }
+                    } catch {
+                        self.recorder.clearAll()
+                        self.state.presentStatus(
+                            String(
+                                format: String(localized: "Could not read the macro data: %@", table: "Common"),
+                                error.localizedDescription
+                            ),
+                            tone: .error
+                        )
+                    }
+                } else {
+                    self.recorder.clearAll()
+                }
+            }
+
+            // Persistence or sanitization may have published a more actionable
+            // failure while Finalizing. Only replace the neutral saving message;
+            // never hide a later repository/privacy diagnostic behind "Saved".
+            if self.state.statusFeedback?.id == finalizingFeedbackID {
+                let feedback = self.recordingFinalizationFeedback(
+                    semanticStatus: status,
+                    fallback: completionMessage,
+                    fallbackTone: completionTone,
+                    savedMacroID: savedMacroID,
+                    eventCount: eventCount
+                )
+                self.state.presentStatus(feedback.message, tone: feedback.tone)
+            }
+            self.state.recordingFinalizationActive = false
+            self.recordingFinalizationTask = nil
+            self.refreshIcon()
+            self.updateDockBadge()
+        }
+    }
+
+    private func recordingFinalizationFeedback(
+        semanticStatus: SemanticRecorderBridgeStatus,
+        fallback: String,
+        fallbackTone: AppStatusFeedback.Tone,
+        savedMacroID: UUID?,
+        eventCount: Int
+    ) -> (message: String, tone: AppStatusFeedback.Tone) {
+        switch semanticStatus {
+        case .failed(let message):
+            guard let savedMacroID,
+                  let macro = library.macros.first(where: { $0.id == savedMacroID }) else {
+                return (
+                    String(
+                        format: String(localized: "Visual recording failed: %@", table: "Recording"),
+                        message
+                    ),
+                    .error
+                )
+            }
+            return (
+                String(
+                    format: String(
+                        localized: "Saved %@ · %d events. Visual recording failed: %@",
+                        table: "Recording"
+                    ),
+                    macro.name,
+                    eventCount,
+                    message
+                ),
+                .warning
+            )
+        case .suppressed:
+            guard savedMacroID != nil else { return (fallback, fallbackTone) }
+            return (
+                String(
+                    localized: "Saved the action recording. Visual evidence was stopped to protect sensitive content.",
+                    table: "Recording"
+                ),
+                .warning
+            )
+        case .blocked(let preflight):
+            let issue = visualRecordingBlockedStatus(preflight.blockingIssues)
+            guard savedMacroID != nil else { return (issue, .error) }
+            return (
+                String(
+                    format: String(
+                        localized: "Saved the action recording. Visual evidence was unavailable: %@",
+                        table: "Recording"
+                    ),
+                    issue
+                ),
+                .warning
+            )
+        case .idle, .starting, .active, .finishing, .finished, .cancelled:
+            return (fallback, fallbackTone)
+        }
+    }
+
+    private func waitForRecordingFinalization() async {
+        let task = recordingFinalizationTask
+        await task?.value
+    }
+
     /// Wraps the actual recording start with an optional countdown.
     private func beginRecordingFlow() {
-        guard !reconstructionTestActive, !recordingPreparationActive else { return }
+        guard !reconstructionTestActive,
+              !recordingPreparationActive,
+              !state.recordingFinalizationActive else { return }
         recordingPreparationActive = true
+        state.recordingFlowActive = true
         if player.isPlaying { player.stop() }
         persistCurrentMacroIfNeeded()
 
-        Task { @MainActor [weak self] in
+        recordingPreparationTask = Task { @MainActor [weak self] in
             guard let self else { return }
-            defer { self.recordingPreparationActive = false }
+            defer {
+                self.recordingPreparationActive = false
+                self.recordingPreparationTask = nil
+            }
             await self.prepareSemanticRecordingAndContinue()
         }
     }
@@ -714,34 +1530,80 @@ final class MenuBarController: NSObject, NSPopoverDelegate {
     private func prepareSemanticRecordingAndContinue() async {
         pendingRecordingStartMessage = nil
         state.semanticRecordingPreflightPresentation = nil
-        guard await chooseRecordingEvidenceModeIfNeeded() else { return }
+
+        await finishPreviousRecordingPostprocessingBeforeNewRecording()
+        guard !Task.isCancelled else {
+            state.recordingFlowActive = false
+            return
+        }
+
+        guard await chooseRecordingEvidenceModeIfNeeded() else {
+            state.recordingFlowActive = false
+            return
+        }
+        guard !Task.isCancelled else {
+            state.recordingFlowActive = false
+            return
+        }
         guard state.semanticRecordingEnabled else {
             closePopoverForRecording()
             try? await Task.sleep(for: .milliseconds(150))
-            guard !Task.isCancelled else { return }
+            guard !Task.isCancelled else {
+                state.recordingFlowActive = false
+                restoreVisibilityAfterAbortedRecordingPreparation()
+                return
+            }
             startRecordingAfterPreflight()
             return
         }
 
-        state.statusMessage = "Checking visual recording permissions…"
-        let result = await SemanticRecordingPreflightClient.live.evaluate()
+        state.presentStatus(
+            String(localized: "Checking visual recording permissions…", table: "Recording"),
+            tone: .progress
+        )
+        let result = await SemanticRecordingPreflightClient.live.evaluate(
+            policy: SemanticRecordingPreflightPolicy(
+                capturePolicy: state.semanticRecordingCapturePolicy
+            )
+        )
         let presentation = SemanticRecordingPreflightPresenter.presentation(for: result)
         state.semanticRecordingPreflightPresentation = presentation
 
         guard presentation.canStart else {
-            state.statusMessage = "Visual recording blocked: \(semanticRecordingIssueSummary(result.blockingIssues))"
+            state.recordingFlowActive = false
+            state.presentStatus(
+                visualRecordingBlockedStatus(result.blockingIssues),
+                tone: .error
+            )
             SoundController.shared.play(.error)
             showSettingsWindow()
             return
         }
 
         if presentation.status == .degraded {
-            pendingRecordingStartMessage = "Recording with limited visual context."
+            pendingRecordingStartMessage = String(localized: "Recording with limited visual context.", table: "Recording")
         }
         closePopoverForRecording()
         try? await Task.sleep(for: .milliseconds(150))
-        guard !Task.isCancelled else { return }
+        guard !Task.isCancelled else {
+            state.recordingFlowActive = false
+            restoreVisibilityAfterAbortedRecordingPreparation()
+            return
+        }
         startRecordingAfterPreflight()
+    }
+
+    private func finishPreviousRecordingPostprocessingBeforeNewRecording() async {
+        let status = await recorder.waitForSemanticRecordingCompletion()
+        handleSemanticRecordingStatus(status)
+        let sanitizationTask = semanticSanitizationTask
+        await sanitizationTask?.value
+
+        // Starting a new recording only depends on the Macro whose editor buffer
+        // is about to be cleared. Unrelated Library writes remain background work.
+        if let currentMacroID = library.currentMacroID {
+            await library.flushPendingPersistence(for: currentMacroID)
+        }
     }
 
     /// Ask once before the first action-only recording, so missing visual
@@ -766,15 +1628,37 @@ final class MenuBarController: NSObject, NSPopoverDelegate {
         }
         guard response != .alertThirdButtonReturn else { return false }
         state.semanticRecordingEnabled = response == .alertFirstButtonReturn
+        if state.semanticRecordingEnabled {
+            state.semanticRecordingCaptureMode = .videoAndKeyframes
+        }
         defaults.set(true, forKey: "recordingEvidenceModeChosen")
         return true
     }
 
     private func closePopoverForRecording() {
+        recordingPreparationVisibility = RecordingPreparationVisibility(
+            appWasHidden: NSApp.isHidden,
+            appWasActive: NSApp.isActive,
+            popoverWasShown: popover.isShown
+        )
         if popover.isShown { popover.performClose(nil) }
         // The standalone library must also relinquish focus before capturing
         // the recording surface, including when countdown is disabled.
         NSApp.hide(nil)
+    }
+
+    private func restoreVisibilityAfterAbortedRecordingPreparation() {
+        guard let visibility = recordingPreparationVisibility else { return }
+        recordingPreparationVisibility = nil
+        guard !visibility.appWasHidden else { return }
+
+        NSApp.unhide(nil)
+        if visibility.appWasActive {
+            NSApp.activate(ignoringOtherApps: true)
+        }
+        if visibility.popoverWasShown {
+            showPopoverProgrammatically()
+        }
     }
 
     private func startRecordingAfterPreflight() {
@@ -791,39 +1675,114 @@ final class MenuBarController: NSObject, NSPopoverDelegate {
     private func actuallyStartRecording() {
         let capture = WindowSurfaceCapture()
         self.recordedSurface = try? capture.captureFrontmostWindow()
-        let semanticCaptureTarget = SemanticRecordingCaptureTargetMapper.target(
-            surface: recordedSurface
-        )
+        let semanticCaptureTarget: RecordingCaptureTarget
+        switch state.semanticRecordingCaptureScope {
+        case .frontmostWindow:
+            semanticCaptureTarget = SemanticRecordingCaptureTargetMapper.target(
+                surface: recordedSurface
+            )
+        case .display:
+            semanticCaptureTarget = SemanticRecordingCaptureTargetMapper.target(
+                surface: nil,
+                fallbackDisplayID: recordedSurface?.recordedDisplayId
+            )
+        }
         
+        // A new recording owns a fresh buffer. Detach it from the previously
+        // selected macro before Recorder clears events so startup failure or an
+        // interrupted recording can never be persisted over that macro.
+        recorderLoadedMacroID = nil
         let ok = recorder.startRecording(
             semanticRecordingEnabled: state.semanticRecordingEnabled,
-            semanticCaptureTarget: semanticCaptureTarget
+            semanticCaptureTarget: semanticCaptureTarget,
+            semanticCapturePolicy: state.semanticRecordingCapturePolicy
         )
         if ok {
+            recordingPreparationVisibility = nil
+            state.isRecording = true
+            editorWC?.window?.orderOut(nil)
             showRecordingHUDIfNeeded()
-            state.statusMessage = pendingRecordingStartMessage ?? "Recording…"
+            state.presentStatus(
+                pendingRecordingStartMessage ?? String(localized: "Recording…", table: "Recording"),
+                tone: .progress
+            )
             pendingRecordingStartMessage = nil
             SoundController.shared.play(.recordStart)
         } else {
+            state.recordingFlowActive = false
             pendingRecordingStartMessage = nil
-            state.statusMessage = "Could not start. Grant Accessibility permission."
+            restoreVisibilityAfterAbortedRecordingPreparation()
+            if let macro = library.currentMacro {
+                loadMacroEventsIntoRecorder(macro.id)
+            } else {
+                recorder.clearAll()
+            }
+            state.refreshPermissions()
+            state.presentStatus(recordingStartFailureStatus(), tone: .error)
             SoundController.shared.play(.error)
         }
     }
 
     func stopAll() {
+        if state.recordingFinalizationActive {
+            state.presentStatus(
+                String(localized: "Finishing recording…", table: "Recording"),
+                tone: .progress
+            )
+            return
+        }
+
+        let wasPlaybackActive = state.playbackFlowActive
+            || manualPlaybackTask != nil
+            || player.isPlaybackTargetReserved
+            || player.isPlaying
+        let wasRecordingPreparationActive = state.recordingFlowActive && !recorder.isRecording
+        let wasAuxiliaryCaptureActive = auxiliaryCaptureActive
+
         playbackRequestGeneration &+= 1
         manualPlaybackTask?.cancel()
         manualPlaybackTask = nil
+        playingMacroID = nil
+        recorderLoadingMacroID = nil
+        manualPlaybackVisibilitySession.restore()
+        cancelAuxiliaryCaptures()
+        recordingPreparationTask?.cancel()
+        recordingPreparationTask = nil
+        recordingPreparationActive = false
+        state.playbackFlowActive = false
         player.stop()
         countdown?.cancel()
+        if !recorder.isRecording {
+            state.recordingFlowActive = false
+            restoreVisibilityAfterAbortedRecordingPreparation()
+        }
         if recorder.isRecording {
-            // F7 = "abort". Throw away the in-flight recording instead of saving.
+            // Global Stop during a live recording is destructive by design: discard
+            // the in-flight recording instead of routing through the Save flow.
             cancelRecording()
             return
         }
-        if player.isPlaying { player.stop() }
-        state.statusMessage = "Stopped."
+        if wasPlaybackActive {
+            state.presentStatus(
+                String(localized: "Playback stopped.", table: "Recording"),
+                tone: .info
+            )
+        } else if wasRecordingPreparationActive {
+            state.presentStatus(
+                String(localized: "Recording setup cancelled.", table: "Recording"),
+                tone: .info
+            )
+        } else if wasAuxiliaryCaptureActive {
+            state.presentStatus(
+                String(localized: "Picking cancelled.", table: "EditorUX"),
+                tone: .info
+            )
+        } else {
+            state.presentStatus(
+                String(localized: "Nothing is running.", table: "Recording"),
+                tone: .info
+            )
+        }
     }
 
     private func observeSemanticRecordingStatus() {
@@ -844,27 +1803,45 @@ final class MenuBarController: NSObject, NSPopoverDelegate {
 
         case .blocked(let preflight):
             pendingSemanticRecordingMacroID = nil
-            guard UserDefaults.standard.bool(forKey: "semanticRecordingEnabled") else {
+            guard UserDefaults.standard.bool(forKey: "semanticRecordingEnabled"),
+                  !state.recordingFinalizationActive else {
                 return
             }
-            state.statusMessage = "Visual recording blocked: \(semanticRecordingIssueSummary(preflight.blockingIssues))"
+            state.presentStatus(
+                visualRecordingBlockedStatus(preflight.blockingIssues),
+                tone: .error
+            )
 
         case .failed(let message):
             pendingSemanticRecordingMacroID = nil
-            guard UserDefaults.standard.bool(forKey: "semanticRecordingEnabled") else {
+            guard UserDefaults.standard.bool(forKey: "semanticRecordingEnabled"),
+                  !state.recordingFinalizationActive else {
                 return
             }
-            state.statusMessage = "Visual recording failed: \(message)"
+            state.presentStatus(
+                String(
+                    format: String(localized: "Visual recording failed: %@", table: "Recording"),
+                    message
+                ),
+                tone: .error
+            )
 
         case .cancelled:
             pendingSemanticRecordingMacroID = nil
 
-        case .suppressed(let message):
+        case .suppressed:
             pendingSemanticRecordingMacroID = nil
-            guard UserDefaults.standard.bool(forKey: "semanticRecordingEnabled") else {
+            guard UserDefaults.standard.bool(forKey: "semanticRecordingEnabled"),
+                  !state.recordingFinalizationActive else {
                 return
             }
-            state.statusMessage = "Visual recording suppressed: \(message)"
+            state.presentStatus(
+                String(
+                    localized: "Visual evidence stopped to protect sensitive content. Action recording continues.",
+                    table: "Recording"
+                ),
+                tone: .warning
+            )
 
         default:
             break
@@ -904,8 +1881,9 @@ final class MenuBarController: NSObject, NSPopoverDelegate {
         bundleID: UUID,
         bundleDirectory: URL
     ) {
-        Task { @MainActor [weak self] in
+        semanticSanitizationTask = Task { @MainActor [weak self] in
             guard let self else { return }
+            defer { self.semanticSanitizationTask = nil }
             do {
                 let store = RecordingBundleStore(
                     rootDirectory: bundleDirectory.deletingLastPathComponent()
@@ -914,11 +1892,16 @@ final class MenuBarController: NSObject, NSPopoverDelegate {
                 guard bundle.id == bundleID else {
                     return
                 }
-                let events = try await library.loadEvents(for: macroID)
-                let plan = SemanticRecordingPlayableSanitizationPlanner.plan(
-                    for: events,
-                    bundle: bundle
-                )
+                let inMemoryEvents = library.macros.first(where: { $0.id == macroID })?.events ?? []
+                let events = inMemoryEvents.isEmpty
+                    ? try await library.loadEvents(for: macroID)
+                    : inMemoryEvents
+                let plan = await Task.detached(priority: .utility) {
+                    SemanticRecordingPlayableSanitizationPlanner.plan(
+                        for: events,
+                        bundle: bundle
+                    )
+                }.value
                 guard !plan.isEmpty else {
                     return
                 }
@@ -936,47 +1919,40 @@ final class MenuBarController: NSObject, NSPopoverDelegate {
                 }
                 if summary.sanitizedEventCount > 0,
                    summary.reviewRequiredEventCount > 0 {
-                    state.statusMessage = String(
-                        format: "Saved visual evidence, withheld readable text from %d event(s), and left %d event(s) for Review.",
-                        summary.sanitizedEventCount,
-                        summary.reviewRequiredEventCount
+                    state.presentStatus(
+                        String(
+                            format: String(localized: "Saved visual evidence, hid readable text from %d action(s), and left %d action(s) for review.", table: "Recording"),
+                            summary.sanitizedEventCount,
+                            summary.reviewRequiredEventCount
+                        ),
+                        tone: .warning
                     )
                 } else if summary.sanitizedEventCount > 0 {
-                    state.statusMessage = String(
-                        format: "Saved visual evidence and withheld readable text from %d event(s).",
-                        summary.sanitizedEventCount
+                    state.presentStatus(
+                        String(
+                            format: String(localized: "Saved visual evidence and hid readable text from %d action(s).", table: "Recording"),
+                            summary.sanitizedEventCount
+                        ),
+                        tone: .success
                     )
                 } else if summary.reviewRequiredEventCount > 0 {
-                    state.statusMessage = String(
-                        format: "Saved visual evidence. %d sensitive event(s) need Review before playable text can be changed.",
-                        summary.reviewRequiredEventCount
+                    state.presentStatus(
+                        String(
+                            format: String(localized: "Saved visual evidence. Review %d sensitive action(s) before changing the text used during playback.", table: "Recording"),
+                            summary.reviewRequiredEventCount
+                        ),
+                        tone: .warning
                     )
                 }
             } catch {
-                state.statusMessage = "Playable text sanitization skipped: \(error.localizedDescription)"
+                state.presentStatus(
+                    String(
+                        format: String(localized: "Recording text protection could not finish: %@", table: "Recording"),
+                        error.localizedDescription
+                    ),
+                    tone: .warning
+                )
             }
-        }
-    }
-
-    private func playbackSanitizedEventsForExport(
-        _ events: [RecordedEvent],
-        macro: SavedMacro?
-    ) async -> [RecordedEvent] {
-        guard let reference = macro?.semanticRecording else {
-            return events
-        }
-
-        do {
-            let bundle = try await RecordingBundleStore().loadBundle(
-                recordingID: reference.recordingID
-            )
-            let plan = SemanticRecordingPlayableSanitizationPlanner.plan(
-                for: events,
-                bundle: bundle
-            )
-            return plan.playbackPreservingSanitizedEvents(from: events)
-        } catch {
-            return events
         }
     }
 
@@ -989,30 +1965,83 @@ final class MenuBarController: NSObject, NSPopoverDelegate {
         return macro.events
     }
 
+    private func recordingStartFailureStatus() -> String {
+        switch (state.accessibilityGranted, state.inputMonitoringGranted) {
+        case (false, false):
+            return String(
+                localized: "Could not start. Grant Accessibility and Input Monitoring permissions.",
+                table: "Recording"
+            )
+        case (false, true):
+            return String(localized: "Could not start. Grant Accessibility permission.", table: "Recording")
+        case (true, false):
+            return String(localized: "Could not start. Grant Input Monitoring permission.", table: "Recording")
+        case (true, true):
+            return String(localized: "Could not start recording. Check permissions in Settings.", table: "Recording")
+        }
+    }
+
+    private func visualRecordingBlockedStatus(
+        _ issues: [SemanticRecordingPreflightIssue]
+    ) -> String {
+        String(
+            format: String(localized: "Visual recording blocked: %@", table: "Recording"),
+            semanticRecordingIssueSummary(issues)
+        )
+    }
+
     private func semanticRecordingIssueSummary(
         _ issues: [SemanticRecordingPreflightIssue]
     ) -> String {
-        let labels = issues.prefix(2).map(\.permission.rawValue)
+        let labels = issues.prefix(2).map { issue in
+            semanticRecordingPermissionLabel(issue.permission)
+        }
         guard !labels.isEmpty else {
-            return "permissions unavailable"
+            return String(localized: "Unavailable", table: "Common")
         }
         return labels.joined(separator: ", ")
+    }
+
+    private func semanticRecordingPermissionLabel(
+        _ permission: SemanticRecordingPermissionKind
+    ) -> String {
+        switch permission {
+        case .accessibility:
+            return String(localized: "Accessibility", table: "Settings")
+        case .inputMonitoring:
+            return String(localized: "Input Monitoring", table: "Common")
+        case .screenRecording:
+            return String(localized: "Screen Recording", table: "Recording")
+        }
     }
 
     func refreshSemanticRecordingPreflightPresentation() {
         Task { @MainActor [weak self] in
             guard let self else { return }
-            state.statusMessage = "Checking visual recording permissions..."
-            let result = await SemanticRecordingPreflightClient.live.evaluate()
+            state.presentStatus(
+                String(localized: "Checking visual recording permissions…", table: "Recording"),
+                tone: .progress
+            )
+            let result = await SemanticRecordingPreflightClient.live.evaluate(
+                policy: SemanticRecordingPreflightPolicy(
+                    capturePolicy: state.semanticRecordingCapturePolicy
+                )
+            )
             state.semanticRecordingPreflightPresentation = SemanticRecordingPreflightPresenter.presentation(
                 for: result
             )
             if result.isReadyToStart {
-                state.statusMessage = result.isDegraded
-                    ? "Visual recording can continue with limited context."
-                    : "Visual recording is ready."
+                state.presentStatus(
+                    result.isDegraded
+                        ? String(localized: "Visual recording can continue with limited context.", table: "Recording")
+                        : String(localized: "Visual recording is ready.", table: "Recording"),
+                    tone: result.isDegraded ? .warning : .success
+                )
             } else {
-                state.statusMessage = "Visual recording blocked: \(semanticRecordingIssueSummary(result.blockingIssues))"
+                state.presentStatus(
+                    visualRecordingBlockedStatus(result.blockingIssues),
+                    tone: .error
+                )
             }
         }
     }
@@ -1122,13 +2151,22 @@ final class MenuBarController: NSObject, NSPopoverDelegate {
                 total + result.deletedRelativePaths.count
             }
             let deletedBundles = results.filter(\.deletedBundleDirectory).count
-            state.statusMessage = String(
-                format: "Cleaned up %d expired visual evidence artifact(s) and %d bundle(s).",
-                deletedArtifacts,
-                deletedBundles
+            state.presentStatus(
+                String(
+                    format: String(localized: "Cleaned up %d expired visual evidence artifact(s) and %d bundle(s).", table: "Automation"),
+                    deletedArtifacts,
+                    deletedBundles
+                ),
+                tone: .success
             )
         } catch {
-            state.statusMessage = "Scheduled visual evidence cleanup failed: \(error.localizedDescription)"
+            state.presentStatus(
+                String(
+                    format: String(localized: "Scheduled visual evidence cleanup failed: %@", table: "Automation"),
+                    error.localizedDescription
+                ),
+                tone: .error
+            )
         }
     }
 
@@ -1162,11 +2200,21 @@ final class MenuBarController: NSObject, NSPopoverDelegate {
                     state.automationRunLastCleanupEvidenceCount = result.prunedArtifactRunCount
                     state.automationRunLastCleanupHistoryCount = result.deletedMetadataRunCount
                     state.automationRunLastCleanupFreedByteCount = preview.estimatedByteCount
-                    state.statusMessage = String(
-                        format: String(localized: "Cleaned up evidence from %d run(s) and removed %d old history record(s).", table: "Automation"),
-                        result.prunedArtifactRunCount,
-                        result.deletedMetadataRunCount
-                    )
+                    let cleanupMessage: String
+                    if preview.estimatedByteCount == 0 {
+                        cleanupMessage = String(
+                            format: String(localized: "Updated %d expired evidence record(s) and removed %d old history record(s). No local evidence files needed deletion.", table: "Automation"),
+                            result.prunedArtifactRunCount,
+                            result.deletedMetadataRunCount
+                        )
+                    } else {
+                        cleanupMessage = String(
+                            format: String(localized: "Cleaned up evidence from %d run(s) and removed %d old history record(s).", table: "Automation"),
+                            result.prunedArtifactRunCount,
+                            result.deletedMetadataRunCount
+                        )
+                    }
+                    state.presentStatus(cleanupMessage, tone: .success)
                 } else {
                     state.automationRunLastCleanupEvidenceCount = 0
                     state.automationRunLastCleanupHistoryCount = 0
@@ -1174,34 +2222,81 @@ final class MenuBarController: NSObject, NSPopoverDelegate {
                 }
                 state.automationRunLastScheduledRetentionCleanupAt = decision.evaluatedAt
             } catch {
-                state.statusMessage = String(
-                    format: String(localized: "Run history cleanup failed: %@", table: "Automation"),
-                    error.localizedDescription
+                state.presentStatus(
+                    String(
+                        format: String(localized: "Run history cleanup failed: %@", table: "Automation"),
+                        error.localizedDescription
+                    ),
+                    tone: .error
                 )
                 NSLog("SparkleRecorder: Run history cleanup failed: \(error)")
             }
         }
     }
 
-    func play() {
+    func play(triggeredBy hotkey: HotkeyBinding? = nil) {
         guard !reconstructionTestActive else { return }
-        play(isChained: false)
-    }
-
-    private func play(isChained: Bool) {
-        guard !recorder.events.isEmpty, recorderLoadingMacroID == nil else {
-            state.statusMessage = String(localized: "No loaded actions to play. Select a macro and wait for it to load.", table: "Recording")
+        if auxiliaryCaptureActive {
+            stopAll()
             return
         }
-        guard !player.isPlaying, manualPlaybackTask == nil, !recordingPreparationActive else { return }
+        play(isChained: false, triggeredBy: hotkey)
+    }
+
+    private func play(isChained: Bool, triggeredBy hotkey: HotkeyBinding? = nil) {
+        if recorder.isRecording {
+            _ = stopRecordingAndSave(triggeredBy: hotkey?.recordingIgnoredKeyChord)
+            state.presentStatus(
+                String(
+                    localized: "Recording stopped. Play again after saving finishes.",
+                    table: "Recording"
+                ),
+                tone: .info
+            )
+            return
+        }
+        guard !state.recordingFinalizationActive else {
+            state.presentStatus(
+                String(
+                    localized: "Wait for the current recording to finish saving before starting another recording or playback.",
+                    table: "Recording"
+                ),
+                tone: .warning
+            )
+            return
+        }
+        guard !recorder.events.isEmpty, recorderLoadingMacroID == nil else {
+            if isChained { state.playbackFlowActive = false }
+            state.presentStatus(
+                String(localized: "No macro is ready to play. Select a macro and wait for its actions to load.", table: "Recording"),
+                tone: .warning
+            )
+            return
+        }
+        guard !player.isPlaying,
+              manualPlaybackTask == nil,
+              !recordingPreparationActive,
+              (!state.playbackFlowActive || isChained) else {
+            if isChained { state.playbackFlowActive = false }
+            return
+        }
         if let failure = player.playbackPermissionFailure {
-            state.statusMessage = failure
+            state.playbackFlowActive = false
+            state.presentStatus(failure, tone: .error)
             SoundController.shared.play(.error)
             showSettingsWindow()
             return
         }
         countdown?.cancel()
-        if recorder.isRecording { toggleRecording() }
+        if let currentMacroID = library.currentMacroID,
+           recorderLoadedMacroID != currentMacroID {
+            if isChained { state.playbackFlowActive = false }
+            state.presentStatus(
+                String(localized: "No macro is ready to play. Select a macro and wait for its actions to load.", table: "Recording"),
+                tone: .warning
+            )
+            return
+        }
         if !isChained { chainVisited.removeAll() }
         var macro = library.currentMacro ?? SavedMacro(name: "macro", events: recorder.events, loops: state.loops)
         macro.events = recorder.events
@@ -1213,7 +2308,12 @@ final class MenuBarController: NSObject, NSPopoverDelegate {
             targetApplicationPolicy: snapshot.surfaces.isEmpty ? .doNotActivate : .launchIfNeeded,
             targetApplicationReadyDelay: 0, targetApplicationCleanupPolicy: .keepOpen,
             targetApplicationQuitTimeout: 5, targetApplicationForceQuitOnTimeout: false)
-        state.statusMessage = String(localized: "Preparing playback…", table: "Recording")
+        manualPlaybackVisibilitySession.beginIfNeeded()
+        state.playbackFlowActive = true
+        state.presentStatus(
+            String(localized: "Preparing playback…", table: "Recording"),
+            tone: .progress
+        )
         if popover.isShown { popover.performClose(nil) }
         if snapshot.surfaces.isEmpty { NSApp.hide(nil) }
         manualPlaybackTask = Task { [weak self] in
@@ -1232,89 +2332,312 @@ final class MenuBarController: NSObject, NSPopoverDelegate {
                         self.playStartTime = CFAbsoluteTimeGetCurrent()
                         self.playingMacroID = snapshot.id
                         self.chainVisited.insert(snapshot.id)
-                        self.state.statusMessage = "Playing \(snapshot.name) · ×\(snapshot.loops)…"
+                        self.state.presentStatus(
+                            String(
+                                format: String(localized: "Playing %@ · ×%d…", table: "Recording"),
+                                snapshot.name,
+                                snapshot.loops
+                            ),
+                            tone: .progress
+                        )
                         SoundController.shared.play(.playStart)
                     }
                 })
                 try Task.checkCancellation()
-                guard self.playbackRequestGeneration == generation else { return }
+                guard self.playbackRequestGeneration == generation else {
+                    self.manualPlaybackVisibilitySession.restore()
+                    return
+                }
                 let elapsed = CFAbsoluteTimeGetCurrent() - self.playStartTime
                 self.library.recordPlay(id: snapshot.id, runTime: elapsed)
-                self.state.statusMessage = String(localized: "Playback finished.", table: "Recording")
-                SoundController.shared.play(.playEnd)
                 let chainID = self.library.macros.first(where: { $0.id == snapshot.id })?.chainTo
                 if let id = chainID, let next = self.library.macros.first(where: { $0.id == id }) {
                     guard !self.chainVisited.contains(id) else {
-                        self.state.statusMessage = "Chain stopped (loop detected)."
+                        self.state.playbackFlowActive = false
+                        self.manualPlaybackVisibilitySession.restore()
+                        self.state.presentStatus(
+                            String(localized: "Playback chain stopped because it would repeat a macro already played in this run.", table: "Recording"),
+                            tone: .warning
+                        )
                         return
                     }
                     self.library.select(id: id)
+                    // The current playback has completed. Release this Task slot before
+                    // loading the next chained macro, while playbackFlowActive keeps
+                    // user-facing App windows locked until the whole chain ends.
+                    self.manualPlaybackTask = nil
                     Task { [weak self] in
                         guard let self else { return }
                         do {
                             let events = try await self.library.loadEvents(for: id)
-                            guard self.playbackRequestGeneration == generation, self.library.currentMacroID == id else { return }
+                            guard self.playbackRequestGeneration == generation, self.library.currentMacroID == id else {
+                                self.state.playbackFlowActive = false
+                                self.manualPlaybackVisibilitySession.restore()
+                                return
+                            }
                             self.recorder.loadEvents(events)
                             self.recorderLoadedMacroID = id
-                            self.state.statusMessage = "Chaining to \(next.name)…"
+                            self.state.presentStatus(
+                                String(
+                                    format: String(localized: "Chaining to %@…", table: "Recording"),
+                                    next.name
+                                ),
+                                tone: .progress
+                            )
                             self.play(isChained: true)
-                        } catch { self.state.statusMessage = error.localizedDescription }
+                        } catch {
+                            self.state.playbackFlowActive = false
+                            self.manualPlaybackVisibilitySession.restore()
+                            self.state.presentStatus(
+                                String(
+                                    format: String(localized: "Failed to load %@.", table: "Recording"),
+                                    next.name
+                                ),
+                                tone: .error
+                            )
+                        }
                     }
+                } else {
+                    self.state.playbackFlowActive = false
+                    self.manualPlaybackVisibilitySession.restore()
+                    self.state.presentStatus(
+                        String(localized: "Playback finished.", table: "Recording"),
+                        tone: .success
+                    )
+                    SoundController.shared.play(.playEnd)
                 }
             } catch {
+                self.manualPlaybackVisibilitySession.restore()
                 guard self.playbackRequestGeneration == generation else { return }
-                self.state.statusMessage = Task.isCancelled
-                    ? String(localized: "Playback stopped.", table: "Recording") : error.localizedDescription
+                self.state.playbackFlowActive = false
+                self.state.presentStatus(
+                    Task.isCancelled
+                        ? String(localized: "Playback stopped.", table: "Recording")
+                        : error.localizedDescription,
+                    tone: Task.isCancelled ? .info : .error
+                )
                 if !Task.isCancelled {
-                    NSApp.unhide(nil)
-                    NSApp.activate()
                     SoundController.shared.play(.error)
                 }
             }
         }
     }
 
-    func preparePlaybackContext(for macro: SavedMacro?, completion: @escaping (PlaybackContext) -> Void) {
-        guard let macro = macro else {
-            completion(PlaybackContext())
+    /// Runs an Editor subset preview through the same manual-playback ownership seam
+    /// as Library playback. This keeps Stop, App window locking, Automation resource
+    /// arbitration, target preparation, and visibility restoration consistent.
+    func playEditorPreview(events: [RecordedEvent], sourceMacro: SavedMacro?) {
+        guard !events.isEmpty else {
+            state.presentStatus(
+                String(localized: "This preview has no playable actions.", table: "Common"),
+                tone: .warning
+            )
+            return
+        }
+        guard canStartForegroundInputSession else {
+            state.presentStatus(
+                String(localized: "Stop recording or playback before previewing.", table: "Automation"),
+                tone: .warning
+            )
+            return
+        }
+        if let failure = player.playbackPermissionFailure {
+            state.presentStatus(failure, tone: .error)
+            SoundController.shared.play(.error)
+            showSettingsWindow()
             return
         }
 
-        // Return the base context immediately. Player will use WindowTracker to lazily resolve
-        // the frame for each surface during playback exactly when it's needed, preventing
-        // stale upfront coordinates from breaking playback if a user moves windows.
-        completion(macro.playbackContext)
+        var preview = sourceMacro ?? SavedMacro(name: "Preview", events: events, loops: 1)
+        preview.events = events
+        preview.loops = 1
+        preview.chainTo = nil
+        if sourceMacro == nil {
+            preview.speed = state.speed
+        }
+        guard !PlaybackPlanner.plan(
+            events: preview.events,
+            loops: preview.loops,
+            speed: preview.speed
+        ).steps.isEmpty else {
+            state.presentStatus(
+                String(localized: "This preview has no playable actions.", table: "Common"),
+                tone: .warning
+            )
+            return
+        }
+
+        playbackRequestGeneration &+= 1
+        let generation = playbackRequestGeneration
+        let client = AutomationPlayerClient.live(player: player, windowTracker: WindowTracker())
+        let request = AutomationPlayerStartRequest(
+            runID: UUID(),
+            macro: preview,
+            targetApplicationPolicy: preview.surfaces.isEmpty ? .doNotActivate : .launchIfNeeded,
+            targetApplicationReadyDelay: 0,
+            targetApplicationCleanupPolicy: .keepOpen,
+            targetApplicationQuitTimeout: 5,
+            targetApplicationForceQuitOnTimeout: false
+        )
+
+        manualPlaybackVisibilitySession.beginIfNeeded()
+        state.playbackFlowActive = true
+        state.presentStatus(
+            String(localized: "Playing preview…", table: "Common"),
+            tone: .progress
+        )
+        if popover.isShown { popover.performClose(nil) }
+        if preview.surfaces.isEmpty { NSApp.hide(nil) }
+
+        manualPlaybackTask = Task { [weak self] in
+            guard let self else { return }
+            defer {
+                if self.playbackRequestGeneration == generation {
+                    self.manualPlaybackTask = nil
+                    self.playingMacroID = nil
+                }
+            }
+            do {
+                try Task.checkCancellation()
+                try await AutomationScheduledMacroPreviewClient(player: client).run(
+                    request,
+                    onStarted: { [weak self] in
+                        await MainActor.run {
+                            guard let self,
+                                  self.playbackRequestGeneration == generation else { return }
+                            self.playingMacroID = preview.id
+                            self.state.presentStatus(
+                                String(localized: "Playing preview…", table: "Common"),
+                                tone: .progress
+                            )
+                            SoundController.shared.play(.playStart)
+                        }
+                    }
+                )
+                try Task.checkCancellation()
+                guard self.playbackRequestGeneration == generation else {
+                    self.manualPlaybackVisibilitySession.restore()
+                    return
+                }
+                self.state.playbackFlowActive = false
+                self.manualPlaybackVisibilitySession.restore()
+                self.state.presentStatus(
+                    String(localized: "Preview finished.", table: "Common"),
+                    tone: .success
+                )
+                SoundController.shared.play(.playEnd)
+            } catch {
+                self.manualPlaybackVisibilitySession.restore()
+                guard self.playbackRequestGeneration == generation else { return }
+                self.state.playbackFlowActive = false
+                self.state.presentStatus(
+                    Task.isCancelled
+                        ? String(localized: "Playback stopped.", table: "Recording")
+                        : error.localizedDescription,
+                    tone: Task.isCancelled ? .info : .error
+                )
+                if !Task.isCancelled {
+                    SoundController.shared.play(.error)
+                }
+            }
+        }
     }
 
     /// Play a specific saved macro by id (used by per-macro hotkeys + library card buttons).
-    func playMacroByID(_ id: UUID) {
-        guard library.macros.contains(where: { $0.id == id }), !reconstructionTestActive else { return }
-        if recorder.isRecording { toggleRecording() }
+    /// Loading is part of the playback session: Stop can cancel it and recording cannot
+    /// begin while an older async load is still able to replace the Recorder buffer.
+    func playMacroByID(_ id: UUID, triggeredBy hotkey: HotkeyBinding? = nil) {
+        guard let macroName = library.macros.first(where: { $0.id == id })?.name,
+              !reconstructionTestActive else { return }
+        if auxiliaryCaptureActive {
+            stopAll()
+            return
+        }
+        if recorder.isRecording {
+            _ = stopRecordingAndSave(triggeredBy: hotkey?.recordingIgnoredKeyChord)
+            state.presentStatus(
+                String(
+                    localized: "Recording stopped. Play again after saving finishes.",
+                    table: "Recording"
+                ),
+                tone: .info
+            )
+            return
+        }
+        guard !state.recordingFinalizationActive else {
+            state.presentStatus(
+                String(
+                    localized: "Wait for the current recording to finish saving before starting another recording or playback.",
+                    table: "Recording"
+                ),
+                tone: .warning
+            )
+            return
+        }
+
         let previous = manualPlaybackTask
         stopAll()
         persistCurrentMacroIfNeeded()
         chainVisited.removeAll()
         library.select(id: id)
+
         let generation = playbackRequestGeneration
-        Task { [weak self] in
+        recorderLoadingMacroID = id
+        state.playbackFlowActive = true
+        state.presentStatus(
+            String(
+                format: String(localized: "Loading %@...", table: "Recording"),
+                macroName
+            ),
+            tone: .progress
+        )
+
+        let loadTask = Task { [weak self] in
             await previous?.value
-            guard let self, self.playbackRequestGeneration == generation else { return }
+            guard let self,
+                  self.playbackRequestGeneration == generation,
+                  !Task.isCancelled else { return }
             do {
                 let events = try await self.library.loadEvents(for: id)
-                guard self.playbackRequestGeneration == generation, self.library.currentMacroID == id else { return }
+                try Task.checkCancellation()
+                guard self.playbackRequestGeneration == generation,
+                      self.state.playbackFlowActive,
+                      self.library.currentMacroID == id,
+                      !self.recorder.isRecording,
+                      !self.state.recordingFinalizationActive else { return }
+
                 self.recorder.loadEvents(events)
                 self.recorderLoadedMacroID = id
-                self.recorderLoadingMacroID = nil
+                if self.recorderLoadingMacroID == id {
+                    self.recorderLoadingMacroID = nil
+                }
                 self.manualPlaybackTask = nil
+                self.state.playbackFlowActive = false
                 self.play()
-            } catch { self.state.statusMessage = error.localizedDescription }
+            } catch {
+                guard self.playbackRequestGeneration == generation else { return }
+                if self.recorderLoadingMacroID == id {
+                    self.recorderLoadingMacroID = nil
+                }
+                self.manualPlaybackTask = nil
+                self.state.playbackFlowActive = false
+                self.state.presentStatus(
+                    Task.isCancelled
+                        ? String(localized: "Playback stopped.", table: "Recording")
+                        : String(
+                            format: String(localized: "Failed to load %@.", table: "Recording"),
+                            macroName
+                        ),
+                    tone: Task.isCancelled ? .info : .error
+                )
+            }
         }
+        manualPlaybackTask = loadTask
     }
 
     func reconstructionReviewModel(for id: UUID) -> MacroReconstructionReviewModel {
         MacroReconstructionReviewModel(macroID: id, testMacro: { [weak self] macro in
-            guard let self, !self.recorder.isRecording, !self.player.isPlaying,
-                  !self.reconstructionTestActive, self.manualPlaybackTask == nil, !self.recordingPreparationActive, self.countdown?.isActive != true else {
+            guard let self, self.canStartForegroundInputSession else {
                 throw AutomationTargetApplicationPreparationFailure(message: String(
                     localized: "Stop recording or playback before previewing.", table: "Automation"))
             }
@@ -1323,7 +2646,11 @@ final class MenuBarController: NSObject, NSPopoverDelegate {
                     localized: "Macro has no playable events.", table: "Automation"))
             }
             self.reconstructionTestActive = true
-            defer { self.reconstructionTestActive = false }
+            self.state.playbackFlowActive = true
+            defer {
+                self.reconstructionTestActive = false
+                self.state.playbackFlowActive = false
+            }
             let client = AutomationPlayerClient.live(player: self.player, windowTracker: WindowTracker())
             let request = AutomationPlayerStartRequest(runID: UUID(), macro: macro,
                 targetApplicationPolicy: macro.surfaces.isEmpty ? .doNotActivate : .launchIfNeeded,
@@ -1332,13 +2659,17 @@ final class MenuBarController: NSObject, NSPopoverDelegate {
             if let failure = self.player.playbackPermissionFailure {
                 throw AutomationScheduledMacroPreviewFailure(message: failure)
             }
+            let visibility = ApplicationWindowVisibilitySnapshot.capture()
             if macro.surfaces.isEmpty { NSApp.hide(nil) }
-            defer { NSApp.unhide(nil); NSApp.activate() }
+            defer { visibility.restore() }
             try await AutomationScheduledMacroPreviewClient(player: client).run(request)
-        }, stopTest: {}, canPublish: { [weak self] in
+        }, stopTest: { [weak self] in
+            self?.player.stop()
+        }, canPublish: { [weak self] in
             guard let self else { return false }
-            return !self.recorder.isRecording && !self.player.isPlaying && !self.recordingPreparationActive
-                && !self.reconstructionTestActive && self.manualPlaybackTask == nil && self.countdown?.isActive != true
+            return self.canStartForegroundInputSession
+        }, editCandidate: { [weak self] candidate, onSaved in
+            self?.openCandidateEditor(candidate, onSaved: onSaved)
         }, onRevision: { [weak self] macro in
             guard let self else { return }
             await self.library.load()
@@ -1359,7 +2690,7 @@ final class MenuBarController: NSObject, NSPopoverDelegate {
                 table: "Automation"
             ))
         }
-        guard !recorder.isRecording, !player.isPlaying else {
+        guard canStartForegroundInputSession else {
             throw AutomationTargetApplicationPreparationFailure(message: String(
                 localized: "Stop recording or playback before previewing.",
                 table: "Automation"
@@ -1367,12 +2698,25 @@ final class MenuBarController: NSObject, NSPopoverDelegate {
         }
 
         macro.events = try await library.loadEvents(for: id)
+        guard canStartForegroundInputSession else {
+            throw AutomationTargetApplicationPreparationFailure(message: String(
+                localized: "Stop recording or playback before previewing.",
+                table: "Automation"
+            ))
+        }
         macro.loops = 1
         guard !PlaybackPlanner.plan(events: macro.events, loops: macro.loops, speed: macro.speed).steps.isEmpty else {
             throw AutomationTargetApplicationPreparationFailure(message: String(
                 localized: "Macro has no playable events.",
                 table: "Automation"
             ))
+        }
+
+        let previewVisibility = ApplicationWindowVisibilitySnapshot.capture()
+        state.playbackFlowActive = true
+        defer {
+            state.playbackFlowActive = false
+            previewVisibility.restore()
         }
 
         let runID = UUID()
@@ -1399,91 +2743,247 @@ final class MenuBarController: NSObject, NSPopoverDelegate {
 
     // MARK: - Save / Open / Export
 
-    /// Import any supported macro file: legacy Windows `.rec`, plain-text `.txt`/`.trm`,
-    /// or native `.tinyrec`/`.json`. Dispatches on extension, falling back to a
-    /// content sniff so a mislabeled file still has a chance.
+    private var auxiliaryCaptureActive: Bool {
+        auxiliaryCaptureActivityCenter.isActive
+    }
+
+    private var appInputSessionActivity: AppInputSessionActivity {
+        AppInputSessionActivity(
+            recordingFlowActive: state.recordingFlowActive,
+            isRecording: recorder.isRecording,
+            recordingFinalizationActive: state.recordingFinalizationActive,
+            manualPlaybackActive: state.playbackFlowActive || manualPlaybackTask != nil,
+            playbackTargetReserved: player.isPlaybackTargetReserved,
+            isPlaying: player.isPlaying,
+            reconstructionTestActive: reconstructionTestActive,
+            auxiliaryCaptureActive: auxiliaryCaptureActive
+        )
+    }
+
+    private func cancelAuxiliaryCaptures() {
+        windowTargetPicker.cancel()
+        CoordinatePickerOverlay.shared.cancel()
+        TextPickerOverlay.shared.cancel()
+        AutomationOCRRegionPickerOverlay.shared.cancel()
+    }
+
+    func requireScreenPickingAvailable() -> Bool {
+        guard canStartForegroundInputSession else {
+            state.presentStatus(
+                String(
+                    localized: "Finish the current recording or playback before picking from the screen.",
+                    table: "EditorUX"
+                ),
+                tone: .warning
+            )
+            return false
+        }
+        return true
+    }
+
+    private var canStartForegroundInputSession: Bool {
+        !appInputSessionActivity.blocksForegroundInputStart
+            && !recordingPreparationActive
+            && countdown?.isActive != true
+    }
+
+    private var macroLibraryInteractionLocked: Bool {
+        AppInputSessionInteractionLock.protectsMacroLibrary(appInputSessionActivity)
+    }
+
+    private var captureSurfaceInteractionLocked: Bool {
+        AppInputSessionInteractionLock.protectsAppWindows(appInputSessionActivity)
+    }
+
+    var preventsSystemWindowReopen: Bool {
+        captureSurfaceInteractionLocked
+    }
+
+    var appMenuInteractionLocked: Bool {
+        appInputSessionActivity.ownsInputOrCaptureTarget
+    }
+
+    var stopMenuMode: AppStopMenuMode {
+        AppStopMenuMode.project(appInputSessionActivity)
+    }
+
+    @discardableResult
+    private func requireMacroLibraryInteractionAvailable() -> Bool {
+        guard !macroLibraryInteractionLocked else {
+            state.presentStatus(
+                String(
+                    localized: "Wait for the current recording to finish saving, or stop recording or playback, before opening or changing the macro library.",
+                    table: "Common"
+                ),
+                tone: .warning
+            )
+            SoundController.shared.play(.error)
+            return false
+        }
+        return true
+    }
+
+    @discardableResult
+    private func requireCaptureSurfaceInteractionAvailable() -> Bool {
+        guard !captureSurfaceInteractionLocked else {
+            state.presentStatus(
+                String(
+                    localized: "Wait for the current recording to finish saving, or stop recording or playback, before opening another SparkleRecorder window.",
+                    table: "Common"
+                ),
+                tone: .warning
+            )
+            SoundController.shared.play(.error)
+            return false
+        }
+        return true
+    }
+
+    func openExternalMacroFiles(_ urls: [URL]) {
+        guard requireMacroLibraryInteractionAvailable() else { return }
+        enqueueMacroImports(urls, showMainWindowAfterward: true)
+    }
+
+    /// Import any supported macro file without blocking the MainActor on file IO
+    /// or decoding. Library mutation is committed back on MainActor only after the
+    /// input-session lock is rechecked.
     func importMacro(at url: URL) {
-        do {
-            let data = try Data(contentsOf: url)
-            let ext = url.pathExtension.lowercased()
+        guard requireMacroLibraryInteractionAvailable() else { return }
+        enqueueMacroImports([url], showMainWindowAfterward: false)
+    }
 
-            // Native formats first (preserve full metadata).
-            if ext == "tinyrec" || ext == "json" {
-                let dec = JSONDecoder()
-                if let saved = try? dec.decode(SavedMacro.self, from: data) {
-                    DispatchQueue.main.async {
-                        var copy = saved
-                        copy.id = UUID()
-                        copy.hotkey = nil
-                        self.library.insert(copy)
-                        self.recorder.loadEvents(copy.events)
-                        self.state.statusMessage = "Imported \(copy.name)."
-                    }
-                    return
-                }
-                if let macro = try? dec.decode(Macro.self, from: data) {
-                    finishImport(events: macro.events, name: url.deletingPathExtension().lastPathComponent, warning: nil)
-                    return
-                }
+    private func enqueueMacroImports(
+        _ urls: [URL],
+        showMainWindowAfterward: Bool
+    ) {
+        guard !urls.isEmpty else { return }
+        let previous = macroImportTail
+        let task = Task { @MainActor [weak self] in
+            await previous?.value
+            guard let self else { return }
+            await self.performMacroImports(
+                urls,
+                showMainWindowAfterward: showMainWindowAfterward
+            )
+        }
+        macroImportTail = task
+    }
+
+    private func performMacroImports(
+        _ urls: [URL],
+        showMainWindowAfterward: Bool
+    ) async {
+        for url in urls {
+            guard !macroLibraryInteractionLocked else {
+                state.presentStatus(
+                    String(
+                        localized: "Import stopped because recording or playback started. Try again after it finishes.",
+                        table: "Common"
+                    ),
+                    tone: .warning
+                )
+                SoundController.shared.play(.error)
+                return
             }
 
-            // External formats by extension.
-            let result: MacroImportResult
-            switch ext {
-            case "rec":
-                result = try LegacyRecImporter.parse(data)
-            case "txt", "trm":
-                guard let text = String(data: data, encoding: .utf8) else {
-                    throw MacroImportError.notTextFormat("file is not UTF-8 text.")
-                }
-                result = try TextMacroFormat.parse(text)
-            default:
-                // Unknown extension — sniff: legacy Windows .rec is binary multiple-of-20;
-                // otherwise try text, then JSON.
-                if data.count % 20 == 0, let r = try? LegacyRecImporter.parse(data) {
-                    result = r
-                } else if let text = String(data: data, encoding: .utf8),
-                          let r = try? TextMacroFormat.parse(text) {
-                    result = r
-                } else if let macro = try? JSONDecoder().decode(Macro.self, from: data) {
-                    result = MacroImportResult(events: macro.events, parsed: macro.events.count, skipped: 0, warning: nil)
-                } else {
-                    throw MacroImportError.unreadable("Unrecognized macro file format.")
-                }
-            }
+            state.presentStatus(
+                String(
+                    format: String(localized: "Importing %@…", table: "Common"),
+                    url.lastPathComponent
+                ),
+                tone: .progress
+            )
 
-            finishImport(events: result.events,
-                         name: url.deletingPathExtension().lastPathComponent,
-                         warning: result.warning ?? (result.skipped > 0 ? result.summary : nil))
-        } catch {
-            DispatchQueue.main.async {
-                self.state.statusMessage = "Import failed: \(error.localizedDescription)"
+            do {
+                let prepared = try await Task.detached(priority: .userInitiated) {
+                    try MacroImportLoader.load(url: url)
+                }.value
+
+                guard !macroLibraryInteractionLocked else {
+                    state.presentStatus(
+                        String(
+                            localized: "Import stopped because recording or playback started. Try again after it finishes.",
+                            table: "Common"
+                        ),
+                        tone: .warning
+                    )
+                    SoundController.shared.play(.error)
+                    return
+                }
+                applyPreparedMacroImport(prepared)
+            } catch {
+                state.presentStatus(
+                    String(
+                        format: String(localized: "Import failed: %@", table: "Common"),
+                        MacroImportPresentation.errorMessage(error)
+                    ),
+                    tone: .error
+                )
                 SoundController.shared.play(.error)
             }
         }
+
+        if showMainWindowAfterward, !captureSurfaceInteractionLocked {
+            showMainWindow()
+        }
     }
 
-    private func finishImport(events: [RecordedEvent], name: String, warning: String?) {
-        DispatchQueue.main.async {
-            let imported = self.library.add(events: events, name: name)
-            self.recorder.loadEvents(imported.events)
-            self.recorderLoadedMacroID = imported.id
-            if let warning {
-                self.state.statusMessage = "Imported \(imported.name) — \(warning)"
+    private func applyPreparedMacroImport(_ prepared: PreparedMacroImport) {
+        switch prepared {
+        case .savedMacro(let saved):
+            let copy = SavedMacroStandaloneTransfer.importedCopy(from: saved)
+            library.insert(copy)
+            recorder.loadEvents(copy.events)
+            recorderLoadedMacroID = copy.id
+            state.presentStatus(
+                String(
+                    format: String(localized: "Imported %@.", table: "Common"),
+                    copy.name
+                ),
+                tone: .success
+            )
+
+        case .events(let name, let events, let skippedEntryCount, let legacyVersionWarning):
+            let imported = library.add(events: events, name: name)
+            recorder.loadEvents(imported.events)
+            recorderLoadedMacroID = imported.id
+            if let warning = MacroImportPresentation.warning(
+                skippedEntryCount: skippedEntryCount,
+                legacyVersionWarning: legacyVersionWarning
+            ) {
+                state.presentStatus(
+                    String(
+                        format: String(localized: "Imported %@ — %@", table: "Common"),
+                        imported.name,
+                        warning
+                    ),
+                    tone: .warning
+                )
             } else {
-                self.state.statusMessage = "Imported \(imported.name) · \(events.count) events."
+                state.presentStatus(
+                    String(
+                        format: String(localized: "Imported %@ · %d actions.", table: "Common"),
+                        imported.name,
+                        events.count
+                    ),
+                    tone: .success
+                )
             }
         }
     }
 
     /// Export the current macro as a hand-editable `.txt` (TRM) file.
     func exportAsText() {
+        guard requireMacroLibraryInteractionAvailable() else { return }
         guard !recorder.events.isEmpty else {
-            state.statusMessage = "Nothing to export."
+            state.presentStatus(
+                String(localized: "This macro has no actions to export.", table: "Common"),
+                tone: .warning
+            )
             return
         }
         let panel = NSSavePanel()
-        panel.title = "Export as Text"
+        panel.title = String(localized: "Export as Text", table: "Common")
         let baseName = library.currentMacro?.name ?? defaultMacroName()
         panel.nameFieldStringValue = baseName + ".txt"
         if let ut = UTType(filenameExtension: "txt") {
@@ -1496,15 +2996,17 @@ final class MenuBarController: NSObject, NSPopoverDelegate {
             guard response == .OK, let url = panel.url, let self else { return }
             Task { @MainActor in
                 do {
-                    let events = await self.playbackSanitizedEventsForExport(
+                    let events = try await MacroExportPrivacySanitizer.live.prepare(
                         self.recorder.events,
                         macro: self.library.currentMacro
                     )
-                    let text = TextMacroFormat.export(events)
-                    try text.write(to: url, atomically: true, encoding: .utf8)
-                    self.state.statusMessage = "Exported \(url.lastPathComponent)."
+                    try await MacroExportWriter.writeText(events, to: url)
+                    self.state.presentStatus(
+                        self.exportSucceededStatus(url.lastPathComponent),
+                        tone: .success
+                    )
                 } catch {
-                    self.state.statusMessage = "Export failed: \(error.localizedDescription)"
+                    self.state.presentStatus(self.exportFailedStatus(error), tone: .error)
                 }
             }
         }
@@ -1512,9 +3014,13 @@ final class MenuBarController: NSObject, NSPopoverDelegate {
 
     /// Export a specific macro (by id) as a `.txt` (TRM) file.
     func exportMacroAsText(_ id: UUID) {
+        guard requireMacroLibraryInteractionAvailable() else { return }
         guard let macro = library.macros.first(where: { $0.id == id }) else { return }
         let panel = NSSavePanel()
-        panel.title = "Export \(macro.name) as Text"
+        panel.title = String(
+            format: String(localized: "Export %@ as Text", table: "Common"),
+            macro.name
+        )
         panel.nameFieldStringValue = macro.name + ".txt"
         if let ut = UTType(filenameExtension: "txt") {
             panel.allowedContentTypes = [ut]
@@ -1526,24 +3032,30 @@ final class MenuBarController: NSObject, NSPopoverDelegate {
             Task { @MainActor in
                 do {
                     let loadedEvents = try await self.loadedEventsForExport(macro: macro)
-                    let events = await self.playbackSanitizedEventsForExport(
+                    let events = try await MacroExportPrivacySanitizer.live.prepare(
                         loadedEvents,
                         macro: macro
                     )
-                    let text = TextMacroFormat.export(events)
-                    try text.write(to: url, atomically: true, encoding: .utf8)
-                    self.state.statusMessage = "Exported \(url.lastPathComponent)."
+                    try await MacroExportWriter.writeText(events, to: url)
+                    self.state.presentStatus(
+                        self.exportSucceededStatus(url.lastPathComponent),
+                        tone: .success
+                    )
                 } catch {
-                    self.state.statusMessage = "Export failed: \(error.localizedDescription)"
+                    self.state.presentStatus(self.exportFailedStatus(error), tone: .error)
                 }
             }
         }
     }
 
     func open() {
+        guard requireMacroLibraryInteractionAvailable() else { return }
         let panel = NSOpenPanel()
-        panel.title = "Import Macro"
-        panel.message = "Import a SparkleRecorder (.tinyrec), legacy Windows .rec, or text (.txt) macro."
+        panel.title = String(localized: "Import Macro", table: "Common")
+        panel.message = String(
+            localized: "Import a SparkleRecorder (.tinyrec), legacy Windows .rec, or text (.txt) macro.",
+            table: "Common"
+        )
         panel.allowsMultipleSelection = true
         panel.canChooseDirectories = false
         let exts = ["tinyrec", "rec", "txt", "trm"]
@@ -1555,17 +3067,21 @@ final class MenuBarController: NSObject, NSPopoverDelegate {
         NSApp.activate(ignoringOtherApps: true)
         panel.begin { [weak self] response in
             guard response == .OK, let self else { return }
-            for url in panel.urls { self.importMacro(at: url) }
+            self.enqueueMacroImports(panel.urls, showMainWindowAfterward: false)
         }
     }
 
     func exportAsScript() {
+        guard requireMacroLibraryInteractionAvailable() else { return }
         guard !recorder.events.isEmpty else {
-            state.statusMessage = "Nothing to export."
+            state.presentStatus(
+                String(localized: "This macro has no actions to export.", table: "Common"),
+                tone: .warning
+            )
             return
         }
         let panel = NSSavePanel()
-        panel.title = "Export as Shell Script"
+        panel.title = String(localized: "Export as Shell Script", table: "Common")
         let baseName = library.currentMacro?.name ?? defaultMacroName()
         panel.nameFieldStringValue = baseName + ".command"
         if let ut = UTType(filenameExtension: "command") {
@@ -1583,10 +3099,13 @@ final class MenuBarController: NSObject, NSPopoverDelegate {
                     // library, so strip them.
                     var payload: SavedMacro
                     if let current = self.library.currentMacro {
-                        payload = current
-                        payload.events = await self.playbackSanitizedEventsForExport(
+                        let events = try await MacroExportPrivacySanitizer.live.prepare(
                             self.recorder.events,
                             macro: current
+                        )
+                        payload = SavedMacroStandaloneTransfer.exportedPayload(
+                            from: current,
+                            events: events
                         )
                     } else {
                         payload = SavedMacro(
@@ -1596,27 +3115,18 @@ final class MenuBarController: NSObject, NSPopoverDelegate {
                     }
                     payload.hotkey = nil
                     payload.chainTo = nil
-                    let json = try JSONEncoder().encode(payload)
                     let exec = Bundle.main.executablePath ?? "/Applications/SparkleRecorder.app/Contents/MacOS/SparkleRecorder"
-                    let macroLine = json.base64EncodedString()
-                    let script = """
-                    #!/bin/bash
-                    # SparkleRecorder self-running macro
-                    EXEC="\(exec)"
-                    if [ ! -x "$EXEC" ]; then
-                        echo "SparkleRecorder binary not found at $EXEC. Please install SparkleRecorder."
-                        exit 1
-                    fi
-                    TMP=$(mktemp -t tinyrec).json
-                    echo "\(macroLine)" | base64 -D > "$TMP"
-                    "$EXEC" --play "$TMP"
-                    rm -f "$TMP"
-                    """
-                    try script.write(to: url, atomically: true, encoding: .utf8)
-                    try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: url.path)
-                    self.state.statusMessage = "Exported \(url.lastPathComponent)."
+                    try await MacroExportWriter.writeShellScript(
+                        payload,
+                        executablePath: exec,
+                        to: url
+                    )
+                    self.state.presentStatus(
+                        self.exportSucceededStatus(url.lastPathComponent),
+                        tone: .success
+                    )
                 } catch {
-                    self.state.statusMessage = "Export failed: \(error.localizedDescription)"
+                    self.state.presentStatus(self.exportFailedStatus(error), tone: .error)
                 }
             }
         }
@@ -1624,9 +3134,13 @@ final class MenuBarController: NSObject, NSPopoverDelegate {
 
     /// Export a specific macro (from card menu).
     func exportMacroToFile(_ id: UUID) {
+        guard requireMacroLibraryInteractionAvailable() else { return }
         guard let macro = library.macros.first(where: { $0.id == id }) else { return }
         let panel = NSSavePanel()
-        panel.title = "Export \(macro.name)"
+        panel.title = String(
+            format: String(localized: "Export %@", table: "Common"),
+            macro.name
+        )
         panel.nameFieldStringValue = macro.name + ".tinyrec"
         if let ut = UTType(filenameExtension: "tinyrec") {
             panel.allowedContentTypes = [ut]
@@ -1637,27 +3151,47 @@ final class MenuBarController: NSObject, NSPopoverDelegate {
             guard response == .OK, let url = panel.url, let self else { return }
             Task { @MainActor in
                 do {
-                    var payload = macro
                     let loadedEvents = try await self.loadedEventsForExport(macro: macro)
-                    payload.events = await self.playbackSanitizedEventsForExport(
+                    let events = try await MacroExportPrivacySanitizer.live.prepare(
                         loadedEvents,
                         macro: macro
                     )
-                    let enc = JSONEncoder()
-                    enc.outputFormatting = [.prettyPrinted]
-                    let data = try enc.encode(payload)
-                    try data.write(to: url)
-                    self.state.statusMessage = "Exported \(url.lastPathComponent)."
+                    let payload = SavedMacroStandaloneTransfer.exportedPayload(
+                        from: macro,
+                        events: events
+                    )
+                    try await MacroExportWriter.writeNative(payload, to: url)
+                    self.state.presentStatus(
+                        self.exportSucceededStatus(url.lastPathComponent),
+                        tone: .success
+                    )
                 } catch {
-                    self.state.statusMessage = "Export failed: \(error.localizedDescription)"
+                    self.state.presentStatus(self.exportFailedStatus(error), tone: .error)
                 }
             }
         }
     }
 
+    private func exportSucceededStatus(_ fileName: String) -> String {
+        String(
+            format: String(localized: "Exported %@.", table: "Common"),
+            fileName
+        )
+    }
+
+    private func exportFailedStatus(_ error: Error) -> String {
+        String(
+            format: String(localized: "Export failed: %@", table: "Common"),
+            error.localizedDescription
+        )
+    }
+
     func persistEdits() {
         persistCurrentMacroIfNeeded()
-        state.statusMessage = "Saved."
+        state.presentStatus(
+            String(localized: "Changes saved.", table: "Common"),
+            tone: .success
+        )
     }
 
     private func defaultMacroName() -> String {
@@ -1669,9 +3203,15 @@ final class MenuBarController: NSObject, NSPopoverDelegate {
     // MARK: - Editor
 
     func openEditor() {
+        guard requireCaptureSurfaceInteractionAvailable() else { return }
         if popover.isShown { popover.performClose(nil) }
         if editorWC == nil {
             let view = EditorView(controller: self)
+                .appStatusFeedbackOverlay(
+                    state: state,
+                    isWindow: true,
+                    bottomPadding: 18
+                )
                 .environmentObject(recorder)
                 .environmentObject(player)
                 .environmentObject(library)
@@ -1681,6 +3221,70 @@ final class MenuBarController: NSObject, NSPopoverDelegate {
         NSApp.activate(ignoringOtherApps: true)
         editorWC?.showWindow(nil)
         editorWC?.window?.makeKeyAndOrderFront(nil)
+    }
+
+    func openCandidateEditor(
+        _ candidate: MacroStoredCandidate,
+        onSaved: @escaping @MainActor (MacroStoredCandidate) -> Void
+    ) {
+        guard requireCaptureSurfaceInteractionAvailable() else { return }
+        if popover.isShown { popover.performClose(nil) }
+
+        guard closeCandidateEditor() else { return }
+        persistCurrentMacroIfNeeded()
+        if library.currentMacroID != candidate.macro.id {
+            library.select(id: candidate.macro.id)
+        }
+
+        let draftRecorder = Recorder()
+        draftRecorder.loadEvents(candidate.macro.events)
+        let session = MacroCandidateEditorSession(candidate: candidate, onSaved: onSaved)
+        let view = CandidateEditorContainer(controller: self, session: session)
+            .appStatusFeedbackOverlay(
+                state: state,
+                isWindow: true,
+                bottomPadding: 18
+            )
+            .environmentObject(draftRecorder)
+            .environmentObject(player)
+            .environmentObject(library)
+            .environmentObject(state)
+
+        let title = String(
+            format: String(localized: "Candidate Editor — %@", table: "EditorUX"),
+            candidate.macro.name
+        )
+        let windowController = EditorWindowController(rootView: view, title: title)
+        windowController.shouldClose = { [weak session] in
+            guard let session, session.hasChanges else { return true }
+            let alert = NSAlert()
+            alert.messageText = String(localized: "Discard candidate draft changes?", table: "EditorUX")
+            alert.informativeText = String(localized: "The accepted macro is unchanged. Unsaved candidate edits will be lost.", table: "EditorUX")
+            alert.addButton(withTitle: String(localized: "Discard changes", table: "EditorUX"))
+            alert.addButton(withTitle: String(localized: "Keep editing", table: "EditorUX"))
+            alert.alertStyle = .warning
+            return alert.runModal() == .alertFirstButtonReturn
+        }
+        windowController.onClose = { [weak self, weak windowController] in
+            guard let self, self.candidateEditorWC === windowController else { return }
+            self.candidateEditorWC = nil
+            self.candidateEditorSession = nil
+            self.candidateEditorRecorder = nil
+        }
+        candidateEditorSession = session
+        candidateEditorRecorder = draftRecorder
+        candidateEditorWC = windowController
+
+        NSApp.activate(ignoringOtherApps: true)
+        windowController.showWindow(nil)
+        windowController.window?.makeKeyAndOrderFront(nil)
+    }
+
+    @discardableResult
+    func closeCandidateEditor() -> Bool {
+        guard let candidateEditorWC else { return true }
+        candidateEditorWC.window?.performClose(nil)
+        return self.candidateEditorWC == nil
     }
 
     // MARK: - Appearance (Dock vs menu-bar-only)
@@ -1698,7 +3302,10 @@ final class MenuBarController: NSObject, NSPopoverDelegate {
         if menuBarOnly {
             // No Dock icon now — flash the menu-bar popover so the control surface
             // is discoverable, then leave the user there.
-            state.statusMessage = "Menu-bar only. Click the menu-bar icon to open SparkleRecorder."
+            state.presentStatus(
+                String(localized: "Menu-bar only. Click the menu-bar icon to open SparkleRecorder.", table: "Settings"),
+                tone: .info
+            )
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
                 self?.showPopoverProgrammatically()
             }
@@ -1718,9 +3325,13 @@ final class MenuBarController: NSObject, NSPopoverDelegate {
     /// Opens the main library window (forwarded from AppDelegate so the controller
     /// can show it after an appearance switch).
     var showMainWindowHandler: (() -> Void)?
-    func showMainWindow() { showMainWindowHandler?() }
+    func showMainWindow() {
+        guard requireMacroLibraryInteractionAvailable() else { return }
+        showMainWindowHandler?()
+    }
 
     func showAutomationWorkspace() {
+        guard requireCaptureSurfaceInteractionAvailable() else { return }
         state.automationWorkspaceDestination = nil
         state.workspace = .automation
         if popover.isShown { popover.performClose(nil) }
@@ -1728,6 +3339,7 @@ final class MenuBarController: NSObject, NSPopoverDelegate {
     }
 
     func showAutomationWorkspace(workflowID: UUID, taskID: UUID? = nil) {
+        guard requireCaptureSurfaceInteractionAvailable() else { return }
         state.automationWorkspaceDestination = AutomationWorkspaceDestination(
             workflowID: workflowID,
             taskID: taskID
@@ -1740,6 +3352,7 @@ final class MenuBarController: NSObject, NSPopoverDelegate {
     // MARK: - Settings window
 
     func showSettingsWindow() {
+        guard requireCaptureSurfaceInteractionAvailable() else { return }
         if popover.isShown { popover.close() }
         if settingsWC == nil {
             settingsWC = SettingsWindowController(controller: self)
@@ -1759,28 +3372,25 @@ final class MenuBarController: NSObject, NSPopoverDelegate {
 
         let bundleURL = Bundle.main.bundleURL
         let isApplicationBundle = bundleURL.pathExtension.lowercased() == "app"
-        let applicationURL = isApplicationBundle
-            ? bundleURL
-            : (Bundle.main.executableURL ?? bundleURL)
-        let relauncher = Process()
-        relauncher.executableURL = URL(fileURLWithPath: "/bin/sh")
-        relauncher.arguments = [
-            "-c",
-            isApplicationBundle
-                ? "sleep 0.5; /usr/bin/open \"$1\""
-                : "sleep 0.5; exec \"$1\"",
-            "sparklerecorder-relaunch",
-            applicationURL.path,
-        ]
+        pendingRelaunchRequest = ApplicationRelaunchRequest(
+            applicationURL: isApplicationBundle
+                ? bundleURL
+                : (Bundle.main.executableURL ?? bundleURL),
+            isApplicationBundle: isApplicationBundle
+        )
+        // AppDelegate delays termination until recording evidence and repository
+        // writes finish. The replacement process is launched from
+        // applicationWillTerminate, after that preparation has completed.
+        NSApp.terminate(nil)
+    }
 
+    func performPendingRelaunchIfNeeded() {
+        guard let request = pendingRelaunchRequest else { return }
+        pendingRelaunchRequest = nil
         do {
-            try relauncher.run()
-            NSApp.terminate(nil)
+            try request.makeProcess().run()
         } catch {
-            state.statusMessage = String(
-                format: String(localized: "Could not relaunch SparkleRecorder: %@", table: "Settings"),
-                error.localizedDescription
-            )
+            NSLog("SparkleRecorder: Failed to relaunch after language change: \(error)")
         }
     }
 
@@ -1813,42 +3423,88 @@ final class MenuBarController: NSObject, NSPopoverDelegate {
 
     // MARK: - Termination
 
-    /// Called from applicationWillTerminate so Cmd-Q never loses work:
-    /// a live recording is stopped and saved, pending editor edits persist.
-    func prepareForTermination() {
-        automationRuntimeHost?.stop()
+    /// Completes termination-sensitive work before AppDelegate allows the process
+    /// to exit. This deliberately waits for visual evidence and repository writes
+    /// instead of relying on fire-and-forget Tasks during applicationWillTerminate.
+    func prepareForTermination() async {
+        await automationRuntimeHost?.stopAndWait()
+        recordingPreparationTask?.cancel()
+        recordingPreparationTask = nil
+        recordingPreparationActive = false
+        state.recordingFlowActive = false
+        state.playbackFlowActive = false
         countdown?.cancel()
+        playbackRequestGeneration &+= 1
+        manualPlaybackTask?.cancel()
+        manualPlaybackTask = nil
+        playingMacroID = nil
+        recorderLoadingMacroID = nil
+        cancelAuxiliaryCaptures()
+        manualPlaybackVisibilitySession.restore()
         if player.isPlaying { player.stop() }
+
         if recorder.isRecording {
-            recorder.stopRecording()
-            if recorder.eventCount > 0 {
-                library.add(events: recorder.events, loops: state.loops)
-            }
-        } else {
-            persistCurrentMacroIfNeeded()
+            _ = stopRecordingAndSave()
         }
-        library.save()
+
+        if state.recordingFinalizationActive {
+            await waitForRecordingFinalization()
+        }
+
+        // Imports do file IO off-main but commit through this controller. Let any
+        // already-requested import either commit or abort against the session lock
+        // before taking the final repository snapshot for termination.
+        let importTask = macroImportTail
+        await importTask?.value
+
+        if !state.recordingFinalizationActive,
+           let currentMacroID = library.currentMacroID,
+                  recorderLoadedMacroID == currentMacroID,
+                  recorderLoadingMacroID == nil {
+            await library.persistEventsAndMetadataImmediately(
+                id: currentMacroID,
+                events: recorder.events
+            )
+        }
+
+        await library.persistAllMetadataImmediately()
+    }
+
+    func showAboutPanel() {
+        guard requireCaptureSurfaceInteractionAvailable() else { return }
+        NSApp.orderFrontStandardAboutPanel(nil)
+    }
+
+    func showHelp() {
+        guard requireCaptureSurfaceInteractionAvailable() else { return }
+        if let url = URL(string: "https://github.com/Aaru1801/SparkleRecorder-macOS#readme") {
+            NSWorkspace.shared.open(url)
+        }
     }
 
     func openAccessibilityPrefs() {
+        guard requireCaptureSurfaceInteractionAvailable() else { return }
         if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility") {
             NSWorkspace.shared.open(url)
         }
     }
 
     func openInputMonitoringPrefs() {
+        guard requireCaptureSurfaceInteractionAvailable() else { return }
         if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_ListenEvent") {
             NSWorkspace.shared.open(url)
         }
     }
 
     func openScreenCapturePrefs() {
+        guard requireCaptureSurfaceInteractionAvailable() else { return }
         if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture") {
             NSWorkspace.shared.open(url)
         }
     }
 
     func openAutomationPrefs() {
+        guard requireCaptureSurfaceInteractionAvailable() else { return }
         if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Automation") {
             NSWorkspace.shared.open(url)
         }
@@ -1877,5 +3533,6 @@ enum SparkleIcons {
     }
     static var idle: NSImage? { make("record.circle", description: "SparkleRecorder") }
     static var recording: NSImage? { make("record.circle.fill", description: "SparkleRecorder — recording", color: .systemRed) }
+    static var finalizing: NSImage? { make("arrow.triangle.2.circlepath.circle.fill", description: "SparkleRecorder — finishing recording", color: .systemOrange) }
     static var playing: NSImage? { make("play.circle.fill", description: "SparkleRecorder — playing", color: .systemGreen) }
 }

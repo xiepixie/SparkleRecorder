@@ -410,7 +410,7 @@ public enum SemanticRecordingDebugSmokeEvidenceSidecar {
         - This sidecar is generated evidence metadata. It does not by itself close S2 product evidence.
         - Keep the live recording bundle directory available until the manifest, video segment sidecar, frame index and redaction indexes have been reviewed.
         - If status is `blocked`, fix the listed preflight issues and rerun the same command before attempting live capture.
-        - If status is `finished`, inspect `manifest.json`, `video/segments.json`, `frames/index.jsonl`, `timeline.jsonl`, `events.jsonl`, `ocr/observations.jsonl`, `suppressed.jsonl`, and any `redacted/*/index.json` sidecars.
+        - If status is `finished`, inspect `manifest.json`, `video/segments.json`, `frames/index.jsonl`, `timeline.jsonl`, `events.jsonl`, `input-evidence.jsonl`, `ocr/observations.jsonl`, `suppressed.jsonl`, and any `redacted/*/index.json` sidecars.
         - Product evidence still needs a reviewed live clip or screenshot showing the user-facing flow when the target gate asks for UI proof.
 
         """

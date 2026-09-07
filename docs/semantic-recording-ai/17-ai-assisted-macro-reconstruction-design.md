@@ -6,7 +6,7 @@ Status: Accepted design; product implementation and automated verification compl
 
 Owners: Recording/Video Alignment, Macro Core, AI Collaboration, Macro Review
 
-Implementation ledger: [19-reconstruction-product-implementation-plan.md](19-reconstruction-product-implementation-plan.md) records current capture provenance, candidate validation, revision repository, playback observation, package/CLI and Review work plus direct test mappings. [18-reconstruction-foundation-implementation-plan.md](18-reconstruction-foundation-implementation-plan.md) remains the prior pure-foundation evidence. The product slice passes 829 tests and Swift 6 build. Live-product acceptance remains open because local Input Monitoring permission is unavailable. Review user flows are documented in [21-reconstruction-review-ux.md](21-reconstruction-review-ux.md).
+Implementation ledger: [19-reconstruction-product-implementation-plan.md](19-reconstruction-product-implementation-plan.md) records current capture provenance, candidate validation, revision repository, playback observation, package/CLI and Review work plus direct test mappings. [18-reconstruction-foundation-implementation-plan.md](18-reconstruction-foundation-implementation-plan.md) remains the prior pure-foundation evidence. The current product slice passes 964 Swift Testing tests across 134 suites and the Swift 6 build. Live-product acceptance remains open because installed-app permission and representative live evidence still require explicit product verification. Review user flows are documented in [21-reconstruction-review-ux.md](21-reconstruction-review-ux.md).
 
 ## 1. Decision Summary
 
@@ -66,7 +66,7 @@ The following are current code observations, not completed reconstruction featur
 | Recording origin | `RecordingTimeline.eventTime` uses the first input; `Recorder` starts live duration at session start. | Separate session time from trimmed playback time. |
 | Recording end | `Recorder.stopRecording` passes the last event time to semantic finish. | Preserve the observation interval after the final input. |
 | Frame timing | `SemanticRecordingCaptureSession.captureFrame` labels requested frames with event time and uses `videoTime = recordingTime`. | Store actual sample time; delayed screenshots are not before frames. |
-| Input evidence | `RecordingEventPipeline` filters moves and samples drags. | Retain bounded hover/trajectory evidence independently of playable cleanup. |
+| Input evidence | `RecordingEventPipeline` filters moves and samples drags; `RecordingSessionProcessor` now separates compact playable events from bounded privacy-safe mechanical evidence and persists playable-to-evidence provenance. | Extend the evidence policy to richer hover/drag intent only when direct reconstruction evidence justifies it; do not collapse the two tracks again. |
 | Macro capabilities | `RecordedEvent.Kind` has text waits/verification; richer visual conditions are in `AutomationContract`. | Export an executable capability manifest, not the combined vocabulary of unrelated layers. |
 | Observation outcome | Live playback text waits catch locator failures as not found. | Distinguish non-match from unavailable observation. |
 | Persistence | `MacroRepository` saves metadata and events in separate atomic writes. | Add revision-level transactions. |
@@ -82,7 +82,7 @@ AI may:
 - read the complete candidate macro representation;
 - inspect the complete local MP4 when the user starts optimization;
 - inspect event-centered clips and extracted frames;
-- replace the entire candidate event array;
+- replace the entire candidate event array and choose explicit existing Playback Surface references per event;
 - remove unintentional mouse movement and redundant input pairs;
 - merge low-level events into semantic actions;
 - simplify drag trajectories;
@@ -249,7 +249,7 @@ Current frame and surface fields are close to sufficient, but the implementation
 
 Freeze reconstruction policy/version and derive stable action IDs from source revision and event identity. Editor grouping preferences and localized summaries must not change coverage identity. Derived waits carry source time ranges even without event indices.
 
-The playable track remains compact; the evidence track retains bounded, privacy-filtered cursor samples, hover intervals, and gesture timing. Mark overlay points as measured or interpolated. Missing intermediate samples cannot establish a straight drag. Path-sensitive simplification considers pauses, direction changes, and speed as well as geometry.
+The playable/evidence Seam is now implemented for bounded privacy-safe mechanical mouse and scroll samples: continuous scroll is compacted deterministically for playback while `input-evidence.jsonl` retains the denser source trajectory plus playable-to-evidence links. Richer hover intervals and drag-intent evidence remain an extension of this Interface rather than a reason to merge the tracks. Overlay points must still distinguish measured from interpolated evidence. Missing intermediate samples cannot establish a straight drag. Path-sensitive simplification considers pauses, direction changes, and speed as well as geometry.
 
 Geometry history includes surface identity, window/content bounds, capture region, scale, and effective session time. Missing history produces degraded reconstruction, not reuse of the final window geometry.
 
@@ -259,28 +259,34 @@ The AI optimization session receives one local package:
 
 ```text
 ai-macro-reconstruction/
-  source-macro.json
-  reconstruction.json
-  alignment.json
-  recording.mov
-  frames/
-  clips/
-  observations.json
-  instructions.json
+  harness.json               # small index, versions, file roles, staged reading plan
+  authoring-contract.json    # complete executable vocabulary/enums/rules/policy
+  source-context.json        # lightweight Macro/Surface overview; no raw events
+  reconstruction.json        # primary action-level inventory and compact semantics
+  candidate-template.json    # single raw-event baseline and output shape
+  manifest.json              # evidence availability, warnings and artifact hashes
+  alignment.json             # only when source-event identity is verified
+  input-evidence.json        # when bounded mechanical evidence is available
+  visual-inspection.json     # when aligned visual bytes are exported
+  video/                     # explicit visual inclusion only
+  frames/                    # explicit visual inclusion only
+  candidate.json             # only external-author output
 ```
 
-`source-macro.json` is the complete source `SavedMacro`, not a lossy text export. `reconstruction.json` provides grouped actions and source-event coverage. `recording.mov` is the canonical visual record. Frames, clips, and observations are indexes and acceleration aids, not replacements for the MP4.
+`harness.json` is the compact package entry point and version ledger; it tells the external author what to read and when rather than duplicating the full authoring rules. `authoring-contract.json` is the single machine-readable source for executable event codes/names, Reconstruction Action representations, string enums, numeric limits, faithful/robust policy and validator-facing rules. `source-context.json` is a versioned lightweight execution overview, not the complete Library `SavedMacro`; it exposes source identity, Playback Surfaces and protected playback facts while withholding raw events, Library personalization, notes, hotkeys, statistics, local evidence references and chained Macro identity. `candidate-template.json` is the single exported raw-event baseline. `reconstruction.json` is the default action-first working set and colocates each Reconstruction Action with its Playback Surface, geometry and compact pointer/keyboard/scroll/text semantics. Video and frames remain local evidence and are exported only when the user explicitly includes permitted visual evidence.
 
 The AI adapter may extract event-centered clips to reduce model context, but the full MP4 remains available when the user authorizes optimization. The adapter must not claim that the model inspected the complete video when it only inspected selected frames or clips.
 
-The optimization instructions must include:
+The machine-readable Harness must include:
 
-- supported `SavedMacro` schema version;
-- supported locator and condition fields;
-- transformation guidance;
-- output path for the complete candidate macro;
-- prohibited unsupported fields;
-- instruction to retain candidate provenance and uncertainty annotations outside playback-critical fields.
+- supported `SavedMacro` / candidate capability versions;
+- every executable event code together with its enum name and meaning;
+- every Reconstruction Action kind together with its executable candidate representation;
+- supported locator/condition fields and all accepted string enum values;
+- transformation and validator-facing invariants;
+- a staged reading plan so action understanding precedes raw-event/media inspection;
+- the output path for the complete candidate document;
+- prohibited unsupported fields/capabilities and uncertainty/coverage requirements.
 
 ### 8.1 Executable capabilities and evidence access
 
@@ -296,7 +302,7 @@ Materialization resolves permitted redacted artifacts and sanitized readable eve
 
 ### 9.1 Output
 
-AI writes a complete candidate `SavedMacro`, including metadata, surfaces, and an entire event array. It may make broad changes. It does not return a mandatory patch list.
+AI writes a complete candidate authoring document with an entire event array. Source Revision Playback Surface bodies are not copied into new external candidate JSON; each event may choose an existing surface through `event.surfaceId`, while external authoring does not invent/remove/rewrite Playback Surface identity or geometry. Live window rebinding is an App-owned Candidate Editor operation. The output does not require a mandatory patch list.
 
 The app should normalize volatile metadata after decoding:
 

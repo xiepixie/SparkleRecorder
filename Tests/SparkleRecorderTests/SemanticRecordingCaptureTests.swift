@@ -4,6 +4,122 @@ import Testing
 
 @Suite("Semantic Recording Capture Tests")
 struct SemanticRecordingCaptureTests {
+    @Test("Balanced video mode keeps PNG checkpoints sparse while diagnostic mode stays dense")
+    func captureModeControlsEventKeyframeDensity() {
+        #expect(RecordingFrameCaptureSource(recordedEventKind: .keyDown, mode: .videoAndKeyframes) == nil)
+        #expect(RecordingFrameCaptureSource(recordedEventKind: .leftMouseDragged, mode: .videoAndKeyframes) == nil)
+        #expect(RecordingFrameCaptureSource(recordedEventKind: .leftMouseDown, mode: .videoAndKeyframes) == nil)
+        #expect(RecordingFrameCaptureSource(recordedEventKind: .leftMouseUp, mode: .videoAndKeyframes) == .mouseUp)
+        #expect(RecordingFrameCaptureSource(recordedEventKind: .scrollWheel, mode: .videoAndKeyframes) == nil)
+
+        #expect(RecordingFrameCaptureSource(recordedEventKind: .keyDown, mode: .keyframesOnly) == .textInput)
+        #expect(RecordingFrameCaptureSource(recordedEventKind: .leftMouseDragged, mode: .keyframesOnly) == .dragEnd)
+        #expect(RecordingFrameCaptureSource(recordedEventKind: .keyDown, mode: .diagnosticRich) == .textInput)
+        #expect(RecordingFrameCaptureSource(recordedEventKind: .leftMouseDragged, mode: .diagnosticRich) == .dragEnd)
+    }
+
+    @Test("Video mode keeps a discrete wheel burst in the movie instead of queuing OCR checkpoints")
+    func videoModeDoesNotCaptureEveryDiscreteWheelEvent() async throws {
+        let spy = CaptureClientSpy()
+        let client = SemanticRecordingCaptureClient(
+            startMovie: { request in
+                SemanticRecordingMovieHandle(
+                    segmentID: request.segmentID,
+                    artifactRef: request.artifactRef,
+                    target: request.target,
+                    startTime: request.recordingTime
+                )
+            },
+            finishMovie: { request in
+                SemanticRecordingMovieFinishResult(duration: request.recordingTime)
+            },
+            captureFrame: { request in
+                await spy.append("captureFrame:\(request.source.rawValue)")
+                return SemanticRecordingCapturedFrame()
+            }
+        )
+        let session = SemanticRecordingCaptureSession(
+            configuration: SemanticRecordingCaptureConfiguration(
+                capturePolicy: RecordingCapturePolicy(mode: .videoAndKeyframes)
+            ),
+            client: client
+        )
+
+        try await session.start()
+        for index in 0..<17 {
+            try await session.record(
+                recordedEvent(.scrollWheel, time: 4.4 + Double(index) * 0.03),
+                index: index
+            )
+        }
+        let bundle = try await session.finish(recordingTime: 5.1)
+
+        #expect(bundle.frames.map(\.source) == [.recordingStart, .recordingStop])
+        #expect(bundle.timelineEvents.count == 17)
+        #expect(bundle.timelineEvents.allSatisfy { $0.frameID == nil })
+        #expect(await spy.operations == ["captureFrame:recordingStart", "captureFrame:recordingStop"])
+    }
+
+    @Test("Video mode falls back to scroll keyframes when movie startup fails")
+    func videoModeFallsBackToScrollKeyframesWithoutMovie() async throws {
+        let client = SemanticRecordingCaptureClient(
+            startMovie: { _ in throw SemanticRecordingCaptureError.alreadyStarted },
+            finishMovie: { _ in
+                Issue.record("No movie handle should exist after startup failure")
+                return SemanticRecordingMovieFinishResult(duration: 0)
+            },
+            captureFrame: { _ in SemanticRecordingCapturedFrame() }
+        )
+        let session = SemanticRecordingCaptureSession(
+            configuration: SemanticRecordingCaptureConfiguration(
+                capturePolicy: RecordingCapturePolicy(mode: .videoAndKeyframes)
+            ),
+            client: client
+        )
+
+        try await session.start()
+        try await session.record(recordedEvent(.scrollWheel, time: 0.5), index: 0)
+        let bundle = try await session.finish(recordingTime: 1)
+
+        #expect(bundle.frames.map(\.source) == [.recordingStart, .scrollSettled, .recordingStop])
+        #expect(bundle.captureIssues.filter { $0.kind == .movieStartFailed }.count == 1)
+    }
+
+    @Test("Optional movie and frame indexing failures degrade evidence without losing captured frames")
+    func optionalEvidenceFailuresAreNonFatal() async throws {
+        let client = SemanticRecordingCaptureClient(
+            startMovie: { _ in throw SemanticRecordingCaptureError.alreadyStarted },
+            finishMovie: { _ in
+                Issue.record("No movie handle should exist after startup failure")
+                return SemanticRecordingMovieFinishResult(duration: 0)
+            },
+            captureFrame: { _ in SemanticRecordingCapturedFrame() },
+            indexFrame: { _ in throw SemanticRecordingCaptureError.alreadyFinished }
+        )
+        let session = SemanticRecordingCaptureSession(
+            configuration: SemanticRecordingCaptureConfiguration(
+                capturePolicy: RecordingCapturePolicy(mode: .videoAndKeyframes),
+                sessionOriginHostTime: 100
+            ),
+            client: client
+        )
+
+        try await session.start()
+        try await session.record(
+            recordedEvent(.leftMouseUp, time: 0.5),
+            index: 0,
+            sessionTime: 0.5
+        )
+        let bundle = try await session.finish(recordingTime: 1)
+
+        #expect(bundle.videoSegments.isEmpty)
+        #expect(bundle.frames.map(\.source) == [.recordingStart, .mouseUp, .recordingStop])
+        #expect(bundle.timelineEvents.count == 1)
+        #expect(bundle.timelineEvents.first?.frameID == bundle.frames[1].id)
+        #expect(bundle.captureIssues.filter { $0.kind == .movieStartFailed }.count == 1)
+        #expect(bundle.captureIssues.filter { $0.kind == .frameIndexFailed }.count == 3)
+    }
+
     @Test("Capture target mapper prefers window identity from playback surface")
     func captureTargetMapperPrefersWindowIdentityFromPlaybackSurface() {
         let surface = PlaybackSurface(
@@ -144,6 +260,7 @@ struct SemanticRecordingCaptureTests {
             configuration: SemanticRecordingCaptureConfiguration(
                 recordingID: recordingID,
                 createdAt: Date(timeIntervalSince1970: 1_800_000_100),
+                capturePolicy: RecordingCapturePolicy(mode: .diagnosticRich),
                 captureTarget: RecordingCaptureTarget(
                     kind: .window,
                     surfaceID: "checkout-window",
@@ -298,7 +415,10 @@ struct SemanticRecordingCaptureTests {
             }
         )
         let session = SemanticRecordingCaptureSession(
-            configuration: SemanticRecordingCaptureConfiguration(recordingID: recordingID),
+            configuration: SemanticRecordingCaptureConfiguration(
+                recordingID: recordingID,
+                capturePolicy: RecordingCapturePolicy(mode: .diagnosticRich)
+            ),
             client: client,
             ids: ids.provider
         )
@@ -375,7 +495,10 @@ struct SemanticRecordingCaptureTests {
             }
         )
         let session = SemanticRecordingCaptureSession(
-            configuration: SemanticRecordingCaptureConfiguration(recordingID: recordingID),
+            configuration: SemanticRecordingCaptureConfiguration(
+                recordingID: recordingID,
+                capturePolicy: RecordingCapturePolicy(mode: .diagnosticRich)
+            ),
             client: client,
             ids: ids.provider
         )

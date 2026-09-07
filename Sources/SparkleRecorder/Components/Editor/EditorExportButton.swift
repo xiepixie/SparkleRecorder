@@ -36,7 +36,7 @@ struct EditorExportButton: View {
             }
             .buttonStyle(.plain)
             .popover(isPresented: $showInfo) {
-                Text(NSLocalizedString("Exports a double-clickable .command script", tableName: "EditorUX", comment: ""))
+                Text("Exports a double-clickable .command script", tableName: "EditorUX")
                     .font(.system(size: 11))
                     .multilineTextAlignment(.leading)
                     .fixedSize(horizontal: false, vertical: true)

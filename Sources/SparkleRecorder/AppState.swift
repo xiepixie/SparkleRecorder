@@ -4,6 +4,13 @@ import Combine
 import ApplicationServices
 import SparkleRecorderCore
 
+enum SemanticRecordingCaptureScope: String, CaseIterable, Identifiable, Hashable {
+    case frontmostWindow
+    case display
+
+    var id: String { rawValue }
+}
+
 enum RecordingHUDMode: String, CaseIterable, Identifiable {
     case compact
     case expanded
@@ -50,8 +57,50 @@ final class AppState: ObservableObject {
     @Published var playHotkey: HotkeyBinding {
         didSet { persist(playHotkey, key: "hk_play") }
     }
-    @Published var statusMessage: String = ""
+    @Published private(set) var statusFeedback: AppStatusFeedback?
+    /// Presentation projection owned by MenuBarController. Windows render this as
+    /// read-only/disabled while recording, playback, or screen picking owns input.
+    @Published private(set) var appInteractionLocked = false
+
+    func setAppInteractionLocked(_ locked: Bool) {
+        if appInteractionLocked != locked {
+            appInteractionLocked = locked
+        }
+    }
+
+    func presentStatus(
+        _ message: String,
+        tone: AppStatusFeedback.Tone = .info,
+        dismissAfter: TimeInterval? = nil
+    ) {
+        let trimmed = message.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else {
+            statusFeedback = nil
+            return
+        }
+        statusFeedback = AppStatusFeedback(
+            message: trimmed,
+            tone: tone,
+            dismissAfter: dismissAfter
+        )
+    }
+
+    func dismissStatus(_ id: UUID? = nil) {
+        guard id == nil || statusFeedback?.id == id else { return }
+        statusFeedback = nil
+    }
     @Published var isRecording: Bool = false
+    /// True from the moment a recording request begins through preflight/countdown
+    /// and the live recording itself. This lets callers distinguish a cancelled
+    /// recording attempt from an unrelated later recording.
+    @Published var recordingFlowActive: Bool = false
+    /// True after live input stops while visual evidence, redaction, and its
+    /// macro attachment are still being finalized. App windows and new input
+    /// sessions stay locked until this completes.
+    @Published var recordingFinalizationActive: Bool = false
+    /// True while user-initiated playback owns or is preparing the foreground
+    /// input target, including preflight before Player.isPlaying becomes true.
+    @Published var playbackFlowActive: Bool = false
     @Published var isPlaying: Bool = false
     /// The product surface currently shown in the main window.
     @Published var workspace: WorkspaceMode = .library
@@ -79,16 +128,35 @@ final class AppState: ObservableObject {
     @Published var recordingHUDMode: RecordingHUDMode {
         didSet {
             UserDefaults.standard.set(recordingHUDMode.rawValue, forKey: Self.recordingHUDModeKey)
-            UserDefaults.standard.set(recordingHUDMode.showsFloatingPanel, forKey: "showRecordingHUD")
         }
     }
     /// Whether to log unclicked mouse moves (can result in very large files).
     @Published var recordMouseMoves: Bool {
         didSet { UserDefaults.standard.set(recordMouseMoves, forKey: "recordMouseMoves") }
     }
-    /// Experimental: pair playable macro events with video/keyframe semantic evidence.
+    /// Pair playable macro events with local video/keyframe semantic evidence.
     @Published var semanticRecordingEnabled: Bool {
         didSet { UserDefaults.standard.set(semanticRecordingEnabled, forKey: "semanticRecordingEnabled") }
+    }
+    @Published var semanticRecordingCaptureMode: RecordingCaptureMode {
+        didSet {
+            UserDefaults.standard.set(
+                semanticRecordingCaptureMode.rawValue,
+                forKey: Self.semanticRecordingCaptureModeKey
+            )
+        }
+    }
+    @Published var semanticRecordingCaptureScope: SemanticRecordingCaptureScope {
+        didSet {
+            UserDefaults.standard.set(
+                semanticRecordingCaptureScope.rawValue,
+                forKey: Self.semanticRecordingCaptureScopeKey
+            )
+        }
+    }
+
+    var semanticRecordingCapturePolicy: RecordingCapturePolicy {
+        RecordingCapturePolicy(mode: semanticRecordingCaptureMode)
     }
     @Published var semanticRecordingRetentionMaximumArtifactAgeDays: Int {
         didSet {
@@ -196,10 +264,21 @@ final class AppState: ObservableObject {
             self.recordingHUDMode = hudMode
         } else {
             let legacyShowsHUD = d.object(forKey: "showRecordingHUD") as? Bool ?? true
-            self.recordingHUDMode = legacyShowsHUD ? .compact : .menuBar
+            let migratedHUDMode: RecordingHUDMode = legacyShowsHUD ? .compact : .menuBar
+            self.recordingHUDMode = migratedHUDMode
+            d.set(migratedHUDMode.rawValue, forKey: Self.recordingHUDModeKey)
         }
+        // One-way migration: once the enum-backed preference exists, stop keeping
+        // the old boolean key alive. Future mode changes only write the new key.
+        d.removeObject(forKey: "showRecordingHUD")
         self.recordMouseMoves = d.object(forKey: "recordMouseMoves") as? Bool ?? false
         self.semanticRecordingEnabled = d.object(forKey: "semanticRecordingEnabled") as? Bool ?? false
+        self.semanticRecordingCaptureMode = RecordingCaptureMode(
+            rawValue: d.string(forKey: Self.semanticRecordingCaptureModeKey) ?? ""
+        ) ?? .videoAndKeyframes
+        self.semanticRecordingCaptureScope = SemanticRecordingCaptureScope(
+            rawValue: d.string(forKey: Self.semanticRecordingCaptureScopeKey) ?? ""
+        ) ?? .frontmostWindow
         self.semanticRecordingRetentionMaximumArtifactAgeDays = max(
             0,
             d.object(forKey: "semanticRecordingRetentionMaximumArtifactAgeDays") as? Int
@@ -314,8 +393,25 @@ final class AppState: ObservableObject {
         }
     }
 
+    var recordingPermissionReadiness: RecordingPermissionReadiness {
+        RecordingPermissionReadiness(
+            accessibilityGranted: accessibilityGranted,
+            inputMonitoringGranted: inputMonitoringGranted,
+            screenCaptureGranted: screenCaptureGranted,
+            visualEvidenceEnabled: semanticRecordingEnabled
+        )
+    }
+
+    var coreRecordingPermissionsGranted: Bool {
+        recordingPermissionReadiness.canRecordAndReplay
+    }
+
+    var requiredPermissionsGranted: Bool {
+        recordingPermissionReadiness.allEnabledFeaturesReady
+    }
+
     private var needsPermissionRefresh: Bool {
-        !accessibilityGranted || !inputMonitoringGranted || !screenCaptureGranted
+        isRecording || !requiredPermissionsGranted
     }
 
     var semanticRecordingRetentionSettings: SemanticRecordingRetentionSettings {
@@ -406,4 +502,6 @@ final class AppState: ObservableObject {
     private static let automationRunLastCleanupHistoryCountKey = "automationRunLastCleanupHistoryCount"
     private static let automationRunLastCleanupFreedByteCountKey = "automationRunLastCleanupFreedByteCount"
     private static let recordingHUDModeKey = "recordingHUDMode"
+    private static let semanticRecordingCaptureModeKey = "semanticRecordingCaptureMode"
+    private static let semanticRecordingCaptureScopeKey = "semanticRecordingCaptureScope"
 }

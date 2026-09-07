@@ -68,6 +68,15 @@ private struct WelcomeView: View {
     @State private var screenCapture: Bool = PermissionCenter.shared.checkScreenCaptureAccess() == .authorized
     @State private var refreshTimer: Timer?
 
+    private var permissionReadiness: RecordingPermissionReadiness {
+        RecordingPermissionReadiness(
+            accessibilityGranted: accessibility,
+            inputMonitoringGranted: inputMonitoring,
+            screenCaptureGranted: screenCapture,
+            visualEvidenceEnabled: false
+        )
+    }
+
     var body: some View {
         ZStack {
             VisualEffectBackground(material: .windowBackground, blendingMode: .behindWindow)
@@ -121,7 +130,7 @@ private struct WelcomeView: View {
                     } else {
                         // Never trap the user: permissions can be skipped and
                         // granted later from Settings.
-                        if step == .permissions && !(accessibility && inputMonitoring && screenCapture) {
+                        if step == .permissions && !permissionReadiness.canRecordAndReplay {
                             Button(String(localized: "Skip for Now", table: "Common")) {
                                 withAnimation(.spring(response: 0.4)) { step = .hotkeys }
                             }
@@ -139,7 +148,7 @@ private struct WelcomeView: View {
                         .buttonStyle(.borderedProminent)
                         .controlSize(.large)
                         .tint(.red)
-                        .disabled(step == .permissions && !(accessibility && inputMonitoring && screenCapture))
+                        .disabled(step == .permissions && !permissionReadiness.canRecordAndReplay)
                     }
                 }
                 .padding(.horizontal, 24)
@@ -153,7 +162,7 @@ private struct WelcomeView: View {
     private var nextLabel: String {
         switch step {
         case .welcome:     return String(localized: "Next", table: "Common")
-        case .permissions: return (accessibility && inputMonitoring && screenCapture) ? String(localized: "Continue", table: "Common") : String(localized: "Waiting…", table: "EditorUX")
+        case .permissions: return permissionReadiness.canRecordAndReplay ? String(localized: "Continue", table: "Common") : String(localized: "Waiting…", table: "EditorUX")
         case .hotkeys:     return String(localized: "Next", table: "Common")
         case .ready:       return String(localized: "Get Started", table: "Common")
         }
@@ -231,7 +240,7 @@ private struct PermissionsStep: View {
                 .font(.system(size: 56, weight: .light))
                 .foregroundStyle(.tint)
 
-            Text("Two quick permissions", tableName: "Settings")
+            Text("Permissions", tableName: "Settings")
                 .font(.system(size: 22, weight: .bold))
             Text("macOS requires explicit consent to capture and post input events. We never see what you type or click outside of recordings you initiate.", tableName: "Recording")
                 .font(.system(size: 12))
@@ -254,7 +263,7 @@ private struct PermissionsStep: View {
                 )
                 PermissionCard(
                     title: String(localized: "Screen Recording", table: "Recording"),
-                    subtitle: String(localized: "Required for visual window mapping & OCR.", table: "EditorUX"),
+                    subtitle: String(localized: "Optional. Required only for visual evidence and OCR.", table: "Recording"),
                     granted: screenCapture,
                     action: { controller.openScreenCapturePrefs() }
                 )

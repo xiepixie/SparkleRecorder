@@ -1,20 +1,20 @@
 import Foundation
 import CoreGraphics
 
-public enum CoordinateBinding: String, Codable, Sendable {
+public enum CoordinateBinding: String, Codable, CaseIterable, Sendable {
     case targetWindow
     case globalScreen
     case unbound
 }
 
-public enum CoordinateStrategy: String, Codable, Sendable {
+public enum CoordinateStrategy: String, Codable, CaseIterable, Sendable {
     case windowLocalPreferred
     case normalizedPreferred
     case absoluteOnly
     case locatorOnly
 }
 
-public enum LocatorFallbackPolicy: String, Codable, Sendable {
+public enum LocatorFallbackPolicy: String, Codable, CaseIterable, Sendable {
     case fail
     case allowCoordinateFallback
 }
@@ -35,9 +35,24 @@ public struct PointValue: Codable, Equatable, Sendable {
         self.x = x
         self.y = y
     }
+
+    public init(_ point: CGPoint) {
+        self.init(x: point.x, y: point.y)
+    }
+
+    public var cgPoint: CGPoint {
+        CGPoint(x: x, y: y)
+    }
+
+    public static func normalized(point: CGPoint, in bounds: CGRect) -> PointValue {
+        PointValue(
+            x: bounds.width > 0 ? (point.x - bounds.minX) / bounds.width : 0,
+            y: bounds.height > 0 ? (point.y - bounds.minY) / bounds.height : 0
+        )
+    }
 }
 
-public enum TextMatchMode: String, Codable, Equatable, Sendable {
+public enum TextMatchMode: String, Codable, Equatable, CaseIterable, Sendable {
     case contains
     case exact
 }
@@ -73,6 +88,12 @@ public struct TextAnchor: Codable, Equatable, Sendable {
         self.observedContentNormalizedFrame = observedContentNormalizedFrame
         self.searchContentNormalizedRegion = searchContentNormalizedRegion
         self.coordinateFallbackContentNormalized = coordinateFallbackContentNormalized
+    }
+
+    public var usesContentNormalizedGeometry: Bool {
+        observedContentNormalizedFrame != nil
+            || searchContentNormalizedRegion != nil
+            || coordinateFallbackContentNormalized != nil
     }
 }
 
@@ -111,7 +132,7 @@ public struct ScrollPayload: Codable, Equatable, Sendable {
 }
 
 public struct RecordedEvent: Codable, Equatable, Sendable {
-    public enum Kind: Int, Codable, Sendable {
+    public enum Kind: Int, Codable, CaseIterable, Sendable {
         case leftMouseDown      = 1
         case leftMouseUp        = 2
         case rightMouseDown     = 3

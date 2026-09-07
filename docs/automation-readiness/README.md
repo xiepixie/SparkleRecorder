@@ -24,6 +24,8 @@ Quick Schedule exposes a bounded `Wait after opening` control for a single macro
 - The live adapter waits only after target application preparation succeeds and before posting macro input.
 - Cancellation during readiness waiting cleans up the exact application process launched by that run and does not start playback.
 - Preview and scheduled execution use the same player request contract.
+- Unattended playback repairs legacy pointer events that were recorded inside exactly one known target surface but lack coordinate binding, provided the source has recorded content geometry. The repair exists only in the playback copy; explicit global-screen input, ambiguous multi-surface input, incomplete geometry, and the accepted macro remain unchanged.
+- Launch readiness requires every recorded target surface for the application to resolve before playback starts; finding only one of several required surfaces is not sufficient.
 
 ## Boundaries
 
@@ -39,6 +41,8 @@ Quick Schedule exposes a bounded `Wait after opening` control for a single macro
 - [x] Quick Schedule creates and restores the selected delay.
 - [x] Quick Sequence applies the delay only to the first macro and restores it.
 - [x] Live playback waits after application preparation and honors cancellation cleanup.
+- [x] Legacy unbound pointer input inside one unambiguous recorded surface is repaired before unattended playback without mutating the accepted macro.
+- [x] Multi-surface startup waits until every required surface resolves.
 - [x] UI separates fixed startup waiting, ordered preparation macros, observable OCR readiness, and advanced branching.
 - [x] English and Simplified Chinese strings are complete.
 - [x] A 900 x 720 product screenshot confirms the preparation, steps, and timing hierarchy without clipping.

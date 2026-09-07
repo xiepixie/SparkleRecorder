@@ -85,8 +85,88 @@ struct LibraryHeader: View {
                 .buttonStyle(.plain)
             }
 
+            if !state.isRecording {
+                recordingEvidenceStatus
+            }
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 16)
+    }
+
+    @ViewBuilder
+    private var recordingEvidenceStatus: some View {
+        let mode = state.recordingPermissionReadiness.evidenceMode
+        HStack(alignment: .center, spacing: 8) {
+            Image(systemName: evidenceIcon(for: mode))
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(evidenceTint(for: mode))
+                .frame(width: 16)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(evidenceTitle(for: mode))
+                    .font(.system(size: 10.5, weight: .semibold))
+                    .foregroundStyle(.primary)
+                Text(evidenceDetail(for: mode))
+                    .font(.system(size: 9.5))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(2)
+            }
+
+            Spacer(minLength: 8)
+
+            if mode == .visualEvidenceBlocked {
+                Button(String(localized: "Grant…", table: "Settings")) {
+                    controller.openScreenCapturePrefs()
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.mini)
+            }
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 7)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(evidenceTint(for: mode).opacity(0.06), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .strokeBorder(evidenceTint(for: mode).opacity(0.16), lineWidth: 0.5)
+        )
+    }
+
+    private func evidenceTitle(for mode: RecordingEvidenceMode) -> String {
+        switch mode {
+        case .actionsOnly:
+            return String(localized: "Record actions only", table: "Recording")
+        case .actionsAndVisualEvidence:
+            return String(localized: "Evidence ready", table: "Automation")
+        case .visualEvidenceBlocked:
+            return String(localized: "Screen Recording required", table: "Common")
+        }
+    }
+
+    private func evidenceDetail(for mode: RecordingEvidenceMode) -> String {
+        switch mode {
+        case .actionsOnly:
+            return String(localized: "Enable visual evidence before your next recording to review it alongside video.", table: "EditorUX")
+        case .actionsAndVisualEvidence:
+            return String(localized: "Frames, OCR, and privacy exclusions stay separate from playable macro events.", table: "EditorUX")
+        case .visualEvidenceBlocked:
+            return String(localized: "Screen Recording is required while visual evidence is enabled.", table: "Recording")
+        }
+    }
+
+    private func evidenceIcon(for mode: RecordingEvidenceMode) -> String {
+        switch mode {
+        case .actionsOnly: return "record.circle"
+        case .actionsAndVisualEvidence: return "film.stack.fill"
+        case .visualEvidenceBlocked: return "exclamationmark.triangle.fill"
+        }
+    }
+
+    private func evidenceTint(for mode: RecordingEvidenceMode) -> Color {
+        switch mode {
+        case .actionsOnly: return .secondary
+        case .actionsAndVisualEvidence: return .green
+        case .visualEvidenceBlocked: return .orange
+        }
     }
 }

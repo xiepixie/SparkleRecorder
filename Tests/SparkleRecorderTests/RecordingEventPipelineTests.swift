@@ -40,7 +40,7 @@ struct RecordingEventPipelineTests {
 
     @Test("Ignored key events are dropped while preserving clock alignment")
     func ignoredKeyEventsAreDroppedWhilePreservingClockAlignment() throws {
-        var pipeline = RecordingEventPipeline(ignoredKeyCodes: [49])
+        var pipeline = RecordingEventPipeline(ignoredKeyChords: [RecordingIgnoredKeyChord(keyCode: 49, modifiers: 0)])
 
         let keyOutputs = pipeline.process(
             RawInputEvent(
@@ -67,6 +67,50 @@ struct RecordingEventPipelineTests {
         let event = try #require(downOutputs.first?.event)
 
         #expect(event.time == 1.0)
+    }
+
+    @Test("Ignored hotkeys match the full key chord, not only the key code")
+    func ignoredHotkeysMatchFullChord() {
+        let optionR = RecordingIgnoredKeyChord(keyCode: 15, modifiers: ModFlag.option)
+        var pipeline = RecordingEventPipeline(ignoredKeyChords: [optionR])
+
+        let plainR = pipeline.process(
+            RawInputEvent(
+                kind: .keyDown,
+                timestamp: 1_000_000_000,
+                location: .zero,
+                keyCode: 15,
+                flags: 0,
+                unicodeString: "r"
+            ),
+            trackedActiveSurface: nil
+        )
+        let optionRResult = pipeline.process(
+            RawInputEvent(
+                kind: .keyDown,
+                timestamp: 1_100_000_000,
+                location: .zero,
+                keyCode: 15,
+                flags: ModFlag.option,
+                unicodeString: "®"
+            ),
+            trackedActiveSurface: nil
+        )
+        let commandR = pipeline.process(
+            RawInputEvent(
+                kind: .keyDown,
+                timestamp: 1_200_000_000,
+                location: .zero,
+                keyCode: 15,
+                flags: ModFlag.command,
+                unicodeString: "r"
+            ),
+            trackedActiveSurface: nil
+        )
+
+        #expect(plainR.count == 1)
+        #expect(optionRResult.isEmpty)
+        #expect(commandR.count == 1)
     }
 
     @Test("Mouse input records target surface and local coordinate fields")

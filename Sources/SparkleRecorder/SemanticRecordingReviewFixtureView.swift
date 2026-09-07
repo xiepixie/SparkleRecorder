@@ -9,7 +9,7 @@ struct SemanticRecordingReviewFixtureView: View {
     private let reviewState: SemanticRecordingReviewState?
     private let workflow: AutomationWorkflow?
     private let macros: [SavedMacro]
-    private let onImportWorkflow: (AutomationWorkflow, URL?) -> Void
+    private let onImportWorkflow: @MainActor (AutomationWorkflow, URL?) async throws -> Void
     private let runTargetPresentation: SemanticRecordingReviewRunTargetPresentation?
     private let runTargetEvidence: SemanticRecordingReviewRunTargetEvidence?
 
@@ -101,7 +101,7 @@ struct SemanticRecordingReviewFixtureView: View {
         initialDraftPatchCandidateID: String? = nil,
         initialRunTargetPresentation: SemanticRecordingReviewRunTargetPresentation? = nil,
         initialRunTargetEvidence: SemanticRecordingReviewRunTargetEvidence? = nil,
-        onImportWorkflow: @escaping (AutomationWorkflow, URL?) -> Void = { _, _ in }
+        onImportWorkflow: @escaping @MainActor (AutomationWorkflow, URL?) async throws -> Void = { _, _ in }
     ) {
         let projection = SemanticRecordingReviewProjection(
             bundle: state.bundle,
@@ -256,7 +256,7 @@ struct SemanticRecordingReviewFixtureView: View {
     private var header: some View {
         HStack(alignment: .center, spacing: 16) {
             VStack(alignment: .leading, spacing: 5) {
-                Text("Macro Review")
+                Text("Macro Review", tableName: "EditorUX")
                     .font(.system(size: 15, weight: .semibold))
                     .foregroundStyle(Color.white.opacity(0.52))
                 Text(projection.title)
@@ -275,10 +275,10 @@ struct SemanticRecordingReviewFixtureView: View {
 
             Spacer()
 
-            metric("Frames", projection.summary.frameCount)
-            metric("Events", projection.summary.eventCount)
-            metric("Evidence", projection.summary.observationCount + projection.summary.sourcePreviewCount)
-            metric("Suggestions", projection.summary.suggestionCount)
+            metric(String(localized: "Frames", table: "EditorUX"), projection.summary.frameCount)
+            metric(String(localized: "Events", table: "EditorUX"), projection.summary.eventCount)
+            metric(String(localized: "Evidence", table: "Automation"), projection.summary.observationCount + projection.summary.sourcePreviewCount)
+            metric(String(localized: "Review suggestions", table: "EditorUX"), projection.summary.suggestionCount)
 
             if reviewState != nil {
                 Button("", systemImage: "xmark", action: dismiss.callAsFunction)
@@ -303,89 +303,19 @@ struct SemanticRecordingReviewFixtureView: View {
     }
 
     private var timeline: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            sectionTitle("Timeline")
-
-            VStack(spacing: 8) {
-                ForEach(projection.timelineRows) { row in
-                    VStack(alignment: .leading, spacing: 10) {
-                        HStack(spacing: 8) {
-                            Text(timeLabel(row.recordingTime))
-                                .font(.system(size: 12, weight: .semibold, design: .monospaced))
-                                .foregroundStyle(row.isSelected ? Color(red: 0.34, green: 0.72, blue: 0.95) : Color.white.opacity(0.46))
-                            Text(row.kind.rawValue)
-                                .font(.system(size: 11, weight: .semibold))
-                                .foregroundStyle(Color.white.opacity(0.42))
-                            Spacer()
-                            if row.suggestionCount > 0 {
-                                Image(systemName: "sparkles")
-                                    .font(.system(size: 12, weight: .semibold))
-                                    .foregroundStyle(Color(red: 1.00, green: 0.72, blue: 0.30))
-                            }
-                        }
-
-                        Text(row.title)
-                            .font(.system(size: 14, weight: .semibold))
-                            .foregroundStyle(.white)
-                            .lineLimit(2)
-
-                        HStack(spacing: 8) {
-                            timelineChip("Before", row.beforeFrameID) {
-                                selectTimelineFrame(row.beforeFrameID, eventID: row.id)
-                            }
-                            timelineChip("After", row.afterFrameID) {
-                                selectTimelineFrame(row.afterFrameID, eventID: row.id)
-                            }
-                        }
-
-                        Text("\(row.observationCount) overlays · \(row.sourcePreviewCount) refs")
-                            .font(.system(size: 11, weight: .medium))
-                            .foregroundStyle(Color.white.opacity(0.46))
-                    }
-                    .padding(12)
-                    .background(
-                        RoundedRectangle(cornerRadius: 8)
-                            .fill(row.isSelected ? Color.white.opacity(0.085) : Color.white.opacity(0.045))
-                    )
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 8)
-                            .stroke(row.isSelected ? Color(red: 0.34, green: 0.72, blue: 0.95).opacity(0.52) : Color.white.opacity(0.07), lineWidth: 1)
-                    )
-                    .contentShape(RoundedRectangle(cornerRadius: 8))
-                    .onTapGesture {
-                        selectTimelineRow(row)
-                    }
-                }
+        SemanticRecordingReviewTimelineView(
+            rows: projection.timelineRows,
+            onSelectRow: selectTimelineRow,
+            onSelectFrame: { frameID, eventID in
+                selectTimelineFrame(frameID, eventID: eventID)
             }
-        }
-    }
-
-    private func timelineChip(
-        _ title: String,
-        _ id: UUID?,
-        action: @escaping () -> Void
-    ) -> some View {
-        Button(action: action) {
-            HStack(spacing: 5) {
-                Text(title)
-                    .font(.system(size: 10, weight: .semibold))
-                    .foregroundStyle(Color.white.opacity(0.42))
-                Text(shortID(id))
-                    .font(.system(size: 10, weight: .semibold, design: .monospaced))
-                    .foregroundStyle(Color.white.opacity(0.72))
-            }
-        }
-        .buttonStyle(.plain)
-        .padding(.horizontal, 8)
-        .padding(.vertical, 5)
-        .background(Color.white.opacity(0.055), in: RoundedRectangle(cornerRadius: 5))
-        .disabled(id == nil)
+        )
     }
 
     private var reviewFrame: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(alignment: .firstTextBaseline) {
-                sectionTitle("Selected Frame")
+                sectionTitle(String(localized: "Selected Frame", table: "EditorUX"))
                 Spacer()
                 Text(projection.selectedFrame?.imageRefPath ?? "No frame selected")
                     .font(.system(size: 12, weight: .medium, design: .monospaced))
@@ -445,7 +375,7 @@ struct SemanticRecordingReviewFixtureView: View {
 
                 frameStrip
             } else {
-                Text("No review frame is available in this bundle.")
+                Text("No review frame is available in this bundle.", tableName: "EditorUX")
                     .font(.system(size: 14, weight: .semibold))
                     .foregroundStyle(Color(red: 1.00, green: 0.50, blue: 0.58))
                     .padding(16)
@@ -468,18 +398,29 @@ struct SemanticRecordingReviewFixtureView: View {
                     .clipped()
             }
             VStack(alignment: .leading, spacing: 8) {
-                Text(frame.source.rawValue)
+                Text(SemanticRecordingReviewLabelPresentation.frameCaptureSource(frame.source))
                     .font(.system(size: 16, weight: .semibold))
                     .foregroundStyle(.white)
-                Text("\(frame.isRedacted ? "redacted ref" : "safe ref") · \(frame.imageRefPath)")
+                Text(String(
+                    format: frame.isRedacted
+                        ? String(localized: "Redacted ref · %@", table: "EditorUX")
+                        : String(localized: "Safe ref · %@", table: "EditorUX"),
+                    frame.imageRefPath
+                ))
                     .font(.system(size: 12, weight: .medium, design: .monospaced))
                     .foregroundStyle(Color.white.opacity(0.55))
                 if frame.isRedacted {
-                    Text("source ref · \(frame.sourceImageRefPath)")
+                    Text(String(
+                        format: String(localized: "Source ref · %@", table: "EditorUX"),
+                        frame.sourceImageRefPath
+                    ))
                         .font(.system(size: 11, weight: .medium, design: .monospaced))
                         .foregroundStyle(Color.white.opacity(0.36))
                 }
-                Text("surface · \(frame.surfaceID ?? "unknown")")
+                Text(String(
+                    format: String(localized: "Surface · %@", table: "EditorUX"),
+                    frame.surfaceID ?? String(localized: "Unknown surface", table: "EditorUX")
+                ))
                     .font(.system(size: 12, weight: .medium, design: .monospaced))
                     .foregroundStyle(Color.white.opacity(0.38))
             }
@@ -521,36 +462,10 @@ struct SemanticRecordingReviewFixtureView: View {
     }
 
     private var frameStrip: some View {
-        HStack(spacing: 10) {
-            ForEach(projection.frameStrip) { frame in
-                VStack(alignment: .leading, spacing: 7) {
-                    Text(timeLabel(frame.recordingTime))
-                        .font(.system(size: 11, weight: .semibold, design: .monospaced))
-                        .foregroundStyle(frame.isSelected ? Color(red: 0.34, green: 0.72, blue: 0.95) : Color.white.opacity(0.50))
-                    Text(frame.source.rawValue)
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundStyle(.white)
-                        .lineLimit(1)
-                    Text("\(frame.isRedacted ? "redacted" : "ref") · \(frame.imageRefPath)")
-                        .font(.system(size: 10, weight: .medium, design: .monospaced))
-                        .foregroundStyle(Color.white.opacity(0.42))
-                        .lineLimit(1)
-                }
-                .padding(10)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(frame.isSelected ? Color.white.opacity(0.08) : Color.white.opacity(0.04), in: RoundedRectangle(cornerRadius: 8))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 8)
-                        .stroke(frame.isSelected ? Color(red: 0.34, green: 0.72, blue: 0.95).opacity(0.45) : Color.white.opacity(0.07), lineWidth: 1)
-                )
-                .contentShape(RoundedRectangle(cornerRadius: 8))
-                .onTapGesture {
-                    selectFrame(frame)
-                }
-            }
-        }
-        .frame(width: 440, alignment: .leading)
-        .clipped()
+        SemanticRecordingReviewFrameStripView(
+            frames: projection.frameStrip,
+            onSelect: selectFrame
+        )
     }
 
     private var inspector: some View {
@@ -575,7 +490,7 @@ struct SemanticRecordingReviewFixtureView: View {
     private var runTargetSection: some View {
         if let runTargetEvidence {
             VStack(alignment: .leading, spacing: 10) {
-                sectionTitle("Run Target")
+                sectionTitle(String(localized: "Run Target", table: "EditorUX"))
                 inspectorRow(
                     title: runTargetEvidence.title,
                     subtitle: String(localized: "Opened from Run Detail", table: "Common"),
@@ -596,7 +511,7 @@ struct SemanticRecordingReviewFixtureView: View {
             }
         } else if let runTargetPresentation {
             VStack(alignment: .leading, spacing: 10) {
-                sectionTitle("Run Target")
+                sectionTitle(String(localized: "Run Target", table: "EditorUX"))
                 inspectorRow(
                     title: runTargetPresentation.title,
                     subtitle: String(localized: "Opened from Run Detail", table: "Common"),
@@ -623,7 +538,7 @@ struct SemanticRecordingReviewFixtureView: View {
         if let reviewState {
             let counts = artifactAvailabilityCounts(reviewState)
             VStack(alignment: .leading, spacing: 10) {
-                sectionTitle("Bundle Health")
+                sectionTitle(String(localized: "Bundle Health", table: "EditorUX"))
                 inspectorRow(
                     title: reviewState.validationIssues.isEmpty
                         ? String(localized: "Bundle ready", table: "Common")
@@ -665,7 +580,7 @@ struct SemanticRecordingReviewFixtureView: View {
                         ForEach(Array(reviewState.validationIssues.prefix(2).enumerated()), id: \.offset) { _, issue in
                             bundleHealthInfoRow(
                                 title: String(localized: "Validation", table: "Common"),
-                                value: validationIssueLabel(issue),
+                                value: SemanticRecordingReviewIssuePresenter.validationIssue(issue),
                                 systemImage: "exclamationmark.triangle",
                                 tint: Color(red: 1.00, green: 0.72, blue: 0.30)
                             )
@@ -677,7 +592,7 @@ struct SemanticRecordingReviewFixtureView: View {
                     VStack(alignment: .leading, spacing: 6) {
                         ForEach(projection.suppressionRows.prefix(2)) { suppression in
                             bundleHealthInfoRow(
-                                title: suppression.reason.rawValue,
+                                title: SemanticRecordingReviewIssuePresenter.suppressionTitle(suppression.reason),
                                 value: suppressionDetail(suppression),
                                 systemImage: "hand.raised",
                                 tint: Color(red: 1.00, green: 0.50, blue: 0.58)
@@ -695,10 +610,10 @@ struct SemanticRecordingReviewFixtureView: View {
            let regionSelection,
            regionSelection.frameID == frame.id {
             VStack(alignment: .leading, spacing: 10) {
-                sectionTitle("Selected Region")
+                sectionTitle(String(localized: "Selected Region", table: "EditorUX"))
                 inspectorRow(
                     title: regionSelection.label ?? String(localized: "Reviewed frame selection", table: "Common"),
-                    subtitle: regionSelection.candidateKind.rawValue,
+                    subtitle: SemanticRecordingReviewLabelPresentation.conditionCandidateKind(regionSelection.candidateKind),
                     detail: regionSelectionDetail(regionSelection),
                     accent: Color(red: 0.48, green: 0.76, blue: 0.52)
                 )
@@ -734,13 +649,13 @@ struct SemanticRecordingReviewFixtureView: View {
 
     private var conditionCandidates: some View {
         VStack(alignment: .leading, spacing: 10) {
-            sectionTitle("Teach System")
+            sectionTitle(String(localized: "Teach System", table: "EditorUX"))
             if let candidates = projection.selectedFrame?.conditionCandidates, !candidates.isEmpty {
                 ForEach(candidates) { candidate in
                     VStack(alignment: .leading, spacing: 8) {
                         inspectorRow(
                             title: candidate.title,
-                            subtitle: candidate.kind.rawValue,
+                            subtitle: SemanticRecordingReviewLabelPresentation.conditionCandidateKind(candidate.kind),
                             detail: candidate.artifactPath ?? "frame \(shortID(candidate.sourceFrameID))",
                             accent: Color(red: 0.48, green: 0.76, blue: 0.52)
                         )
@@ -762,11 +677,14 @@ struct SemanticRecordingReviewFixtureView: View {
                             .buttonStyle(.bordered)
                             .controlSize(.small)
                             .disabled(bundle == nil || repeatUntilResolution?.isResolved != true)
-                            .help(NSLocalizedString(
-                                repeatUntilResolution?.message
-                                    ?? "Open a linked semantic recording before creating a Repeat-Until loop.",
-                                comment: ""
-                            ))
+                            .help(
+                                repeatUntilResolution.map {
+                                    SemanticRecordingReviewRepeatUntilBodyPresentation.message(for: $0)
+                                } ?? String(
+                                    localized: "Open a linked semantic recording before creating a Repeat-Until loop.",
+                                    table: "Automation"
+                                )
+                            )
 
                             repeatUntilBodyMenu
 
@@ -799,7 +717,7 @@ struct SemanticRecordingReviewFixtureView: View {
                     }
                 }
             } else {
-                emptyInspectorText("No condition candidates on this frame.")
+                emptyInspectorText(String(localized: "No condition candidates on this frame.", table: "EditorUX"))
             }
         }
     }
@@ -835,9 +753,9 @@ struct SemanticRecordingReviewFixtureView: View {
     private var draftPatchSection: some View {
         if let draftPatchResult {
             VStack(alignment: .leading, spacing: 10) {
-                sectionTitle("Draft Patch")
+                sectionTitle(String(localized: "Draft Patch", table: "EditorUX"))
                 inspectorRow(
-                    title: draftPatchResult.condition.type,
+                    title: reviewConditionTypeLabel(draftPatchResult.condition.type),
                     subtitle: draftPatchResult.taskKey,
                     detail: patchDetail(draftPatchResult),
                     accent: Color(red: 0.34, green: 0.72, blue: 0.95)
@@ -858,7 +776,10 @@ struct SemanticRecordingReviewFixtureView: View {
                     .buttonStyle(.bordered)
                     .controlSize(.small)
 
-                    Text("\(draftPatchResult.patch.ops.count) ops")
+                    Text(String(
+                        format: String(localized: "%d patch operations", table: "EditorUX"),
+                        draftPatchResult.patch.ops.count
+                    ))
                         .font(.system(size: 11, weight: .semibold, design: .monospaced))
                         .foregroundStyle(Color.white.opacity(0.52))
 
@@ -874,7 +795,7 @@ struct SemanticRecordingReviewFixtureView: View {
             }
         } else if !draftPatchErrorMessage.isEmpty {
             VStack(alignment: .leading, spacing: 10) {
-                sectionTitle("Draft Patch")
+                sectionTitle(String(localized: "Draft Patch", table: "EditorUX"))
                 Label(draftPatchErrorMessage, systemImage: "exclamationmark.triangle")
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundStyle(Color(red: 1.00, green: 0.72, blue: 0.30))
@@ -892,13 +813,17 @@ struct SemanticRecordingReviewFixtureView: View {
 
     private var comparisonSection: some View {
         VStack(alignment: .leading, spacing: 10) {
-            sectionTitle("Source / Runtime")
+            sectionTitle(String(localized: "Source / Runtime", table: "EditorUX"))
             if let comparisons = projection.selectedFrame?.comparisonRows, !comparisons.isEmpty {
                 ForEach(comparisons) { comparison in
                     VStack(alignment: .leading, spacing: 8) {
                         inspectorRow(
-                            title: comparison.outcome.rawValue,
-                            subtitle: "score \(percent(comparison.score)) · threshold \(percent(comparison.threshold))",
+                            title: SemanticRecordingReviewLabelPresentation.comparisonOutcome(comparison.outcome),
+                            subtitle: String(
+                                format: String(localized: "score %@ · threshold %@", table: "EditorUX"),
+                                percent(comparison.score),
+                                percent(comparison.threshold)
+                            ),
                             detail: comparison.reason ?? comparison.runtimeArtifactPath,
                             accent: Color(red: 1.00, green: 0.72, blue: 0.30)
                         )
@@ -911,20 +836,24 @@ struct SemanticRecordingReviewFixtureView: View {
                     }
                 }
             } else {
-                emptyInspectorText("No runtime comparison for this frame.")
+                emptyInspectorText(String(localized: "No runtime comparison for this frame.", table: "EditorUX"))
             }
         }
     }
 
     private var suggestionSection: some View {
         VStack(alignment: .leading, spacing: 10) {
-            sectionTitle("Suggestion Review")
+            sectionTitle(String(localized: "Suggestion Review", table: "EditorUX"))
             if !projection.suggestionRows.isEmpty {
                 ForEach(projection.suggestionRows) { suggestion in
                     VStack(alignment: .leading, spacing: 8) {
                         inspectorRow(
                             title: suggestion.title,
-                            subtitle: "\(suggestion.kind.rawValue) · confidence \(percent(suggestion.confidence))",
+                            subtitle: String(
+                                format: String(localized: "%@ · confidence %@", table: "EditorUX"),
+                                SemanticRecordingReviewLabelPresentation.suggestionKind(suggestion.kind),
+                                percent(suggestion.confidence)
+                            ),
                             detail: suggestion.risk ?? suggestion.mutationPolicy,
                             accent: Color(red: 0.34, green: 0.72, blue: 0.95)
                         )
@@ -979,7 +908,7 @@ struct SemanticRecordingReviewFixtureView: View {
                     }
                 }
             } else {
-                emptyInspectorText("No suggestions for this fixture.")
+                emptyInspectorText(String(localized: "No suggestions for this review.", table: "EditorUX"))
             }
         }
     }
@@ -993,8 +922,8 @@ struct SemanticRecordingReviewFixtureView: View {
             Image(systemName: semantics.mutatesWorkflow ? "square.and.arrow.down" : decision.systemImage)
                 .font(.system(size: 10, weight: .semibold))
                 .foregroundStyle(decision.tint)
-            Text(semantics.actionName.rawValue)
-                .font(.system(size: 10, weight: .semibold, design: .monospaced))
+            Text(SemanticRecordingReviewLabelPresentation.actionName(semantics.actionName))
+                .font(.system(size: 10, weight: .semibold))
                 .foregroundStyle(Color.white.opacity(0.60))
                 .lineLimit(1)
             Text(mutationBoundaryLabel(semantics.mutationBoundary))
@@ -1168,8 +1097,8 @@ struct SemanticRecordingReviewFixtureView: View {
                 Image(systemName: reviewActionSystemImage(semantics))
                     .font(.system(size: 10, weight: .semibold))
                     .foregroundStyle(reviewActionTint(semantics))
-                Text(semantics.actionName.rawValue)
-                    .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                Text(SemanticRecordingReviewLabelPresentation.actionName(semantics.actionName))
+                    .font(.system(size: 10, weight: .semibold))
                     .foregroundStyle(Color.white.opacity(0.62))
                     .lineLimit(1)
                     .minimumScaleFactor(0.85)
@@ -1226,8 +1155,8 @@ struct SemanticRecordingReviewFixtureView: View {
                 Image(systemName: reviewActionSystemImage(presentation.actionName))
                     .font(.system(size: 10, weight: .semibold))
                     .foregroundStyle(reviewActionTint(presentation.actionName))
-                Text(presentation.actionName.rawValue)
-                    .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                Text(SemanticRecordingReviewLabelPresentation.actionName(presentation.actionName))
+                    .font(.system(size: 10, weight: .semibold))
                     .foregroundStyle(Color.white.opacity(0.62))
                     .lineLimit(1)
                     .minimumScaleFactor(0.85)
@@ -1327,7 +1256,7 @@ struct SemanticRecordingReviewFixtureView: View {
             return [
                 (
                     String(localized: "Action", table: "Common"),
-                    "\(semantics.actionName.rawValue) · \(mutationBoundaryLabel(semantics.mutationBoundary))",
+                    "\(SemanticRecordingReviewLabelPresentation.actionName(semantics.actionName)) · \(mutationBoundaryLabel(semantics.mutationBoundary))",
                     "checkmark.circle",
                     Color(red: 0.48, green: 0.76, blue: 0.52)
                 ),
@@ -1348,7 +1277,7 @@ struct SemanticRecordingReviewFixtureView: View {
             return [
                 (
                     String(localized: "Action", table: "Common"),
-                    "\(semantics.actionName.rawValue) · \(mutationBoundaryLabel(semantics.mutationBoundary))",
+                    "\(SemanticRecordingReviewLabelPresentation.actionName(semantics.actionName)) · \(mutationBoundaryLabel(semantics.mutationBoundary))",
                     "xmark.circle",
                     Color(red: 1.00, green: 0.50, blue: 0.58)
                 ),
@@ -1370,10 +1299,13 @@ struct SemanticRecordingReviewFixtureView: View {
 
     private var safetySection: some View {
         VStack(alignment: .leading, spacing: 10) {
-            sectionTitle("Safety")
+            sectionTitle(String(localized: "Safety", table: "EditorUX"))
             inspectorRow(
-                title: "Review-only mutation",
-                subtitle: "\(projection.suppressionRows.count) suppression records",
+                title: String(localized: "Review-only mutation", table: "EditorUX"),
+                subtitle: String(
+                    format: String(localized: "%d suppression records", table: "EditorUX"),
+                    projection.suppressionRows.count
+                ),
                 detail: projection.suggestionRows.first?.mutationPolicy ?? "No workflow mutation from Review without an accepted action.",
                 accent: Color(red: 1.00, green: 0.50, blue: 0.58)
             )
@@ -1475,30 +1407,27 @@ struct SemanticRecordingReviewFixtureView: View {
         return String(localized: "Review can still inspect available evidence, but fix bundle references before treating suggestions as product-ready.", table: "Common")
     }
 
-    private func validationIssueLabel(_ issue: SemanticRecordingBundleIssue) -> String {
-        String(describing: issue)
-            .replacingOccurrences(of: "SemanticRecordingBundleIssue.", with: "")
-    }
-
     private func suppressionDetail(
         _ suppression: SemanticRecordingReviewProjection.SuppressionRow
     ) -> String {
-        var parts: [String] = []
+        var parts: [String] = [
+            SemanticRecordingReviewIssuePresenter.suppressionExplanation(suppression.reason)
+        ]
         if let recordingTime = suppression.recordingTime {
             parts.append(timeLabel(recordingTime))
         }
         if let frameID = suppression.frameID {
-            parts.append("frame \(shortID(frameID))")
+            parts.append(
+                String(
+                    format: String(localized: "Frame %@", table: "Common"),
+                    shortID(frameID)
+                )
+            )
         }
         if suppression.count > 1 {
-            parts.append("\(suppression.count)x")
+            parts.append("\(suppression.count)×")
         }
-        if let detail = suppression.detail {
-            parts.append(detail)
-        }
-        return parts.isEmpty
-            ? String(localized: "Sensitive context was recorded and kept as review evidence.", table: "Common")
-            : parts.joined(separator: " · ")
+        return parts.joined(separator: " · ")
     }
 
     private func inspectorRow(
@@ -1921,7 +1850,7 @@ struct SemanticRecordingReviewFixtureView: View {
             draftPatchResult = nil
             draftPreviewActionPresentations = []
             draftPatchSourceSuggestionID = nil
-            draftPatchErrorMessage = String(describing: error)
+            draftPatchErrorMessage = SemanticRecordingReviewDraftIssuePresentation.message(for: error)
         }
     }
 
@@ -1941,7 +1870,7 @@ struct SemanticRecordingReviewFixtureView: View {
         )
         guard bodyResolution.isResolved else {
             draftPatchResult = nil
-            draftPatchErrorMessage = String(localized: String.LocalizationValue(bodyResolution.message), table: "Common")
+            draftPatchErrorMessage = SemanticRecordingReviewRepeatUntilBodyPresentation.message(for: bodyResolution)
             return
         }
 
@@ -1968,7 +1897,7 @@ struct SemanticRecordingReviewFixtureView: View {
             draftPatchResult = nil
             draftPreviewActionPresentations = []
             draftPatchSourceSuggestionID = nil
-            draftPatchErrorMessage = String(describing: error)
+            draftPatchErrorMessage = SemanticRecordingReviewDraftIssuePresentation.message(for: error)
         }
     }
 
@@ -2009,7 +1938,7 @@ struct SemanticRecordingReviewFixtureView: View {
             draftPatchResult = nil
             draftPreviewActionPresentations = []
             draftPatchSourceSuggestionID = nil
-            draftPatchErrorMessage = String(describing: error)
+            draftPatchErrorMessage = SemanticRecordingReviewDraftIssuePresentation.message(for: error)
         }
     }
 
@@ -2134,7 +2063,7 @@ struct SemanticRecordingReviewFixtureView: View {
             case .success(let url):
                 patchSaveMessage = String(format: String(localized: "Saved %@", table: "Common"), url.lastPathComponent)
             case .failure(let error):
-                patchSaveMessage = String(describing: error)
+                patchSaveMessage = SemanticRecordingReviewDraftIssuePresentation.saveMessage(for: error)
             }
         }
     }
@@ -2157,26 +2086,58 @@ struct SemanticRecordingReviewFixtureView: View {
         } catch {
             draftPreviewState = nil
             draftPreviewActionPresentations = []
-            draftPatchErrorMessage = String(describing: error)
+            draftPatchErrorMessage = SemanticRecordingReviewDraftIssuePresentation.message(for: error)
         }
     }
 
     private func patchDetail(_ result: SemanticRecordingReviewDraftPatchResult) -> String {
-        var parts = [
-            result.createsRepeatUntilLoop
-                ? "addRepeatUntil"
-                : result.appliesToExistingTask ? "setCondition" : "addTask"
-        ]
+        var parts = [draftPatchOperationLabel(result)]
         if let region = result.region {
-            parts.append("region \(region.key)")
+            parts.append(String(
+                format: String(localized: "Region %@", table: "Common"),
+                region.key
+            ))
         }
         if let imageAsset = result.imageAsset {
-            parts.append("image \(imageAsset.key)")
+            parts.append(String(
+                format: String(localized: "Image %@", table: "Common"),
+                imageAsset.key
+            ))
         }
         if let baselineAsset = result.baselineAsset {
-            parts.append("baseline \(baselineAsset.key)")
+            parts.append(String(
+                format: String(localized: "Baseline %@", table: "Common"),
+                baselineAsset.key
+            ))
         }
         return parts.joined(separator: " · ")
+    }
+
+    private func draftPatchOperationLabel(_ result: SemanticRecordingReviewDraftPatchResult) -> String {
+        if result.createsRepeatUntilLoop {
+            return String(localized: "Add Repeat-Until loop", table: "Common")
+        }
+        if result.appliesToExistingTask {
+            return String(localized: "Update condition", table: "Common")
+        }
+        return String(localized: "Add condition task", table: "Common")
+    }
+
+    private func reviewConditionTypeLabel(_ type: String) -> String {
+        switch type {
+        case "ocrText":
+            return String(localized: "OCR text", table: "EditorUX")
+        case "regionChanged":
+            return String(localized: "Region changed", table: "EditorUX")
+        case "imageAppeared":
+            return String(localized: "Image appeared", table: "Common")
+        case "imageDisappeared":
+            return String(localized: "Image disappeared", table: "Common")
+        case "pixelMatched":
+            return String(localized: "Pixel matched", table: "Common")
+        default:
+            return String(localized: "Condition", table: "Automation")
+        }
     }
 
     private func repeatUntilBodyMenuHelp(
@@ -2204,14 +2165,20 @@ struct SemanticRecordingReviewFixtureView: View {
             rect.y,
             rect.width,
             rect.height,
-            selection.bounds.coordinateSpace.rawValue
+            SemanticRecordingReviewLabelPresentation.coordinateSpace(selection.bounds.coordinateSpace)
         )
         var parts = [
             bounds,
-            "frame \(shortID(selection.frameID))"
+            String(
+                format: String(localized: "Frame %@", table: "Common"),
+                shortID(selection.frameID)
+            )
         ]
         if let surfaceID = selection.surfaceID {
-            parts.append("surface \(surfaceID)")
+            parts.append(String(
+                format: String(localized: "Surface · %@", table: "EditorUX"),
+                surfaceID
+            ))
         }
         return parts.joined(separator: " · ")
     }
@@ -2475,8 +2442,12 @@ struct SemanticRecordingReviewFixtureView: View {
             return String(localized: "Patch can be regenerated from the cited evidence.", table: "Common")
         }
 
-        let operation = draftPatchResult.appliesToExistingTask ? "setCondition" : "addTask"
-        return "\(operation) \(draftPatchResult.condition.type) · \(draftPatchResult.patch.ops.count) ops · Draft Preview import required"
+        return String(
+            format: String(localized: "%@ · %@ · %d changes · Draft Preview required", table: "Common"),
+            draftPatchOperationLabel(draftPatchResult),
+            reviewConditionTypeLabel(draftPatchResult.condition.type),
+            draftPatchResult.patch.ops.count
+        )
     }
 }
 

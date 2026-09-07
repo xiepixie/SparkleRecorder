@@ -8,6 +8,37 @@ private final class CaptureWindow: NSWindow {
     override var canBecomeKey: Bool { true }
 }
 
+enum TextPickerAnchorBuilder {
+    static func makeAnchor(
+        text: String,
+        observedScreenRect: CGRect,
+        searchScreenRect: CGRect,
+        fallback: CGPoint,
+        contentFrame: CGRect?
+    ) -> TextAnchor {
+        let normalizedObserved = contentFrame.map {
+            RectValue.normalized(rect: observedScreenRect, in: $0)
+        }
+        let normalizedSearch = contentFrame.map {
+            RectValue.normalized(rect: searchScreenRect, in: $0)
+        }
+        let normalizedFallback = contentFrame.map {
+            PointValue.normalized(point: fallback, in: $0)
+        }
+        return TextAnchor(
+            text: text,
+            matchMode: .contains,
+            observedFrame: RectValue(observedScreenRect),
+            searchRegion: RectValue(searchScreenRect),
+            occurrenceHint: nil,
+            coordinateFallback: PointValue(fallback),
+            observedContentNormalizedFrame: normalizedObserved,
+            searchContentNormalizedRegion: normalizedSearch,
+            coordinateFallbackContentNormalized: normalizedFallback
+        )
+    }
+}
+
 @available(macOS 14.0, *)
 private struct TextPickerView: View {
     let image: CGImage
@@ -236,26 +267,17 @@ private struct TextPickerView: View {
             height: rect.height
         )
         let searchScreenRect = defaultSearchRegion(for: observedScreenRect, in: targetFrame)
-        let fallback = PointValue(
+        let fallback = CGPoint(
             x: screenFrame.minX + rect.midX,
             y: screenFrame.minY + rect.midY
         )
-        let normalizedObserved = RectValue.normalized(rect: observedScreenRect, in: targetFrame)
-        let normalizedSearch = RectValue.normalized(rect: searchScreenRect, in: targetFrame)
-        let normalizedFallback = PointValue.normalized(point: CGPoint(x: fallback.x, y: fallback.y), in: targetFrame)
-        
-        let anchor = TextAnchor(
+        onPicked?(TextPickerAnchorBuilder.makeAnchor(
             text: det.text,
-            matchMode: .contains,
-            observedFrame: RectValue(rect: observedScreenRect),
-            searchRegion: RectValue(rect: searchScreenRect),
-            occurrenceHint: nil,
-            coordinateFallback: fallback,
-            observedContentNormalizedFrame: normalizedObserved,
-            searchContentNormalizedRegion: normalizedSearch,
-            coordinateFallbackContentNormalized: normalizedFallback
-        )
-        onPicked?(anchor)
+            observedScreenRect: observedScreenRect,
+            searchScreenRect: searchScreenRect,
+            fallback: fallback,
+            contentFrame: contentFrame
+        ))
     }
     
     private func defaultSearchRegion(for frame: CGRect, in bounds: CGRect) -> CGRect {
@@ -353,9 +375,17 @@ public final class TextPickerOverlay {
     
     private var captureWindow: NSWindow?
     private var eventMonitor: Any?
+    private var captureTask: Task<Void, Never>?
+    private var captureGeneration: UInt64 = 0
+    private var activityToken: UUID?
+
+    public var isActive: Bool {
+        captureTask != nil || captureWindow != nil
+    }
     
     public var onPicked: ((TextAnchor) -> Void)?
     public var onCancelled: (() -> Void)?
+    public var onFailed: ((String) -> Void)?
     
     private static func topSpaceFrame(for screen: NSScreen) -> CGRect {
         guard let mainScreen = NSScreen.screens.first else { return screen.frame }
@@ -370,38 +400,53 @@ public final class TextPickerOverlay {
     
     public func start(targetSurface: PlaybackSurface? = nil) {
         stop()
-        
-        Task { @MainActor in
+        captureGeneration &+= 1
+        let generation = captureGeneration
+        activityToken = AuxiliaryCaptureActivityCenter.shared.begin()
+
+        captureTask = Task { @MainActor [weak self] in
+            guard let self else { return }
+            defer {
+                if self.captureGeneration == generation {
+                    self.captureTask = nil
+                }
+            }
+
             var capturedImage: CGImage? = nil
             var resolvedWindowFrame: CGRect? = nil
             var resolvedContentFrame: CGRect? = nil
             var targetScreen = NSScreen.main ?? NSScreen.screens.first
-            
+
             if let surface = targetSurface, let bid = surface.bundleIdentifier {
                 let tracker = WindowTracker()
-                let frames = tracker.resolveCurrentFrames(for: ["target": surface])
-                if let frame = frames["target"] {
-                    let winFrame = CGRect(x: frame.x, y: frame.y, width: frame.width, height: frame.height)
+                let windows = tracker.resolveCurrentWindows(for: ["target": surface])
+                if let window = windows["target"] {
+                    let frame = window.frame
+                    let winFrame = frame.cgRect
                     resolvedWindowFrame = winFrame
-                    
-                    let pid = surface.bundleIdentifier.flatMap { bundleId in
-                        NSWorkspace.shared.runningApplications.first(where: { $0.bundleIdentifier == bundleId })?.processIdentifier
-                    }
-                    let content = CoordinateMapper.resolveContentFrame(for: pid, outerFrame: frame).frame
+
+                    let content = WindowContentFrameResolver.resolveContentFrame(
+                        for: window.processID,
+                        outerFrame: frame
+                    ).frame
                     if content.width > 8, content.height > 8 {
                         resolvedContentFrame = content
                     }
-                    
-                    // Find screen containing window frame
+
                     if let mainScreen = NSScreen.screens.first {
                         let cocoaCenter = CGPoint(x: winFrame.midX, y: mainScreen.frame.height - winFrame.midY)
                         if let screen = NSScreen.screens.first(where: { NSMouseInRect(cocoaCenter, $0.frame, false) }) {
                             targetScreen = screen
                         }
                     }
-                    
-                    // Try to capture only the window
-                    capturedImage = try? await ScreenCaptureService.shared.captureWindow(bundleIdentifier: bid, title: surface.windowTitle)
+
+                    capturedImage = try? await ScreenCaptureService.shared.captureWindow(
+                        bundleIdentifier: bid,
+                        title: surface.windowTitle,
+                        recordedWindowID: surface.recordedWindowId,
+                        expectedFrame: winFrame
+                    )
+                    guard !Task.isCancelled, self.captureGeneration == generation else { return }
                     if let image = capturedImage,
                        let contentFrame = resolvedContentFrame,
                        let cropped = Self.crop(image: image, sourceFrame: winFrame, targetFrame: contentFrame) {
@@ -411,26 +456,44 @@ public final class TextPickerOverlay {
                     }
                 }
             }
-            
-            guard let target = targetScreen else { return }
+
+            guard !Task.isCancelled, self.captureGeneration == generation else { return }
+            guard let target = targetScreen else {
+                self.finishCaptureFailure(
+                    String(localized: "No display is available for text picking.", table: "EditorUX"),
+                    generation: generation
+                )
+                return
+            }
             let displayID = (target.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber)?.uint32Value ?? CGMainDisplayID()
-            
+
             let finalImage: CGImage
             if let img = capturedImage {
                 finalImage = img
             } else {
-                guard let img = try? await ScreenCaptureService.shared.captureDisplay(displayID: displayID) else {
-                    self.onCancelled?()
+                do {
+                    finalImage = try await ScreenCaptureService.shared.captureDisplay(displayID: displayID)
+                } catch {
+                    guard !Task.isCancelled, self.captureGeneration == generation else { return }
+                    self.finishCaptureFailure(error.localizedDescription, generation: generation)
                     return
                 }
-                finalImage = img
-                resolvedContentFrame = nil // Fallback to full screen if window capture fails
+                guard !Task.isCancelled, self.captureGeneration == generation else { return }
+                resolvedContentFrame = nil
             }
-            
+
+            guard !Task.isCancelled, self.captureGeneration == generation else { return }
             self.showOverlay(image: finalImage, screen: target, contentFrame: resolvedContentFrame)
         }
     }
     
+    private func finishCaptureFailure(_ message: String, generation: UInt64) {
+        guard captureGeneration == generation else { return }
+        AuxiliaryCaptureActivityCenter.shared.end(activityToken)
+        activityToken = nil
+        onFailed?(message)
+    }
+
     private static func crop(image: CGImage, sourceFrame: CGRect, targetFrame: CGRect) -> CGImage? {
         let clipped = targetFrame.intersection(sourceFrame)
         guard !clipped.isNull, clipped.width > 1, clipped.height > 1 else { return nil }
@@ -487,35 +550,22 @@ public final class TextPickerOverlay {
     }
     
     public func stop() {
+        captureGeneration &+= 1
+        captureTask?.cancel()
+        captureTask = nil
         if let monitor = eventMonitor {
             NSEvent.removeMonitor(monitor)
             eventMonitor = nil
         }
         captureWindow?.orderOut(nil)
         captureWindow = nil
+        AuxiliaryCaptureActivityCenter.shared.end(activityToken)
+        activityToken = nil
     }
-}
 
-private extension RectValue {
-    init(rect: CGRect) {
-        self.init(x: rect.minX, y: rect.minY, width: rect.width, height: rect.height)
-    }
-    
-    static func normalized(rect: CGRect, in bounds: CGRect) -> RectValue {
-        RectValue(
-            x: bounds.width > 0 ? (rect.minX - bounds.minX) / bounds.width : 0,
-            y: bounds.height > 0 ? (rect.minY - bounds.minY) / bounds.height : 0,
-            width: bounds.width > 0 ? rect.width / bounds.width : 0,
-            height: bounds.height > 0 ? rect.height / bounds.height : 0
-        )
-    }
-}
-
-private extension PointValue {
-    static func normalized(point: CGPoint, in bounds: CGRect) -> PointValue {
-        PointValue(
-            x: bounds.width > 0 ? (point.x - bounds.minX) / bounds.width : 0,
-            y: bounds.height > 0 ? (point.y - bounds.minY) / bounds.height : 0
-        )
+    public func cancel() {
+        guard isActive else { return }
+        stop()
+        onCancelled?()
     }
 }

@@ -1,6 +1,6 @@
 # SparkleRecorder 项目架构
 
-> 文档状态（2026-07-05）：这是当前产品心智模型和架构快照。Swift 6、录制边界、播放器失败证据等底座已经继续推进；定时启动、依赖编排、资源仲裁和 FlowGraph 还没有进入产品代码，后续以 [DOCUMENTATION_STATUS.md](DOCUMENTATION_STATUS.md) 与 [automation-engine/README.md](automation-engine/README.md) 跟踪。
+> 文档状态（2026-09-06）：这是当前产品心智模型和架构快照。Swift 6、录制/播放、自动化 reducer/runtime、FlowGraph、语义录制与 reconstruction 已有产品代码和直接测试；尚未完成的 live acceptance、后台生命周期与产品化缺口以 [DOCUMENTATION_STATUS.md](DOCUMENTATION_STATUS.md) 及各工作台文档为准。
 
 本文记录 SparkleRecorder 当前的数据结构、动作设计、用户使用逻辑和功能边界，便于后续继续重构或扩展。
 
@@ -26,11 +26,12 @@ SparkleRecorder 是一个原生 macOS 宏录制和回放工具。它的核心目
 | --- | --- | --- |
 | 应用入口 | `main.swift`, `AppDelegate.swift` | App/CLI 分发、菜单、文件打开、帮助入口 |
 | 状态编排 | `MenuBarController.swift`, `AppState.swift` | 录制/播放/导入/导出流程，权限状态，用户偏好 |
+| 操作反馈 | `AppStatusFeedback.swift`, `Components/Library/AppStatusFeedbackView.swift` | App 级操作结果提示；统一成功/信息/警告/错误/进行中语义、显示时长、下方浮层布局和无障碍反馈，供 Library、Automations、Settings、Editor 共用 |
 | 宏库 | `MacroLibrary.swift`, `SavedMacro.swift` | 保存宏、筛选、统计、标签、收藏、链式播放 |
 | 录制引擎 | `Recorder.swift`, `EventTapThread.swift`, `RecordingSurfaceTracker.swift` | 监听输入事件，计算时间戳，采集窗口 surface，批量刷新 UI |
 | 播放引擎 | `Player.swift`, `MouseKeyboardSynthesizer.swift` | 按时间轴调度事件，发送合成输入，检测用户打断 |
-| 坐标解析 | `PointResolver.swift`, `CoordinateMapper.swift`, `WindowTracker.swift` | 将录制时坐标映射到当前屏幕或当前窗口 |
-| OCR/定位 | `ScreenCaptureService.swift`, `VisionDetector.swift`, `LocatorEngine.swift` | 截图、识别文字、按文本锚点定位点击目标 |
+| 坐标解析 | `PointResolver.swift`, `CoordinateMapper.swift`, `WindowTracker.swift`, `WindowContentFrameResolver.swift` | Core 只处理纯坐标投影；App Adapter 负责实时窗口/内容区解析与 macOS Accessibility 查询 |
+| OCR/定位 | `ScreenCaptureService.swift`, `VisionDetector.swift`, `PlaybackTextTargetResolver.swift`, `LocatorEngine.swift`, `TextAnchorGeometryProjection.swift`, `TextAnchorMatchRanking.swift`, `PlaybackLocatorFallback.swift` | 统一解析文本锚点：稳定 Playback Surface、content-normalized geometry、OCR 候选、纯 Core 匹配排序与坐标兜底 |
 | 编辑器 | `MacroEditor.swift`, `MacroTransformer.swift`, `Components/Editor/*` | 时间线、动作列表、侧边栏、文本/坐标 picker、批量编辑 |
 | 导入导出 | `MacroImport.swift`, `TextMacroFormat.swift` | native JSON、legacy `.rec`、TRM 文本格式转换 |
 
@@ -96,7 +97,7 @@ SparkleRecorder 是一个原生 macOS 宏录制和回放工具。它的核心目
 
 ### 3.3 `PlaybackSurface` 与 `PlaybackContext`
 
-`PlaybackSurface` 描述录制时的目标窗口，包括 bundle id、窗口标题、窗口 id、显示器 id、窗口外框和内容区。播放时 `PlaybackContext` 会携带：
+`PlaybackSurface` 描述录制时的目标窗口，包括 bundle id、窗口标题、窗口 id、显示器 id、窗口外框和内容区。它是持久化的目标身份，不等同于播放时当前的 OS 窗口。播放时 `PlaybackContext` 会携带：
 
 | 字段 | 含义 |
 | --- | --- |
@@ -120,6 +121,9 @@ SparkleRecorder 是一个原生 macOS 宏录制和回放工具。它的核心目
 | `coordinateFallback` | OCR 失败时可选坐标兜底 |
 | `observedContentNormalizedFrame` | 内容区归一化文本区域 |
 | `searchContentNormalizedRegion` | 内容区归一化搜索区域 |
+| `coordinateFallbackContentNormalized` | locator 失败时相对内容区的坐标兜底 |
+
+只要 `TextAnchor` 使用任一 content-normalized geometry，事件就必须显式设置 `surfaceId`。多窗口播放不会为这类锚点猜测“第一个窗口”。
 
 ## 4. 动作设计
 
@@ -162,9 +166,9 @@ SparkleRecorder 把动作分成两层：底层事件和语义动作组。
 1. 用户触发 Play、宏卡片播放或宏专属热键。
 2. `MenuBarController` 选择当前 `SavedMacro` 并构建 `PlaybackContext`。
 3. `Player.play()` 启动异步播放任务，按 loop/speed 调度。
-4. 播放每一轮之前尝试激活目标 app，并通过 `WindowTracker` 更新当前窗口外框和内容区。
-5. 对每个事件，`PointResolver` 先尝试窗口/归一化/绝对坐标解析。
-6. 如果事件带 `TextAnchor`，`LocatorEngine` 会调用 `ScreenCaptureService` 和 `VisionDetector` 通过 OCR 查找当前文本位置。
+4. 播放每一轮之前尝试激活目标 app；`WindowTracker` 解析当前窗口外框，App 层 `WindowContentFrameResolver` 通过 macOS Accessibility 补充当前内容区，再写入 `PlaybackContext`。Core 不主动查询 `NSWorkspace` 或 AX。
+5. 对普通坐标事件，`PointResolver` 只使用 `PlaybackContext` 与录制几何做窗口/归一化/绝对坐标解析；缺少实时内容区时使用已记录的内容 inset 或保守兼容值，不从 Core 偷跑系统 API。
+6. 如果事件带 `TextAnchor`，`PlaybackTextTargetResolver` 通过稳定 Playback Surface 捕获当前窗口，并用 `TextAnchorGeometryProjection` 投影 observed/search/fallback geometry；`VisionDetector` 只产生 OCR 候选，`TextAnchorMatchRanking` 在 Core 中统一处理 exact/contains、模糊容错、位置权重和 occurrence。文本点击由 `LocatorEngine` 负责 bounded polling 后取匹配中心；`waitForText` / `verifyText` 消费同一 Text Target 解析语义。locator 失败时 async/sync playback 都通过 `PlaybackLocatorFallback` 使用同一套坐标兜底规则。
 7. 解析出目标点后，`MouseKeyboardSynthesizer` 发送合成输入。
 8. 合成事件写入 `"SPARKLE!"` loopback marker，录制 tap 和播放冲突监控会忽略这些事件。
 9. 如果用户在播放期间真实输入，`PlaybackConflictMonitor` 会标记冲突，播放可提前停止。
@@ -190,6 +194,14 @@ SparkleRecorder --convert input.tinyrec output.txt
 
 格式演进建议见 [FormatEvolutionPlan.md](FormatEvolutionPlan.md)。
 
+### 7.1 AI reconstruction Candidate 生命周期
+
+AI reconstruction 不直接修改当前已接受的 Macro。导入结果首先成为不可变 **Candidate**；Review 可以对该精确版本执行一次完整试跑，成功后生成与 Candidate digest 和 single-iteration execution policy 绑定的测试凭证。只要版本未变化，Review 会明确显示 `Test passed`，用户可以直接选择 `Accept this version`。
+
+需要人工调整时，Review 通过 **Candidate Draft** 打开复用后的 Macro Editor。Candidate Draft 使用独立 `Recorder` 作为编辑缓冲，不进入普通 `persistCurrentMacroIfNeeded()` 路径，因此动作、时间、坐标、Text Anchor、Playback Surface 等修改不会覆盖 accepted Macro。未修改就返回 Review 时仍是原 Candidate，已有测试资格不变；保存过修改则由 `MacroCandidateEditorDraftBuilder` 生成新的不可变 Candidate，并要求重新 `Test once`。仍能对应到原 candidate action ID 的 coverage 会保留，结构性修改导致的失效映射只把相关 source action 标为 unresolved，不猜测新对应关系。
+
+Candidate Draft 只暴露 candidate-owned 编辑能力。局部 Editor Preview 用于调试，不产生 acceptance receipt；导出 accepted Macro、修改受保护的重复/跟随窗口策略、创建新的 Library Repeat-Until 行为宏等 Library-owned side effect 不从 Candidate Draft 入口执行。
+
 ## 8. 用户功能清单
 
 | 功能 | 用户价值 |
@@ -200,6 +212,7 @@ SparkleRecorder --convert input.tinyrec output.txt
 | 宏卡片菜单 | 重命名、复制、删除、导出、标签、收藏、绑定窗口 |
 | 时间线编辑 | 修剪、移动、缩放时间、插入等待、编辑单个事件 |
 | OCR 文本 picker | 将动作绑定到界面文字，提高窗口变化后的稳定性 |
+| Candidate 审阅与编辑 | AI 候选版本可试跑后直接接受，也可在独立 Candidate Draft 中编辑、保存为新版本并重新试跑 |
 | 坐标 picker | 手动设置动作目标点 |
 | 窗口绑定 | 按当前窗口偏移或内容区坐标回放 |
 | 链式播放 | 一个宏结束后自动触发另一个宏 |

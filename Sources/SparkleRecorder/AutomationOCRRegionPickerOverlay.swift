@@ -147,6 +147,11 @@ final class AutomationOCRRegionPickerOverlay {
     private var captureWindow: OCRRegionCaptureWindow?
     private var instructionPanel: NSPanel?
     private var preparationTask: Task<Void, Never>?
+    private var activityToken: UUID?
+
+    var isActive: Bool {
+        preparationTask != nil || captureWindow != nil || instructionPanel != nil
+    }
 
     var onPicked: ((AutomationScreenRegionPickerSelection) -> Void)?
     var onCancelled: (() -> Void)?
@@ -162,7 +167,8 @@ final class AutomationOCRRegionPickerOverlay {
         }
 
         let displayID = Self.displayID(for: screen)
-        preparationTask = Task { [weak self, weak screen] in
+        activityToken = AuxiliaryCaptureActivityCenter.shared.begin()
+        preparationTask = Task { [weak self] in
             let sourceImage: CGImage?
             if #available(macOS 14.0, *) {
                 sourceImage = try? await ScreenCaptureService.shared.captureDisplay(displayID: displayID)
@@ -172,7 +178,6 @@ final class AutomationOCRRegionPickerOverlay {
 
             await MainActor.run {
                 guard let self,
-                      let screen,
                       !Task.isCancelled else {
                     return
                 }
@@ -241,6 +246,14 @@ final class AutomationOCRRegionPickerOverlay {
         preparationTask?.cancel()
         preparationTask = nil
         stopActiveWindows()
+        AuxiliaryCaptureActivityCenter.shared.end(activityToken)
+        activityToken = nil
+    }
+
+    func cancel() {
+        guard isActive else { return }
+        stop()
+        onCancelled?()
     }
 
     private func stopActiveWindows() {
@@ -361,7 +374,7 @@ final class AutomationOCRRegionPickerOverlay {
                 continue
             }
 
-            let content = CoordinateMapper.resolveContentFrame(
+            let content = WindowContentFrameResolver.resolveContentFrame(
                 for: pid,
                 outerFrame: RectValue(
                     x: frame.minX,

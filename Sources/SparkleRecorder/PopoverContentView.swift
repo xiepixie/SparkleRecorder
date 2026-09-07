@@ -10,7 +10,8 @@ struct PopoverContentView: View {
     let controller: MenuBarController
     /// `true` when hosted in the resizable Dock window, `false` for the menu-bar popover.
     var isWindow: Bool = false
-    @ObservedObject private var recorder: Recorder
+    private let recorder: Recorder
+    @ObservedObject private var player: Player
 
     @EnvironmentObject var state: AppState
     @EnvironmentObject var library: MacroLibrary
@@ -36,11 +37,26 @@ struct PopoverContentView: View {
     init(controller: MenuBarController, isWindow: Bool = false) {
         self.controller = controller
         self.isWindow = isWindow
-        _recorder = ObservedObject(initialValue: controller.recorder)
+        recorder = controller.recorder
+        _player = ObservedObject(initialValue: controller.player)
     }
 
     private var usesRecordingPopover: Bool {
         !isWindow && state.isRecording
+    }
+
+    private var usesRecordingFinalizationPopover: Bool {
+        !isWindow && state.recordingFinalizationActive
+    }
+
+    private var usesRecordingPreparationPopover: Bool {
+        !isWindow && state.recordingFlowActive && !state.isRecording
+            && !state.recordingFinalizationActive
+    }
+
+    private var usesPlaybackPopover: Bool {
+        !isWindow && !state.isRecording
+            && (state.playbackFlowActive || player.isPlaybackTargetReserved || state.isPlaying)
     }
 
     var body: some View {
@@ -52,6 +68,19 @@ struct PopoverContentView: View {
                 RecordingMenuBarPopoverView(
                     controller: controller,
                     recorder: recorder,
+                    state: state
+                )
+            } else if usesRecordingFinalizationPopover {
+                RecordingFinalizationMenuBarPopoverView(state: state)
+            } else if usesRecordingPreparationPopover {
+                RecordingPreparationMenuBarPopoverView(
+                    controller: controller,
+                    state: state
+                )
+            } else if usesPlaybackPopover {
+                PlaybackMenuBarPopoverView(
+                    controller: controller,
+                    player: player,
                     state: state
                 )
             } else if isWindow {
@@ -78,7 +107,19 @@ struct PopoverContentView: View {
                     case .automation:
                         AutomationMainView(
                             runtimeHost: controller.automationHost(),
-                            onRecordMacro: { controller.toggleRecording() }
+                            onRecordMacro: { controller.toggleRecording() },
+                            onPreviewScheduledMacro: { macroID, task in
+                                try await controller.previewScheduledMacro(
+                                    macroID,
+                                    taskConfiguration: task
+                                )
+                            },
+                            onRenameMacro: { macroID, name in
+                                controller.renameMacro(macroID, to: name)
+                            },
+                            onSetMacroLoops: { macroID, loops in
+                                controller.setMacroLoops(macroID, to: loops)
+                            }
                         )
                             .frame(maxWidth: .infinity, maxHeight: .infinity)
                     }
@@ -108,11 +149,11 @@ struct PopoverContentView: View {
                             .font(.system(size: 38, weight: .semibold))
                             .foregroundStyle(.tint)
 	                        Text("Drop to import", tableName: "Common")
-	                            .font(.system(size: 13, weight: .semibold))
-	                            .foregroundStyle(.primary)
-	                        Text("Drop a .tinyrec, legacy Windows .rec, or .txt macro.", tableName: "EditorUX")
-	                            .font(.system(size: 10.5))
-	                            .foregroundStyle(.secondary)
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(.primary)
+                        Text("Drop a .tinyrec, legacy Windows .rec, or .txt macro.", tableName: "EditorUX")
+                            .font(.system(size: 10.5))
+                            .foregroundStyle(.secondary)
                     }
                     .padding(20)
                 }
@@ -128,6 +169,16 @@ struct PopoverContentView: View {
                 .allowsHitTesting(false)
             }
         }
+        .disabled(isWindow && state.appInteractionLocked)
+        .appStatusFeedbackOverlay(
+            state: state,
+            isWindow: isWindow,
+            bottomPadding: 58,
+            isEnabled: !usesRecordingPopover
+                && !usesRecordingFinalizationPopover
+                && !usesRecordingPreparationPopover
+                && !usesPlaybackPopover
+        )
         .frame(
             minWidth: usesRecordingPopover ? 320 : (isWindow ? 600 : 400),
             idealWidth: usesRecordingPopover ? 320 : (isWindow ? 880 : 400),
@@ -181,17 +232,15 @@ struct PopoverContentView: View {
         }
     }
 
-    /// Importable macro file extensions accepted via drag-and-drop.
-    private static let importableExts: Set<String> = ["tinyrec", "rec", "txt", "trm", "json"]
-
-    /// Returns `true` if any provider was a macro file URL we accepted.
+    /// Returns `true` if any provider was a file URL. Import dispatch owns content
+    /// sniffing, so drag-and-drop follows the same format rules and error feedback
+    /// as Finder/open-panel imports instead of silently ignoring unknown extensions.
     func handleFileDrop(providers: [NSItemProvider]) -> Bool {
         var accepted = false
-        let importableExts = Self.importableExts
         for provider in providers where provider.hasItemConformingToTypeIdentifier(UTType.fileURL.identifier) {
             accepted = true
             _ = provider.loadObject(ofClass: URL.self) { url, _ in
-                guard let url, importableExts.contains(url.pathExtension.lowercased()) else { return }
+                guard let url else { return }
                 DispatchQueue.main.async {
                     controller.importMacro(at: url)
                 }
@@ -200,14 +249,18 @@ struct PopoverContentView: View {
         return accepted
     }
 
-    private var usedHotkeys: Set<UInt32> {
-        var s: Set<UInt32> = [
-            state.recordHotkey.keyCode,
-            state.stopHotkey.keyCode,
-            state.playHotkey.keyCode,
-        ]
-        for m in library.macros { if let hk = m.hotkey { s.insert(hk.keyCode) } }
-        return s
+    private var usedHotkeys: Set<HotkeyIdentity> {
+        var identities = Set([
+            state.recordHotkey.hotkeyIdentity,
+            state.stopHotkey.hotkeyIdentity,
+            state.playHotkey.hotkeyIdentity,
+        ])
+        for macro in library.macros {
+            if let hotkey = macro.hotkey {
+                identities.insert(hotkey.hotkeyIdentity)
+            }
+        }
+        return identities
     }
 
     private var workspaceBinding: Binding<WorkspaceMode> {
@@ -262,6 +315,7 @@ struct PopoverContentView: View {
 private final class RecordingPopoverSnapshotModel: ObservableObject {
     @Published private(set) var durationText = "00:00"
     @Published private(set) var stats = RecordingStats.zero
+    @Published private(set) var semanticStatus: SemanticRecorderBridgeStatus = .idle
 
     private weak var recorder: Recorder?
     private var refreshTask: Task<Void, Never>?
@@ -269,6 +323,7 @@ private final class RecordingPopoverSnapshotModel: ObservableObject {
     init(recorder: Recorder) {
         self.recorder = recorder
         stats = recorder.liveStats
+        semanticStatus = recorder.semanticRecordingStatus
         refreshDuration()
 
         refreshTask = Task { @MainActor [weak self] in
@@ -284,18 +339,177 @@ private final class RecordingPopoverSnapshotModel: ObservableObject {
     }
 
     func updateStats(_ stats: RecordingStats) {
+        guard self.stats != stats else { return }
         self.stats = stats
+    }
+
+    func updateSemanticStatus(_ status: SemanticRecorderBridgeStatus) {
+        guard semanticStatus != status else { return }
+        semanticStatus = status
     }
 
     private func refreshDuration() {
         let totalSeconds = max(0, Int(recorder?.liveDuration ?? 0))
-        durationText = String(format: "%02d:%02d", totalSeconds / 60, totalSeconds % 60)
+        let text = String(format: "%02d:%02d", totalSeconds / 60, totalSeconds % 60)
+        guard durationText != text else { return }
+        durationText = text
+    }
+}
+
+private struct RecordingFinalizationMenuBarPopoverView: View {
+    @ObservedObject private var state: AppState
+
+    init(state: AppState) {
+        _state = ObservedObject(initialValue: state)
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 10) {
+                Image(systemName: "arrow.triangle.2.circlepath.circle.fill")
+                    .font(.system(size: 22, weight: .semibold))
+                    .foregroundStyle(.orange)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Finishing recording…", tableName: "Recording")
+                        .font(.headline)
+                    Text("Finishing visual evidence and saving this macro. SparkleRecorder stays responsive; recording and playback will be available when this finishes.", tableName: "Recording")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(3)
+                }
+                Spacer(minLength: 0)
+            }
+
+            Label(
+                String(localized: "Saving evidence", table: "Automation"),
+                systemImage: "clock.arrow.circlepath"
+            )
+            .font(.caption)
+            .foregroundStyle(.secondary)
+        }
+        .padding(14)
+        .frame(width: 320, height: 150, alignment: .topLeading)
+        .transaction { transaction in
+            transaction.animation = nil
+        }
+    }
+}
+
+private struct RecordingPreparationMenuBarPopoverView: View {
+    let controller: MenuBarController
+    @ObservedObject private var state: AppState
+
+    init(controller: MenuBarController, state: AppState) {
+        self.controller = controller
+        _state = ObservedObject(initialValue: state)
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 10) {
+                Image(systemName: "record.circle")
+                    .font(.system(size: 22, weight: .semibold))
+                    .foregroundStyle(Brand.red500)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Preparing recording…", tableName: "Recording")
+                        .font(.headline)
+                    Text(verbatim: state.statusFeedback?.message ?? "")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(2)
+                }
+                Spacer(minLength: 0)
+            }
+
+            ProgressView()
+                .controlSize(.small)
+
+            Button(role: .destructive) {
+                controller.stopAll()
+            } label: {
+                Label(String(localized: "Cancel", table: "Common"), systemImage: "xmark")
+                    .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(RecordingPopoverButtonStyle(tint: Brand.red500))
+            .keyboardShortcut(.cancelAction)
+        }
+        .padding(14)
+        .frame(width: 320, height: 150, alignment: .topLeading)
+        .transaction { transaction in
+            transaction.animation = nil
+        }
+    }
+}
+
+private struct PlaybackMenuBarPopoverView: View {
+    let controller: MenuBarController
+    @ObservedObject private var player: Player
+    @ObservedObject private var clock: PlaybackClock
+    @ObservedObject private var state: AppState
+
+    init(controller: MenuBarController, player: Player, state: AppState) {
+        self.controller = controller
+        _player = ObservedObject(initialValue: player)
+        _clock = ObservedObject(initialValue: player.clock)
+        _state = ObservedObject(initialValue: state)
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 10) {
+                Image(systemName: state.isPlaying ? "play.circle.fill" : "hourglass.circle.fill")
+                    .font(.system(size: 22, weight: .semibold))
+                    .foregroundStyle(Brand.libraryGreen)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(
+                        state.isPlaying
+                            ? String(localized: "Playing", table: "Recording")
+                            : String(localized: "Preparing playback…", table: "Recording")
+                    )
+                    .font(.headline)
+                    Text(verbatim: state.statusFeedback?.message ?? "")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(2)
+                }
+                Spacer(minLength: 0)
+            }
+
+            if state.isPlaying {
+                ProgressView(value: min(1, max(0, clock.progress)))
+                    .progressViewStyle(.linear)
+            } else {
+                ProgressView()
+                    .controlSize(.small)
+            }
+
+            Button(role: .destructive) {
+                controller.stopAll()
+            } label: {
+                Label(String(localized: "Stop", table: "Common"), systemImage: "stop.fill")
+                    .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(RecordingPopoverButtonStyle(tint: Brand.red500))
+            .keyboardShortcut(.cancelAction)
+
+            Label(
+                String(localized: "Library and Settings stay locked until playback stops.", table: "Common"),
+                systemImage: "lock.fill"
+            )
+            .font(.caption)
+            .foregroundStyle(.secondary)
+        }
+        .padding(14)
+        .frame(width: 320, height: 176, alignment: .topLeading)
+        .transaction { transaction in
+            transaction.animation = nil
+        }
     }
 }
 
 private struct RecordingMenuBarPopoverView: View {
     let controller: MenuBarController
-    @ObservedObject private var recorder: Recorder
+    private let recorder: Recorder
     @ObservedObject private var state: AppState
     @StateObject private var model: RecordingPopoverSnapshotModel
 
@@ -305,7 +519,7 @@ private struct RecordingMenuBarPopoverView: View {
 
     init(controller: MenuBarController, recorder: Recorder, state: AppState) {
         self.controller = controller
-        _recorder = ObservedObject(initialValue: recorder)
+        self.recorder = recorder
         _state = ObservedObject(initialValue: state)
         _model = StateObject(wrappedValue: RecordingPopoverSnapshotModel(recorder: recorder))
     }
@@ -378,31 +592,31 @@ private struct RecordingMenuBarPopoverView: View {
                 .help(state.recordHotkey.name)
             }
 
-            HStack(spacing: 8) {
-                Button {
-                    controller.showSettingsWindow()
-                } label: {
-                    Label(String(localized: "Settings", table: "Settings"), systemImage: "gearshape")
-                        .frame(maxWidth: .infinity)
-                }
-                .buttonStyle(RecordingPopoverButtonStyle(tint: Brand.libraryBlue, isQuiet: true))
-
-                Button {
-                    controller.showMainWindow()
-                } label: {
-                    Label(String(localized: "Library", table: "Common"), systemImage: "rectangle.stack")
-                        .frame(maxWidth: .infinity)
-                }
-                .buttonStyle(RecordingPopoverButtonStyle(tint: Brand.libraryBlue, isQuiet: true))
-            }
+            Label(
+                String(localized: "Stop or discard to open Library or Settings.", table: "Common"),
+                systemImage: "lock.fill"
+            )
+            .font(.caption)
+            .foregroundStyle(.secondary)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .accessibilityLabel(
+                String(localized: "Stop or discard to open Library or Settings.", table: "Common")
+            )
         }
         .padding(14)
         .frame(width: 320, height: 276, alignment: .topLeading)
         .transaction { transaction in
             transaction.animation = nil
         }
-        .onReceive(recorder.$liveStats.removeDuplicates()) { stats in
+        .onReceive(
+            recorder.$liveStats
+                .removeDuplicates()
+                .throttle(for: .milliseconds(100), scheduler: RunLoop.main, latest: true)
+        ) { stats in
             model.updateStats(stats)
+        }
+        .onReceive(recorder.$semanticRecordingStatus.removeDuplicates()) { status in
+            model.updateSemanticStatus(status)
         }
     }
 
@@ -410,7 +624,7 @@ private struct RecordingMenuBarPopoverView: View {
         guard state.semanticRecordingEnabled else {
             return String(localized: "Action recording", table: "Recording")
         }
-        switch recorder.semanticRecordingStatus {
+        switch model.semanticStatus {
         case .starting:
             return String(localized: "Preparing evidence", table: "Automation")
         case .active:
@@ -422,7 +636,7 @@ private struct RecordingMenuBarPopoverView: View {
         case .blocked, .failed:
             return String(localized: "Evidence issue", table: "Automation")
         case .suppressed:
-            return String(localized: "Evidence paused", table: "Automation")
+            return String(localized: "Evidence stopped for privacy", table: "Automation")
         case .cancelled:
             return String(localized: "Evidence cancelled", table: "Automation")
         case .idle:
@@ -434,7 +648,7 @@ private struct RecordingMenuBarPopoverView: View {
         guard state.semanticRecordingEnabled else {
             return "record.circle"
         }
-        switch recorder.semanticRecordingStatus {
+        switch model.semanticStatus {
         case .blocked, .failed:
             return "exclamationmark.triangle.fill"
         case .suppressed:
@@ -450,7 +664,7 @@ private struct RecordingMenuBarPopoverView: View {
         guard state.semanticRecordingEnabled else {
             return .secondary
         }
-        switch recorder.semanticRecordingStatus {
+        switch model.semanticStatus {
         case .blocked, .failed:
             return .orange
         case .suppressed:
@@ -584,94 +798,3 @@ enum WorkspaceMode: String, CaseIterable, Identifiable {
         }
     }
 }
-
-// MARK: - Filter chips (popover mode)
-
-// Extracted FilterChipRow.swift
-
-
-// MARK: - Sidebar (window mode)
-
-// Extracted LibrarySidebar.swift
-
-
-// Extracted StatsSummary.swift
-
-
-// MARK: - Header
-
-// Extracted LibraryHeader.swift
-
-
-// MARK: - Selection toolbar
-
-// Extracted SelectionToolbar.swift
-
-
-// MARK: - Macro card
-
-// Extracted MacroCard.swift
-
-
-// MARK: - Card pieces
-
-// Extracted MacroIconView.swift
-
-
-// Extracted CardActionButton.swift
-
-
-// MARK: - Mini waveform
-
-// Extracted MiniWaveform.swift
-
-
-// MARK: - Empty state
-
-// Extracted EmptyState.swift
-
-
-// MARK: - Footer
-
-// Extracted LibraryFooter.swift
-
-
-// Extracted FooterRow.swift
-
-
-// MARK: - Permission banner
-
-// Extracted PermissionBanner.swift
-
-
-// MARK: - Loop chip
-
-// Extracted LoopChip.swift
-
-
-// MARK: - Hotkey assignment sheet
-
-// Extracted HotkeyAssignmentSheet.swift
-
-
-// MARK: - Notes sheet
-
-// Extracted NotesSheet.swift
-
-
-// MARK: - Tag assignment sheet
-
-// Extracted TagAssignmentSheet.swift
-
-
-// Extracted FlowChips.swift
-
-
-// MARK: - Settings panel
-
-// Extracted SettingsPanel.swift
-
-
-// MARK: - Pill button style
-
-// Extracted PillButtonStyle.swift

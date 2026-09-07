@@ -26,6 +26,24 @@ struct RecorderBufferTests {
     }
 
     @MainActor
+    @Test("Hotkey cleanup removes only trailing modifier artifacts from a saved recording")
+    func hotkeyCleanupRemovesTrailingModifierArtifacts() {
+        let recorder = Recorder()
+        recorder.loadEvents([
+            RecordedEvent.make(.leftMouseDown, time: 1.0, x: 10, y: 10),
+            RecordedEvent.make(.flagsChanged, time: 2.0, keyCode: 58, flags: ModFlag.option)
+        ])
+
+        recorder.discardTrailingHotkeyModifierArtifacts(
+            for: RecordingIgnoredKeyChord(keyCode: 15, modifiers: ModFlag.option)
+        )
+
+        #expect(recorder.events.count == 1)
+        #expect(recorder.events.first?.kind == .leftMouseDown)
+        #expect(recorder.liveDuration == 1.0)
+    }
+
+    @MainActor
     @Test("Clearing the recorder buffer resets live duration")
     func clearingRecorderBufferResetsLiveDuration() {
         let recorder = Recorder()

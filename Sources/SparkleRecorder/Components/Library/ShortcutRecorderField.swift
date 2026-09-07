@@ -16,7 +16,7 @@ struct ShortcutRecording {
 
 struct ShortcutRecorderField: View {
     @Binding var currentBinding: HotkeyBinding?
-    let allHotkeys: Set<UInt32>
+    let allHotkeys: Set<HotkeyIdentity>
     var allowsClear = true
     var recordingPrompt = String(localized: "Type shortcut...", table: "Common")
     var emptyPrompt = String(localized: "Click to record shortcut", table: "Recording")
@@ -105,11 +105,11 @@ struct ShortcutRecorderField: View {
         stopRecording()
         isRecording = true
         recordedEventFlags = 0
-        let previousKeyCode = currentBinding?.keyCode
-        if allowsClear {
-            currentBinding = nil
-        }
-        
+        let previousIdentity = currentBinding?.hotkeyIdentity
+
+        // Keep the committed binding intact while listening. A conflicting key,
+        // a second click, or dismissing the sheet is cancellation—not a clear.
+        // Explicit clearing is handled by the dedicated clear affordance.
         localEventMonitor = NSEvent.addLocalMonitorForEvents(matching: [.keyDown, .flagsChanged]) { event in
             if event.type == .flagsChanged {
                 self.recordedEventFlags = Self.eventFlags(from: event.modifierFlags)
@@ -124,7 +124,8 @@ struct ShortcutRecorderField: View {
 
             let recording = Self.recording(from: event)
 
-            if !allHotkeys.contains(keyCode) || keyCode == previousKeyCode {
+            let identity = recording.hotkeyBinding.hotkeyIdentity
+            if !allHotkeys.contains(identity) || identity == previousIdentity {
                 self.currentBinding = recording.hotkeyBinding
                 self.onRecord(recording)
             }

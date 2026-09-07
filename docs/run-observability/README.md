@@ -83,11 +83,11 @@ The Runs surface must not claim that an absent run proves the scheduler never at
 ## Retention Defaults
 
 - Successful run evidence: 30 days.
-- Failed or interrupted run evidence: 90 days.
+- Run evidence needing attention: 90 days. This includes failures, interruptions, timeouts, permission denial, resource conflicts, missing macros, and rejected runs.
 - Lightweight run-history metadata: 365 days.
-- Lightweight run-history metadata: at most 10,000 records by default, with the oldest eligible terminal records removed first.
-- Zero/"Never" disables the selected age limit; the 10,000-record metadata capacity limit remains active.
-- Active runs, the latest workflow execution, the latest workflow failure, and the latest evidence for each macro are protected.
+- Lightweight run-history metadata targets at most 10,000 records by default, with the oldest eligible terminal records removed first. Active/protected records can temporarily keep the total above that target.
+- Zero/"Never" disables the selected age limit; the metadata capacity target remains active.
+- Active runs, the latest workflow execution, the latest run needing attention, and the latest evidence for each macro are protected.
 - Cleanup first persists `pendingDeletion`, then deletes only validated artifact directories, and finally persists `pruned`. A failed deletion is retried on the next preview or daily check.
 - Automatic cleanup is enabled by default, can be disabled without changing retention values, and exposes the last result plus the next eligible check in Settings.
 - Storage usage uses allocated file size. Settings shows whole-store usage and its report/screenshot breakdown; Run Center shows the selected execution's evidence size.

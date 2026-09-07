@@ -11,13 +11,25 @@ public struct PlaybackForegroundWindowObservation: Equatable, Sendable {
 }
 
 public enum PlaybackForegroundWindowVerification {
+    public static func frontmostMatchingWindowID(
+        targetProcessID: Int32,
+        recordedFrame: RectValue,
+        windows: [PlaybackForegroundWindowObservation]
+    ) -> UInt32? {
+        windows.first { window in
+            window.processID == targetProcessID &&
+            abs(window.frame.x - recordedFrame.x) + abs(window.frame.y - recordedFrame.y) +
+                abs(window.frame.width - recordedFrame.width) + abs(window.frame.height - recordedFrame.height) < 8
+        }?.id
+    }
+
     public static func targetProcessID(recordedFrame: RectValue, recordedWindowID: UInt32? = nil,
                                        windows: [PlaybackForegroundWindowObservation]) -> Int32? {
-        let matches = windows.filter { window in
-            if let recordedWindowID { return window.id == recordedWindowID }
-            return abs(window.frame.x - recordedFrame.x) + abs(window.frame.y - recordedFrame.y) +
-                abs(window.frame.width - recordedFrame.width) + abs(window.frame.height - recordedFrame.height) < 8
-        }
+        let matches = matchingWindows(
+            recordedFrame: recordedFrame,
+            recordedWindowID: recordedWindowID,
+            windows: windows
+        )
         let processes = Set(matches.map(\.processID))
         return processes.count == 1 ? processes.first : nil
     }
@@ -28,14 +40,29 @@ public enum PlaybackForegroundWindowVerification {
                                recordedFrame: RectValue, recordedWindowID: UInt32? = nil,
                                windows: [PlaybackForegroundWindowObservation]) -> Bool {
         guard active, let front = windows.first, front.processID == targetProcessID else { return false }
-        if let recordedWindowID {
-            return front.id == recordedWindowID
-        }
-        let matches = windows.filter { window in
-            window.processID == targetProcessID &&
-            abs(window.frame.x - recordedFrame.x) + abs(window.frame.y - recordedFrame.y) +
-            abs(window.frame.width - recordedFrame.width) + abs(window.frame.height - recordedFrame.height) < 8
-        }
+        let matches = matchingWindows(
+            recordedFrame: recordedFrame,
+            recordedWindowID: recordedWindowID,
+            windows: windows
+        ).filter { $0.processID == targetProcessID }
         return matches.count == 1 && matches.first?.id == front.id
+    }
+
+    /// A CGWindowID is strong identity only while that exact window still exists.
+    /// Once the recorded window has been destroyed and recreated, fall back to the
+    /// recorded geometry instead of treating the stale ID as a permanent failure.
+    private static func matchingWindows(
+        recordedFrame: RectValue,
+        recordedWindowID: UInt32?,
+        windows: [PlaybackForegroundWindowObservation]
+    ) -> [PlaybackForegroundWindowObservation] {
+        if let recordedWindowID {
+            let exact = windows.filter { $0.id == recordedWindowID }
+            if !exact.isEmpty { return exact }
+        }
+        return windows.filter { window in
+            abs(window.frame.x - recordedFrame.x) + abs(window.frame.y - recordedFrame.y) +
+                abs(window.frame.width - recordedFrame.width) + abs(window.frame.height - recordedFrame.height) < 8
+        }
     }
 }

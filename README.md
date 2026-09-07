@@ -130,8 +130,10 @@ Useful environment variables:
 ```bash
 SPARKLERECORDER_INSTALL_DIR="$HOME/Desktop" ./build.sh
 SPARKLERECORDER_SWIFT_FLAGS="-Xswiftc -DHIDE_PERMISSION_BANNER" ./build.sh
-SPARKLERECORDER_SIGN_ID="Developer ID Application: Name (TEAMID)" ./build.sh
+SPARKLERECORDER_BUILD_PROFILE=distribution SPARKLERECORDER_SIGN_ID="Developer ID Application: Name (TEAMID)" ./build.sh
 ```
+
+`./build.sh` defaults to the `local` profile: optimized release code with whole-module optimization disabled and Swift incremental compilation enabled. This keeps installed-app behavior close to release while making repeated local rebuilds much faster. Use `SPARKLERECORDER_BUILD_PROFILE=distribution` for the full SwiftPM release/WMO path before shipping or notarizing a distribution build; the two profiles keep separate caches under `.build/`.
 
 Run tests:
 
@@ -147,7 +149,7 @@ Sources/SparkleRecorder/InfoPlist.xcstrings
 ```
 
 `build.sh` exports those catalogs into generated `.lproj/*.strings` files inside the app bundle for `NSLocalizedString` runtime lookup. Do not edit generated `.strings` files by hand.
-The export uses Xcode's `xcstringstool`, so local app packaging requires a full Xcode 15+ install selected with `xcode-select`.
+The export uses Xcode's `xcstringstool`, and the Swift 6 package requires a Swift 6-capable full Xcode (16+) selected with `xcode-select`.
 
 Notarization uses `notarize.sh` after a Developer ID signed build.
 

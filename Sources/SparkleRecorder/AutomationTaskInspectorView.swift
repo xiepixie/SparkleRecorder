@@ -11,10 +11,11 @@ struct AutomationTaskInspectorView: View {
     let taskRuns: [AutomationTaskRun]
     let activeRunID: UUID?
     let initialSelectedRunID: UUID?
-    let onImportWorkflowFromDraftPreview: (AutomationWorkflow, URL?) -> Void
+    let onImportWorkflowFromDraftPreview: @MainActor (AutomationWorkflow, URL?) async throws -> Void
     let onSelectTask: (UUID) -> Void
     let onSelectDependency: (UUID) -> Void
     let onAction: (AutomationAction) -> Void
+    let onCommitAction: @MainActor (AutomationAction) async throws -> Void
 
     @State private var nameDraft = ""
     @State private var isEnabledDraft = true
@@ -78,6 +79,8 @@ struct AutomationTaskInspectorView: View {
     @State private var conditionTimeoutDraft = 30.0
     @State private var conditionPollingDraft = 0.25
     @State private var isConfirmingDeleteTask = false
+    @State private var isCommitInFlight = false
+    @State private var commitErrorMessage: String?
     @State private var selectedTab: TaskInspectorTab = .block
 
     var body: some View {
@@ -96,7 +99,9 @@ struct AutomationTaskInspectorView: View {
             }
         }
         .alert(deleteTaskTitle, isPresented: $isConfirmingDeleteTask) {
-            Button(String(localized: "Delete Task", table: "Automation"), role: .destructive, action: deleteTask)
+            Button(String(localized: "Delete Task", table: "Automation"), role: .destructive) {
+                Task { await deleteTask() }
+            }
             Button(String(localized: "Cancel", table: "Common"), role: .cancel) {}
         } message: {
             Text(deleteTaskMessage)
@@ -257,7 +262,7 @@ struct AutomationTaskInspectorView: View {
         VStack(alignment: .leading, spacing: 8) {
             TextField(String(localized: "Task name", table: "Automation"), text: $nameDraft)
                 .textFieldStyle(.roundedBorder)
-                .onSubmit(saveTask)
+                .onSubmit { Task { await saveTask() } }
 
             Toggle(String(localized: "Enabled", table: "Common"), isOn: $isEnabledDraft)
                 .toggleStyle(.switch)
@@ -654,13 +659,28 @@ struct AutomationTaskInspectorView: View {
 
     private var saveFooter: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Button(action: saveTask) {
-                Label(String(localized: "Save Task", table: "Automation"), systemImage: "checkmark")
-                    .frame(maxWidth: .infinity)
+            Button {
+                Task { await saveTask() }
+            } label: {
+                if isCommitInFlight {
+                    ProgressView()
+                        .controlSize(.small)
+                        .frame(maxWidth: .infinity)
+                } else {
+                    Label(String(localized: "Save Task", table: "Automation"), systemImage: "checkmark")
+                        .frame(maxWidth: .infinity)
+                }
             }
             .buttonStyle(.bordered)
             .controlSize(.large)
-            .disabled(trimmedName.isEmpty)
+            .disabled(trimmedName.isEmpty || isCommitInFlight)
+
+            if let commitErrorMessage {
+                Label(commitErrorMessage, systemImage: "exclamationmark.triangle.fill")
+                    .font(.caption)
+                    .foregroundStyle(.red)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
         }
         .padding(.top, 2)
     }
@@ -1157,6 +1177,7 @@ struct AutomationTaskInspectorView: View {
     }
 
     private func resetDraft() {
+        commitErrorMessage = nil
         nameDraft = task.name
         isEnabledDraft = task.isEnabled
         targetApplicationPolicyDraft = task.targetApplicationPolicy
@@ -1321,12 +1342,14 @@ struct AutomationTaskInspectorView: View {
         visualRegionHeightDraft = Double(region.height)
     }
 
-    private func saveTask() {
-        saveTask(ocrConditionOverride: nil)
+    @MainActor
+    private func saveTask() async {
+        await saveTask(ocrConditionOverride: nil)
     }
 
-    private func saveTask(ocrConditionOverride: AutomationOCRCondition?) {
-        guard !trimmedName.isEmpty else {
+    @MainActor
+    private func saveTask(ocrConditionOverride: AutomationOCRCondition?) async {
+        guard !trimmedName.isEmpty, !isCommitInFlight else {
             return
         }
 
@@ -1342,7 +1365,14 @@ struct AutomationTaskInspectorView: View {
         updated.kind = draftedTaskKind(ocrConditionOverride: ocrConditionOverride)
         updated.resourceRequirement = draftedResourceRequirement
 
-        onAction(.upsertTask(workflowID: workflow.id, task: updated, at: Date()))
+        isCommitInFlight = true
+        commitErrorMessage = nil
+        defer { isCommitInFlight = false }
+        do {
+            try await onCommitAction(.upsertTask(workflowID: workflow.id, task: updated, at: Date()))
+        } catch {
+            commitErrorMessage = error.localizedDescription
+        }
     }
 
     private func draftedTaskKind(ocrConditionOverride: AutomationOCRCondition?) -> AutomationTaskKind {
@@ -1384,8 +1414,17 @@ struct AutomationTaskInspectorView: View {
         onAction(intent.reducerAction(at: Date.now))
     }
 
-    private func deleteTask() {
-        onAction(.deleteTask(workflowID: workflow.id, taskID: task.id, at: Date.now))
+    @MainActor
+    private func deleteTask() async {
+        guard !isCommitInFlight else { return }
+        isCommitInFlight = true
+        commitErrorMessage = nil
+        defer { isCommitInFlight = false }
+        do {
+            try await onCommitAction(.deleteTask(workflowID: workflow.id, taskID: task.id, at: Date.now))
+        } catch {
+            commitErrorMessage = error.localizedDescription
+        }
     }
 
     private var deleteTaskTitle: String {
@@ -1468,6 +1507,7 @@ struct AutomationTaskInspectorView: View {
         AutomationOCRRegionPicker.pick(
             currentCondition: draftedOCRCondition,
             targetSurface: targetSurfaceForOCRPicker,
+            onFailure: { message in commitErrorMessage = message },
             onPicked: applyPickedOCRCondition
         )
     }
@@ -1496,13 +1536,13 @@ struct AutomationTaskInspectorView: View {
         ocrRequiresVisibleDraft = condition.requireVisible
         resetOCRRegionDraft(from: condition.searchRegion)
         ocrRegionPreview = preview
-        saveTask(ocrConditionOverride: condition)
+        Task { await saveTask(ocrConditionOverride: condition) }
     }
 
     private func clearOCRRegion() {
         resetOCRRegionDraft(from: nil)
         ocrRegionPreview = nil
-        saveTask()
+        Task { await saveTask() }
     }
 
     private func drawVisualRegion() {
@@ -1526,13 +1566,13 @@ struct AutomationTaskInspectorView: View {
         visualSearchRegionSpaceDraft = condition.searchRegionSpace
         resetVisualRegionDraft(from: condition.searchRegion)
         visualRegionPreview = preview
-        saveTask()
+        Task { await saveTask() }
     }
 
     private func clearVisualRegion() {
         resetVisualRegionDraft(from: nil)
         visualRegionPreview = nil
-        saveTask()
+        Task { await saveTask() }
     }
 
     private func applyPickedVisualPixel(_ sample: AutomationRegionCapturePixelSample) {
@@ -1542,7 +1582,7 @@ struct AutomationTaskInspectorView: View {
         if let colorHex = sample.colorHex {
             visualColorHexDraft = colorHex
         }
-        saveTask()
+        Task { await saveTask() }
     }
 
     private func clearRegionPreviews() {

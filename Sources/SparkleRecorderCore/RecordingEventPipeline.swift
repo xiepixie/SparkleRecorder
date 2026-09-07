@@ -35,6 +35,25 @@ public struct RawInputEvent: Equatable, Sendable {
     }
 }
 
+public struct RecordingIgnoredKeyChord: Hashable, Sendable {
+    public static let relevantModifierMask: UInt64 =
+        ModFlag.shift | ModFlag.control | ModFlag.option | ModFlag.command
+
+    public var keyCode: UInt16
+    public var modifiers: UInt64
+
+    public init(keyCode: UInt16, modifiers: UInt64) {
+        self.keyCode = keyCode
+        self.modifiers = modifiers & Self.relevantModifierMask
+    }
+
+    public func matches(_ input: RawInputEvent) -> Bool {
+        guard input.kind == .keyDown || input.kind == .keyUp,
+              input.keyCode == keyCode else { return false }
+        return input.flags & Self.relevantModifierMask == modifiers
+    }
+}
+
 public struct RecordingPipelineOutput: Sendable {
     public var registry: RecordingSurfaceRegistry
     public var event: RecordedEvent
@@ -47,7 +66,7 @@ public struct RecordingPipelineOutput: Sendable {
 
 public struct RecordingEventPipeline: Sendable {
     public var recordMouseMoves: Bool
-    public var ignoredKeyCodes: Set<UInt16>
+    public var ignoredKeyChords: Set<RecordingIgnoredKeyChord>
     public var resumeOffsetDuration: TimeInterval
     public var surfaceMatcher: SurfaceMatcher
     public private(set) var registry: RecordingSurfaceRegistry
@@ -58,7 +77,7 @@ public struct RecordingEventPipeline: Sendable {
 
     public init(
         recordMouseMoves: Bool = false,
-        ignoredKeyCodes: Set<UInt16> = [],
+        ignoredKeyChords: Set<RecordingIgnoredKeyChord> = [],
         resumeOffsetDuration: TimeInterval = 0,
         surfaceMatcher: SurfaceMatcher = SurfaceMatcher(),
         registry: RecordingSurfaceRegistry = RecordingSurfaceRegistry(),
@@ -66,7 +85,7 @@ public struct RecordingEventPipeline: Sendable {
         dragSampler: RecordingDragSampler = RecordingDragSampler()
     ) {
         self.recordMouseMoves = recordMouseMoves
-        self.ignoredKeyCodes = ignoredKeyCodes
+        self.ignoredKeyChords = ignoredKeyChords
         self.resumeOffsetDuration = resumeOffsetDuration
         self.surfaceMatcher = surfaceMatcher
         self.registry = registry
@@ -76,12 +95,12 @@ public struct RecordingEventPipeline: Sendable {
 
     public mutating func reset(
         recordMouseMoves: Bool,
-        ignoredKeyCodes: Set<UInt16>,
+        ignoredKeyChords: Set<RecordingIgnoredKeyChord>,
         resumeOffsetDuration: TimeInterval,
         registry: RecordingSurfaceRegistry = RecordingSurfaceRegistry()
     ) {
         self.recordMouseMoves = recordMouseMoves
-        self.ignoredKeyCodes = ignoredKeyCodes
+        self.ignoredKeyChords = ignoredKeyChords
         self.resumeOffsetDuration = resumeOffsetDuration
         self.registry = registry
         baseTimestamp = nil
@@ -104,7 +123,7 @@ public struct RecordingEventPipeline: Sendable {
         )
         baseTimestamp = eventTime.baseTimestamp
 
-        if input.kind.isKey, ignoredKeyCodes.contains(input.keyCode) {
+        if ignoredKeyChords.contains(where: { $0.matches(input) }) {
             return []
         }
 

@@ -1,6 +1,74 @@
 import Foundation
 
-public enum MacroCandidateDisposition: String, Codable, Equatable, Sendable {
+public enum MacroReconstructionObjective: String, Codable, Equatable, Hashable, CaseIterable, Sendable {
+    case faithful
+    case robust
+}
+
+/// Machine-readable guidance for external reconstruction authors. This policy
+/// never grants capabilities beyond `MacroCandidateCapabilities`; it only chooses
+/// how aggressively supported transformations should be preferred.
+public struct MacroReconstructionAuthoringPolicy: Codable, Equatable, Sendable {
+    public static let currentVersion = MacroReconstructionContractVersions.authoringPolicy
+    private enum CodingKeys: String, CodingKey {
+        case version
+        case objective
+        case preferEvidenceBackedTextLocators
+        case replaceRecordedGapsWithBoundedWaits
+        case addVerificationOnlyFromAlignedEvidence
+        case preferWindowOrContentRelativeCoordinates
+        case preferContentNormalizedTextGeometry
+        case preservePathSensitiveGestures
+        case prohibitUnsupportedVisualLocators
+    }
+
+    public var version: String
+    public var objective: MacroReconstructionObjective
+    public var preferEvidenceBackedTextLocators: Bool
+    public var replaceRecordedGapsWithBoundedWaits: Bool
+    public var addVerificationOnlyFromAlignedEvidence: Bool
+    public var preferWindowOrContentRelativeCoordinates: Bool
+    public var preferContentNormalizedTextGeometry: Bool
+    public var preservePathSensitiveGestures: Bool
+    public var prohibitUnsupportedVisualLocators: Bool
+
+    public init(objective: MacroReconstructionObjective) {
+        self.version = Self.currentVersion
+        self.objective = objective
+        switch objective {
+        case .faithful:
+            self.preferEvidenceBackedTextLocators = false
+            self.replaceRecordedGapsWithBoundedWaits = false
+            self.addVerificationOnlyFromAlignedEvidence = false
+            self.preferWindowOrContentRelativeCoordinates = false
+            self.preferContentNormalizedTextGeometry = false
+        case .robust:
+            self.preferEvidenceBackedTextLocators = true
+            self.replaceRecordedGapsWithBoundedWaits = true
+            self.addVerificationOnlyFromAlignedEvidence = true
+            self.preferWindowOrContentRelativeCoordinates = true
+            self.preferContentNormalizedTextGeometry = true
+        }
+        self.preservePathSensitiveGestures = true
+        self.prohibitUnsupportedVisualLocators = true
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        version = try container.decode(String.self, forKey: .version)
+        objective = try container.decode(MacroReconstructionObjective.self, forKey: .objective)
+        preferEvidenceBackedTextLocators = try container.decode(Bool.self, forKey: .preferEvidenceBackedTextLocators)
+        replaceRecordedGapsWithBoundedWaits = try container.decode(Bool.self, forKey: .replaceRecordedGapsWithBoundedWaits)
+        addVerificationOnlyFromAlignedEvidence = try container.decode(Bool.self, forKey: .addVerificationOnlyFromAlignedEvidence)
+        preferWindowOrContentRelativeCoordinates = try container.decode(Bool.self, forKey: .preferWindowOrContentRelativeCoordinates)
+        preferContentNormalizedTextGeometry = try container.decodeIfPresent(Bool.self, forKey: .preferContentNormalizedTextGeometry)
+            ?? (objective == .robust)
+        preservePathSensitiveGestures = try container.decode(Bool.self, forKey: .preservePathSensitiveGestures)
+        prohibitUnsupportedVisualLocators = try container.decode(Bool.self, forKey: .prohibitUnsupportedVisualLocators)
+    }
+}
+
+public enum MacroCandidateDisposition: String, Codable, Equatable, CaseIterable, Sendable {
     case preserved, merged, replacedByLocator, replacedByWait, removedAsNoise, unresolved
 }
 
@@ -44,6 +112,50 @@ public struct MacroCandidateDocument: Codable, Equatable, Sendable {
     }
 }
 
+public struct MacroCandidateSurfaceAuthoringPolicy: Codable, Equatable, Sendable {
+    public let sourceSurfacesAreReadOnly: Bool
+    public let sourceSurfacesAreOmittedFromCandidate: Bool
+    public let eventSurfaceReferencesMayChange: Bool
+    public let textOperationsRequireExplicitSurface: Bool
+    public let liveSurfaceRebindingIsAppOwned: Bool
+
+    public init(
+        sourceSurfacesAreReadOnly: Bool,
+        sourceSurfacesAreOmittedFromCandidate: Bool,
+        eventSurfaceReferencesMayChange: Bool,
+        textOperationsRequireExplicitSurface: Bool,
+        liveSurfaceRebindingIsAppOwned: Bool
+    ) {
+        self.sourceSurfacesAreReadOnly = sourceSurfacesAreReadOnly
+        self.sourceSurfacesAreOmittedFromCandidate = sourceSurfacesAreOmittedFromCandidate
+        self.eventSurfaceReferencesMayChange = eventSurfaceReferencesMayChange
+        self.textOperationsRequireExplicitSurface = textOperationsRequireExplicitSurface
+        self.liveSurfaceRebindingIsAppOwned = liveSurfaceRebindingIsAppOwned
+    }
+}
+
+public struct MacroCandidateTextOperationPolicy: Codable, Equatable, Sendable {
+    public let locatorMouseEventsRequireTargetWindowBinding: Bool
+    public let locatorMouseEventsRequireLocatorOnlyStrategy: Bool
+    public let pointerGestureRequiresStableLocatorIdentity: Bool
+    public let waitAndVerifyRequireBoundedTimeout: Bool
+    public let verificationIsSingleObservation: Bool
+
+    public init(
+        locatorMouseEventsRequireTargetWindowBinding: Bool,
+        locatorMouseEventsRequireLocatorOnlyStrategy: Bool,
+        pointerGestureRequiresStableLocatorIdentity: Bool,
+        waitAndVerifyRequireBoundedTimeout: Bool,
+        verificationIsSingleObservation: Bool
+    ) {
+        self.locatorMouseEventsRequireTargetWindowBinding = locatorMouseEventsRequireTargetWindowBinding
+        self.locatorMouseEventsRequireLocatorOnlyStrategy = locatorMouseEventsRequireLocatorOnlyStrategy
+        self.pointerGestureRequiresStableLocatorIdentity = pointerGestureRequiresStableLocatorIdentity
+        self.waitAndVerifyRequireBoundedTimeout = waitAndVerifyRequireBoundedTimeout
+        self.verificationIsSingleObservation = verificationIsSingleObservation
+    }
+}
+
 /// This manifest describes RecordedEvent playback, not the broader automation
 /// condition vocabulary. Text verification is a single observation, not stability.
 public struct MacroCandidateCapabilities: Codable, Equatable, Sendable {
@@ -51,6 +163,7 @@ public struct MacroCandidateCapabilities: Codable, Equatable, Sendable {
     public let macroVersions: [Int]
     public let eventKinds: [Int]
     public let locatorKinds: [String]
+    public let authoringMacroFields: [String]
     public let eventFields: [String]
     public let textAnchorFields: [String]
     public let maximumEventCount: Int
@@ -58,25 +171,52 @@ public struct MacroCandidateCapabilities: Codable, Equatable, Sendable {
     public let maximumTextTimeout: Double
     public let maximumCoordinateMagnitude: Double
     public let normalizedCoordinateRange: [Double]
+    public let surfaceAuthoringPolicy: MacroCandidateSurfaceAuthoringPolicy
+    public let textOperationPolicy: MacroCandidateTextOperationPolicy
     public let textVerificationPolicy: String
     public let candidateActionRevision: String
     public let protectedExecutionFields: [String]
 
     public static let current = MacroCandidateCapabilities(
-        version: "macro-candidate/v1", macroVersions: [3],
-        eventKinds: [1, 2, 3, 4, 5, 6, 7, 10, 11, 12, 22, 25, 26, 27, 100, 101],
-        locatorKinds: ["text"], eventFields: MacroCandidateSchema.eventFields.sorted(),
+        version: MacroReconstructionContractVersions.candidateCapability, macroVersions: [3],
+        eventKinds: RecordedEvent.Kind.allCases.map(\.rawValue),
+        locatorKinds: ["text"], authoringMacroFields: MacroCandidateSchema.authoringMacroFields.sorted(),
+        eventFields: MacroCandidateSchema.eventFields.sorted(),
         textAnchorFields: MacroCandidateSchema.anchorFields.sorted(),
         maximumEventCount: 100_000, maximumDuration: 86_400, maximumTextTimeout: 3_600,
         maximumCoordinateMagnitude: 1_000_000, normalizedCoordinateRange: [0, 1],
+        surfaceAuthoringPolicy: MacroCandidateSurfaceAuthoringPolicy(
+            sourceSurfacesAreReadOnly: true,
+            sourceSurfacesAreOmittedFromCandidate: true,
+            eventSurfaceReferencesMayChange: true,
+            textOperationsRequireExplicitSurface: true,
+            liveSurfaceRebindingIsAppOwned: true
+        ),
+        textOperationPolicy: MacroCandidateTextOperationPolicy(
+            locatorMouseEventsRequireTargetWindowBinding: true,
+            locatorMouseEventsRequireLocatorOnlyStrategy: true,
+            pointerGestureRequiresStableLocatorIdentity: true,
+            waitAndVerifyRequireBoundedTimeout: true,
+            verificationIsSingleObservation: true
+        ),
         textVerificationPolicy: "single observation; explicit positive bounded textTimeout; no stability guarantee",
-        candidateActionRevision: "candidate",
+        candidateActionRevision: MacroReconstructionContractVersions.candidateActionRevision,
         protectedExecutionFields: ["loops", "speed", "followWindowOffset", "chainTo"]
     )
 }
 
 // Shared with the strict JSON boundary so the exported manifest cannot drift.
 enum MacroCandidateSchema {
+    /// External authoring JSON exposes only executable content plus the minimum
+    /// SavedMacro identity required for lossless decoding. Library placement,
+    /// personalization, execution policy, statistics, caches and evidence links
+    /// remain app-owned and are restored from the accepted source.
+    static let authoringMacroFields: Set<String> = [
+        "id", "name", "events", "createdAt", "modifiedAt", "version"
+    ]
+    /// Compatibility-only input accepted from v3 standalone candidates. New v4
+    /// packages omit source-owned Surface bodies and reference them by event.surfaceId.
+    static let acceptedMacroFields = authoringMacroFields.union(["surfaces"])
     static let eventFields: Set<String> = [
         "kind", "time", "x", "y", "keyCode", "flags", "mouseButton", "clickCount", "scrollDeltaY", "scrollDeltaX",
         "scrollPayload", "unicodeString", "windowLocalX", "windowLocalY", "windowNormalizedX", "windowNormalizedY",

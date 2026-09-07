@@ -10,6 +10,7 @@ final class LiveAutomationRuntimeHost {
     private let windowTracker: WindowTracker
     private var startupTask: Task<Void, Never>?
     private var runtimeHandoffTask: Task<Void, Never>?
+    private var stopTask: Task<Void, Never>?
 
     init(
         player: Player,
@@ -30,6 +31,7 @@ final class LiveAutomationRuntimeHost {
         ) async -> AutomationOCRSearchRegionContext = { _, displayBounds in
             AutomationOCRSearchRegionContext(displayBounds: displayBounds)
         },
+        foregroundInputAvailable: @escaping @Sendable () async -> Bool = { true },
         windowTracker: WindowTracker = WindowTracker(),
         now: @escaping @Sendable () -> Date = { Date() }
     ) {
@@ -84,7 +86,9 @@ final class LiveAutomationRuntimeHost {
             return try await storedVisualPackageProviders.baselineProvider(request, reference)
         }
         let effectRunner = AutomationEffectRunner(
-            resourceArbiter: .live(),
+            resourceArbiter: AppAutomationResourceArbiter.make(
+                foregroundInputAvailable: foregroundInputAvailable
+            ),
             player: playerClient,
             conditionEvaluator: .live(
                 externalSignal: externalSignal,
@@ -109,6 +113,7 @@ final class LiveAutomationRuntimeHost {
     }
 
     func start() {
+        guard stopTask == nil else { return }
         startupTask?.cancel()
         startRuntimeHandoffPolling()
         startupTask = Task { [session] in
@@ -122,13 +127,31 @@ final class LiveAutomationRuntimeHost {
     }
 
     func stop() {
-        startupTask?.cancel()
+        _ = beginStopIfNeeded()
+    }
+
+    func stopAndWait() async {
+        let task = beginStopIfNeeded()
+        await task.value
+    }
+
+    private func beginStopIfNeeded() -> Task<Void, Never> {
+        if let stopTask { return stopTask }
+
+        let startup = startupTask
+        let handoff = runtimeHandoffTask
+        startup?.cancel()
+        handoff?.cancel()
         startupTask = nil
-        runtimeHandoffTask?.cancel()
         runtimeHandoffTask = nil
-        Task { [session] in
+
+        let task = Task { [session] in
+            await startup?.value
+            await handoff?.value
             await session.stop()
         }
+        stopTask = task
+        return task
     }
 
     func dispatchManualStart(workflowID: UUID, taskID: UUID, requestedAt: Date = Date()) {
@@ -151,6 +174,14 @@ final class LiveAutomationRuntimeHost {
 
     func currentState() async -> AutomationRunState? {
         await session.currentState()
+    }
+
+    /// The App shell released its own foreground-input ownership. Wake waiting
+    /// runs immediately instead of making them wait for the next scheduler tick.
+    func foregroundInputBecameAvailable(at date: Date = Date()) {
+        Task { [session] in
+            _ = try? await session.dispatch(.clockTick(date))
+        }
     }
 
     func currentSnapshot() async -> AutomationRuntimeSnapshot? {

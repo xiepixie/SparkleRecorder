@@ -264,7 +264,7 @@ struct AutomationViewProjectionTests {
             ]
         }
         let summaryFormat = "Open the semantic recording captured with %@. It includes %d timeline events; this run does not carry a separate semantic bundle yet."
-        let keys = presentations.reduce(into: Set([summaryFormat])) { keys, presentation in
+        let commonKeys = presentations.reduce(into: Set<String>()) { keys, presentation in
             if presentation.sourceKind == .manualBundle {
                 keys.insert(presentation.summary)
             }
@@ -282,28 +282,9 @@ struct AutomationViewProjectionTests {
                 keys.insert(row.detail)
             }
         }
-        let catalog = try localizationCatalog()
 
-        var missingEntries: [String] = []
-        var missingEnglish: [String] = []
-        var missingSimplifiedChinese: [String] = []
-        for key in keys.sorted() {
-            guard let entry = catalog[key] as? [String: Any] else {
-                missingEntries.append(key)
-                continue
-            }
-            let localizations = entry["localizations"] as? [String: Any] ?? [:]
-            if localizations["en"] == nil {
-                missingEnglish.append(key)
-            }
-            if localizations["zh-Hans"] == nil {
-                missingSimplifiedChinese.append(key)
-            }
-        }
-
-        #expect(missingEntries.isEmpty, "Missing Localizable.xcstrings entries: \(missingEntries)")
-        #expect(missingEnglish.isEmpty, "Missing English localizations: \(missingEnglish)")
-        #expect(missingSimplifiedChinese.isEmpty, "Missing Simplified Chinese localizations: \(missingSimplifiedChinese)")
+        try assertLocalizedKeys(commonKeys, table: "Common")
+        try assertLocalizedKeys(Set([summaryFormat]), table: "Automation")
     }
 
     @Test("Macro Review source presentation exposes failed event target")
@@ -1287,9 +1268,34 @@ struct AutomationViewProjectionTests {
         #expect(node.position == position)
     }
 
-    private func localizationCatalog() throws -> [String: Any] {
+    private func assertLocalizedKeys(_ keys: Set<String>, table: String) throws {
+        let catalog = try localizationCatalog(table: table)
+        var missingEntries: [String] = []
+        var missingEnglish: [String] = []
+        var missingSimplifiedChinese: [String] = []
+
+        for key in keys.sorted() {
+            guard let entry = catalog[key] as? [String: Any] else {
+                missingEntries.append(key)
+                continue
+            }
+            let localizations = entry["localizations"] as? [String: Any] ?? [:]
+            if localizations["en"] == nil {
+                missingEnglish.append(key)
+            }
+            if localizations["zh-Hans"] == nil {
+                missingSimplifiedChinese.append(key)
+            }
+        }
+
+        #expect(missingEntries.isEmpty, "Missing \(table).xcstrings entries: \(missingEntries)")
+        #expect(missingEnglish.isEmpty, "Missing \(table) English localizations: \(missingEnglish)")
+        #expect(missingSimplifiedChinese.isEmpty, "Missing \(table) Simplified Chinese localizations: \(missingSimplifiedChinese)")
+    }
+
+    private func localizationCatalog(table: String) throws -> [String: Any] {
         let url = repositoryRoot()
-            .appendingPathComponent("Sources/SparkleRecorder/Localizable.xcstrings")
+            .appendingPathComponent("Sources/SparkleRecorder/\(table).xcstrings")
         let data = try Data(contentsOf: url)
         let rootObject = try #require(
             try JSONSerialization.jsonObject(with: data) as? [String: Any]

@@ -16,7 +16,30 @@ set -euo pipefail
 
 APP_NAME="SparkleRecorder"
 ROOT="$(cd "$(dirname "$0")" && pwd)"
-BUILD_DIR="${ROOT}/.build/release"
+BUILD_PROFILE="${SPARKLERECORDER_BUILD_PROFILE:-local}"
+case "$BUILD_PROFILE" in
+    local)
+        # Keep release optimization for realistic app behavior, but disable WMO so
+        # Swift can reuse per-file incremental build state during daily iteration.
+        BUILD_SCRATCH="${ROOT}/.build/local"
+        BUILD_DIR="${BUILD_SCRATCH}/release"
+        BUILD_SWIFT_ARGS=(-c release --scratch-path "$BUILD_SCRATCH" -Xswiftc -no-whole-module-optimization -Xswiftc -incremental)
+        BUILD_LABEL="release, incremental"
+        ;;
+    distribution)
+        # Distribution keeps SwiftPM's default release WMO. It uses a separate
+        # cache so an occasional shipping build does not invalidate the fast local
+        # incremental graph.
+        BUILD_SCRATCH="${ROOT}/.build/distribution"
+        BUILD_DIR="${BUILD_SCRATCH}/release"
+        BUILD_SWIFT_ARGS=(-c release --scratch-path "$BUILD_SCRATCH")
+        BUILD_LABEL="release, WMO"
+        ;;
+    *)
+        echo "error: SPARKLERECORDER_BUILD_PROFILE must be 'local' or 'distribution'." >&2
+        exit 2
+        ;;
+esac
 STAGE="${ROOT}/.build/${APP_NAME}.app"        # assembled here first (gitignored)
 GENERATED_L10N="${ROOT}/.build/generated-localizations"
 # Install location can be overridden (e.g. to build a one-off copy on the Desktop
@@ -24,8 +47,25 @@ GENERATED_L10N="${ROOT}/.build/generated-localizations"
 INSTALL_DIR="${SPARKLERECORDER_INSTALL_DIR:-/Applications}"
 APP_BUNDLE="${INSTALL_DIR}/${APP_NAME}.app"   # final location
 CONTENTS="${STAGE}/Contents"
+INSTALL_STAGING=""
+INSTALL_BACKUP=""
 
 cd "$ROOT"
+
+cleanup() {
+    rm -rf "$STAGE"
+    if [ -n "$INSTALL_STAGING" ]; then
+        rm -rf "$INSTALL_STAGING"
+    fi
+    if [ -n "$INSTALL_BACKUP" ] && [ -e "$INSTALL_BACKUP" ]; then
+        if [ ! -e "$APP_BUNDLE" ]; then
+            mv "$INSTALL_BACKUP" "$APP_BUNDLE" 2>/dev/null || true
+        else
+            rm -rf "$INSTALL_BACKUP"
+        fi
+    fi
+}
+trap cleanup EXIT
 
 # Regenerate the icon if the source script is newer than the .icns (or it's missing).
 if [ ! -f "AppIcon.icns" ] || [ "tools/make_icon.swift" -nt "AppIcon.icns" ]; then
@@ -34,10 +74,10 @@ if [ ! -f "AppIcon.icns" ] || [ "tools/make_icon.swift" -nt "AppIcon.icns" ]; th
     iconutil -c icns AppIcon.iconset -o AppIcon.icns
 fi
 
-echo "→ Compiling (release)..."
+echo "→ Compiling (${BUILD_LABEL})..."
 # Extra swiftc flags can be injected, e.g. SPARKLERECORDER_SWIFT_FLAGS="-Xswiftc -DHIDE_PERMISSION_BANNER".
 # Unquoted on purpose so multiple flags word-split into separate arguments.
-swift build -c release ${SPARKLERECORDER_SWIFT_FLAGS:-}
+swift build "${BUILD_SWIFT_ARGS[@]}" ${SPARKLERECORDER_SWIFT_FLAGS:-}
 
 echo "→ Bundling ${APP_NAME}.app..."
 rm -rf "$STAGE"
@@ -51,7 +91,7 @@ chmod +x "${CONTENTS}/MacOS/${APP_NAME}"
 
 echo "→ Compiling string catalogs..."
 if ! XCSTRINGSTOOL=$(xcrun --find xcstringstool 2>/dev/null); then
-    echo "error: xcstringstool was not found. Install full Xcode 15+ and select it with xcode-select." >&2
+    echo "error: xcstringstool was not found. Install a Swift 6-capable full Xcode (16+) and select it with xcode-select." >&2
     exit 1
 fi
 rm -rf "$GENERATED_L10N"
@@ -76,29 +116,24 @@ if pgrep -f "${APP_BUNDLE}/Contents/MacOS/${APP_NAME}" >/dev/null 2>&1; then
     exit 1
 fi
 
-echo "→ Installing to ${INSTALL_DIR}..."
-rm -rf "$APP_BUNDLE"
-mkdir -p "$INSTALL_DIR"
-cp -R "$STAGE" "$APP_BUNDLE"
-
-# Sign the bundle, stripping extended attributes first. Writing into a
-# Finder-watched dir (e.g. ~/Desktop) can race in com.apple.FinderInfo/macl that
-# codesign rejects as "detritus", so clear-then-sign with one retry.
-#   $1 = extra codesign flags (may be empty), $2 = identity ("-" for ad-hoc)
+# Sign the staged bundle before touching the currently installed app. This keeps
+# a failed identity lookup, timestamp request, or codesign operation from replacing
+# a known-good installation with an unsigned/partially signed bundle.
+#   $1 = bundle path, $2 = identity ("-" for ad-hoc), remaining args = codesign flags
 sign_app() {
-    xattr -cr "$APP_BUNDLE" 2>/dev/null || true
-    if ! codesign --force $1 --sign "$2" "$APP_BUNDLE" 2>/dev/null; then
-        echo "  …xattr race; clearing and retrying"
-        xattr -cr "$APP_BUNDLE" 2>/dev/null || true
-        codesign --force $1 --sign "$2" "$APP_BUNDLE"
-    fi
+    local target="$1"
+    local identity="$2"
+    shift 2
+    xattr -cr "$target" 2>/dev/null || true
+    codesign --force "$@" --sign "$identity" "$target"
 }
 
 # Prefer a Developer ID Application identity when one is installed: a stable
 # signature means TCC (Accessibility / Input Monitoring) grants persist across
 # rebuilds, and it's a prerequisite for notarization. Override by exporting
-# SPARKLERECORDER_SIGN_ID="Developer ID Application: Name (TEAMID)". Falls back to
-# ad-hoc signing until a Developer ID cert exists (then grants re-prompt per build).
+# SPARKLERECORDER_SIGN_ID="Developer ID Application: Name (TEAMID)". Without a
+# Developer ID cert, a stable Apple development/distribution identity is preferred;
+# if none exists, the script uses ad-hoc signing.
 # List identities once. The trailing `|| true` on each pipeline matters: under
 # `set -euo pipefail` a grep with no match exits non-zero and would abort the
 # build, so we swallow that and just end up with an empty SIGN_ID.
@@ -113,63 +148,53 @@ fi
 if [ -z "$SIGN_ID" ]; then
     SIGN_ID=$(printf '%s\n' "$SIGN_IDS" | grep -E "Apple Development|Apple Distribution" | head -1 | sed -E 's/.*"(.*)"$/\1/' || true)
 fi
-# 3) Fallback: use or create a stable self-signed local certificate "SparkleRecorder-SelfSigned"
-#    so that TCC (Accessibility) permissions persist across rebuilds on this Mac.
-if [ -z "$SIGN_ID" ]; then
-    if printf '%s\n' "$SIGN_IDS" | grep -q "SparkleRecorder-SelfSigned"; then
-        SIGN_ID="SparkleRecorder-SelfSigned"
-    else
-        echo "→ Generating stable self-signed codesigning certificate 'SparkleRecorder-SelfSigned'..."
-        CERT_TMP_DIR=$(mktemp -d)
-        CERT_CONF_TMP="${CERT_TMP_DIR}/openssl.cnf"
-        KEY_PEM="${CERT_TMP_DIR}/key.pem"
-        CERT_PEM="${CERT_TMP_DIR}/cert.pem"
-        CERT_P12="${CERT_TMP_DIR}/cert.p12"
-        cat <<EOF > "$CERT_CONF_TMP"
-[req]
-distinguished_name = req_distinguished_name
-prompt = no
-[req_distinguished_name]
-CN = SparkleRecorder-SelfSigned
-[ext]
-keyUsage = critical, digitalSignature
-extendedKeyUsage = critical, codeSigning
-basicConstraints = critical, CA:false
-EOF
-        
-        openssl req -x509 -newkey rsa:2048 -keyout "$KEY_PEM" -out "$CERT_PEM" -sha256 -days 3650 -nodes -config "$CERT_CONF_TMP" -extensions ext
-        openssl pkcs12 -export -legacy -inkey "$KEY_PEM" -in "$CERT_PEM" -out "$CERT_P12" -passout pass:123456
-        security import "$CERT_P12" -f pkcs12 -P 123456 -A -T /usr/bin/codesign
-        security add-trusted-cert -p codeSign -r trustRoot "$CERT_PEM"
-        
-        rm -rf "$CERT_TMP_DIR"
-        SIGN_ID="SparkleRecorder-SelfSigned"
-    fi
-fi
+# 3) Otherwise fall back to ad-hoc signing. build.sh must not silently create a
+#    private key or change the user's Keychain trust policy. A deliberately created
+#    local identity can still be selected explicitly with SPARKLERECORDER_SIGN_ID.
 
 if [ -n "$SIGN_ID" ]; then
     case "$SIGN_ID" in
         *"Developer ID"*)
             echo "→ Signing with Developer ID (hardened runtime): ${SIGN_ID}"
-            sign_app "--options runtime --timestamp" "$SIGN_ID"
+            sign_app "$STAGE" "$SIGN_ID" --options runtime --timestamp
             ;;
         *)
             echo "→ Signing with stable identity (TCC grants persist): ${SIGN_ID}"
-            sign_app "" "$SIGN_ID"
+            sign_app "$STAGE" "$SIGN_ID"
             ;;
     esac
     SIGNED_WITH="$SIGN_ID"
 else
-    echo "→ No signing identity found — ad-hoc signing (permissions re-prompt per rebuild)."
-    sign_app "" "-"
+    echo "→ No signing identity found — ad-hoc signing (permissions may re-prompt after rebuilds)."
+    sign_app "$STAGE" "-"
     SIGNED_WITH="ad-hoc"
 fi
+
+codesign --verify --deep --strict --verbose=2 "$STAGE"
+
+echo "→ Installing to ${INSTALL_DIR}..."
+mkdir -p "$INSTALL_DIR"
+INSTALL_STAGING="${INSTALL_DIR}/.${APP_NAME}.app.installing.$$"
+INSTALL_BACKUP="${INSTALL_DIR}/.${APP_NAME}.app.previous.$$"
+rm -rf "$INSTALL_STAGING" "$INSTALL_BACKUP"
+cp -R "$STAGE" "$INSTALL_STAGING"
+codesign --verify --deep --strict --verbose=2 "$INSTALL_STAGING"
+
+if [ -e "$APP_BUNDLE" ]; then
+    mv "$APP_BUNDLE" "$INSTALL_BACKUP"
+fi
+if ! mv "$INSTALL_STAGING" "$APP_BUNDLE"; then
+    if [ -e "$INSTALL_BACKUP" ]; then
+        mv "$INSTALL_BACKUP" "$APP_BUNDLE" 2>/dev/null || true
+    fi
+    echo "✗ Failed to activate the new app; the previous installation was restored when possible." >&2
+    exit 1
+fi
+INSTALL_STAGING=""
+rm -rf "$INSTALL_BACKUP"
+INSTALL_BACKUP=""
 
 echo
 echo "✅ Installed: ${APP_BUNDLE}"
 echo "   Signed:   ${SIGNED_WITH}"
 echo "   Run:  open \"${APP_BUNDLE}\""
-
-# Keep the build directory from looking like a second runnable copy of the app.
-# Launching this unsigned staging bundle would create a separate TCC identity.
-rm -rf "$STAGE"

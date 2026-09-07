@@ -52,7 +52,7 @@ struct DomainSendableTests {
             detail: "Secure Input"
         ))
         assertSendable(RecordingEventBuffer())
-        assertSendable(RecordingEventBufferSnapshot(events: [event], surfaces: [TestFixtures.surfaceId: surface]))
+        assertSendable(RecordingSessionTrackSnapshot(playableEvents: [event], surfaces: [TestFixtures.surfaceId: surface]))
         assertSendable(RecordingSessionProcessor())
         assertSendable(RecordingEngineClient(
             events: { AsyncStream { $0.finish() } },

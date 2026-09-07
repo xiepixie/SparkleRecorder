@@ -102,7 +102,7 @@ struct ActionRowView: View {
                             .truncationMode(.tail)
                             .foregroundStyle(Brand.sigAmber)
                     } else {
-                        Text(NSLocalizedString("No target text", tableName: "EditorUX", comment: ""))
+                        Text("No target text", tableName: "EditorUX")
                             .lineLimit(1)
                             .truncationMode(.tail)
                             .foregroundStyle(Brand.sigAmber)

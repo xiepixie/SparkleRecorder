@@ -67,21 +67,67 @@ public struct RecordingReconstructionProvenance: Codable, Equatable, Sendable {
     public var sessionOriginHostTime: Double
     public var sessionEndTime: Double
     public var sourceEvents: [RecordingSourceEventTime]
-    /// Digest of the exact captured playable event sequence, before session-time projection.
+    /// Digest of the final playable event sequence owned by the saved macro.
     /// Missing in legacy provenance; index/time equality alone never binds an edited macro.
     public var sourceEventDigest: String?
     public var movieEvidence: [RecordingMovieTimingEvidence]
     public var frameTimings: [RecordingFrameTimingEvidence]
     public var clockSegments: [RecordingVideoClockSegment]
     public var geometrySnapshots: [RecordingGeometrySnapshot]
+    /// Maps compact playable events to their higher-resolution mechanical evidence.
+    public var playableEvidenceLinks: [RecordingPlayableEvidenceLink]
+    /// Evidence samples dropped after the bounded high-resolution track reached its cap.
+    public var omittedEvidenceSampleCount: Int
+
+    private enum CodingKeys: String, CodingKey {
+        case sessionOriginHostTime, sessionEndTime, sourceEvents, sourceEventDigest
+        case movieEvidence, frameTimings, clockSegments, geometrySnapshots
+        case playableEvidenceLinks, omittedEvidenceSampleCount
+    }
+
     public init(sessionOriginHostTime: Double, sessionEndTime: Double,
                 sourceEvents: [RecordingSourceEventTime] = [], movieEvidence: [RecordingMovieTimingEvidence] = [],
                 frameTimings: [RecordingFrameTimingEvidence] = [], clockSegments: [RecordingVideoClockSegment] = [],
-                geometrySnapshots: [RecordingGeometrySnapshot] = [], sourceEventDigest: String? = nil) {
+                geometrySnapshots: [RecordingGeometrySnapshot] = [], sourceEventDigest: String? = nil,
+                playableEvidenceLinks: [RecordingPlayableEvidenceLink] = [], omittedEvidenceSampleCount: Int = 0) {
         self.sessionOriginHostTime = sessionOriginHostTime; self.sessionEndTime = sessionEndTime
         self.sourceEvents = sourceEvents; self.sourceEventDigest = sourceEventDigest
         self.movieEvidence = movieEvidence; self.frameTimings = frameTimings
         self.clockSegments = clockSegments; self.geometrySnapshots = geometrySnapshots
+        self.playableEvidenceLinks = playableEvidenceLinks
+        self.omittedEvidenceSampleCount = max(0, omittedEvidenceSampleCount)
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        sessionOriginHostTime = try container.decode(Double.self, forKey: .sessionOriginHostTime)
+        sessionEndTime = try container.decode(Double.self, forKey: .sessionEndTime)
+        sourceEvents = try container.decodeIfPresent([RecordingSourceEventTime].self, forKey: .sourceEvents) ?? []
+        sourceEventDigest = try container.decodeIfPresent(String.self, forKey: .sourceEventDigest)
+        movieEvidence = try container.decodeIfPresent([RecordingMovieTimingEvidence].self, forKey: .movieEvidence) ?? []
+        frameTimings = try container.decodeIfPresent([RecordingFrameTimingEvidence].self, forKey: .frameTimings) ?? []
+        clockSegments = try container.decodeIfPresent([RecordingVideoClockSegment].self, forKey: .clockSegments) ?? []
+        geometrySnapshots = try container.decodeIfPresent([RecordingGeometrySnapshot].self, forKey: .geometrySnapshots) ?? []
+        playableEvidenceLinks = try container.decodeIfPresent([RecordingPlayableEvidenceLink].self, forKey: .playableEvidenceLinks) ?? []
+        omittedEvidenceSampleCount = max(0, try container.decodeIfPresent(Int.self, forKey: .omittedEvidenceSampleCount) ?? 0)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(sessionOriginHostTime, forKey: .sessionOriginHostTime)
+        try container.encode(sessionEndTime, forKey: .sessionEndTime)
+        try container.encode(sourceEvents, forKey: .sourceEvents)
+        try container.encodeIfPresent(sourceEventDigest, forKey: .sourceEventDigest)
+        try container.encode(movieEvidence, forKey: .movieEvidence)
+        try container.encode(frameTimings, forKey: .frameTimings)
+        try container.encode(clockSegments, forKey: .clockSegments)
+        try container.encode(geometrySnapshots, forKey: .geometrySnapshots)
+        if !playableEvidenceLinks.isEmpty {
+            try container.encode(playableEvidenceLinks, forKey: .playableEvidenceLinks)
+        }
+        if omittedEvidenceSampleCount > 0 {
+            try container.encode(omittedEvidenceSampleCount, forKey: .omittedEvidenceSampleCount)
+        }
     }
 }
 

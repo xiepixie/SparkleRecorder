@@ -139,6 +139,68 @@ struct AutomationEngineRuntimeTests {
         #expect(run.outcome == nil)
     }
 
+    @Test("Scheduled macro tick reaches Player with unattended target preparation")
+    func scheduledMacroTickReachesPlayer() async throws {
+        let workflowID = UUID()
+        let taskID = UUID()
+        let macroID = UUID()
+        let tickAt = Date(timeIntervalSince1970: 1_350)
+        let macro = SavedMacro(id: macroID, name: "Scheduled macro", events: TestFixtures.clickPair(), loops: 7)
+        let recorder = RuntimePlayerStartRecorder()
+        let player = AutomationPlayerClient(
+            start: { request in
+                await recorder.record(request)
+                return .started
+            },
+            cancel: { _ in }
+        )
+        let task = AutomationTask(
+            id: taskID,
+            name: "Scheduled macro",
+            kind: .macro(macroID: macroID),
+            schedule: .once(tickAt),
+            resourceRequirement: .foregroundInput,
+            targetApplicationPolicy: .launchIfNeeded,
+            targetApplicationReadyDelay: 4,
+            targetApplicationCleanupPolicy: .quitIfLaunched,
+            targetApplicationQuitTimeout: 9,
+            targetApplicationForceQuitOnTimeout: false,
+            playbackLoops: 1
+        )
+        let workflow = AutomationWorkflow(
+            id: workflowID,
+            name: "Scheduled player workflow",
+            tasks: [task],
+            createdAt: tickAt,
+            modifiedAt: tickAt
+        )
+        let runner = AutomationEffectRunner(
+            resourceArbiter: .live(),
+            player: player,
+            loadMacro: { id in id == macroID ? macro : nil },
+            now: { tickAt },
+            sleep: { _ in }
+        )
+        let runtime = AutomationEngineRuntime(
+            initialState: AutomationRunState(workflows: [workflow]),
+            effectRunner: runner
+        )
+
+        await runtime.runScheduler(.fixed([.clockTick(tickAt)]))
+
+        let state = await runtime.currentState()
+        let run = try #require(state.runs.first)
+        #expect(run.scheduledStartTime == tickAt)
+        #expect(run.status == .running)
+        #expect(await recorder.macroIDs == [macroID])
+        #expect(await recorder.targetApplicationPolicies == [.launchIfNeeded])
+        #expect(await recorder.targetApplicationReadyDelays == [4])
+        #expect(await recorder.targetApplicationCleanupPolicies == [.quitIfLaunched])
+        #expect(await recorder.targetApplicationQuitTimeouts == [9])
+        #expect(await recorder.targetApplicationForceQuitOnTimeouts == [false])
+        #expect(await recorder.playbackLoops == [1])
+    }
+
     @Test("Runtime consumes PlayerClient completion events as reducer actions")
     func runtimeConsumesPlayerCompletionEvents() async throws {
         let workflowID = UUID()
@@ -268,17 +330,30 @@ struct AutomationEngineRuntimeTests {
 private actor RuntimePlayerStartRecorder {
     private var recordedRunIDs: [UUID] = []
     private var recordedMacroIDs: [UUID] = []
+    private var recordedTargetApplicationPolicies: [AutomationTargetApplicationPolicy] = []
+    private var recordedTargetApplicationReadyDelays: [TimeInterval] = []
+    private var recordedTargetApplicationCleanupPolicies: [AutomationTargetApplicationCleanupPolicy] = []
+    private var recordedTargetApplicationQuitTimeouts: [TimeInterval] = []
+    private var recordedTargetApplicationForceQuitOnTimeouts: [Bool] = []
+    private var recordedPlaybackLoops: [Int] = []
 
-    var runIDs: [UUID] {
-        recordedRunIDs
-    }
-
-    var macroIDs: [UUID] {
-        recordedMacroIDs
-    }
+    var runIDs: [UUID] { recordedRunIDs }
+    var macroIDs: [UUID] { recordedMacroIDs }
+    var targetApplicationPolicies: [AutomationTargetApplicationPolicy] { recordedTargetApplicationPolicies }
+    var targetApplicationReadyDelays: [TimeInterval] { recordedTargetApplicationReadyDelays }
+    var targetApplicationCleanupPolicies: [AutomationTargetApplicationCleanupPolicy] { recordedTargetApplicationCleanupPolicies }
+    var targetApplicationQuitTimeouts: [TimeInterval] { recordedTargetApplicationQuitTimeouts }
+    var targetApplicationForceQuitOnTimeouts: [Bool] { recordedTargetApplicationForceQuitOnTimeouts }
+    var playbackLoops: [Int] { recordedPlaybackLoops }
 
     func record(_ request: AutomationPlayerStartRequest) {
         recordedRunIDs.append(request.runID)
         recordedMacroIDs.append(request.macro.id)
+        recordedTargetApplicationPolicies.append(request.targetApplicationPolicy)
+        recordedTargetApplicationReadyDelays.append(request.targetApplicationReadyDelay)
+        recordedTargetApplicationCleanupPolicies.append(request.targetApplicationCleanupPolicy)
+        recordedTargetApplicationQuitTimeouts.append(request.targetApplicationQuitTimeout)
+        recordedTargetApplicationForceQuitOnTimeouts.append(request.targetApplicationForceQuitOnTimeout)
+        recordedPlaybackLoops.append(request.macro.loops)
     }
 }

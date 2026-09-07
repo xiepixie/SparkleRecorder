@@ -55,10 +55,8 @@ struct LibraryMenuLocalizationTests {
             "Common": [
                 "Add Tag…",
                 "Assign Hotkey…",
-                "Bind Active Window",
                 "Chain To",
                 "Clear Hotkey",
-                "Clear Window Binding",
                 "Color",
                 "Create Sequence…",
                 "Custom…",
@@ -67,7 +65,6 @@ struct LibraryMenuLocalizationTests {
                 "Edit…",
                 "Export",
                 "Favorite",
-                "Follow Window Position",
                 "None",
                 "Notes…",
                 "Play",
@@ -76,7 +73,13 @@ struct LibraryMenuLocalizationTests {
                 "Unfavorite",
             ],
             "EditorUX": ["As Text…"],
-            "Recording": ["As SparkleRecorder File…"],
+            "Recording": [
+                "As SparkleRecorder File…",
+                "Choose Target Window…",
+                "Change Target Window…",
+                "Follow Target Window Position",
+                "Remove Target Window",
+            ],
         ]
 
         for (table, keys) in catalogs {

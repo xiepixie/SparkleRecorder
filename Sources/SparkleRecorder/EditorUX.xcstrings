@@ -1,6 +1,216 @@
 {
   "sourceLanguage": "en",
   "strings": {
+    "Assign the selected action to one Playback Surface before retargeting its coordinates.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Assign the selected action to one Playback Surface before retargeting its coordinates." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "重新定位坐标前，请先为所选动作明确指定一个播放窗口。" } }
+      }
+    },
+    "Choose one Playback Surface for the selected text actions before picking text.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Choose one Playback Surface for the selected text actions before picking text." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "拾取文本前，请先为所选文本动作明确指定同一个播放窗口。" } }
+      }
+    },
+    "%d referenced events": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "%d referenced events" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "%d 个事件引用" } }
+      }
+    },
+    "The current selection uses this Playback Surface.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "The current selection uses this Playback Surface." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "当前所选动作使用此播放窗口。" } }
+      }
+    },
+    "Rebind…": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Rebind…" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "重新绑定…" } }
+      }
+    },
+    "Use for selection": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Use for selection" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "用于所选动作" } }
+      }
+    },
+    "Reassign every action that uses this surface before removing it.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Reassign every action that uses this surface before removing it." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "移除此窗口前，请先为所有引用它的动作重新指定播放窗口。" } }
+      }
+    },
+    "The current selection spans multiple Playback Surfaces. Rebind each surface independently, or choose one surface explicitly for the selected actions.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "The current selection spans multiple Playback Surfaces. Rebind each surface independently, or choose one surface explicitly for the selected actions." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "当前所选动作跨越多个播放窗口。请分别重新绑定各窗口，或明确为所选动作指定同一个播放窗口。" } }
+      }
+    },
+    "Add Target Window…": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Add Target Window…" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "添加目标窗口…" } }
+      }
+    },
+    "Change Playback Surface": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Change Playback Surface" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "更改播放窗口" } }
+      }
+    },
+    "The Playback Surface changed before it could be updated. Try again.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "The Playback Surface changed before it could be updated. Try again." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "播放窗口在更新前已发生变化，请重试。" } }
+      }
+    },
+    "Reassign every action that uses this Playback Surface before removing it.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Reassign every action that uses this Playback Surface before removing it." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "移除此播放窗口前，请先为所有引用它的动作重新指定窗口。" } }
+      }
+    },
+    "This macro uses multiple Playback Surfaces. Open the editor to manage them individually.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "This macro uses multiple Playback Surfaces. Open the editor to manage them individually." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "此宏使用多个播放窗口。请打开编辑器分别管理这些窗口。" } }
+      }
+    },
+    "This reconstruction package uses an unsupported contract manifest (%@). Export the current macro again.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "This reconstruction package uses an unsupported contract manifest (%@). Export the current macro again." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "此重建包使用了不受支持的契约清单（%@）。请重新导出当前宏。" } }
+      }
+    },
+    "This reconstruction package uses an unsupported source-context contract (%@). Export the current macro again.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "This reconstruction package uses an unsupported source-context contract (%@). Export the current macro again." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "此重建包使用了不受支持的源上下文契约（%@）。请重新导出当前宏。" } }
+      }
+    },
+    "This reconstruction package uses an unsupported action-context contract (%@). Export the current macro again.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "This reconstruction package uses an unsupported action-context contract (%@). Export the current macro again." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "此重建包使用了不受支持的动作上下文契约（%@）。请重新导出当前宏。" } }
+      }
+    },
+    "Reconstruction package contract metadata disagrees for %@. Export the current macro again instead of mixing package files.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Reconstruction package contract metadata disagrees for %@. Export the current macro again instead of mixing package files." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "重建包中的 %@ 契约信息不一致。请重新导出当前宏，不要混用不同重建包中的文件。" } }
+      }
+    },
+    "Actions only": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Actions only" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "仅动作数据" } }
+      }
+    },
+    "Mechanical input evidence included": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Mechanical input evidence included" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "包含输入轨迹证据" } }
+      }
+    },
+    "Package provenance unavailable.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Package provenance unavailable." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "未提供重建包来源信息。" } }
+      }
+    },
+    "Recording aligned": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Recording aligned" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "已与原始录制对齐" } }
+      }
+    },
+    "Recording alignment unavailable": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Recording alignment unavailable" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "无法与原始录制对齐" } }
+      }
+    },
+    "This macro changed after recording, but no verified source revision is available to realign it. Action times below are not video seek times.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "This macro changed after recording, but no verified source revision is available to realign it. Action times below are not video seek times." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "此宏在录制后已被修改，但当前没有可验证的源版本可用于重新对齐。下方动作时间不能用于定位视频。" } }
+      }
+    },
+    "Some edited steps cannot be aligned to the original video. Verified steps can still seek precisely.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Some edited steps cannot be aligned to the original video. Verified steps can still seek precisely." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "部分已编辑步骤无法与原始视频精确对齐；已验证的步骤仍可准确定位视频。" } }
+      }
+    },
+    "Standalone candidate": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Standalone candidate" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "独立候选版本" } }
+      }
+    },
+    "Verified AI package": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Verified AI package" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "已验证的 AI 重建包" } }
+      }
+    },
+    "Visual evidence included": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Visual evidence included" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "包含视觉证据" } }
+      }
+    },
+    "AI can analyze actions, but this recording has no screen frames.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "AI can analyze actions, but this recording has no screen frames." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "AI 可以分析动作序列，但这次录制没有保存屏幕画面帧。" } }
+      }
+    },
+    "The linked visual evidence is unavailable. AI can analyze actions, but it must not infer the recorded screen state.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "The linked visual evidence is unavailable. AI can analyze actions, but it must not infer the recorded screen state." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "已关联的视觉证据当前不可用。AI 可以分析动作，但不能据此推断录制时的屏幕状态。" } }
+      }
+    },
+    "Visual evidence is ready. Include it to give AI the recording plus an action-linked map for seeking, cropping, and checking coordinates.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Visual evidence is ready. Include it to give AI the recording plus an action-linked map for seeking, cropping, and checking coordinates." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "视觉证据已就绪。导出后，AI 可结合录制画面与动作关联的定位图，按时间跳转、裁剪放大并核对坐标。" } }
+      }
+    },
     "%.1f second delay": {
       "extractionState": "manual",
       "localizations": {
@@ -924,23 +1134,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "可从 %@ 获取内容上下文。适合在应用内容区域内做 OCR。"
-          }
-        }
-      }
-    },
-    "Continue without full context": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Continue without full context"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "在缺少完整上下文时继续"
           }
         }
       }
@@ -2352,7 +2545,21 @@
       "generatesSymbol": false
     },
     "MACRO RESOLUTION": {
-      "extractionState": "manual"
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "MACRO RESOLUTION"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "宏解析"
+          }
+        }
+      }
     },
     "MACROS": {
       "extractionState": "manual",
@@ -2540,7 +2747,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "宏级别"
+            "value": "宏级"
           }
         }
       }
@@ -3967,7 +4174,21 @@
       }
     },
     "Resolved macros": {
-      "extractionState": "manual"
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Resolved macros"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已解析宏"
+          }
+        }
+      }
     },
     "Reuse this wait target for the next text click.": {
       "extractionState": "manual",
@@ -4963,7 +5184,21 @@
       }
     },
     "Unnamed macro": {
-      "extractionState": "manual"
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Unnamed macro"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "未命名宏"
+          }
+        }
+      }
     },
     "Untitled macro": {
       "extractionState": "manual",
@@ -5900,36 +6135,36 @@
         }
       }
     },
-    "Include permitted video and frames": {
+    "Include the recorded video and key images. AI can use its own tools to seek, screenshot, crop, and zoom.": {
       "extractionState": "manual",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Include permitted video and frames"
+            "value": "Include the recorded video and key images. AI can use its own tools to seek, screenshot, crop, and zoom."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "包含允许导出的视频和画面"
+            "value": "包含录制视频和关键画面。AI 可使用自己的工具跳转、截图、裁剪并放大查看。"
           }
         }
       }
     },
-    "Import candidate…": {
+    "Import result…": {
       "extractionState": "manual",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Import candidate…"
+            "value": "Import result…"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "导入候选版本…"
+            "value": "导入重建结果…"
           }
         }
       }
@@ -6257,23 +6492,6 @@
         }
       }
     },
-    "Accept tested version": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Accept tested version"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "接受已试跑版本"
-          }
-        }
-      }
-    },
     "Source action": {
       "extractionState": "manual",
       "localizations": {
@@ -6427,19 +6645,19 @@
         }
       }
     },
-    "AI package exported. Follow instructions.md and import the completed candidate.": {
+    "AI package exported. Start with harness.json, follow its staged reading plan, generate candidate.json, then import the package or candidate.json.": {
       "extractionState": "manual",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "AI package exported. Follow instructions.md and import the completed candidate."
+            "value": "AI package exported. Start with harness.json, follow its staged reading plan, generate candidate.json, then import the package or candidate.json."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "AI 材料已导出。按 instructions.md 完成修改后，导入候选版本。"
+            "value": "AI 重建包已导出。请先阅读 harness.json，按分阶段读取计划生成 candidate.json，再导入整个重建包或 candidate.json。"
           }
         }
       }
@@ -6563,19 +6781,53 @@
         }
       }
     },
-    "The macro changed after candidate import. Export its current revision and import a new candidate.": {
+    "Reconstruction package does not contain candidate.json. Ask your AI tool to finish the package, then import it again.": {
       "extractionState": "manual",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "The macro changed after candidate import. Export its current revision and import a new candidate."
+            "value": "Reconstruction package does not contain candidate.json. Ask your AI tool to finish the package, then import it again."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "导入后当前宏已发生变化。请导出最新版本并重新生成候选版本。"
+            "value": "重建包中没有 candidate.json。请让 AI 工具完成候选版本生成后再导入。"
+          }
+        }
+      }
+    },
+    "This candidate uses an older reconstruction package format (%@). Export the current macro again and generate a new candidate.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This candidate uses an older reconstruction package format (%@). Export the current macro again and generate a new candidate."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "此候选版本使用旧版重建包格式（%@）。请重新导出当前宏并生成新的候选版本。"
+          }
+        }
+      }
+    },
+    "This candidate was generated from an older macro revision. Export the current reconstruction package and generate a new candidate.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This candidate was generated from an older macro revision. Export the current reconstruction package and generate a new candidate."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "此候选版本基于较早的宏版本。请导出当前重建包并重新生成候选版本。"
           }
         }
       }
@@ -6699,19 +6951,19 @@
         }
       }
     },
-    "Drop candidate .json file here": {
+    "Drop reconstruction package or candidate.json here": {
       "extractionState": "manual",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Drop candidate .json file here"
+            "value": "Drop reconstruction package or candidate.json here"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "可将候选 .json 文件直接拖拽至此处"
+            "value": "可将重建包或 candidate.json 直接拖拽至此处"
           }
         }
       }
@@ -6818,19 +7070,19 @@
         }
       }
     },
-    "Import candidate JSON to test and accept": {
+    "Import the reconstruction package or candidate.json to review and test": {
       "extractionState": "manual",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Import candidate JSON to test and accept"
+            "value": "Import the reconstruction package or candidate.json to review and test"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "导入生成的候选 JSON，试跑并采纳"
+            "value": "导入重建包或 candidate.json，检查并试跑"
           }
         }
       }
@@ -7037,6 +7289,990 @@
             "value": "未包含视觉证据。如需提供画面或视频，请在导出时勾选包含视觉证据。"
           }
         }
+      }
+    },
+    "Hide Moves": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hide Moves"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "隐藏微移"
+          }
+        }
+      }
+    },
+    "Smart Merge": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Smart Merge"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "智能合并"
+          }
+        }
+      }
+    },
+    "Macro Overview": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Macro Overview"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "宏概览"
+          }
+        }
+      }
+    },
+    "Total Actions": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Total Actions"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "总动作数"
+          }
+        }
+      }
+    },
+    "Total Duration": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Total Duration"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "总时长"
+          }
+        }
+      }
+    },
+    "Action Breakdown": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Action Breakdown"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "动作构成"
+          }
+        }
+      }
+    },
+    "Clicks": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Clicks"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "点击"
+          }
+        }
+      }
+    },
+    "Moves": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Moves"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "微移"
+          }
+        }
+      }
+    },
+    "Keys": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Keys"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "按键"
+          }
+        }
+      }
+    },
+    "Waits": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Waits"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "等待"
+          }
+        }
+      }
+    },
+    "Select an action in the timeline or list to edit its properties, or switch to Tools to insert new actions.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Select an action in the timeline or list to edit its properties, or switch to Tools to insert new actions."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "在时间轴或列表中选择动作以编辑属性，或切换到“工具”标签插入新动作。"
+          }
+        }
+      }
+    },
+    "Flow & Loops": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Flow & Loops"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "流程与循环"
+          }
+        }
+      }
+    },
+    "Select 2 or more actions in the timeline to wrap them into a Repeat Until loop.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Select 2 or more actions in the timeline to wrap them into a Repeat Until loop."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "在时间轴中选择 2 个或更多动作即可将其封装为“重复直到”循环。"
+          }
+        }
+      }
+    },
+    "Macro Review": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Macro Review" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "宏审阅" } }
+      }
+    },
+    "Review suggestions": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Suggestions" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "建议" } }
+      }
+    },
+    "Timeline": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Timeline" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "时间轴" } }
+      }
+    },
+    "Before frame": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Before" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "之前" } }
+      }
+    },
+    "After frame": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "After" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "之后" } }
+      }
+    },
+    "%d overlays · %d refs": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "%d overlays · %d refs" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "%d 个叠加标记 · %d 个引用" } }
+      }
+    },
+    "Selected Frame": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Selected Frame" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "选中画面" } }
+      }
+    },
+    "No review frame is available in this bundle.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "No review frame is available in this bundle." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "此记录包中没有可供审阅的画面。" } }
+      }
+    },
+    "Redacted ref · %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "redacted ref · %@" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "已脱敏引用 · %@" } }
+      }
+    },
+    "Safe ref · %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "safe ref · %@" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "安全引用 · %@" } }
+      }
+    },
+    "Source ref · %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "source ref · %@" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "源引用 · %@" } }
+      }
+    },
+    "Surface · %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "surface · %@" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "界面 · %@" } }
+      }
+    },
+    "Unknown surface": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "unknown" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "未知界面" } }
+      }
+    },
+    "Redacted · %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "redacted · %@" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "已脱敏 · %@" } }
+      }
+    },
+    "Ref · %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "ref · %@" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "引用 · %@" } }
+      }
+    },
+    "Run Target": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Run Target" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "运行目标" } }
+      }
+    },
+    "Bundle Health": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Bundle Health" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "记录包状态" } }
+      }
+    },
+    "Selected Region": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Selected Region" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "选中区域" } }
+      }
+    },
+    "Teach System": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Teach System" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "教系统识别" } }
+      }
+    },
+    "No condition candidates on this frame.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "No condition candidates on this frame." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "当前画面没有可用的条件候选项。" } }
+      }
+    },
+    "Draft Patch": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Draft Patch" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "草稿补丁" } }
+      }
+    },
+    "%d patch operations": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "%d ops" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "%d 项修改" } }
+      }
+    },
+    "Source / Runtime": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Source / Runtime" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "源画面 / 运行结果" } }
+      }
+    },
+    "score %@ · threshold %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "score %@ · threshold %@" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "得分 %@ · 阈值 %@" } }
+      }
+    },
+    "No runtime comparison for this frame.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "No runtime comparison for this frame." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "当前画面没有运行对比结果。" } }
+      }
+    },
+    "Suggestion Review": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Suggestion Review" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "建议审阅" } }
+      }
+    },
+    "%@ · confidence %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "%@ · confidence %@" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "%@ · 置信度 %@" } }
+      }
+    },
+    "No suggestions for this review.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "No suggestions for this review." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "当前没有可审阅的建议。" } }
+      }
+    },
+    "Safety": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Safety" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "安全" } }
+      }
+    },
+    "Review-only mutation": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Review-only mutation" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "仅在审阅阶段修改" } }
+      }
+    },
+    "%d suppression records": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "%d suppression records" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "%d 条隐私保护记录" } }
+      }
+    },
+    "Raw input": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Raw input" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "原始输入" } }
+      }
+    },
+    "Recorded event": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Recorded event" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "已录制事件" } }
+      }
+    },
+    "Focus change": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Focus change" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "焦点变化" } }
+      }
+    },
+    "Window snapshot": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Window snapshot" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "窗口快照" } }
+      }
+    },
+    "Keyframe": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Keyframe" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "关键帧" } }
+      }
+    },
+    "Visual observation": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Visual observation" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "视觉观察" } }
+      }
+    },
+    "Wait started": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Wait started" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "开始等待" } }
+      }
+    },
+    "Wait ended": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Wait ended" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "等待结束" } }
+      }
+    },
+    "User marker": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "User marker" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "用户标记" } }
+      }
+    },
+    "Privacy protection": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Privacy protection" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "隐私保护" } }
+      }
+    },
+    "Note": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Note" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "备注" } }
+      }
+    },
+    "Recording started": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Recording started" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "录制开始" } }
+      }
+    },
+    "Recording stopped": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Recording stopped" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "录制结束" } }
+      }
+    },
+    "Mouse down": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Mouse down" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "鼠标按下" } }
+      }
+    },
+    "Mouse up": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Mouse up" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "鼠标抬起" } }
+      }
+    },
+    "Drag ended": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Drag ended" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "拖拽结束" } }
+      }
+    },
+    "Text input": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Text input" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "文本输入" } }
+      }
+    },
+    "Scroll settled": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Scroll settled" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "滚动结束" } }
+      }
+    },
+    "Before long wait": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Before long wait" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "长时间等待前" } }
+      }
+    },
+    "After long wait": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "After long wait" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "长时间等待后" } }
+      }
+    },
+    "Frame changed": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Frame changed" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "画面变化" } }
+      }
+    },
+    "Manual capture": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Manual capture" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "手动采集" } }
+      }
+    },
+    "Matched": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Matched" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "匹配" } }
+      }
+    },
+    "Changed": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Changed" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "已变化" } }
+      }
+    },
+    "Unchanged": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Unchanged" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "未变化" } }
+      }
+    },
+    "Reference missing": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Reference missing" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "缺少参考画面" } }
+      }
+    },
+    "Runtime sample missing": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Runtime sample missing" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "缺少运行样本" } }
+      }
+    },
+    "Unreadable": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Unreadable" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "无法读取" } }
+      }
+    },
+    "Unavailable": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Unavailable" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "不可用" } }
+      }
+    },
+    "Improve wait step": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Improve wait step" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "优化等待步骤" } }
+      }
+    },
+    "Replace locator": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Replace locator" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "替换定位方式" } }
+      }
+    },
+    "Condition suggestion": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Condition suggestion" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "条件建议" } }
+      }
+    },
+    "Extract visual asset": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Extract visual asset" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "提取视觉资源" } }
+      }
+    },
+    "Fragile click": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Fragile click" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "不稳定点击" } }
+      }
+    },
+    "Generate draft": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Generate draft" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "生成草稿" } }
+      }
+    },
+    "Create draft from candidate": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Create draft from candidate" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "从候选项创建草稿" } }
+      }
+    },
+    "Create draft from selection": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Create draft from selection" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "从选区创建草稿" } }
+      }
+    },
+    "Accept suggestion": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Accept suggestion" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "接受建议" } }
+      }
+    },
+    "Reject suggestion": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Reject suggestion" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "拒绝建议" } }
+      }
+    },
+    "Clear review decision": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Clear review decision" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "清除审阅决定" } }
+      }
+    },
+    "Prepare visual asset": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Prepare visual asset" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "准备视觉资源" } }
+      }
+    },
+    "Preview draft": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Preview draft" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "预览草稿" } }
+      }
+    },
+    "Import draft": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Import draft" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "导入草稿" } }
+      }
+    },
+    "Screen coordinates": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Screen coordinates" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "屏幕坐标" } }
+      }
+    },
+    "Display coordinates": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Display coordinates" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "显示器坐标" } }
+      }
+    },
+    "Window coordinates": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Window coordinates" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "窗口坐标" } }
+      }
+    },
+    "Frame coordinates": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Frame coordinates" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "画面帧坐标" } }
+      }
+    },
+    "Normalized frame coordinates": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Normalized frame coordinates" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "归一化画面坐标" } }
+      }
+    },
+    "Stop or discard the recording before editing macros.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Stop or discard the recording before editing macros." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "请先停止并保存，或丢弃本次录制，再编辑宏。" } }
+      }
+    },
+    "No display is available for text picking.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "No display is available for text picking." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "当前没有可用于选取文本的显示器。" } }
+      }
+    },
+    "No display is available for coordinate picking.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "No display is available for coordinate picking." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "当前没有可用于选取坐标的显示器。" } }
+      }
+    },
+    "Finish the current recording or playback before picking from the screen.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Finish the current recording or playback before picking from the screen." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "请先结束当前录制或播放，再从屏幕中选取内容。" } }
+      }
+    },
+    "Cancel Picking": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Cancel Picking" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "取消选取" } }
+      }
+    },
+    "Picking cancelled.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Picking cancelled." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "已取消选取。" } }
+      }
+    },
+    "Could not capture the screen for text picking: %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Could not capture the screen for text picking: %@" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "无法截取屏幕以选取文本：%@" } }
+      }
+    },
+    "Video & images": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Video & images" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "视频与关键画面" } }
+      }
+    },
+    "Robust": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Robust" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "鲁棒优化" } }
+      }
+    },
+    "Faithful": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Faithful" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "忠实还原" } }
+      }
+    },
+    "Prefer evidence-backed text locators, bounded waits, verification, and relative coordinates when supported.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Prefer evidence-backed text locators, bounded waits, verification, and relative coordinates when supported." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "在证据充分且播放器支持时，优先使用文本定位、有限等待、结果校验和相对坐标，提高重放稳定性。" } }
+      }
+    },
+    "Preserve the demonstrated timing and targeting unless a correction is required.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Preserve the demonstrated timing and targeting unless a correction is required." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "尽量保留录制时的节奏和定位方式，只在确有必要时修正。" } }
+      }
+    },
+    "Editing candidate draft": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Editing candidate draft" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "正在编辑候选草稿" } }
+      }
+    },
+    "Changes stay separate from the accepted macro. Saving creates a new candidate that must be tested again.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Changes stay separate from the accepted macro. Saving creates a new candidate that must be tested again." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "修改只作用于候选草稿，不会改动当前已接受的宏。保存后会生成新的候选版本，并需要重新试跑。" } }
+      }
+    },
+    "Editor previews help you adjust the draft. Return to Review and use Test once to qualify the saved candidate for acceptance.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Editor previews help you adjust the draft. Return to Review and use Test once to qualify the saved candidate for acceptance." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "编辑器预览只用于调整草稿。保存后请返回审阅并执行一次“试跑”，通过后才能接受该候选版本。" } }
+      }
+    },
+    "Save as new candidate": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Save as new candidate" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "保存为新候选版本" } }
+      }
+    },
+    "Back to review": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Back to review" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "返回审阅" } }
+      }
+    },
+    "Repeat and window-follow settings belong to the accepted macro and are not changed by candidate editing.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Repeat and window-follow settings belong to the accepted macro and are not changed by candidate editing." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "重复次数和跟随窗口设置属于当前已接受的宏，编辑候选版本时不会修改这些设置。" } }
+      }
+    },
+    "Candidate Editor — %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Candidate Editor — %@" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "候选版本编辑器 — %@" } }
+      }
+    },
+    "Edited version saved as a new candidate. Test the new version before accepting it.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Edited version saved as a new candidate. Test the new version before accepting it." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "已将编辑后的版本保存为新的候选版本。接受前请先重新试跑。" } }
+      }
+    },
+    "Edited candidate saved. Test this new version before accepting it.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Edited candidate saved. Test this new version before accepting it." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "候选版本已保存。接受前请先试跑这个新版本。" } }
+      }
+    },
+    "Select a candidate before accepting it.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Select a candidate before accepting it." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "请先选择一个候选版本再接受。" } }
+      }
+    },
+    "Edit tested version": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Edit tested version" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "编辑已试跑版本" } }
+      }
+    },
+    "Edit candidate": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Edit candidate" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "编辑候选版本" } }
+      }
+    },
+    "Test passed": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Test passed" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "试跑通过" } }
+      }
+    },
+    "Accept this version": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Accept this version" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "接受此版本" } }
+      }
+    },
+    "Discard candidate draft changes?": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Discard candidate draft changes?" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "放弃候选草稿的修改？" } }
+      }
+    },
+    "The accepted macro is unchanged. Unsaved candidate edits will be lost.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "The accepted macro is unchanged. Unsaved candidate edits will be lost." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "当前已接受的宏不会受影响，但未保存的候选修改将丢失。" } }
+      }
+    },
+    "Discard changes": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Discard changes" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "放弃修改" } }
+      }
+    },
+    "Keep editing": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Keep editing" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "继续编辑" } }
       }
     }
   },

@@ -129,7 +129,7 @@ public enum SemanticRecordingPreflightPresenter {
                 status: .blocked,
                 canStart: false,
                 title: "Semantic recording is blocked",
-                summary: "Grant the required permissions before recording video, keyframes and playable macro events.",
+                summary: "Visual evidence is unavailable until Screen Recording access is granted. Action-only recording remains available separately.",
                 decisionRows: blockedDecisionRows(),
                 availableCapabilityLabels: availableCapabilityLabels,
                 issues: issues,

@@ -21,7 +21,15 @@ struct EditorSidebar: View {
     @Binding var inspVerifyMustExist: Bool
     @Binding var inspBehaviorName: String
     let recorder: Recorder
+    let macroID: UUID?
     let surfaces: [String: PlaybackSurface]
+    let followWindowOffset: Bool
+    let canEditFollowWindowOffset: Bool
+    let allowsLibrarySideEffects: Bool
+    /// `nil` adds a new Playback Surface; a non-nil ID rebinds only that surface.
+    let onChooseTargetWindow: (String?) -> Void
+    let onRemoveTargetWindow: (String) -> Void
+    let onSetFollowWindowOffset: (Bool) -> Void
     let onLoadInspector: () -> Void
     let onUpdatePreview: () -> Void
     let onPickCoordinate: (Bool) -> Void
@@ -30,6 +38,14 @@ struct EditorSidebar: View {
     let onRefreshRows: () -> [ActionRow]
     let onCreateRepeatUntilDraft: (Int, TimeInterval, TimeInterval, String) -> Void
 
+    enum SidebarTab: String, CaseIterable, Identifiable {
+        case inspector
+        case tools
+
+        var id: String { rawValue }
+    }
+
+    @State private var activeTab: SidebarTab = .inspector
     @State private var insertWaitMs: Double = 1000
     @State private var confirmClearAll = false
     @State private var loopMaxAttempts: Int = 10
@@ -44,44 +60,357 @@ struct EditorSidebar: View {
     }
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 14) {
-                if selection.count == 1 {
-                    section(String(localized: "Selected action", table: "EditorUX"), icon: "slider.horizontal.3") {
-                        selectedActionInspector()
-                    }
-                } else if selection.count > 1 {
-                    section(String(localized: "Batch edit", table: "Common"), icon: "slider.horizontal.3") {
-                        batchEditInspector()
-                    }
-                }
-
-                if selection.isEmpty {
-                    section(String(localized: "Global actions", table: "EditorUX"), icon: "globe") {
-                        clearAllButton()
-                    }
-                } else {
-                    section(String(localized: "Selection", table: "Common"), icon: "checklist") {
-                        selectionActionsContent()
-                    }
-
-                    section(String(localized: "Time Adjustments", table: "Common"), icon: "timer") {
-                        timeAdjustmentsContent()
-                    }
-
-                    if selectedBehaviorGroup() != nil || selection.count > 1 {
-                        behaviorSection()
-                    }
-
-                    repeatUntilSection()
-                }
-
-                insertTabContent()
-                editorReviewSection()
+        VStack(spacing: 0) {
+            Picker("", selection: $activeTab) {
+                Label(String(localized: "Inspector", table: "Common"), systemImage: "slider.horizontal.3")
+                    .tag(SidebarTab.inspector)
+                Label(String(localized: "Tools", table: "Common"), systemImage: "wrench.and.screwdriver")
+                    .tag(SidebarTab.tools)
             }
-            .padding(14)
+            .pickerStyle(.segmented)
+            .labelsHidden()
+            .controlSize(.small)
+            .padding(.horizontal, 14)
+            .padding(.top, 12)
+            .padding(.bottom, 8)
+
+            Divider().opacity(0.3)
+
+            ScrollView {
+                VStack(alignment: .leading, spacing: 14) {
+                    switch activeTab {
+                    case .inspector:
+                        inspectorTabContent()
+                    case .tools:
+                        toolsTabContent()
+                    }
+                }
+                .padding(14)
+            }
         }
         .background(VisualEffectBackground(material: .sidebar, blendingMode: .behindWindow))
+        .onChange(of: selection) { _, newSelection in
+            if !newSelection.isEmpty && activeTab != .inspector {
+                activeTab = .inspector
+            }
+        }
+    }
+
+    @ViewBuilder
+    func inspectorTabContent() -> some View {
+        if macroID != nil {
+            targetWindowSection()
+        }
+
+        if selection.count == 1 {
+            section(String(localized: "Selected action", table: "EditorUX"), icon: "slider.horizontal.3") {
+                selectedActionInspector()
+            }
+
+            section(String(localized: "Selection", table: "Common"), icon: "checklist") {
+                selectionActionsContent()
+            }
+
+            section(String(localized: "Time Adjustments", table: "Common"), icon: "timer") {
+                timeAdjustmentsContent()
+            }
+
+            if selectedBehaviorGroup() != nil {
+                behaviorSection()
+            }
+        } else if selection.count > 1 {
+            section(String(localized: "Batch edit", table: "Common"), icon: "slider.horizontal.3") {
+                batchEditInspector()
+            }
+
+            section(String(localized: "Selection", table: "Common"), icon: "checklist") {
+                selectionActionsContent()
+            }
+
+            section(String(localized: "Time Adjustments", table: "Common"), icon: "timer") {
+                timeAdjustmentsContent()
+            }
+
+            behaviorSection()
+            if allowsLibrarySideEffects {
+                repeatUntilSection()
+            }
+        } else {
+            section(String(localized: "Macro Overview", table: "EditorUX"), icon: "chart.bar.doc.horizontal") {
+                macroOverviewCard()
+            }
+        }
+    }
+
+    @ViewBuilder
+    func toolsTabContent() -> some View {
+        insertTabContent()
+
+        if allowsLibrarySideEffects, selection.count > 1 {
+            repeatUntilSection()
+        } else if allowsLibrarySideEffects {
+            section(String(localized: "Flow & Loops", table: "EditorUX"), icon: "arrow.triangle.2.circlepath") {
+                HStack(alignment: .top, spacing: 6) {
+                    Image(systemName: "info.circle")
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
+                    Text(String(localized: "Select 2 or more actions in the timeline to wrap them into a Repeat Until loop.", table: "EditorUX"))
+                        .font(.system(size: 10.5))
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .padding(8)
+                .background(Color.primary.opacity(0.02))
+                .clipShape(RoundedRectangle(cornerRadius: 6))
+            }
+        }
+
+        editorReviewSection()
+    }
+
+    @ViewBuilder
+    func macroOverviewCard() -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 8) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(String(localized: "Total Actions", table: "EditorUX"))
+                        .font(.system(size: 9.5, weight: .medium))
+                        .foregroundStyle(.secondary)
+                    Text("\(rows.count)")
+                        .font(.system(size: 16, weight: .bold, design: .rounded))
+                        .foregroundStyle(.primary)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(8)
+                .background(Color.primary.opacity(0.04))
+                .clipShape(RoundedRectangle(cornerRadius: 6))
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(String(localized: "Total Duration", table: "EditorUX"))
+                        .font(.system(size: 9.5, weight: .medium))
+                        .foregroundStyle(.secondary)
+                    Text(String(format: "%.2fs", recorder.liveDuration))
+                        .font(.system(size: 16, weight: .bold, design: .monospaced))
+                        .foregroundStyle(.primary)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(8)
+                .background(Color.primary.opacity(0.04))
+                .clipShape(RoundedRectangle(cornerRadius: 6))
+            }
+
+            let clicksCount = rows.filter { $0.group.kind.isClickFamily }.count
+            let movesCount = rows.filter { $0.group.kind == .mouseMove }.count
+            let keysCount = rows.filter { $0.group.kind.editsKeyboardInput }.count
+            let waitsCount = rows.filter { $0.group.kind.isPassiveWait }.count
+
+            VStack(alignment: .leading, spacing: 6) {
+                Text(String(localized: "Action Breakdown", table: "EditorUX"))
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(.secondary)
+
+                HStack(spacing: 6) {
+                    breakdownBadge(icon: "cursorarrow.click", label: String(localized: "Clicks", table: "EditorUX"), count: clicksCount, color: Brand.sigBlue)
+                    breakdownBadge(icon: "arrow.up.left.and.arrow.down.right", label: String(localized: "Moves", table: "EditorUX"), count: movesCount, color: .secondary)
+                }
+                HStack(spacing: 6) {
+                    breakdownBadge(icon: "keyboard", label: String(localized: "Keys", table: "EditorUX"), count: keysCount, color: Brand.sigGreen)
+                    breakdownBadge(icon: "clock", label: String(localized: "Waits", table: "EditorUX"), count: waitsCount, color: Brand.sigAmber)
+                }
+            }
+
+            Divider().opacity(0.4)
+
+            VStack(alignment: .leading, spacing: 8) {
+                HStack(spacing: 6) {
+                    Image(systemName: "info.circle")
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
+                    Text(String(localized: "Select an action in the timeline or list to edit its properties, or switch to Tools to insert new actions.", table: "EditorUX"))
+                        .font(.system(size: 10.5))
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .padding(8)
+                .background(Color.primary.opacity(0.02))
+                .clipShape(RoundedRectangle(cornerRadius: 6))
+
+                clearAllButton()
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func targetWindowSection() -> some View {
+        section(String(localized: "Target windows", table: "Recording"), icon: "window.badge.key") {
+            VStack(alignment: .leading, spacing: 9) {
+                let orderedIDs = MacroPlaybackSurfaceEditing.orderedSurfaceIDs(surfaces)
+                let counts = MacroPlaybackSurfaceEditing.referenceCounts(in: recorder.events)
+                let selectedIDs = selectedPlaybackSurfaceIDs()
+                let selectedIndices = selectedEventIndices()
+
+                if orderedIDs.isEmpty {
+                    Text(
+                        String(
+                            localized: "No target window is set. Playback uses the recorded screen coordinates until an action is explicitly bound to a Playback Surface.",
+                            table: "Recording"
+                        )
+                    )
+                    .font(.system(size: 10.5))
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                } else {
+                    ForEach(orderedIDs, id: \.self) { surfaceID in
+                        if let surface = surfaces[surfaceID] {
+                            VStack(alignment: .leading, spacing: 6) {
+                                HStack(alignment: .top, spacing: 8) {
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text(targetWindowLabel(surface))
+                                            .font(.system(size: 11.5, weight: .semibold))
+                                            .lineLimit(2)
+                                        HStack(spacing: 5) {
+                                            Text(surfaceID)
+                                            Text("·")
+                                            Text(
+                                                String(
+                                                    format: String(localized: "%dx%d recorded window", table: "Recording"),
+                                                    Int(surface.recordedFrame.width),
+                                                    Int(surface.recordedFrame.height)
+                                                )
+                                            )
+                                            Text("·")
+                                            Text(
+                                                String(
+                                                    format: String(localized: "%d referenced events", table: "EditorUX"),
+                                                    counts[surfaceID, default: 0]
+                                                )
+                                            )
+                                        }
+                                        .font(.system(size: 9.5, design: .monospaced))
+                                        .foregroundStyle(.secondary)
+                                    }
+                                    Spacer(minLength: 4)
+                                    if selectedIDs.contains(surfaceID) {
+                                        Label(String(localized: "Selected", table: "Common"), systemImage: "checkmark.circle.fill")
+                                            .labelStyle(.iconOnly)
+                                            .font(.system(size: 11))
+                                            .foregroundStyle(.tint)
+                                            .help(String(localized: "The current selection uses this Playback Surface.", table: "EditorUX"))
+                                    }
+                                }
+
+                                HStack(spacing: 7) {
+                                    Button(String(localized: "Rebind…", table: "EditorUX")) {
+                                        onChooseTargetWindow(surfaceID)
+                                    }
+                                    if !selectedIndices.isEmpty && !selectedIDs.contains(surfaceID) {
+                                        Button(String(localized: "Use for selection", table: "EditorUX")) {
+                                            assignSelection(to: surfaceID)
+                                        }
+                                    }
+                                    Spacer(minLength: 0)
+                                    Button(String(localized: "Remove", table: "Common"), role: .destructive) {
+                                        onRemoveTargetWindow(surfaceID)
+                                    }
+                                    .disabled(counts[surfaceID, default: 0] > 0)
+                                    .help(counts[surfaceID, default: 0] > 0
+                                          ? String(localized: "Reassign every action that uses this surface before removing it.", table: "EditorUX")
+                                          : "")
+                                }
+                                .controlSize(.small)
+                            }
+                            .padding(8)
+                            .background(Color.primary.opacity(selectedIDs.contains(surfaceID) ? 0.055 : 0.025))
+                            .clipShape(RoundedRectangle(cornerRadius: 7))
+                        }
+                    }
+                }
+
+                if selectedIDs.count > 1 {
+                    Text(String(localized: "The current selection spans multiple Playback Surfaces. Rebind each surface independently, or choose one surface explicitly for the selected actions.", table: "EditorUX"))
+                        .font(.system(size: 10))
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+
+                HStack(spacing: 8) {
+                    Button(orderedIDs.isEmpty
+                           ? String(localized: "Choose Target Window…", table: "Recording")
+                           : String(localized: "Add Target Window…", table: "EditorUX")) {
+                        onChooseTargetWindow(nil)
+                    }
+                    .controlSize(.small)
+                    Spacer()
+                }
+
+                if !orderedIDs.isEmpty {
+                    Toggle(
+                        String(localized: "Follow Target Window Position", table: "Recording"),
+                        isOn: Binding(
+                            get: { followWindowOffset },
+                            set: { enabled in onSetFollowWindowOffset(enabled) }
+                        )
+                    )
+                    .toggleStyle(.switch)
+                    .controlSize(.small)
+                    .disabled(!canEditFollowWindowOffset)
+                    .help(canEditFollowWindowOffset ? "" : String(localized: "Repeat and window-follow settings belong to the accepted macro and are not changed by candidate editing.", table: "EditorUX"))
+                }
+            }
+        }
+    }
+
+    private func targetWindowLabel(_ surface: PlaybackSurface) -> String {
+        let appName = surface.appName ?? String(localized: "Target window", table: "Recording")
+        guard let title = surface.windowTitle?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !title.isEmpty else {
+            return appName
+        }
+        return "\(appName) — \(title)"
+    }
+
+    private func selectedPlaybackSurfaceIDs() -> Set<String> {
+        (try? MacroPlaybackSurfaceEditing.selectedSurfaceIDs(
+            in: recorder.events,
+            eventIndices: selectedEventIndices()
+        )) ?? []
+    }
+
+    private func assignSelection(to surfaceID: String) {
+        let indices = selectedEventIndices()
+        guard !indices.isEmpty,
+              let updated = try? MacroPlaybackSurfaceEditing.assign(
+                surfaceID: surfaceID,
+                toEventIndices: indices,
+                in: recorder.events,
+                surfaces: surfaces
+              ) else { return }
+        withUndo(String(localized: "Change Playback Surface", table: "EditorUX")) {
+            recorder.events = updated
+        }
+        _ = onRefreshRows()
+        onLoadInspector()
+        onUpdatePreview()
+    }
+
+    private func breakdownBadge(icon: String, label: String, count: Int, color: Color) -> some View {
+        HStack(spacing: 5) {
+            Image(systemName: icon)
+                .font(.system(size: 10))
+                .foregroundStyle(color)
+            Text(label)
+                .font(.system(size: 10))
+                .foregroundStyle(.secondary)
+            Spacer()
+            Text("\(count)")
+                .font(.system(size: 10, weight: .bold, design: .monospaced))
+                .foregroundStyle(.primary)
+        }
+        .padding(.horizontal, 7)
+        .padding(.vertical, 4)
+        .background(Color.primary.opacity(0.03))
+        .clipShape(RoundedRectangle(cornerRadius: 5))
+        .frame(maxWidth: .infinity)
     }
 
     @ViewBuilder
@@ -166,13 +495,13 @@ struct EditorSidebar: View {
                                         )
 
             		                        inspectorGrid {
-            			                            labeledField(grp.kind.isPassiveWait ? String(localized: "Wait Duration (s)", table: "EditorUX") : String(localized: "Time (s)", table: "Common"), text: $inspTime)
+                                        labeledField(grp.kind.isPassiveWait ? String(localized: "Wait Duration (s)", table: "EditorUX") : String(localized: "Time (s)", table: "EditorUX"), text: $inspTime)
 
             		                            if grp.kind == .waitForText || grp.kind == .waitForTextGone {
             		                                labeledDoubleField(String(localized: "Timeout (s)", table: "Common"), value: $inspTimeout)
             		                            }
 
-            			                            if grp.kind.canUseLocatorStrategy {
+                                            if grp.kind.canUseTextLocator {
             		                                gridField(String(localized: "Strategy", table: "Common")) {
                                                         Picker("", selection: Binding(
                                                             get: { inspStrategy },
@@ -181,10 +510,10 @@ struct EditorSidebar: View {
                                                                 applyInspector(strategyOverride: newStrategy)
                                                             }
             		                                    )) {
-                                        Text(NSLocalizedString("Offset", tableName: "Common", comment: "")).tag(CoordinateStrategy.windowLocalPreferred)
-                                        Text(NSLocalizedString("Proportional", tableName: "Common", comment: "")).tag(CoordinateStrategy.normalizedPreferred)
-                                        Text(NSLocalizedString("Absolute", tableName: "Common", comment: "")).tag(CoordinateStrategy.absoluteOnly)
-                                        Text(NSLocalizedString("Text (OCR)", tableName: "EditorUX", comment: "")).tag(CoordinateStrategy.locatorOnly)
+                                        Text("Offset", tableName: "Common").tag(CoordinateStrategy.windowLocalPreferred)
+                                        Text("Proportional", tableName: "Common").tag(CoordinateStrategy.normalizedPreferred)
+                                        Text("Absolute", tableName: "Common").tag(CoordinateStrategy.absoluteOnly)
+                                        Text("Text (OCR)", tableName: "EditorUX").tag(CoordinateStrategy.locatorOnly)
             		                                    }
             		                                    .pickerStyle(.segmented)
             		                                    .labelsHidden()
@@ -276,17 +605,17 @@ struct EditorSidebar: View {
 
                                             if grp.kind.canConvertClickType {
                                                 VStack(alignment: .leading, spacing: 6) {
-                                                    Text(NSLocalizedString("Action Type", tableName: "EditorUX", comment: ""))
+                                                    Text("Action Type", tableName: "EditorUX")
                                                         .font(.system(size: 9.5, weight: .semibold))
                                                         .foregroundStyle(.secondary)
                                                     Picker("", selection: Binding(
                                                         get: { grp.kind },
                                                         set: { convertClickType(grp: grp, newKind: $0) }
                                                      )) {
-                                                         Text(NSLocalizedString("Click", tableName: "EditorUX", comment: "")).tag(ActionGroupKind.click)
-                                                         Text(NSLocalizedString("Double", tableName: "Common", comment: "")).tag(ActionGroupKind.doubleClick)
-                                                         Text(NSLocalizedString("Triple+", tableName: "Common", comment: "")).tag(ActionGroupKind.repeatedClick)
-                                                         Text(NSLocalizedString("Long Press", tableName: "Common", comment: "")).tag(ActionGroupKind.longPress)
+                                                         Text("Click", tableName: "EditorUX").tag(ActionGroupKind.click)
+                                                         Text("Double", tableName: "Common").tag(ActionGroupKind.doubleClick)
+                                                         Text("Triple+", tableName: "Common").tag(ActionGroupKind.repeatedClick)
+                                                         Text("Long Press", tableName: "Common").tag(ActionGroupKind.longPress)
                                                      }
                                                     .pickerStyle(.segmented)
                                                     .labelsHidden()
@@ -303,7 +632,7 @@ struct EditorSidebar: View {
                                                 .controlSize(.small)
                                             }
 
-            		                        if grp.kind.editsSemanticTextTarget || (grp.kind.canUseLocatorStrategy && inspStrategy == .locatorOnly) {
+                                            if grp.kind.editsSemanticTextTarget || (grp.kind.canUseTextLocator && inspStrategy == .locatorOnly) {
                                                 let textReadiness = ActionGroupProjection.textTargetReadiness(for: grp, events: recorder.events)
                                                 let anchor = ActionGroupProjection.firstTextAnchor(for: grp, events: recorder.events)
             		                            if textReadiness.isReady, let anchor {
@@ -358,7 +687,7 @@ struct EditorSidebar: View {
             let textTargetGroups = selectedTextTargetGroups()
             if !textTargetGroups.isEmpty {
                 VStack(alignment: .leading, spacing: 6) {
-                    Text(NSLocalizedString("Shared Text Target", tableName: "EditorUX", comment: ""))
+                    Text("Shared Text Target", tableName: "EditorUX")
                         .font(.system(size: 9.5, weight: .semibold))
                         .foregroundStyle(.secondary)
                     let textTargetReadiness = batchTextTargetReadiness(for: textTargetGroups, targetText: inspOCRText)
@@ -386,7 +715,7 @@ struct EditorSidebar: View {
             }
 
             VStack(alignment: .leading, spacing: 6) {
-                Text(NSLocalizedString("Align Coordinates", tableName: "Common", comment: ""))
+                Text("Align Coordinates", tableName: "Common")
                      .font(.system(size: 9.5, weight: .semibold))
                      .foregroundStyle(.secondary)
                 let alignXReadiness = coordinateAlignmentReadiness(axis: .x)
@@ -411,7 +740,7 @@ struct EditorSidebar: View {
             }
 
             VStack(alignment: .leading, spacing: 6) {
-                Text(NSLocalizedString("Standardize Timeout", tableName: "Common", comment: ""))
+                Text("Standardize Timeout", tableName: "Common")
                      .font(.system(size: 9.5, weight: .semibold))
                      .foregroundStyle(.secondary)
                 let timeoutReadiness = batchTimeoutReadiness(
@@ -538,7 +867,7 @@ struct EditorSidebar: View {
             Button(String(localized: "Clear All Events", table: "EditorUX"), role: .destructive) { clearAll() }
             Button(String(localized: "Cancel", table: "Common"), role: .cancel) {}
         } message: {
-            Text(NSLocalizedString("You can undo this with ⌘Z while the editor is open.", tableName: "EditorUX", comment: ""))
+            Text("You can undo this with ⌘Z while the editor is open.", tableName: "EditorUX")
         }
 
     }
@@ -551,7 +880,7 @@ struct EditorSidebar: View {
             Divider().opacity(0.3)
             
             HStack {
-                Text(NSLocalizedString("Default Delay", tableName: "EditorUX", comment: ""))
+                Text("Default Delay", tableName: "EditorUX")
                     .font(.system(size: 11))
                     .foregroundStyle(.secondary)
                 
@@ -564,7 +893,7 @@ struct EditorSidebar: View {
                         .frame(width: 55)
                         .multilineTextAlignment(.trailing)
                     
-                    Text(NSLocalizedString("ms", tableName: "Common", comment: ""))
+                    Text("ms", tableName: "Common")
                         .font(.system(size: 11))
                         .foregroundStyle(.secondary)
                     
@@ -684,7 +1013,7 @@ struct EditorSidebar: View {
         let shiftLaterReadiness = actionShiftReadiness(for: shiftGroups, direction: .later)
 
         VStack(alignment: .leading, spacing: 6) {
-            Text(NSLocalizedString("Shift Selected", tableName: "Common", comment: ""))
+            Text("Shift Selected", tableName: "Common")
                 .font(.system(size: 9.5, weight: .semibold))
                 .foregroundStyle(.secondary)
             HStack {
@@ -729,7 +1058,7 @@ struct EditorSidebar: View {
                 factor: stretchFactor
             )
             HStack {
-                Text(NSLocalizedString("Time Stretch", tableName: "Common", comment: ""))
+                Text("Time Stretch", tableName: "Common")
                     .font(.system(size: 9.5, weight: .semibold))
                     .foregroundStyle(.secondary)
                 Spacer()
@@ -773,7 +1102,9 @@ struct EditorSidebar: View {
             events: recorder.events,
             selectedGroupIDs: selection,
             repeatUntilReadiness: repeatUntilReadiness
-        )
+        ).filter { item in
+            allowsLibrarySideEffects || item.action != .createRepeatUntil
+        }
 
         section(String(localized: "Review", table: "Common"), icon: "checklist.checked") {
             VStack(alignment: .leading, spacing: 9) {
@@ -1002,7 +1333,7 @@ struct EditorSidebar: View {
                     Label(String(localized: "Selected Behavior", table: "Common"), systemImage: "checkmark.rectangle.stack")
                         .font(.system(size: 10.5, weight: .semibold))
                         .foregroundStyle(Brand.sigAmber)
-                    Text(NSLocalizedString("Rename or split this behavior without changing the actions inside it.", tableName: "EditorUX", comment: ""))
+                    Text("Rename or split this behavior without changing the actions inside it.", tableName: "EditorUX")
                         .font(.system(size: 10))
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
@@ -1051,7 +1382,7 @@ struct EditorSidebar: View {
                     Label(String(localized: "New Behavior", table: "Common"), systemImage: "plus.square.on.square")
                         .font(.system(size: 10.5, weight: .semibold))
                         .foregroundStyle(Brand.sigAmber)
-                    Text(NSLocalizedString("Select a continuous set of recorded actions, name it, then create one behavior block.", tableName: "Recording", comment: ""))
+                    Text("Select a continuous set of recorded actions, name it, then create one behavior block.", tableName: "Recording")
                         .font(.system(size: 10))
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
@@ -1107,7 +1438,7 @@ struct EditorSidebar: View {
                     // Loop Configuration Form
                     VStack(alignment: .leading, spacing: 8) {
                         HStack(spacing: 6) {
-                            Text(NSLocalizedString("Max Attempts", tableName: "Common", comment: ""))
+                            Text("Max Attempts", tableName: "Common")
                                 .font(.system(size: 11, weight: .medium))
                             Spacer()
                             Text("\(loopMaxAttempts) " + String(localized: "times", table: "Common"))
@@ -1121,7 +1452,7 @@ struct EditorSidebar: View {
                         Divider().opacity(0.3)
 
                         HStack(spacing: 6) {
-                            Text(NSLocalizedString("Timeout", tableName: "Common", comment: ""))
+                            Text("Timeout", tableName: "Common")
                                 .font(.system(size: 11, weight: .medium))
                             Spacer()
                             Text("\(Int(loopTimeoutSeconds))s")
@@ -1135,7 +1466,7 @@ struct EditorSidebar: View {
                         Divider().opacity(0.3)
 
                         HStack(spacing: 6) {
-                            Text(NSLocalizedString("Polling Interval", tableName: "Common", comment: ""))
+                            Text("Polling Interval", tableName: "Common")
                                 .font(.system(size: 11, weight: .medium))
                             Spacer()
                             Text(String(format: "%.1fs", loopPollingSeconds))
@@ -1149,13 +1480,13 @@ struct EditorSidebar: View {
                         Divider().opacity(0.3)
 
                         HStack(spacing: 6) {
-                            Text(NSLocalizedString("On Failure", tableName: "Common", comment: ""))
+                            Text("On Failure", tableName: "Common")
                                 .font(.system(size: 11, weight: .medium))
                             Spacer()
                             Picker("", selection: $loopFailurePolicy) {
-                                Text(NSLocalizedString("Abort Macro", tableName: "EditorUX", comment: "")).tag("failRun")
-                                Text(NSLocalizedString("Pause & Approve", tableName: "Common", comment: "")).tag("requireManualApproval")
-                                Text(NSLocalizedString("Continue next", tableName: "Common", comment: "")).tag("continueWorkflow")
+                                Text("Abort Macro", tableName: "EditorUX").tag("failRun")
+                                Text("Pause & Approve", tableName: "Common").tag("requireManualApproval")
+                                Text("Continue next", tableName: "Common").tag("continueWorkflow")
                             }
                             .labelsHidden()
                             .pickerStyle(.menu)
@@ -1183,7 +1514,7 @@ struct EditorSidebar: View {
                     .disabled(!repeatUntilReadiness.canCreate)
                     .help(repeatUntilReadinessHelp(repeatUntilReadiness))
                     
-                    Text(NSLocalizedString("Save the selected body as a behavior macro, then open a draft-only Repeat-Until preview.", tableName: "EditorUX", comment: ""))
+                    Text("Save the selected body as a behavior macro, then open a draft-only Repeat-Until preview.", tableName: "EditorUX")
                         .font(.system(size: 10))
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
@@ -1336,7 +1667,7 @@ struct EditorSidebar: View {
     @ViewBuilder
     func locatorPlaybackPolicyView() -> some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text(NSLocalizedString("Playback if text is missing", tableName: "EditorUX", comment: ""))
+            Text("Playback if text is missing", tableName: "EditorUX")
                 .font(.system(size: 9.5, weight: .medium))
                 .foregroundStyle(.secondary)
             Picker("", selection: Binding(
@@ -1346,8 +1677,8 @@ struct EditorSidebar: View {
                     applyInspector(fallbackPolicyOverride: newPolicy)
                 }
             )) {
-                Text(NSLocalizedString("Pause", tableName: "Common", comment: "")).tag(LocatorFallbackPolicy.fail)
-                Text(NSLocalizedString("Use fallback point", tableName: "Common", comment: "")).tag(LocatorFallbackPolicy.allowCoordinateFallback)
+                Text("Pause", tableName: "Common").tag(LocatorFallbackPolicy.fail)
+                Text("Use fallback point", tableName: "Common").tag(LocatorFallbackPolicy.allowCoordinateFallback)
             }
             .pickerStyle(.segmented)
             .controlSize(.small)
@@ -1401,7 +1732,7 @@ struct EditorSidebar: View {
     @ViewBuilder
     func multiPointClickEditor(for group: ActionGroup) -> some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text(NSLocalizedString("Click Points", tableName: "EditorUX", comment: ""))
+            Text("Click Points", tableName: "EditorUX")
                 .font(.system(size: 9.5, weight: .semibold))
                 .foregroundStyle(.secondary)
 
@@ -1485,25 +1816,25 @@ struct EditorSidebar: View {
     @ViewBuilder
     func insertionTargetView() -> some View {
         HStack(spacing: 8) {
-            Text(NSLocalizedString("Insert Position", tableName: "Common", comment: ""))
+            Text("Insert Position", tableName: "Common")
                 .font(.system(size: 11))
                 .foregroundStyle(.secondary)
             
             Spacer()
             
             if rows.isEmpty {
-                Text(NSLocalizedString("Empty Timeline", tableName: "EditorUX", comment: ""))
+                Text("Empty Timeline", tableName: "EditorUX")
                     .font(.system(size: 11))
                     .foregroundStyle(.secondary)
             } else {
                 HStack(spacing: 6) {
                     let val = insertionIndexBinding.wrappedValue
                     if val > rows.count {
-                        Text(NSLocalizedString("Append at end", tableName: "Common", comment: ""))
+                        Text("Append at end", tableName: "Common")
                             .font(.system(size: 11))
                             .foregroundStyle(.secondary)
                     } else {
-                        Text(NSLocalizedString("After Action #", tableName: "EditorUX", comment: ""))
+                        Text("After Action #", tableName: "EditorUX")
                             .font(.system(size: 11))
                         
                         TextField("", value: insertionIndexBinding, format: .number)
@@ -2470,7 +2801,7 @@ struct EditorSidebar: View {
                     verifyMustExist: effectiveVerifyMustExist,
                     fallbackPolicy: effectiveFallbackPolicy
                 )
-            } else if grp.kind.canUseLocatorStrategy {
+            } else if grp.kind.canUseTextLocator {
                 let anchor = effectiveStrategy == .locatorOnly && !effectiveOCRText.isEmpty
                     ? updatedAnchor(for: grp, text: effectiveOCRText)
                     : nil
@@ -2689,7 +3020,7 @@ struct AnchorPositionCard: View {
     let fallbackPolicy: LocatorFallbackPolicy
     
     private var hasContentLock: Bool {
-        anchor.observedContentNormalizedFrame != nil || anchor.searchContentNormalizedRegion != nil || anchor.coordinateFallbackContentNormalized != nil
+        anchor.usesContentNormalizedGeometry
     }
     
     var body: some View {
@@ -2697,7 +3028,7 @@ struct AnchorPositionCard: View {
             HStack(spacing: 6) {
                 Image(systemName: hasContentLock ? "rectangle.inset.filled.and.person.filled" : "display")
                     .foregroundStyle(Brand.sigAmber)
-                Text(hasContentLock ? String(localized: "Content-locked target", table: "Common") : String(localized: "Screen target", table: "Recording"))
+                Text(hasContentLock ? String(localized: "Content-locked target", table: "Common") : String(localized: "Screen target", table: "Common"))
                     .font(.system(size: 10.5, weight: .semibold))
                 Spacer()
                 Text(fallbackPolicy == .allowCoordinateFallback ? String(localized: "Fallback on", table: "Common") : String(localized: "Pause on miss", table: "Common"))
@@ -2708,7 +3039,7 @@ struct AnchorPositionCard: View {
             Divider()
             
             VStack(alignment: .leading, spacing: 4) {
-                Text(NSLocalizedString("Detected Text", tableName: "EditorUX", comment: ""))
+                Text("Detected Text", tableName: "EditorUX")
                     .font(.system(size: 9.8, weight: .medium))
                     .foregroundStyle(.secondary)
                 Text(anchor.text)
@@ -2724,10 +3055,14 @@ struct AnchorPositionCard: View {
             if let normalized = anchor.observedContentNormalizedFrame {
                 positionRow(color: Brand.sigBlue, title: String(localized: "Content lock", table: "Common"), value: normalizedRectSummary(normalized))
             }
-            if let search = anchor.searchRegion {
+            if let normalizedSearch = anchor.searchContentNormalizedRegion {
+                positionRow(color: Brand.sigAmber, title: String(localized: "Search region", table: "EditorUX"), value: normalizedRectSummary(normalizedSearch))
+            } else if let search = anchor.searchRegion {
                 positionRow(color: Brand.sigAmber, title: String(localized: "Search region", table: "EditorUX"), value: rectSummary(search))
             }
-            if let fallback = anchor.coordinateFallback {
+            if let normalizedFallback = anchor.coordinateFallbackContentNormalized {
+                positionRow(color: Brand.sigViolet, title: String(localized: "Fallback point", table: "Common"), value: normalizedPointSummary(normalizedFallback))
+            } else if let fallback = anchor.coordinateFallback {
                 positionRow(color: Brand.sigViolet, title: String(localized: "Fallback point", table: "Common"), value: pointSummary(fallback))
             }
         }
@@ -2765,5 +3100,9 @@ struct AnchorPositionCard: View {
     
     private func pointSummary(_ point: PointValue) -> String {
         "\(Int(point.x)),\(Int(point.y))"
+    }
+
+    private func normalizedPointSummary(_ point: PointValue) -> String {
+        "\(Int((point.x * 100).rounded()))%,\(Int((point.y * 100).rounded()))%"
     }
 }

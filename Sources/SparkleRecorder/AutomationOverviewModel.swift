@@ -7,12 +7,18 @@ import SparkleRecorderCore
 final class AutomationOverviewModel {
   @ObservationIgnored
   private let snapshotClient: AutomationRepositorySnapshotClient?
+  typealias RuntimeSnapshotLoader = @MainActor () async -> AutomationRuntimeSnapshot?
+
   @ObservationIgnored
   private let runtimeHost: LiveAutomationRuntimeHost?
+  @ObservationIgnored
+  private let runtimeSnapshotLoader: RuntimeSnapshotLoader?
   @ObservationIgnored
   private let now: () -> Date
   @ObservationIgnored
   private var pollingTask: Task<Void, Never>?
+  @ObservationIgnored
+  private var lastRuntimeRevision: UInt64?
 
   private(set) var state: AutomationRunState
   private(set) var projection: AutomationOverviewProjection
@@ -32,6 +38,7 @@ final class AutomationOverviewModel {
     self.refreshState = .idle
     self.snapshotClient = nil
     self.runtimeHost = nil
+    self.runtimeSnapshotLoader = nil
     self.now = now
   }
 
@@ -51,6 +58,7 @@ final class AutomationOverviewModel {
     self.refreshState = .idle
     self.snapshotClient = snapshotClient
     self.runtimeHost = nil
+    self.runtimeSnapshotLoader = nil
     self.now = now
   }
 
@@ -71,13 +79,35 @@ final class AutomationOverviewModel {
     self.refreshState = .idle
     self.snapshotClient = nil
     self.runtimeHost = runtimeHost
+    self.runtimeSnapshotLoader = { await runtimeHost.currentSnapshot() }
+    self.now = now
+  }
+
+  init(
+    runtimeSnapshotLoader: @escaping RuntimeSnapshotLoader,
+    initialState: AutomationRunState = AutomationRunState(),
+    initialProjection: AutomationOverviewProjection = AutomationViewProjection.overview(
+      from: AutomationRunState()),
+    now: @escaping () -> Date = { Date() }
+  ) {
+    self.state = initialState
+    self.projection = initialProjection
+    self.catalogProjection = AutomationCatalogProjection.make(
+      state: initialState,
+      overview: initialProjection
+    )
+    self.runCenterProjection = AutomationRunCenterProjection.make(state: initialState)
+    self.refreshState = .idle
+    self.snapshotClient = nil
+    self.runtimeHost = nil
+    self.runtimeSnapshotLoader = runtimeSnapshotLoader
     self.now = now
   }
 
   func startAutoRefresh() {
     pollingTask?.cancel()
 
-    guard runtimeHost != nil else {
+    guard runtimeSnapshotLoader != nil else {
       pollingTask = Task { [weak self] in
         await self?.refresh()
       }
@@ -122,33 +152,46 @@ final class AutomationOverviewModel {
     }
   }
 
-  func dispatch(_ action: AutomationAction) async {
+  func perform(_ action: AutomationAction) async throws {
     guard let runtimeHost else {
       let result = AutomationReducer.reduce(state: state, action: action)
       publish(result.state)
       return
     }
 
-    do {
-      publish(try await runtimeHost.dispatch(action))
-    } catch {
-      refreshState = .failed(
-        AutomationRepositoryRefreshFailure(
-          message: String(describing: error),
-          failedAt: now()
-        ),
-        previousSnapshot: refreshState.snapshot
-      )
+    publish(try await runtimeHost.dispatch(action))
+    if let snapshot = await runtimeHost.currentSnapshot() {
+      lastRuntimeRevision = snapshot.revision
     }
   }
 
-  private func refreshRuntimeState() async {
-    guard let runtimeHost else {
+  func dispatch(_ action: AutomationAction) async {
+    do {
+      try await perform(action)
+    } catch {
+      recordDispatchFailure(error)
+    }
+  }
+
+  private func recordDispatchFailure(_ error: Error) {
+    refreshState = .failed(
+      AutomationRepositoryRefreshFailure(
+        message: String(describing: error),
+        failedAt: now()
+      ),
+      previousSnapshot: refreshState.snapshot
+    )
+  }
+
+  func refreshRuntimeState() async {
+    guard let runtimeSnapshotLoader else {
       return
     }
 
-    if let state = await runtimeHost.currentState() {
-      publish(state)
+    if let snapshot = await runtimeSnapshotLoader() {
+      guard lastRuntimeRevision != snapshot.revision else { return }
+      lastRuntimeRevision = snapshot.revision
+      publish(snapshot.state)
     } else if let snapshot = refreshState.snapshot {
       publish(snapshot.state)
     }

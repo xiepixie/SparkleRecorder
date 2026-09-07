@@ -29,11 +29,14 @@ final class Recorder: ObservableObject, @unchecked Sendable {
     private var recordingTask: Task<Void, Never>?
     private var recordingDiagnosticTask: Task<Void, Never>?
     private let makeRecordingEngine: @Sendable (CGEventMask) -> RecordingEngineClient
-    private let makeSemanticRecorderBridge: @Sendable (RecordingCaptureTarget) -> SemanticRecorderBridge
+    private let makeSemanticRecorderBridge: @Sendable (RecordingCaptureTarget, RecordingCapturePolicy) -> SemanticRecorderBridge
     private let semanticSuppressionContextClient: SemanticRecordingSuppressionContextClient
     private let semanticSuppressionProducer: SemanticRecordingSuppressionProducer
     private var semanticRecorderBridge: SemanticRecorderBridge?
     private var semanticRecordingTask: Task<Void, Never>?
+    /// Identifies the semantic lifecycle that owns the current status. Late
+    /// callbacks from a prior recording must never overwrite a newer session.
+    private var semanticSessionGeneration: UInt64 = 0
     private var semanticCaptureTarget: RecordingCaptureTarget?
     private var lastSemanticSuppressionFingerprint: SemanticSuppressionFingerprint?
     private var baseMachTicks: UInt64 = 0
@@ -62,8 +65,9 @@ final class Recorder: ObservableObject, @unchecked Sendable {
     /// @Published mutations caused a SwiftUI re-render per input event, which
     /// could starve the tap into timeout during fast input.
 
-    /// Key codes the recorder must NOT capture (our own hotkeys).
-    var ignoredKeyCodes: Set<UInt16> = []
+    /// Exact key chords the recorder must NOT capture (our own hotkeys).
+    /// Plain keys that share the same keyCode remain recordable.
+    var ignoredKeyChords: Set<RecordingIgnoredKeyChord> = []
 
     var eventCount: Int { events.count }
 
@@ -71,9 +75,10 @@ final class Recorder: ObservableObject, @unchecked Sendable {
         makeRecordingEngine: @escaping @Sendable (CGEventMask) -> RecordingEngineClient = { mask in
             RecordingEngineClient.live(mask: mask)
         },
-        makeSemanticRecorderBridge: @escaping @Sendable (RecordingCaptureTarget) -> SemanticRecorderBridge = { target in
+        makeSemanticRecorderBridge: @escaping @Sendable (RecordingCaptureTarget, RecordingCapturePolicy) -> SemanticRecorderBridge = { target, policy in
             SemanticRecorderBridge(
                 configuration: SemanticRecordingCaptureConfiguration(
+                    capturePolicy: policy,
                     captureTarget: target
                 )
             )
@@ -113,7 +118,8 @@ final class Recorder: ObservableObject, @unchecked Sendable {
     @discardableResult
     func startRecording(
         semanticRecordingEnabled: Bool = UserDefaults.standard.bool(forKey: "semanticRecordingEnabled"),
-        semanticCaptureTarget: RecordingCaptureTarget = RecordingCaptureTarget()
+        semanticCaptureTarget: RecordingCaptureTarget = RecordingCaptureTarget(),
+        semanticCapturePolicy: RecordingCapturePolicy = RecordingCapturePolicy()
     ) -> Bool {
         guard !isRecording else { return true }
         events.removeAll()
@@ -127,7 +133,7 @@ final class Recorder: ObservableObject, @unchecked Sendable {
         recordMouseMovesEnabled = UserDefaults.standard.bool(forKey: "recordMouseMoves")
         sessionProcessor.reset(
             recordMouseMoves: recordMouseMovesEnabled,
-            ignoredKeyCodes: ignoredKeyCodes,
+            ignoredKeyChords: ignoredKeyChords,
             resumeOffsetDuration: resumeOffsetDuration
         )
         
@@ -158,7 +164,7 @@ final class Recorder: ObservableObject, @unchecked Sendable {
             surfaceTracker.stopTracking()
             sessionProcessor.reset(
                 recordMouseMoves: recordMouseMovesEnabled,
-                ignoredKeyCodes: ignoredKeyCodes,
+                ignoredKeyChords: ignoredKeyChords,
                 resumeOffsetDuration: resumeOffsetDuration
             )
             return false
@@ -180,21 +186,30 @@ final class Recorder: ObservableObject, @unchecked Sendable {
         isRecording = true
         startSemanticRecordingIfEnabled(
             semanticRecordingEnabled,
-            captureTarget: semanticCaptureTarget
+            captureTarget: semanticCaptureTarget,
+            capturePolicy: semanticCapturePolicy
         )
         startDisplayTimer()
         return true
     }
 
-    func stopRecording() {
-        stopRecording(shouldFinishSemanticRecording: true)
+    func stopRecording(
+        ignoringTrailingHotkeyArtifactsFor hotkeyChord: RecordingIgnoredKeyChord? = nil
+    ) {
+        stopRecording(
+            shouldFinishSemanticRecording: true,
+            ignoringTrailingHotkeyArtifactsFor: hotkeyChord
+        )
     }
 
     func cancelRecording() {
-        stopRecording(shouldFinishSemanticRecording: false)
+        stopRecording(shouldFinishSemanticRecording: false, ignoringTrailingHotkeyArtifactsFor: nil)
     }
 
-    private func stopRecording(shouldFinishSemanticRecording: Bool) {
+    private func stopRecording(
+        shouldFinishSemanticRecording: Bool,
+        ignoringTrailingHotkeyArtifactsFor hotkeyChord: RecordingIgnoredKeyChord?
+    ) {
         guard isRecording else { return }
         let sessionStopTime = RecordingTimeline.liveDuration(currentMachTicks: mach_absolute_time(), baseMachTicks: baseMachTicks, resumeOffsetDuration: 0, timebase: Recorder.recordingTimebase)
         engineClient?.stop()
@@ -205,12 +220,22 @@ final class Recorder: ObservableObject, @unchecked Sendable {
         recordingDiagnosticTask = nil
         surfaceTracker.stopTracking()
         stopDisplayTimer()
+        sessionProcessor.finishPending()
         flushPending()
+        if let hotkeyChord {
+            discardTrailingHotkeyModifierArtifacts(for: hotkeyChord)
+        }
         isRecording = false
         liveDuration = events.last?.time ?? 0
-        if shouldFinishSemanticRecording {
-            finishSemanticRecording(recordingTime: sessionStopTime)
+        if shouldFinishSemanticRecording, !events.isEmpty {
+            finishSemanticRecording(
+                recordingTime: sessionStopTime,
+                finalPlayableEvents: events
+            )
         } else {
+            // No saved macro can own a zero-event visual bundle. Treat an empty
+            // stop like discard for semantic evidence so temporary capture files
+            // are removed instead of becoming orphaned recordings.
             cancelSemanticRecording(recordingTime: sessionStopTime)
         }
     }
@@ -223,14 +248,33 @@ final class Recorder: ObservableObject, @unchecked Sendable {
         }
         let semanticRecordingTime = RecordingTimeline.liveDuration(currentMachTicks: mach_absolute_time(), baseMachTicks: baseMachTicks, resumeOffsetDuration: 0, timebase: Recorder.recordingTimebase)
         recordSemanticSuppressionContext(recordingTime: semanticRecordingTime)
-        guard !snapshot.events.isEmpty else { return }
-        
-        liveStats.merge(RecordingStats.summarize(snapshot.events))
-        events.append(contentsOf: snapshot.events)
-        appendLiveWaveformEvents(snapshot.events)
-        recordSemanticEvents(snapshot.events)
+        recordSemanticTracks(snapshot)
+        guard !snapshot.playableEvents.isEmpty else { return }
+
+        liveStats.merge(RecordingStats.summarize(snapshot.playableEvents))
+        events.append(contentsOf: snapshot.playableEvents)
+        appendLiveWaveformEvents(snapshot.playableEvents)
     }
     
+    func discardTrailingHotkeyModifierArtifacts(for chord: RecordingIgnoredKeyChord) {
+        guard chord.modifiers != 0 else { return }
+        let mask = RecordingIgnoredKeyChord.relevantModifierMask
+        var removed = false
+
+        while let last = events.last, last.kind == .flagsChanged {
+            let modifiers = last.flags & mask
+            guard modifiers != 0,
+                  modifiers & ~chord.modifiers == 0 else { break }
+            events.removeLast()
+            removed = true
+        }
+
+        guard removed else { return }
+        liveDuration = events.last?.time ?? 0
+        liveWaveformEvents = Self.cappedWaveformEvents(events, maxCount: maxLiveWaveformEvents)
+        recalculateStats()
+    }
+
     public func clearAll() {
         events.removeAll()
         liveWaveformEvents.removeAll()
@@ -297,7 +341,7 @@ final class Recorder: ObservableObject, @unchecked Sendable {
         sessionProcessor.record(
             input,
             recordMouseMoves: recordMouseMovesEnabled,
-            ignoredKeyCodes: ignoredKeyCodes,
+            ignoredKeyChords: ignoredKeyChords,
             trackedActiveSurface: surfaceTracker.cachedActiveSurface
         )
     }
@@ -313,8 +357,11 @@ final class Recorder: ObservableObject, @unchecked Sendable {
 
     private func startSemanticRecordingIfEnabled(
         _ semanticRecordingEnabled: Bool,
-        captureTarget: RecordingCaptureTarget
+        captureTarget: RecordingCaptureTarget,
+        capturePolicy: RecordingCapturePolicy
     ) {
+        semanticSessionGeneration &+= 1
+        let generation = semanticSessionGeneration
         semanticRecordingTask?.cancel()
         semanticRecorderBridge = nil
         semanticCaptureTarget = nil
@@ -341,33 +388,60 @@ final class Recorder: ObservableObject, @unchecked Sendable {
             return
         }
 
-        let bridge = makeSemanticRecorderBridge(captureTarget)
+        let bridge = makeSemanticRecorderBridge(captureTarget, capturePolicy)
         semanticRecorderBridge = bridge
         semanticCaptureTarget = captureTarget
         semanticRecordingStatus = .starting
         let origin = RecordingTimeline.secondsFromMachTicks(baseMachTicks, timebase: Recorder.recordingTimebase)
         semanticRecordingTask = Task { [weak self, bridge] in
             let status = await bridge.start(recordingTime: 0, sessionOriginHostTime: origin)
-            await self?.setSemanticRecordingStatus(status)
+            await self?.setSemanticRecordingStatus(status, generation: generation)
         }
         recordSemanticSuppressionContext(initialContext)
     }
 
-    private func recordSemanticEvents(_ events: [RecordedEvent]) {
+    private func recordSemanticTracks(_ snapshot: RecordingSessionTrackSnapshot) {
         guard let bridge = semanticRecorderBridge else {
             return
         }
+        guard !snapshot.playableEvents.isEmpty || !snapshot.evidenceSamples.isEmpty ||
+                !snapshot.playableEvidenceLinks.isEmpty || snapshot.omittedEvidenceSampleCount > 0 else {
+            return
+        }
         let previous = semanticRecordingTask
+        let generation = semanticSessionGeneration
         let origin = RecordingTimeline.secondsFromMachTicks(baseMachTicks, timebase: Recorder.recordingTimebase)
-        let offset = sourceEventOriginNanoseconds.map { RecordingTimeline.secondsFromNanoseconds($0) - origin - resumeOffsetDuration }
-        semanticRecordingTask = Task { [weak self, bridge, events] in
+        let offset = sourceEventOriginNanoseconds.map {
+            RecordingTimeline.secondsFromNanoseconds($0) - origin - resumeOffsetDuration
+        }
+        let playableEvents = snapshot.playableEvents
+        let evidenceSamples = snapshot.evidenceSamples
+        let playableEvidenceLinks = snapshot.playableEvidenceLinks
+        let omittedEvidenceSampleCount = snapshot.omittedEvidenceSampleCount
+        semanticRecordingTask = Task { [weak self, bridge] in
             await previous?.value
-            let status = await bridge.record(events, sessionTimeOffset: offset)
-            await self?.setSemanticRecordingStatus(status)
+            var status = await bridge.record(playableEvents, sessionTimeOffset: offset)
+            status = await bridge.recordEvidence(
+                samples: evidenceSamples,
+                playableLinks: playableEvidenceLinks,
+                omittedSampleCount: omittedEvidenceSampleCount,
+                sessionTimeOffset: offset
+            )
+            await self?.setSemanticRecordingStatus(status, generation: generation)
         }
     }
 
-    private func finishSemanticRecording(recordingTime: TimeInterval) {
+    @MainActor
+    func waitForSemanticRecordingCompletion() async -> SemanticRecorderBridgeStatus {
+        let task = semanticRecordingTask
+        await task?.value
+        return semanticRecordingStatus
+    }
+
+    private func finishSemanticRecording(
+        recordingTime: TimeInterval,
+        finalPlayableEvents: [RecordedEvent]
+    ) {
         guard let bridge = semanticRecorderBridge else {
             return
         }
@@ -375,10 +449,14 @@ final class Recorder: ObservableObject, @unchecked Sendable {
         semanticCaptureTarget = nil
         lastSemanticSuppressionFingerprint = nil
         let previous = semanticRecordingTask
-        semanticRecordingTask = Task { [weak self, bridge] in
+        let generation = semanticSessionGeneration
+        semanticRecordingTask = Task { [weak self, bridge, finalPlayableEvents] in
             await previous?.value
-            let status = await bridge.finish(recordingTime: recordingTime)
-            await self?.setSemanticRecordingStatus(status)
+            let status = await bridge.finish(
+                recordingTime: recordingTime,
+                finalPlayableEvents: finalPlayableEvents
+            )
+            await self?.setSemanticRecordingStatus(status, generation: generation)
         }
     }
 
@@ -389,9 +467,15 @@ final class Recorder: ObservableObject, @unchecked Sendable {
         semanticRecorderBridge = nil
         semanticCaptureTarget = nil
         lastSemanticSuppressionFingerprint = nil
+        let previous = semanticRecordingTask
+        let generation = semanticSessionGeneration
         semanticRecordingTask = Task { [weak self, bridge] in
+            // Cancellation is terminal for this semantic generation. Serialize it
+            // after any in-flight start/record work so an older task can never
+            // publish a post-cancel status or recreate temporary evidence.
+            await previous?.value
             let status = await bridge.cancel(recordingTime: recordingTime)
-            await self?.setSemanticRecordingStatus(status)
+            await self?.setSemanticRecordingStatus(status, generation: generation)
         }
     }
 
@@ -431,10 +515,11 @@ final class Recorder: ObservableObject, @unchecked Sendable {
         }
 
         let previous = semanticRecordingTask
+        let generation = semanticSessionGeneration
         semanticRecordingTask = Task { [weak self, bridge, context] in
             await previous?.value
             let status = await bridge.addSuppressions(for: context)
-            await self?.setSemanticRecordingStatus(status)
+            await self?.setSemanticRecordingStatus(status, generation: generation)
         }
     }
 
@@ -466,12 +551,13 @@ final class Recorder: ObservableObject, @unchecked Sendable {
         lastSemanticSuppressionFingerprint = nil
         semanticRecordingStatus = .suppressed(message: message)
         semanticRecordingTask?.cancel()
+        let generation = semanticSessionGeneration
         semanticRecordingTask = Task { [weak self, bridge, recordingTime, message] in
             let status = await bridge.suppress(
                 recordingTime: recordingTime,
                 message: message
             )
-            await self?.setSemanticRecordingStatus(status)
+            await self?.setSemanticRecordingStatus(status, generation: generation)
         }
     }
 
@@ -512,8 +598,10 @@ final class Recorder: ObservableObject, @unchecked Sendable {
 
     @MainActor
     private func setSemanticRecordingStatus(
-        _ status: SemanticRecorderBridgeStatus
+        _ status: SemanticRecorderBridgeStatus,
+        generation: UInt64
     ) {
+        guard generation == semanticSessionGeneration else { return }
         if case .suppressed = semanticRecordingStatus,
            case .suppressed = status {
             semanticRecordingStatus = status

@@ -226,11 +226,12 @@ struct AutomationTaskRunEvidenceSectionView: View {
     private func evidenceActionFeedbackView(
         _ feedback: AutomationTaskRunEvidenceActionFeedback
     ) -> some View {
-        Label(actionFeedbackMessage(feedback), systemImage: actionFeedbackSystemImage(feedback))
+        let presentation = AutomationTaskRunEvidenceActionPresentation.make(feedback)
+        return Label(presentation.message, systemImage: presentation.systemImage)
             .font(.caption)
-            .foregroundStyle(actionFeedbackTint(feedback))
+            .foregroundStyle(presentation.isError ? Brand.sigAmber : Brand.libraryGreen)
             .fixedSize(horizontal: false, vertical: true)
-            .accessibilityLabel(actionFeedbackMessage(feedback))
+            .accessibilityLabel(presentation.message)
     }
 
     private func timeSummary(_ date: Date) -> String {
@@ -249,37 +250,6 @@ struct AutomationTaskRunEvidenceSectionView: View {
         payload.screenshotURL == nil
             ? String(localized: "No screenshot saved", table: "Common")
             : String(localized: "Screenshot preview unavailable", table: "Common")
-    }
-
-    private func actionFeedbackMessage(_ feedback: AutomationTaskRunEvidenceActionFeedback) -> String {
-        switch feedback {
-        case .succeeded(.revealReport):
-            return String(localized: "Report revealed in Finder.", table: "Common")
-        case .succeeded(.openScreenshot):
-            return String(localized: "Screenshot opened in the default image viewer.", table: "Common")
-        case .failed(.revealReport, let message), .failed(.openScreenshot, let message):
-            return message
-        }
-    }
-
-    private func actionFeedbackSystemImage(_ feedback: AutomationTaskRunEvidenceActionFeedback) -> String {
-        switch feedback {
-        case .succeeded(.revealReport):
-            return "folder.badge.gearshape"
-        case .succeeded(.openScreenshot):
-            return "photo.badge.checkmark"
-        case .failed:
-            return "exclamationmark.triangle"
-        }
-    }
-
-    private func actionFeedbackTint(_ feedback: AutomationTaskRunEvidenceActionFeedback) -> Color {
-        switch feedback {
-        case .succeeded:
-            return Brand.libraryGreen
-        case .failed:
-            return Brand.sigAmber
-        }
     }
 
     private func shortID(_ id: UUID) -> String {

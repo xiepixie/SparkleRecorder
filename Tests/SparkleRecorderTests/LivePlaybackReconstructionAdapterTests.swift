@@ -49,6 +49,29 @@ struct LivePlaybackReconstructionAdapterTests {
     }
 
     @Test(arguments: [false, true])
+    func locatorFailureUsesSharedContentNormalizedFallback(synchronous: Bool) async {
+        let state = AdapterFixtureState()
+        let adapter = client(
+            synchronous: synchronous,
+            state: state,
+            locator: { _, _, _ in throw VisionDetectorError.textNotMatched }
+        )
+        var input = event(.leftMouseDown, time: 0)
+        input.locatorFallbackPolicy = .allowCoordinateFallback
+        input.textAnchor?.coordinateFallbackContentNormalized = PointValue(x: 0.5, y: 0.5)
+        var context = PlaybackContext()
+        context.surfaces["main"] = TestFixtures.surface(
+            recordedFrame: RectValue(x: 100, y: 80, width: 400, height: 320),
+            recordedContentFrame: RectValue(x: 100, y: 120, width: 400, height: 280)
+        )
+        context.currentSurfaceFrames["main"] = RectValue(x: 100, y: 80, width: 400, height: 320)
+        context.currentContentFrames["main"] = RectValue(x: 100, y: 120, width: 400, height: 280)
+
+        #expect(await adapter(request(input, context: context)) == .succeeded(.postedInput))
+        #expect(state.points == [CGPoint(x: 300, y: 260)])
+    }
+
+    @Test(arguments: [false, true])
     func differentOccurrenceAndLoopNeverReuseGesture(synchronous: Bool) async {
         let state = AdapterFixtureState()
         let adapter = client(synchronous: synchronous, state: state)
@@ -62,16 +85,21 @@ struct LivePlaybackReconstructionAdapterTests {
         #expect(state.locates == 4)
     }
 
-    private func client(synchronous: Bool, state: AdapterFixtureState,
-                        observation: PlaybackTextObservationClient = .init { _, _ in .found }) -> @Sendable (PlaybackRunStepRequest) async -> PlaybackRunStepResult {
+    private func client(
+        synchronous: Bool,
+        state: AdapterFixtureState,
+        observation: PlaybackTextObservationClient = .init { _, _ in .found },
+        locator: (@Sendable (RecordedEvent, PlaybackContext, PlaybackClockClient) async throws -> CGPoint)? = nil
+    ) -> @Sendable (PlaybackRunStepRequest) async -> PlaybackRunStepResult {
         let poster = EventPosterClient { _, point in state.post(point) }
+        let locatorClient = locator ?? { _, _, _ in state.locate() }
         if synchronous {
             let client = LivePlaybackSynchronousRunStepClient(playbackClock: state.clock, eventPoster: poster,
-                textObservationClient: observation, locatorClient: { _, _, _ in state.locate() }, cancelled: { state.cancelled }).makeClient()
+                textObservationClient: observation, locatorClient: locatorClient, cancelled: { state.cancelled }).makeClient()
             return { client.run($0) }
         }
         return LivePlaybackRunStepClient(playbackClock: state.clock, eventPoster: poster,
-            textObservationClient: observation, locatorClient: { _, _, _ in state.locate() }, cancelled: { state.cancelled }).makeClient().run
+            textObservationClient: observation, locatorClient: locatorClient, cancelled: { state.cancelled }).makeClient().run
     }
 
     private func event(_ kind: RecordedEvent.Kind, time: Double) -> RecordedEvent {
@@ -80,10 +108,10 @@ struct LivePlaybackReconstructionAdapterTests {
             textAnchor: TextAnchor(text: "Button", observedFrame: RectValue(x: 0, y: 0, width: 10, height: 10)), textTimeout: 1)
     }
 
-    private func request(_ event: RecordedEvent, loop: Int = 1) -> PlaybackRunStepRequest {
+    private func request(_ event: RecordedEvent, loop: Int = 1, context: PlaybackContext = PlaybackContext()) -> PlaybackRunStepRequest {
         PlaybackRunStepRequest(loopIndex: loop,
             step: PlaybackStep(eventIndex: 0, event: event, deltaFromPrevious: 0, scheduledOffset: 0, progress: 0),
-            context: PlaybackContext(), targetSurfaceId: "main", scheduledTime: 0)
+            context: context, targetSurfaceId: "main", scheduledTime: 0)
     }
 }
 

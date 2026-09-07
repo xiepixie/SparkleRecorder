@@ -36,6 +36,26 @@ struct MacroEditorLocalizationTests {
         #expect(missingSimplifiedChinese.isEmpty, "Missing Simplified Chinese localizations: \(missingSimplifiedChinese)")
     }
 
+    @Test("Macro editor localized calls use the declared catalog")
+    func macroEditorLocalizedCallsUseDeclaredCatalog() throws {
+        let root = repositoryRoot()
+        let sourceFiles = try macroEditorSourceFiles(root: root)
+        let catalogs = try localizationCatalogs(root: root)
+        var mismatches: [String] = []
+
+        for file in sourceFiles {
+            let source = try String(contentsOf: file, encoding: .utf8)
+            for reference in Self.localizedStringReferences(in: source) {
+                guard catalogs[reference.table]?[reference.key] != nil else {
+                    mismatches.append("\(file.lastPathComponent): [\(reference.table)] \(reference.key)")
+                    continue
+                }
+            }
+        }
+
+        #expect(mismatches.isEmpty, "Macro Editor localized calls must use the catalog that owns the key: \(mismatches)")
+    }
+
     @Test("Macro editor avoids hard-coded static visible strings")
     func macroEditorAvoidsHardCodedStaticVisibleStrings() throws {
         let root = repositoryRoot()
@@ -70,42 +90,103 @@ struct MacroEditorLocalizationTests {
     }
 
     private func localizationCatalog(root: URL) throws -> [String: Any] {
+        try localizationCatalogs(root: root).values.reduce(into: [:]) { mergedStrings, strings in
+            for (key, value) in strings {
+                mergedStrings[key] = value
+            }
+        }
+    }
+
+    private func localizationCatalogs(root: URL) throws -> [String: [String: Any]] {
         let folder = root.appendingPathComponent("Sources/SparkleRecorder")
         let contents = try FileManager.default.contentsOfDirectory(at: folder, includingPropertiesForKeys: nil)
         let xcstringsFiles = contents.filter { $0.pathExtension == "xcstrings" }
 
-        var mergedStrings: [String: Any] = [:]
+        var catalogs: [String: [String: Any]] = [:]
         for file in xcstringsFiles {
             let data = try Data(contentsOf: file)
             let rootObject = try #require(
                 try JSONSerialization.jsonObject(with: data) as? [String: Any]
             )
             if let strings = rootObject["strings"] as? [String: Any] {
-                for (key, value) in strings {
-                    mergedStrings[key] = value
-                }
+                catalogs[file.deletingPathExtension().lastPathComponent] = strings
             }
         }
-        return mergedStrings
+        return catalogs
+    }
+
+    private struct LocalizedStringReference {
+        let key: String
+        let table: String
+    }
+
+    private static func localizedStringReferences(in source: String) -> [LocalizedStringReference] {
+        var references: [LocalizedStringReference] = []
+        let literalPatterns = [
+            #"String\(localized:\s*"((?:[^"\\]|\\.)*)"\s*,\s*table:\s*"([^"]+)""#,
+            #"(?:Text|Button|Label|TextField)\("((?:[^"\\]|\\.)*)"\s*,\s*tableName:\s*"([^"]+)""#,
+        ]
+
+        for pattern in literalPatterns {
+            guard let regex = try? NSRegularExpression(pattern: pattern) else { continue }
+            let range = NSRange(source.startIndex..<source.endIndex, in: source)
+            for match in regex.matches(in: source, range: range) {
+                guard match.numberOfRanges > 2,
+                      let keyRange = Range(match.range(at: 1), in: source),
+                      let tableRange = Range(match.range(at: 2), in: source) else {
+                    continue
+                }
+                references.append(LocalizedStringReference(
+                    key: String(source[keyRange]),
+                    table: String(source[tableRange])
+                ))
+            }
+        }
+
+        return references
     }
 
     private static func localizedStringKeys(in source: String) -> Set<String> {
-        let pattern = #"NSLocalizedString\("((?:[^"\\]|\\.)*)""#
-        guard let regex = try? NSRegularExpression(pattern: pattern) else {
-            return []
-        }
-        let range = NSRange(source.startIndex..<source.endIndex, in: source)
-        return Set(regex.matches(in: source, range: range).compactMap { match in
-            guard match.numberOfRanges > 1,
-                  let keyRange = Range(match.range(at: 1), in: source) else {
-                return nil
+        var keys = Set<String>()
+
+        // 1. NSLocalizedString("key", ...)
+        let nsPattern = #"NSLocalizedString\("((?:[^"\\]|\\.)*)""#
+        if let regex = try? NSRegularExpression(pattern: nsPattern) {
+            let range = NSRange(source.startIndex..<source.endIndex, in: source)
+            for match in regex.matches(in: source, range: range) {
+                if match.numberOfRanges > 1, let r = Range(match.range(at: 1), in: source) {
+                    keys.insert(String(source[r]))
+                }
             }
-            return String(source[keyRange])
-        })
+        }
+
+        // 2. String(localized: "key", ...)
+        let strPattern = #"String\(localized:\s*"((?:[^"\\]|\\.)*)""#
+        if let regex = try? NSRegularExpression(pattern: strPattern) {
+            let range = NSRange(source.startIndex..<source.endIndex, in: source)
+            for match in regex.matches(in: source, range: range) {
+                if match.numberOfRanges > 1, let r = Range(match.range(at: 1), in: source) {
+                    keys.insert(String(source[r]))
+                }
+            }
+        }
+
+        // 3. Text("key", tableName: "...") / Button("key", tableName: "...")
+        let uiPattern = #"(?:Text|Button|Label|TextField)\("((?:[^"\\]|\\.)*)",\s*tableName:"#
+        if let regex = try? NSRegularExpression(pattern: uiPattern) {
+            let range = NSRange(source.startIndex..<source.endIndex, in: source)
+            for match in regex.matches(in: source, range: range) {
+                if match.numberOfRanges > 1, let r = Range(match.range(at: 1), in: source) {
+                    keys.insert(String(source[r]))
+                }
+            }
+        }
+
+        return keys
     }
 
     private static func staticVisibleStringLiterals(in source: String) -> [(kind: String, value: String, line: Int)] {
-        let pattern = #"(Text|Button|Label|TextField)\("((?:[^"\\]|\\.)*)""#
+        let pattern = #"(Text|Button|Label|TextField)\("((?:[^"\\]|\\.)*)"(\s*,\s*tableName:\s*"[^"]*")?"#
         guard let regex = try? NSRegularExpression(pattern: pattern) else {
             return []
         }
@@ -114,6 +195,10 @@ struct MacroEditorLocalizationTests {
             guard match.numberOfRanges > 2,
                   let kindRange = Range(match.range(at: 1), in: source),
                   let valueRange = Range(match.range(at: 2), in: source) else {
+                return nil
+            }
+            // If tableName is provided, it is properly localized via String Catalog per AGENTS.md.
+            if match.numberOfRanges > 3, match.range(at: 3).location != NSNotFound {
                 return nil
             }
             let value = String(source[valueRange])

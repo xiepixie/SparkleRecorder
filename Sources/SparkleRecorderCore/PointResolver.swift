@@ -1,8 +1,5 @@
 import Foundation
 import CoreGraphics
-#if canImport(AppKit)
-import AppKit
-#endif
 
 public enum CoordinateMode: String, Codable, Sendable {
     /// Plays macro strictly with absolute screen coordinates.
@@ -25,6 +22,23 @@ public struct RectValue: Codable, Equatable, Sendable {
         self.y = y
         self.width = width
         self.height = height
+    }
+
+    public init(_ rect: CGRect) {
+        self.init(x: rect.minX, y: rect.minY, width: rect.width, height: rect.height)
+    }
+
+    public var cgRect: CGRect {
+        CGRect(x: x, y: y, width: width, height: height)
+    }
+
+    public static func normalized(rect: CGRect, in bounds: CGRect) -> RectValue {
+        RectValue(
+            x: bounds.width > 0 ? (rect.minX - bounds.minX) / bounds.width : 0,
+            y: bounds.height > 0 ? (rect.minY - bounds.minY) / bounds.height : 0,
+            width: bounds.width > 0 ? rect.width / bounds.width : 0,
+            height: bounds.height > 0 ? rect.height / bounds.height : 0
+        )
     }
 }
 
@@ -90,7 +104,7 @@ public enum PointResolveError: Error, Sendable {
     case missingWindowLocalPoint
     case missingNormalizedPoint
     case resolvedPointOutOfBounds(CGPoint, RectValue)
-    case locatorOnlyRequiresLocatorEngine
+    case locatorRequired
 }
 
 public struct PointResolver: Sendable {
@@ -120,20 +134,18 @@ public struct PointResolver: Sendable {
                 break
             }
             
-            let targetSurfaceId: String
-            if let sId = event.surfaceId, context.surfaces[sId] != nil {
-                targetSurfaceId = sId
-            } else if let firstKey = context.surfaces.keys.first {
-                targetSurfaceId = firstKey
-            } else {
-                targetSurfaceId = event.surfaceId ?? "surface-1"
-            }
+            let targetSurfaceId = PlaybackPlanner.targetSurfaceId(for: event, context: context)
             
             guard let currentFrame = context.currentSurfaceFrames[targetSurfaceId] else {
                 return .failure(.missingWindowFrame(targetSurfaceId))
             }
             
             let strategy = event.coordinateStrategy ?? (event.kind.isMouse ? .normalizedPreferred : .windowLocalPreferred)
+            let titleBarHeight = currentTitleBarHeight(
+                surfaceId: targetSurfaceId,
+                currentFrame: currentFrame,
+                context: context
+            )
             
             let tryContentNormalized: () -> (CGPoint, RectValue)? = {
                 guard let contentFrame = context.currentContentFrames[targetSurfaceId],
@@ -155,33 +167,17 @@ public struct PointResolver: Sendable {
             
             let tryWindowNormalized: () -> (CGPoint, RectValue)? = {
                 guard let nx = event.windowNormalizedX, let ny = event.windowNormalizedY else { return nil }
-                let tbHeight: CGFloat
-                if let cached = context.currentTitleBarHeights[targetSurfaceId] {
-                    tbHeight = cached
-                } else {
-                    let bid = context.surfaces[targetSurfaceId]?.bundleIdentifier
-                    let pid = bid.flatMap { b in NSWorkspace.shared.runningApplications.first(where: { $0.bundleIdentifier == b })?.processIdentifier }
-                    tbHeight = CoordinateMapper.windowTitleBarHeight(for: pid, frame: currentFrame)
-                }
-                let clientHeight = max(1.0, currentFrame.height - tbHeight)
+                let clientHeight = max(1.0, currentFrame.height - titleBarHeight)
                 return (
-                    CGPoint(x: currentFrame.x + nx * currentFrame.width, y: currentFrame.y + tbHeight + ny * clientHeight),
+                    CGPoint(x: currentFrame.x + nx * currentFrame.width, y: currentFrame.y + titleBarHeight + ny * clientHeight),
                     currentFrame
                 )
             }
             
             let tryWindowLocal: () -> (CGPoint, RectValue)? = {
                 guard let lx = event.windowLocalX, let ly = event.windowLocalY else { return nil }
-                let tbHeight: CGFloat
-                if let cached = context.currentTitleBarHeights[targetSurfaceId] {
-                    tbHeight = cached
-                } else {
-                    let bid = context.surfaces[targetSurfaceId]?.bundleIdentifier
-                    let pid = bid.flatMap { b in NSWorkspace.shared.runningApplications.first(where: { $0.bundleIdentifier == b })?.processIdentifier }
-                    tbHeight = CoordinateMapper.windowTitleBarHeight(for: pid, frame: currentFrame)
-                }
                 return (
-                    CGPoint(x: currentFrame.x + lx, y: currentFrame.y + tbHeight + ly),
+                    CGPoint(x: currentFrame.x + lx, y: currentFrame.y + titleBarHeight + ly),
                     currentFrame
                 )
             }
@@ -207,7 +203,7 @@ public struct PointResolver: Sendable {
                 resolvedPoint = original
                 
             case .locatorOnly:
-                return .failure(.locatorOnlyRequiresLocatorEngine)
+                return .failure(.locatorRequired)
             }
             
             guard mapper.assertPointIsInsideWindow(resolvedPoint, in: boundsFrame) else {
@@ -216,14 +212,7 @@ public struct PointResolver: Sendable {
             
         case .unbound:
             // Fallback legacy behavior
-            let targetSurfaceId: String
-            if let sId = event.surfaceId, context.surfaces[sId] != nil {
-                targetSurfaceId = sId
-            } else if let firstKey = context.surfaces.keys.first {
-                targetSurfaceId = firstKey
-            } else {
-                targetSurfaceId = event.surfaceId ?? "surface-1"
-            }
+            let targetSurfaceId = PlaybackPlanner.targetSurfaceId(for: event, context: context)
             
             if let surface = context.surfaces[targetSurfaceId],
                let currentFrame = context.currentSurfaceFrames[targetSurfaceId] {
@@ -236,26 +225,15 @@ public struct PointResolver: Sendable {
                     resolvedPoint = CGPoint(x: event.x + dx, y: event.y + dy)
                 } else {
                     let recordedFrame = surface.recordedFrame
-                    let recTb: CGFloat
-                    if let content = surface.recordedContentFrame {
-                        recTb = content.y - recordedFrame.y
-                    } else {
-                        let bid = surface.bundleIdentifier
-                        let pid = bid.flatMap { b in NSWorkspace.shared.runningApplications.first(where: { $0.bundleIdentifier == b })?.processIdentifier }
-                        recTb = CoordinateMapper.windowTitleBarHeight(for: pid, frame: recordedFrame)
-                    }
-                    
-                    let curTb: CGFloat
-                    if let cached = context.currentTitleBarHeights[targetSurfaceId] {
-                        curTb = cached
-                    } else {
-                        let bid = surface.bundleIdentifier
-                        let pid = bid.flatMap { b in NSWorkspace.shared.runningApplications.first(where: { $0.bundleIdentifier == b })?.processIdentifier }
-                        curTb = CoordinateMapper.windowTitleBarHeight(for: pid, frame: currentFrame)
-                    }
+                    let recordedTitleBarHeight = recordedTitleBarHeight(for: surface)
+                    let liveTitleBarHeight = currentTitleBarHeight(
+                        surfaceId: targetSurfaceId,
+                        currentFrame: currentFrame,
+                        context: context
+                    )
                     
                     let dx = currentFrame.x - recordedFrame.x
-                    let dy = (currentFrame.y + curTb) - (recordedFrame.y + recTb)
+                    let dy = (currentFrame.y + liveTitleBarHeight) - (recordedFrame.y + recordedTitleBarHeight)
                     resolvedPoint = CGPoint(x: event.x + dx, y: event.y + dy)
                 }
             }
@@ -279,5 +257,45 @@ public struct PointResolver: Sendable {
         }
         
         return .success(resolvedPoint)
+    }
+
+    private func currentTitleBarHeight(
+        surfaceId: String,
+        currentFrame: RectValue,
+        context: PlaybackContext
+    ) -> CGFloat {
+        if let cached = context.currentTitleBarHeights[surfaceId] {
+            return clampedTitleBarHeight(cached, frameHeight: currentFrame.height)
+        }
+        if let contentFrame = context.currentContentFrames[surfaceId] {
+            return clampedTitleBarHeight(
+                contentFrame.y - currentFrame.y,
+                frameHeight: currentFrame.height
+            )
+        }
+        guard let surface = context.surfaces[surfaceId] else {
+            return clampedTitleBarHeight(28, frameHeight: currentFrame.height)
+        }
+        return clampedTitleBarHeight(
+            recordedTitleBarHeight(for: surface),
+            frameHeight: currentFrame.height
+        )
+    }
+
+    private func recordedTitleBarHeight(for surface: PlaybackSurface) -> CGFloat {
+        if let contentFrame = surface.recordedContentFrame {
+            return clampedTitleBarHeight(
+                contentFrame.y - surface.recordedFrame.y,
+                frameHeight: surface.recordedFrame.height
+            )
+        }
+        if surface.contentFrameSource == CoordinateMapper.ResolvedContentFrame.Source.fallbackOuterFrame.rawValue {
+            return 0
+        }
+        return clampedTitleBarHeight(28, frameHeight: surface.recordedFrame.height)
+    }
+
+    private func clampedTitleBarHeight(_ value: CGFloat, frameHeight: CGFloat) -> CGFloat {
+        min(max(0, value), max(0, frameHeight))
     }
 }

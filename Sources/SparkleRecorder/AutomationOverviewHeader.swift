@@ -60,8 +60,8 @@ struct AutomationOverviewHeader: View {
           .fill(refreshState.isLoading ? Brand.libraryBlue.opacity(0.12) : Color.clear)
       )
       .disabled(refreshState.isLoading)
-      .help(String(localized: "Refresh automation projection", table: "Automation"))
-      .accessibilityLabel(String(localized: "Refresh automation projection", table: "Automation"))
+      .help(String(localized: "Refresh automations", table: "Automation"))
+      .accessibilityLabel(String(localized: "Refresh automations", table: "Automation"))
     }
   }
 }

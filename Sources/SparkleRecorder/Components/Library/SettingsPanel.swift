@@ -54,11 +54,53 @@ private enum SettingsCategory: String, CaseIterable, Identifiable {
     }
 }
 
+private enum SettingsGroup: String, CaseIterable, Identifiable {
+    case generalAndAccess
+    case workflowAndReplay
+    case dataAndStorage
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .generalAndAccess: return String(localized: "General & Access", table: "Settings")
+        case .workflowAndReplay: return String(localized: "Workflow & Replay", table: "Settings")
+        case .dataAndStorage: return String(localized: "Data & Storage", table: "Settings")
+        }
+    }
+
+    var categories: [SettingsCategory] {
+        switch self {
+        case .generalAndAccess: return [.general, .shortcuts, .permissions]
+        case .workflowAndReplay: return [.recording, .playback]
+        case .dataAndStorage: return [.runHistory, .visualEvidence]
+        }
+    }
+}
+
+private enum CompactCategory: String, CaseIterable, Identifiable {
+    case quick
+    case permissions
+    case storage
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .quick: return String(localized: "Quick", table: "Settings")
+        case .permissions: return String(localized: "Permissions", table: "Settings")
+        case .storage: return String(localized: "Storage", table: "Settings")
+        }
+    }
+}
+
 struct SettingsPanel: View {
     let controller: MenuBarController
     /// True when hosted in the dedicated Settings window.
     var inWindow: Bool = false
     @EnvironmentObject var state: AppState
+
+    @State private var compactTab: CompactCategory = .quick
 
     @State private var showCustomLoop = false
     @State private var customLoopText = ""
@@ -100,17 +142,19 @@ struct SettingsPanel: View {
         return "v" + short
     }
 
-    /// F-keys that another binding already owns (other globals + macro hotkeys).
-    func takenKeyCodes(excluding current: UInt32) -> Set<UInt32> {
-        var taken: Set<UInt32> = [
-            state.recordHotkey.keyCode,
-            state.stopHotkey.keyCode,
-            state.playHotkey.keyCode,
-        ]
-        for m in controller.library.macros {
-            if let hk = m.hotkey { taken.insert(hk.keyCode) }
+    /// Exact key + modifier combinations already owned by another global or macro hotkey.
+    func takenHotkeys(excluding current: HotkeyBinding) -> Set<HotkeyIdentity> {
+        var taken = Set([
+            state.recordHotkey.hotkeyIdentity,
+            state.stopHotkey.hotkeyIdentity,
+            state.playHotkey.hotkeyIdentity,
+        ])
+        for macro in controller.library.macros {
+            if let hotkey = macro.hotkey {
+                taken.insert(hotkey.hotkeyIdentity)
+            }
         }
-        taken.remove(current)
+        taken.remove(current.hotkeyIdentity)
         return taken
     }
 
@@ -123,6 +167,13 @@ struct SettingsPanel: View {
                 compactSettingsContent
             }
         }
+        .disabled(inWindow && state.appInteractionLocked)
+        .appStatusFeedbackOverlay(
+            state: state,
+            isWindow: inWindow,
+            bottomPadding: 18,
+            isEnabled: !inWindow
+        )
         .frame(
             minWidth: inWindow ? 640 : 340,
             idealWidth: inWindow ? 760 : 340,
@@ -181,20 +232,34 @@ struct SettingsPanel: View {
         .onChange(of: state.automationRunAutomaticCleanupEnabled) {
             controller.automationRunCleanupPreferenceDidChange()
         }
+        .onChange(of: state.semanticRecordingCaptureMode) {
+            guard state.semanticRecordingEnabled else { return }
+            controller.refreshSemanticRecordingPreflightPresentation()
+        }
     }
 
     private var settingsWindowContent: some View {
         HStack(spacing: 0) {
             VStack(spacing: 0) {
-                VStack(spacing: 4) {
-                    ForEach(SettingsCategory.allCases) { category in
-                        settingsSidebarButton(category)
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 14) {
+                        ForEach(SettingsGroup.allCases) { group in
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text(group.title)
+                                    .font(.system(size: 9.5, weight: .bold))
+                                    .foregroundStyle(.tertiary)
+                                    .textCase(.uppercase)
+                                    .padding(.horizontal, 11)
+                                    .padding(.bottom, 2)
+                                ForEach(group.categories) { category in
+                                    settingsSidebarButton(category)
+                                }
+                            }
+                        }
                     }
+                    .padding(12)
                 }
-                .padding(12)
                 .frame(maxWidth: .infinity, alignment: .top)
-
-                Spacer(minLength: 20)
 
                 Divider()
                 VStack(alignment: .leading, spacing: 8) {
@@ -219,7 +284,7 @@ struct SettingsPanel: View {
                 .padding(14)
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
-            .frame(width: 196)
+            .frame(width: 204)
 
             Divider()
 
@@ -285,10 +350,45 @@ struct SettingsPanel: View {
 
     private var compactSettingsContent: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 14) {
+            VStack(alignment: .leading, spacing: 12) {
                 settingsHeader
-                settingsSections
-                settingsFooter
+
+                Picker("", selection: $compactTab) {
+                    ForEach(CompactCategory.allCases) { tab in
+                        Text(tab.title).tag(tab)
+                    }
+                }
+                .pickerStyle(.segmented)
+                .labelsHidden()
+
+                switch compactTab {
+                case .quick:
+                    hotkeySettingsGroup
+                    recordingSettingsGroup
+                    replaySettingsGroup
+                    applicationSettingsGroup
+                case .permissions:
+                    permissionsSettingsGroup
+                case .storage:
+                    runHistorySettingsGroup
+                    visualEvidenceSettingsGroup
+                }
+
+                Divider()
+
+                HStack {
+                    Button {
+                        controller.showSettingsWindow()
+                    } label: {
+                        Label(String(localized: "Open Settings Window…", table: "Settings"), systemImage: "macwindow.and.cursorarrow")
+                            .font(.system(size: 11))
+                    }
+                    .buttonStyle(.borderless)
+
+                    Spacer()
+
+                    settingsFooter
+                }
             }
             .padding(14)
         }
@@ -458,12 +558,81 @@ struct SettingsPanel: View {
             .controlSize(.mini)
             if state.semanticRecordingEnabled {
                 Divider()
+                VStack(alignment: .leading, spacing: 5) {
+                    Text("Evidence detail", tableName: "Recording")
+                        .font(.system(size: 11.5))
+                    Picker("", selection: $state.semanticRecordingCaptureMode) {
+                        Text("Video + keyframes", tableName: "Recording")
+                            .tag(RecordingCaptureMode.videoAndKeyframes)
+                        Text("Keyframes only", tableName: "Recording")
+                            .tag(RecordingCaptureMode.keyframesOnly)
+                        Text("Diagnostic", tableName: "Recording")
+                            .tag(RecordingCaptureMode.diagnosticRich)
+                    }
+                    .labelsHidden()
+                    .pickerStyle(.segmented)
+                    .frame(maxWidth: .infinity)
+                    Text(semanticCaptureModeDescription)
+                        .settingsDescriptionStyle()
+                }
+                Divider()
+                VStack(alignment: .leading, spacing: 5) {
+                    Text("Capture scope", tableName: "Recording")
+                        .font(.system(size: 11.5))
+                    Picker("", selection: $state.semanticRecordingCaptureScope) {
+                        Text("Current window", tableName: "Recording")
+                            .tag(SemanticRecordingCaptureScope.frontmostWindow)
+                        Text("Entire display", tableName: "Recording")
+                            .tag(SemanticRecordingCaptureScope.display)
+                    }
+                    .labelsHidden()
+                    .pickerStyle(.segmented)
+                    .frame(maxWidth: .infinity)
+                    Text(semanticCaptureScopeDescription)
+                        .settingsDescriptionStyle()
+                }
+                Divider()
                 semanticRecordingPreflightPanel(state.semanticRecordingPreflightPresentation)
                 Divider()
                 semanticRecordingRetentionPanel()
                 Divider()
                 semanticRecordingSuppressionPanel()
             }
+        }
+    }
+
+    private var semanticCaptureModeDescription: String {
+        switch state.semanticRecordingCaptureMode {
+        case .videoAndKeyframes:
+            return String(
+                localized: "Continuous video with sparse high-value checkpoints. Recommended for robust AI reconstruction.",
+                table: "Recording"
+            )
+        case .keyframesOnly:
+            return String(
+                localized: "No movie is recorded. Dense action checkpoints preserve visual state without continuous video.",
+                table: "Recording"
+            )
+        case .diagnosticRich:
+            return String(
+                localized: "Continuous video with dense action checkpoints. Uses more storage and post-processing.",
+                table: "Recording"
+            )
+        }
+    }
+
+    private var semanticCaptureScopeDescription: String {
+        switch state.semanticRecordingCaptureScope {
+        case .frontmostWindow:
+            return String(
+                localized: "Captures the window where recording starts. Best for privacy and focused workflows.",
+                table: "Recording"
+            )
+        case .display:
+            return String(
+                localized: "Captures the whole display so app switches and system dialogs stay visible. Unrelated content on that display may also be recorded.",
+                table: "Recording"
+            )
         }
     }
 
@@ -539,17 +708,19 @@ struct SettingsPanel: View {
                 selection: $state.automationRunSuccessEvidenceAgeDays
             )
             retentionPickerRow(
-                title: String(localized: "Failed run evidence", table: "Automation"),
+                title: String(localized: "Run evidence needing attention", table: "Automation"),
                 selection: $state.automationRunAttentionEvidenceAgeDays
             )
             retentionPickerRow(
-                title: String(localized: "Run history metadata", table: "Automation"),
+                title: String(localized: "Run history records", table: "Automation"),
                 selection: $state.automationRunMetadataAgeDays
             )
 
-            Text("The current run, latest workflow run, latest failure, and latest evidence for each macro are always kept.", tableName: "Automation")
+            Text("Evidence includes reports, ending screenshots, condition evidence, and other run files. When evidence expires, the run result stays in history until its history retention period ends.", tableName: "Automation")
                 .settingsDescriptionStyle()
-            Text("Run history keeps at most 10,000 records. Choosing Never disables the age limit, not this capacity limit.", tableName: "Automation")
+            Text("Automatic cleanup keeps active runs, the latest execution for each workflow, the latest run needing attention, and the latest evidence for each macro.", tableName: "Automation")
+                .settingsDescriptionStyle()
+            Text("Run history targets at most 10,000 records. Protected or active runs may temporarily exceed this limit. Choosing Never disables only the age limit.", tableName: "Automation")
                 .settingsDescriptionStyle()
 
             Divider()
@@ -616,6 +787,16 @@ struct SettingsPanel: View {
                         )
                     }
                 }
+
+                if shouldShowAutomationScreenshotStorageHint(usage) {
+                    Label(
+                        String(localized: "Ending screenshots use most of this storage. Turn off Save ending screenshots to reduce future growth; cleanup removes existing evidence only after its retention period expires.", table: "Automation"),
+                        systemImage: "photo.stack"
+                    )
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                }
             }
 
             if let automationRunStorageError {
@@ -652,16 +833,43 @@ struct SettingsPanel: View {
         guard let lastRun = state.automationRunLastScheduledRetentionCleanupAt else {
             return String(localized: "Automatic cleanup will check when the app is running.", table: "Automation")
         }
-        let freed = formattedBytes(state.automationRunLastCleanupFreedByteCount)
         let next = lastRun.addingTimeInterval(24 * 60 * 60)
+        let checkedAt = lastRun.formatted(date: .abbreviated, time: .shortened)
+        let nextCheck = next.formatted(date: .abbreviated, time: .shortened)
+        let evidenceCount = state.automationRunLastCleanupEvidenceCount
+        let historyCount = state.automationRunLastCleanupHistoryCount
+        let freedByteCount = state.automationRunLastCleanupFreedByteCount
+
+        if evidenceCount == 0, historyCount == 0 {
+            return String(
+                format: String(localized: "Last checked %@ · nothing expired · earliest next check %@", table: "Automation"),
+                checkedAt,
+                nextCheck
+            )
+        }
+        if freedByteCount == 0 {
+            return String(
+                format: String(localized: "Last checked %@ · updated %d expired evidence record(s) and removed %d history record(s) · no local files to free · earliest next check %@", table: "Automation"),
+                checkedAt,
+                evidenceCount,
+                historyCount,
+                nextCheck
+            )
+        }
         return String(
-            format: String(localized: "Last checked %@ · removed %d evidence item(s) and %d record(s) · freed %@ · next check %@", table: "Automation"),
-            lastRun.formatted(date: .abbreviated, time: .shortened),
-            state.automationRunLastCleanupEvidenceCount,
-            state.automationRunLastCleanupHistoryCount,
-            freed,
-            next.formatted(date: .abbreviated, time: .shortened)
+            format: String(localized: "Last checked %@ · cleaned evidence from %d run(s) and removed %d history record(s) · freed %@ · earliest next check %@", table: "Automation"),
+            checkedAt,
+            evidenceCount,
+            historyCount,
+            formattedBytes(freedByteCount),
+            nextCheck
         )
+    }
+
+    private func shouldShowAutomationScreenshotStorageHint(_ usage: AutomationRunStorageUsage) -> Bool {
+        let evidenceBytes = usage.breakdown.evidenceByteCount
+        guard evidenceBytes >= 64 * 1_024 * 1_024, evidenceBytes > 0 else { return false }
+        return Double(usage.breakdown.screenshotByteCount) / Double(evidenceBytes) >= 0.7
     }
 
     private func retentionPickerRow(title: String, selection: Binding<Int>) -> some View {
@@ -753,7 +961,7 @@ struct SettingsPanel: View {
     }
 
     private var permissionsReady: Bool {
-        state.accessibilityGranted && state.inputMonitoringGranted && state.screenCaptureGranted
+        state.requiredPermissionsGranted
     }
 
     private var settingsSummaryText: String {
@@ -834,8 +1042,9 @@ struct SettingsPanel: View {
     /// an already-granted permission never lingers looking like an open prompt.
     @ViewBuilder
     func permissionRow(title: String, granted: Bool, action: @escaping () -> Void) -> some View {
-        HStack(spacing: 8) {
-            Text(title).font(.system(size: 11.5))
+        HStack(spacing: 12) {
+            Text(title)
+                .font(.system(size: 12, weight: .medium))
             Spacer()
             if granted {
                 HStack(spacing: 4) {
@@ -844,11 +1053,27 @@ struct SettingsPanel: View {
                 }
                 .font(.system(size: 11, weight: .semibold))
                 .foregroundStyle(.green)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 3)
+                .background(
+                    Capsule(style: .continuous)
+                        .fill(Color.green.opacity(0.12))
+                )
             } else {
-                Button(String(localized: "Grant…", table: "Settings")) { action() }
-                    .buttonStyle(PillButtonStyle(tint: .blue))
+                HStack(spacing: 8) {
+                    HStack(spacing: 4) {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                        Text("Access Required", tableName: "Settings")
+                    }
+                    .font(.system(size: 10.5, weight: .semibold))
+                    .foregroundStyle(.orange)
+
+                    Button(String(localized: "Grant…", table: "Settings")) { action() }
+                        .buttonStyle(PillButtonStyle(tint: .blue))
+                }
             }
         }
+        .padding(.vertical, 2)
     }
 
     @ViewBuilder
@@ -1058,6 +1283,13 @@ struct SettingsPanel: View {
 
     func automationRunRetentionCleanupConfirmationMessage() -> String {
         guard let preview = automationRunRetentionCleanupPreview else { return "" }
+        if preview.estimatedByteCount == 0 {
+            return String(
+                format: String(localized: "This will mark expired evidence from %d run(s) as cleaned and delete %d old history record(s). No local evidence files are currently taking space. Protected recent runs will stay available.", table: "Automation"),
+                preview.artifactRunCount,
+                preview.metadataRunCount
+            )
+        }
         let size = ByteCountFormatter.string(
             fromByteCount: preview.estimatedByteCount,
             countStyle: .file
@@ -1078,15 +1310,21 @@ struct SettingsPanel: View {
             let preview = try await controller.automationRunRetentionCleanupPreview()
             guard !preview.isEmpty else {
                 automationRunRetentionCleanupPreview = nil
-                state.statusMessage = String(localized: "No expired run evidence or history to clean up.", table: "Automation")
+                state.presentStatus(
+                    String(localized: "No expired run evidence or history to clean up.", table: "Automation"),
+                    tone: .info
+                )
                 return
             }
             automationRunRetentionCleanupPreview = preview
             showAutomationRunRetentionCleanupConfirmation = true
         } catch {
-            state.statusMessage = String(
-                format: String(localized: "Run history cleanup check failed: %@", table: "Automation"),
-                error.localizedDescription
+            state.presentStatus(
+                String(
+                    format: String(localized: "Run history cleanup check failed: %@", table: "Automation"),
+                    error.localizedDescription
+                ),
+                tone: .error
             )
         }
     }
@@ -1097,18 +1335,44 @@ struct SettingsPanel: View {
         automationRunRetentionCleanupBusy = true
         defer { automationRunRetentionCleanupBusy = false }
         do {
-            let result = try await controller.applyAutomationRunRetentionCleanup(preview)
+            let refreshedPreview = try await controller.automationRunRetentionCleanupPreview()
+            guard refreshedPreview.plan.items == preview.plan.items else {
+                automationRunRetentionCleanupPreview = refreshedPreview.isEmpty ? nil : refreshedPreview
+                showAutomationRunRetentionCleanupConfirmation = !refreshedPreview.isEmpty
+                state.presentStatus(
+                    refreshedPreview.isEmpty
+                        ? String(localized: "Run history changed. Nothing needs cleanup now.", table: "Automation")
+                        : String(localized: "Run history changed. Review the updated cleanup plan before deleting anything.", table: "Automation"),
+                    tone: refreshedPreview.isEmpty ? .info : .warning
+                )
+                return
+            }
+
+            let result = try await controller.applyAutomationRunRetentionCleanup(refreshedPreview)
             automationRunRetentionCleanupPreview = nil
-            state.statusMessage = String(
-                format: String(localized: "Cleaned up evidence from %d run(s) and removed %d old history record(s).", table: "Automation"),
-                result.prunedArtifactRunCount,
-                result.deletedMetadataRunCount
-            )
+            let message: String
+            if refreshedPreview.estimatedByteCount == 0 {
+                message = String(
+                    format: String(localized: "Updated %d expired evidence record(s) and removed %d old history record(s). No local evidence files needed deletion.", table: "Automation"),
+                    result.prunedArtifactRunCount,
+                    result.deletedMetadataRunCount
+                )
+            } else {
+                message = String(
+                    format: String(localized: "Cleaned up evidence from %d run(s) and removed %d old history record(s).", table: "Automation"),
+                    result.prunedArtifactRunCount,
+                    result.deletedMetadataRunCount
+                )
+            }
+            state.presentStatus(message, tone: .success)
             await refreshAutomationRunStorageUsage()
         } catch {
-            state.statusMessage = String(
-                format: String(localized: "Run history cleanup failed: %@", table: "Automation"),
-                error.localizedDescription
+            state.presentStatus(
+                String(
+                    format: String(localized: "Run history cleanup failed: %@", table: "Automation"),
+                    error.localizedDescription
+                ),
+                tone: .error
             )
         }
     }
@@ -1137,19 +1401,28 @@ struct SettingsPanel: View {
             let preview = try await controller.semanticRecordingRetentionCleanupPreview()
             if preview.isEmpty {
                 semanticRetentionCleanupPreview = nil
-                state.statusMessage = String(localized: "No expired visual evidence to clean up.", table: "Common")
+                state.presentStatus(
+                    String(localized: "No expired visual evidence to clean up.", table: "Common"),
+                    tone: .info
+                )
                 return
             }
             semanticRetentionCleanupPreview = preview
             showSemanticRetentionCleanupConfirmation = true
-            state.statusMessage = String(
-                format: String(localized: "Found %d recording(s) with expired visual evidence.", table: "Common"),
-                preview.items.count
+            state.presentStatus(
+                String(
+                    format: String(localized: "Found %d recording(s) with expired visual evidence.", table: "Common"),
+                    preview.items.count
+                ),
+                tone: .info
             )
         } catch {
-            state.statusMessage = String(
-                format: String(localized: "Visual evidence cleanup check failed: %@", table: "Common"),
-                error.localizedDescription
+            state.presentStatus(
+                String(
+                    format: String(localized: "Visual evidence cleanup check failed: %@", table: "Common"),
+                    error.localizedDescription
+                ),
+                tone: .error
             )
         }
     }
@@ -1162,22 +1435,56 @@ struct SettingsPanel: View {
         semanticRetentionCleanupBusy = true
         defer { semanticRetentionCleanupBusy = false }
         do {
-            let results = try await controller.applySemanticRecordingRetentionCleanup(preview)
+            let refreshedPreview = try await controller.semanticRecordingRetentionCleanupPreview()
+            guard semanticCleanupDeletionIntentMatches(preview, refreshedPreview) else {
+                semanticRetentionCleanupPreview = refreshedPreview.isEmpty ? nil : refreshedPreview
+                showSemanticRetentionCleanupConfirmation = !refreshedPreview.isEmpty
+                state.presentStatus(
+                    refreshedPreview.isEmpty
+                        ? String(localized: "Visual evidence changed. Nothing needs cleanup now.", table: "Common")
+                        : String(localized: "Visual evidence changed. Review the updated cleanup plan before deleting anything.", table: "Common"),
+                    tone: refreshedPreview.isEmpty ? .info : .warning
+                )
+                return
+            }
+
+            let results = try await controller.applySemanticRecordingRetentionCleanup(refreshedPreview)
             let deletedArtifacts = results.reduce(0) { total, result in
                 total + result.deletedRelativePaths.count
             }
             let deletedBundles = results.filter(\.deletedBundleDirectory).count
             semanticRetentionCleanupPreview = nil
-            state.statusMessage = String(
-                format: String(localized: "Cleaned up %d artifact(s) and %d bundle(s).", table: "Common"),
-                deletedArtifacts,
-                deletedBundles
+            state.presentStatus(
+                String(
+                    format: String(localized: "Cleaned up %d artifact(s) and %d bundle(s).", table: "Common"),
+                    deletedArtifacts,
+                    deletedBundles
+                ),
+                tone: .success
             )
         } catch {
-            state.statusMessage = String(
-                format: String(localized: "Visual evidence cleanup failed: %@", table: "Common"),
-                error.localizedDescription
+            state.presentStatus(
+                String(
+                    format: String(localized: "Visual evidence cleanup failed: %@", table: "Common"),
+                    error.localizedDescription
+                ),
+                tone: .error
             )
+        }
+    }
+
+    private func semanticCleanupDeletionIntentMatches(
+        _ lhs: SemanticRecordingRetentionCleanupPreview,
+        _ rhs: SemanticRecordingRetentionCleanupPreview
+    ) -> Bool {
+        guard lhs.items.count == rhs.items.count else { return false }
+        let rightByID = Dictionary(uniqueKeysWithValues: rhs.items.map { ($0.id, $0.plan) })
+        return lhs.items.allSatisfy { item in
+            guard let right = rightByID[item.id] else { return false }
+            let left = item.plan
+            return left.disposition == right.disposition
+                && left.artifactRefsToDelete == right.artifactRefsToDelete
+                && left.metadataFilesToPreserve == right.metadataFilesToPreserve
         }
     }
 
@@ -1249,7 +1556,11 @@ struct SettingsPanel: View {
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
                 if !issue.affectedCapabilityLabels.isEmpty {
-                    Text(issue.affectedCapabilityLabels.joined(separator: ", "))
+                    Text(
+                        issue.affectedCapabilityLabels
+                            .map { String(localized: String.LocalizationValue($0), table: "Common") }
+                            .joined(separator: ", ")
+                    )
                         .font(.system(size: 9.5))
                         .foregroundStyle(.tertiary)
                         .lineLimit(2)
@@ -1312,34 +1623,50 @@ struct SettingsPanel: View {
     }
 
     func hotkeyRow(title: String, binding: Binding<HotkeyBinding>) -> some View {
-        let taken = takenKeyCodes(excluding: binding.wrappedValue.keyCode)
+        let taken = takenHotkeys(excluding: binding.wrappedValue)
         
         var localOptions = hotkeyOptions
         if !localOptions.contains(binding.wrappedValue) {
             localOptions.insert(binding.wrappedValue, at: 0)
         }
         
-        return HStack {
-            Text(title).font(.system(size: 11.5))
+        return HStack(spacing: 12) {
+            Text(title).font(.system(size: 12, weight: .medium))
             Spacer()
+            Text(binding.wrappedValue.name)
+                .font(.system(size: 11.5, weight: .semibold, design: .monospaced))
+                .padding(.horizontal, 7)
+                .padding(.vertical, 3)
+                .background(
+                    RoundedRectangle(cornerRadius: 5, style: .continuous)
+                        .fill(Color.primary.opacity(0.06))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 5, style: .continuous)
+                                .strokeBorder(Color.primary.opacity(0.12), lineWidth: 0.5)
+                        )
+                )
             Picker("", selection: Binding(
                 get: { binding.wrappedValue },
                 set: { newValue in
-                    guard !taken.contains(newValue.keyCode) else {
-                        state.statusMessage = String(localized: "That key is already assigned.", table: "Automation")
+                    guard !taken.contains(newValue.hotkeyIdentity) else {
+                        state.presentStatus(
+                            String(localized: "That key is already assigned.", table: "Automation"),
+                            tone: .warning
+                        )
                         return
                     }
                     binding.wrappedValue = newValue
                 }
             )) {
                 ForEach(localOptions, id: \.self) { option in
-                    Text(taken.contains(option.keyCode) ? String(format: String(localized: "%@ (in use)", table: "Common"), option.name) : option.name)
+                    Text(taken.contains(option.hotkeyIdentity) ? String(format: String(localized: "%@ (in use)", table: "Common"), option.name) : option.name)
                         .tag(option)
                 }
             }
             .labelsHidden()
-            .frame(width: 110)
+            .frame(width: 105)
         }
+        .padding(.vertical, 2)
     }
 }
 

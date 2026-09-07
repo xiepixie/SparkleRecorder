@@ -35,7 +35,7 @@ struct AutomationLinearSequenceLocalizationTests {
     "Add macro",
     "Add login or navigation macro",
     "No wait",
-    "Open bound application",
+    "Open target application",
     "Start preparation",
     "Wait after window appears",
     "Use this for startup loading. If login or navigation is required, create a sequence with preparation macros.",

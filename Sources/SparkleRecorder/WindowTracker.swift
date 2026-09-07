@@ -4,14 +4,23 @@ import SparkleRecorderCore
 
 public final class WindowTracker: Sendable {
     public init() {}
-    
+
     public func resolveCurrentFrames(for surfaces: [String: PlaybackSurface]) -> [String: RectValue] {
-        var frames: [String: RectValue] = [:]
+        resolveCurrentWindows(for: surfaces).mapValues(\.frame)
+    }
+
+    /// Resolves the concrete WindowServer window as well as its frame. Callers
+    /// that need AX/content geometry must use this owner PID instead of choosing
+    /// an arbitrary process from a multi-process application bundle.
+    public func resolveCurrentWindows(
+        for surfaces: [String: PlaybackSurface]
+    ) -> [String: PlaybackForegroundWindowObservation] {
+        var windows: [String: PlaybackForegroundWindowObservation] = [:]
         
         let workspace = NSWorkspace.shared
         
         guard let winInfoList = CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID) as? [[String: Any]] else {
-            return frames
+            return windows
         }
         
         for (surfaceId, recordedSurface) in surfaces {
@@ -21,7 +30,7 @@ public final class WindowTracker: Sendable {
             let apps = workspace.runningApplications.filter { $0.bundleIdentifier == bid }
             let pids = Set(apps.map { $0.processIdentifier })
             
-            var bestMatch: RectValue?
+            var bestMatch: PlaybackForegroundWindowObservation?
             var bestScore = -1
             
             for winInfo in winInfoList {
@@ -34,7 +43,8 @@ public final class WindowTracker: Sendable {
                 let layer = winInfo[kCGWindowLayer as String] as? Int32 ?? 0
                 guard layer == 0 else { continue }
                 
-                guard let boundsDict = winInfo[kCGWindowBounds as String] as? [String: Any],
+                guard let windowID = winInfo[kCGWindowNumber as String] as? CGWindowID,
+                      let boundsDict = winInfo[kCGWindowBounds as String] as? [String: Any],
                       let bx = boundsDict["X"] as? CGFloat,
                       let by = boundsDict["Y"] as? CGFloat,
                       let bw = boundsDict["Width"] as? CGFloat,
@@ -74,24 +84,29 @@ public final class WindowTracker: Sendable {
                     }
                 }
                 
-                // 4. Window ID matching
+                // 4. Window ID matching. Browser/document titles are mutable;
+                // when the original WindowServer id still exists inside the same
+                // bundle it is the strongest identity signal by far.
                 if let recWinId = recordedSurface.recordedWindowId,
-                   let winId = winInfo[kCGWindowNumber as String] as? CGWindowID,
-                   winId == recWinId {
-                    score += 20
+                   windowID == recWinId {
+                    score += 1_000
                 }
                 
                 if score > bestScore {
                     bestScore = score
-                    bestMatch = RectValue(x: bx, y: by, width: bw, height: bh)
+                    bestMatch = PlaybackForegroundWindowObservation(
+                        id: windowID,
+                        processID: winPid,
+                        frame: RectValue(x: bx, y: by, width: bw, height: bh)
+                    )
                 }
             }
             
             if let match = bestMatch {
-                frames[surfaceId] = match
+                windows[surfaceId] = match
             }
         }
         
-        return frames
+        return windows
     }
 }

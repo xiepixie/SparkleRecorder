@@ -29,6 +29,25 @@ private final class RawEventContinuationBox: @unchecked Sendable {
     }
 }
 
+final class RecordingEngineStopGate: @unchecked Sendable {
+    private let lock = NSLock()
+    private var hasStopped = false
+
+    @discardableResult
+    func runOnce(_ shutdown: () -> Void) -> Bool {
+        lock.lock()
+        guard !hasStopped else {
+            lock.unlock()
+            return false
+        }
+        hasStopped = true
+        lock.unlock()
+
+        shutdown()
+        return true
+    }
+}
+
 private final class RecordingDiagnosticContinuationBox: @unchecked Sendable {
     private let lock = NSLock()
     private var continuation: AsyncStream<RecordingEngineDiagnostic>.Continuation?
@@ -60,6 +79,7 @@ extension RecordingEngineClient {
         let thread = EventTapThread(mask: mask)
         let continuationBox = RawEventContinuationBox()
         let diagnosticBox = RecordingDiagnosticContinuationBox()
+        let stopGate = RecordingEngineStopGate()
 
         final class Adapter: EventTapThreadDelegate, @unchecked Sendable {
             let continuationBox: RawEventContinuationBox
@@ -93,14 +113,20 @@ extension RecordingEngineClient {
         continuationBox.keepAlive = adapter
         thread.delegate = adapter
 
+        let shutdown: @Sendable () -> Void = {
+            stopGate.runOnce {
+                thread.stop()
+                continuationBox.finish()
+                diagnosticBox.finish()
+            }
+        }
+
         return Self(
             events: {
                 AsyncStream(bufferingPolicy: .bufferingNewest(2_048)) { continuation in
                     continuationBox.set(continuation)
                     continuation.onTermination = { @Sendable _ in
-                        thread.stop()
-                        continuationBox.finish()
-                        diagnosticBox.finish()
+                        shutdown()
                     }
                 }
             },
@@ -115,16 +141,12 @@ extension RecordingEngineClient {
             start: {
                 let started = thread.startAndWait()
                 if !started {
-                    thread.stop()
-                    continuationBox.finish()
-                    diagnosticBox.finish()
+                    shutdown()
                 }
                 return started
             },
             stop: {
-                thread.stop()
-                continuationBox.finish()
-                diagnosticBox.finish()
+                shutdown()
             }
         )
     }

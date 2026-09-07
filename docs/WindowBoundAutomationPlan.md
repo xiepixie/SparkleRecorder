@@ -2,7 +2,7 @@
 ## Architecture Draft v0.9
 ### From Screen-Coordinate Replay to Window-Relative, Visual, and Semantic Automation
 
-> Document status (2026-07-05): partially implemented architecture reference. Completed or mostly completed: `PlaybackSurface`, `PlaybackContext`, `PointResolver`, `WindowContextClient`, OCR locator flow, and failure evidence plumbing. Remaining: multi-backend executor, AX/AppleEvent semantic actions, background-visible constraints, and AutomationEngine condition evaluation.
+> Document status (2026-09-06): historical target architecture, not the current implementation reference. Some early concepts were implemented, but the locator/backend diagram below intentionally records a broader design that includes capabilities SparkleRecorder still does not execute (for example image/template locators and multi-backend AX/AppleEvent execution). Use [DOCUMENTATION_STATUS.md](DOCUMENTATION_STATUS.md) and [SparkleRecorderArchitecture.md](SparkleRecorderArchitecture.md) for current Module ownership and behavior.
 
 This document defines the high-level architecture, security permissions, and coordinate mappings required to transition SparkleRecorder from simple screen clicker playback to robust, target-bound automation.
 

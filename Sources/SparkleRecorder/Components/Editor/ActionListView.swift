@@ -20,7 +20,7 @@ struct ActionListView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 10) {
-                Text(NSLocalizedString("ACTIONS", tableName: "EditorUX", comment: ""))
+                Text("ACTIONS", tableName: "EditorUX")
                     .font(.system(size: 10.5, weight: .semibold))
                     .tracking(0.7)
                     .foregroundStyle(.secondary)
@@ -80,9 +80,9 @@ struct ActionListView: View {
 	                            Image(systemName: "sparkles.rectangle.stack")
 	                                .font(.system(size: 22, weight: .semibold))
 	                                .foregroundStyle(.secondary)
-	                            Text(NSLocalizedString("No actions yet", tableName: "EditorUX", comment: ""))
+	                            Text("No actions yet", tableName: "EditorUX")
 	                                .font(.system(size: 12, weight: .semibold))
-	                            Text(NSLocalizedString("Record a macro or insert an action from the sidebar.", tableName: "Recording", comment: ""))
+	                            Text("Record a macro or insert an action from the sidebar.", tableName: "Recording")
 	                                .font(.system(size: 10.5))
 	                                .foregroundStyle(.secondary)
 	                        }
@@ -172,10 +172,10 @@ struct ActionListView: View {
     private var headerRow: some View {
         HStack(spacing: 0) {
             Text("#").frame(width: EventCol.num, alignment: .center)
-            Text(NSLocalizedString("TIME", tableName: "Common", comment: "")).frame(width: EventCol.time, alignment: .center)
-            Text(NSLocalizedString("ACTION", tableName: "EditorUX", comment: "")).frame(maxWidth: .infinity, alignment: .center)
-            Text(NSLocalizedString("POSITION", tableName: "Common", comment: "")).frame(width: EventCol.pos, alignment: .center)
-            Text(NSLocalizedString("KEY", tableName: "Common", comment: "")).frame(width: EventCol.key, alignment: .center)
+            Text("TIME", tableName: "Common").frame(width: EventCol.time, alignment: .center)
+            Text("ACTION", tableName: "EditorUX").frame(maxWidth: .infinity, alignment: .center)
+            Text("POSITION", tableName: "Common").frame(width: EventCol.pos, alignment: .center)
+            Text("KEY", tableName: "Common").frame(width: EventCol.key, alignment: .center)
         }
         .font(.system(size: 9.5, weight: .semibold))
         .tracking(0.6)

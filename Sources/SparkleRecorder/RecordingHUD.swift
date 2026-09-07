@@ -143,60 +143,110 @@ final class RecordingHUDController {
 
 // MARK: - View
 
+@MainActor
+private final class RecordingCompactHUDModel: ObservableObject {
+    @Published private(set) var durationSeconds: Int
+    @Published private(set) var stats: RecordingStats
+
+    private var cancellables: Set<AnyCancellable> = []
+
+    init(recorder: Recorder) {
+        durationSeconds = max(0, Int(recorder.liveDuration))
+        stats = recorder.liveStats
+
+        recorder.$liveDuration
+            .map { max(0, Int($0)) }
+            .removeDuplicates()
+            .receive(on: RunLoop.main)
+            .sink { [weak self] seconds in
+                self?.durationSeconds = seconds
+            }
+            .store(in: &cancellables)
+
+        recorder.$liveStats
+            .removeDuplicates()
+            .throttle(for: .milliseconds(100), scheduler: RunLoop.main, latest: true)
+            .sink { [weak self] stats in
+                self?.stats = stats
+            }
+            .store(in: &cancellables)
+    }
+}
+
 struct RecordingHUDView: View {
     let mode: RecordingHUDMode
-    @ObservedObject var recorder: Recorder
+    let recorder: Recorder
     weak var state: AppState?
     let onDiscard: @MainActor @Sendable () -> Void
     let onStop: @MainActor @Sendable () -> Void
     let onExpand: @MainActor @Sendable () -> Void
     let onCollapse: @MainActor @Sendable () -> Void
 
-    /// The actual configured "stop recording" hotkey — pressing record again toggles off.
-    private var stopHotkeyName: String {
-        state?.recordHotkey.name ?? "F6"
-    }
-    /// The "stop everything" hotkey, shown as the discard shortcut affordance.
-    private var emergencyHotkeyName: String {
-        state?.stopHotkey.name ?? "F7"
-    }
-
-    private var minutes: String { String(format: "%02d", Int(recorder.liveDuration) / 60) }
-    private var seconds: String { String(format: "%02d", Int(recorder.liveDuration) % 60) }
-    private var hundredths: String {
-        String(format: "%02d", Int((recorder.liveDuration - floor(recorder.liveDuration)) * 100))
-    }
-
-    private var stats: RecordingStats {
-        recorder.liveStats
-    }
-
-    private var durationLabel: String {
-        String(format: "%.1fs", recorder.liveDuration)
-    }
-
-    private var eventCount: Int {
-        stats.clicks + stats.keys + stats.scrolls + stats.drags
-    }
+    private var stopHotkeyName: String { state?.recordHotkey.name ?? "F6" }
+    private var emergencyHotkeyName: String { state?.stopHotkey.name ?? "F7" }
 
     @ViewBuilder
     var body: some View {
         switch mode {
         case .compact:
-            compactBody
+            RecordingCompactHUDView(
+                recorder: recorder,
+                stopHotkeyName: stopHotkeyName,
+                emergencyHotkeyName: emergencyHotkeyName,
+                onDiscard: onDiscard,
+                onStop: onStop,
+                onExpand: onExpand
+            )
         case .expanded:
-            expandedBody
+            RecordingExpandedHUDView(
+                recorder: recorder,
+                stopHotkeyName: stopHotkeyName,
+                emergencyHotkeyName: emergencyHotkeyName,
+                onDiscard: onDiscard,
+                onStop: onStop,
+                onCollapse: onCollapse
+            )
         case .menuBar:
             EmptyView()
         }
     }
+}
 
-    private var compactBody: some View {
+private struct RecordingCompactHUDView: View {
+    @StateObject private var model: RecordingCompactHUDModel
+    let stopHotkeyName: String
+    let emergencyHotkeyName: String
+    let onDiscard: @MainActor @Sendable () -> Void
+    let onStop: @MainActor @Sendable () -> Void
+    let onExpand: @MainActor @Sendable () -> Void
+
+    init(
+        recorder: Recorder,
+        stopHotkeyName: String,
+        emergencyHotkeyName: String,
+        onDiscard: @escaping @MainActor @Sendable () -> Void,
+        onStop: @escaping @MainActor @Sendable () -> Void,
+        onExpand: @escaping @MainActor @Sendable () -> Void
+    ) {
+        _model = StateObject(wrappedValue: RecordingCompactHUDModel(recorder: recorder))
+        self.stopHotkeyName = stopHotkeyName
+        self.emergencyHotkeyName = emergencyHotkeyName
+        self.onDiscard = onDiscard
+        self.onStop = onStop
+        self.onExpand = onExpand
+    }
+
+    private var minutes: String { String(format: "%02d", model.durationSeconds / 60) }
+    private var seconds: String { String(format: "%02d", model.durationSeconds % 60) }
+    private var eventCount: Int {
+        model.stats.clicks + model.stats.keys + model.stats.scrolls + model.stats.drags
+    }
+
+    var body: some View {
         HStack(spacing: 10) {
             Button(action: onExpand) {
                 HStack(spacing: 10) {
                     RecDot(size: 9)
-
                     VStack(alignment: .leading, spacing: 1) {
                         Text(String(localized: "Recording", table: "Recording").uppercased())
                             .font(.system(size: 9.5, weight: .semibold))
@@ -210,11 +260,8 @@ struct RecordingHUDView: View {
                             .frame(width: 58, alignment: .leading)
                             .lineLimit(1)
                     }
-
                     Spacer(minLength: 0)
-
                     CompactEventCount(value: eventCount)
-
                     Image(systemName: "chevron.down")
                         .font(.system(size: 9, weight: .bold))
                         .foregroundStyle(Color.white.opacity(0.42))
@@ -262,23 +309,39 @@ struct RecordingHUDView: View {
         .shadow(color: Color.black.opacity(0.22), radius: 8, y: 3)
         .environment(\.colorScheme, .dark)
         .accessibilityElement(children: .contain)
-        .accessibilityLabel(compactAccessibilityLabel)
+        .accessibilityLabel(
+            Text("\(String(localized: "Recording", table: "Recording")), \(minutes):\(seconds), \(eventCount) \(String(localized: "events", table: "EditorUX"))")
+        )
     }
+}
 
-    private var expandedBody: some View {
-        let s = stats
-        return ZStack {
-            // Inky translucent layer over the host glass: guarantees legible white
-            // content over any desktop, while the NSGlassEffectView behind still
-            // refracts. (This is the design's exact approach.)
+private struct RecordingExpandedHUDView: View {
+    @ObservedObject var recorder: Recorder
+    let stopHotkeyName: String
+    let emergencyHotkeyName: String
+    let onDiscard: @MainActor @Sendable () -> Void
+    let onStop: @MainActor @Sendable () -> Void
+    let onCollapse: @MainActor @Sendable () -> Void
+
+    private var minutes: String { String(format: "%02d", Int(recorder.liveDuration) / 60) }
+    private var seconds: String { String(format: "%02d", Int(recorder.liveDuration) % 60) }
+    private var hundredths: String {
+        String(format: "%02d", Int((recorder.liveDuration - floor(recorder.liveDuration)) * 100))
+    }
+    private var durationLabel: String { String(format: "%.1fs", recorder.liveDuration) }
+
+    var body: some View {
+        let stats = recorder.liveStats
+        ZStack {
             RoundedRectangle(cornerRadius: 16, style: .continuous)
                 .fill(LinearGradient(
                     colors: [Color(red: 0.10, green: 0.11, blue: 0.14).opacity(0.52),
                              Color(red: 0.047, green: 0.051, blue: 0.071).opacity(0.52)],
-                    startPoint: .top, endPoint: .bottom))
+                    startPoint: .top,
+                    endPoint: .bottom
+                ))
 
             VStack(alignment: .leading, spacing: 10) {
-                // Top row: status + big gradient timer
                 HStack(spacing: 10) {
                     RecDot(size: 10)
                     Text(String(localized: "Recording", table: "Recording").uppercased())
@@ -296,7 +359,9 @@ struct RecordingHUDView: View {
                     }
                     .foregroundStyle(LinearGradient(
                         colors: [.white, Color(red: 0.77, green: 0.78, blue: 0.82)],
-                        startPoint: .top, endPoint: .bottom))
+                        startPoint: .top,
+                        endPoint: .bottom
+                    ))
                     .contentTransition(.numericText())
                     .frame(width: 96, alignment: .trailing)
                     HUDIconButton(
@@ -308,7 +373,6 @@ struct RecordingHUDView: View {
                     )
                 }
 
-                // Event-track panel
                 VStack(spacing: 2) {
                     LiveWaveform(events: recorder.liveWaveformEvents)
                         .equatable()
@@ -329,17 +393,16 @@ struct RecordingHUDView: View {
                     RoundedRectangle(cornerRadius: 10, style: .continuous)
                         .fill(Color.black.opacity(0.30))
                         .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous)
-                            .strokeBorder(Color.white.opacity(0.05), lineWidth: 0.5)))
+                            .strokeBorder(Color.white.opacity(0.05), lineWidth: 0.5))
+                )
 
-                // 4-stat grid
                 HStack(spacing: 6) {
-                    HUDStat(icon: "cursorarrow.click", value: s.clicks, label: String(localized: "Clicks", table: "EditorUX"), tint: Brand.sigGreen)
-                    HUDStat(icon: "keyboard",          value: s.keys,   label: String(localized: "Keys", table: "Common"),   tint: Brand.sigBlue)
-                    HUDStat(icon: "arrow.up.and.down", value: s.scrolls, label: String(localized: "Scrolls", table: "Common"), tint: Brand.sigTeal)
-                    HUDStat(icon: "hand.draw",         value: s.drags,  label: String(localized: "Drags", table: "EditorUX"),   tint: Brand.sigViolet)
+                    HUDStat(icon: "cursorarrow.click", value: stats.clicks, label: String(localized: "Clicks", table: "EditorUX"), tint: Brand.sigGreen)
+                    HUDStat(icon: "keyboard", value: stats.keys, label: String(localized: "Keys", table: "Common"), tint: Brand.sigBlue)
+                    HUDStat(icon: "arrow.up.and.down", value: stats.scrolls, label: String(localized: "Scrolls", table: "Common"), tint: Brand.sigTeal)
+                    HUDStat(icon: "hand.draw", value: stats.drags, label: String(localized: "Drags", table: "EditorUX"), tint: Brand.sigViolet)
                 }
 
-                // Action bar
                 HStack(spacing: 6) {
                     HUDButton(title: String(localized: "Discard", table: "Common"), icon: "trash", shortcut: emergencyHotkeyName, tint: nil, action: onDiscard)
                     HUDButton(title: String(localized: "Stop", table: "Common"), icon: "stop.fill", shortcut: stopHotkeyName, tint: Brand.red500, action: onStop)
@@ -355,10 +418,6 @@ struct RecordingHUDView: View {
                 .strokeBorder(Color.white.opacity(0.14), lineWidth: 0.5)
         )
         .environment(\.colorScheme, .dark)
-    }
-
-    private var compactAccessibilityLabel: Text {
-        Text("\(String(localized: "Recording", table: "Recording")), \(minutes):\(seconds), \(eventCount) \(String(localized: "events", table: "EditorUX"))")
     }
 }
 

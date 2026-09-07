@@ -4,6 +4,7 @@ import SparkleRecorderCore
 
 public enum WindowCaptureError: LocalizedError {
     case noFrontmostApplication
+    case noWindowAtPoint
     case noAccessibilityPermission
     case noFocusedWindow
     case apiFailure(String)
@@ -12,6 +13,8 @@ public enum WindowCaptureError: LocalizedError {
         switch self {
         case .noFrontmostApplication:
             return "No active application window found."
+        case .noWindowAtPoint:
+            return "No app window was found at that point."
         case .noAccessibilityPermission:
             return "Accessibility permission is required to capture window details."
         case .noFocusedWindow:
@@ -24,6 +27,43 @@ public enum WindowCaptureError: LocalizedError {
 
 public final class WindowSurfaceCapture {
     public init() {}
+
+    /// Captures the visible app window beneath a global top-left screen point.
+    /// This is used by the explicit window picker so SparkleRecorder does not
+    /// accidentally bind its own foreground window.
+    public func captureWindow(at point: CGPoint) throws -> PlaybackSurface {
+        guard AXIsProcessTrusted() else {
+            throw WindowCaptureError.noAccessibilityPermission
+        }
+        let ownPID = Int32(ProcessInfo.processInfo.processIdentifier)
+        guard let observation = WindowTargetSelection.window(
+            at: point,
+            windows: WindowServerObservationAdapter.visibleWindows(),
+            excludingProcessID: ownPID
+        ) else {
+            throw WindowCaptureError.noWindowAtPoint
+        }
+        guard let app = NSRunningApplication(processIdentifier: observation.processID) else {
+            throw WindowCaptureError.noFrontmostApplication
+        }
+
+        let frame = observation.frame
+        let resolvedContent = WindowContentFrameResolver.resolveContentFrame(for: observation.processID, outerFrame: frame)
+        let rectContentFrame = RectValue(resolvedContent.frame)
+
+        return PlaybackSurface(
+            appName: app.localizedName ?? "Unknown App",
+            bundleIdentifier: app.bundleIdentifier,
+            windowTitle: Self.windowTitle(windowID: observation.id),
+            recordedWindowId: observation.id,
+            recordedFrame: frame,
+            recordedContentFrame: rectContentFrame,
+            contentElementRole: resolvedContent.role,
+            contentElementSubrole: resolvedContent.subrole,
+            contentFrameSource: resolvedContent.source.rawValue,
+            capturedAt: Date()
+        )
+    }
     
     public func captureFrontmostWindow() throws -> PlaybackSurface {
         let frontmostApp: NSRunningApplication
@@ -84,18 +124,40 @@ public final class WindowSurfaceCapture {
         let title = (titleResult == .success && titleRef != nil) ? (titleRef as! String) : nil
         
         let frame = RectValue(x: pos.x, y: pos.y, width: size.width, height: size.height)
-        let resolvedContent = CoordinateMapper.resolveContentFrame(for: pid, outerFrame: frame)
-        let rectContentFrame = RectValue(x: resolvedContent.frame.minX, y: resolvedContent.frame.minY, width: resolvedContent.frame.width, height: resolvedContent.frame.height)
+        let recordedWindowID = PlaybackForegroundWindowVerification.frontmostMatchingWindowID(
+            targetProcessID: pid,
+            recordedFrame: frame,
+            windows: WindowServerObservationAdapter.visibleWindows()
+        )
+        let resolvedContent = WindowContentFrameResolver.resolveContentFrame(for: pid, outerFrame: frame)
+        let rectContentFrame = RectValue(resolvedContent.frame)
         
         return PlaybackSurface(
             appName: appName,
             bundleIdentifier: bundleID,
             windowTitle: title,
+            recordedWindowId: recordedWindowID,
             recordedFrame: frame,
             recordedContentFrame: rectContentFrame,
             contentElementRole: resolvedContent.role,
             contentElementSubrole: resolvedContent.subrole,
+            contentFrameSource: resolvedContent.source.rawValue,
             capturedAt: Date()
         )
     }
+
+    private static func windowTitle(windowID: CGWindowID) -> String? {
+        guard let descriptions = CGWindowListCreateDescriptionFromArray(
+            [NSNumber(value: windowID)] as CFArray
+        ) as? [[String: Any]],
+        let description = descriptions.first else {
+            return nil
+        }
+        let title = description[kCGWindowName as String] as? String
+        return title?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
+    }
+}
+
+private extension String {
+    var nilIfEmpty: String? { isEmpty ? nil : self }
 }

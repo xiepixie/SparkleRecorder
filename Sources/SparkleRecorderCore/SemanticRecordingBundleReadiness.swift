@@ -27,6 +27,7 @@ public enum SemanticRecordingBundleReadinessIssueCode: String, Codable, Equatabl
     case redactingSuppressionMissingFrameRedaction
     case redactingSuppressionMissingVideoRedaction
     case redactingSuppressionHasNoVisualEvidence
+    case captureDegraded
 }
 
 public struct SemanticRecordingBundleReadinessIssue: Codable, Equatable, Sendable {
@@ -141,6 +142,16 @@ public struct SemanticRecordingBundleReadiness: Codable, Equatable, Sendable {
                     code: .invalidBundle,
                     severity: .blocking,
                     message: "Bundle validation reported \(validationIssues.count) schema/reference issue(s)."
+                )
+            )
+        }
+
+        if !bundle.captureIssues.isEmpty {
+            issues.append(
+                SemanticRecordingBundleReadinessIssue(
+                    code: .captureDegraded,
+                    severity: .degraded,
+                    message: "Capture completed with \(bundle.captureIssues.count) degraded evidence operation(s)."
                 )
             )
         }

@@ -345,11 +345,11 @@ extension AutomationTargetApplicationPolicy {
       return String(localized: "Keep the current application in front.", table: "Automation")
     case .activateIfRunning:
       return String(
-        localized: "Bring the bound application forward only when it is already open.",
+        localized: "Bring the target application forward only when it is already open.",
         table: "Automation")
     case .launchIfNeeded:
       return String(
-        localized: "Open the bound application and wait for its window before running.",
+        localized: "Open the target application and wait for its window before running.",
         table: "Automation")
     }
   }

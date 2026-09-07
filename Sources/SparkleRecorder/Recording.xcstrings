@@ -1,6 +1,27 @@
 {
   "sourceLanguage": "en",
   "strings": {
+    "Target windows": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Target windows" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "目标窗口" } }
+      }
+    },
+    "No target window is set.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "No target window is set." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "尚未设置目标窗口。" } }
+      }
+    },
+    "No target window is set. Playback uses the recorded screen coordinates until an action is explicitly bound to a Playback Surface.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "No target window is set. Playback uses the recorded screen coordinates until an action is explicitly bound to a Playback Surface." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "尚未设置目标窗口。只有动作明确绑定到某个播放窗口后，回放才会使用该窗口；否则使用录制时的屏幕坐标。" } }
+      }
+    },
     "Action recording": {
       "extractionState": "manual",
       "generatesSymbol": false,
@@ -189,36 +210,36 @@
         }
       }
     },
-    "Grant Accessibility, Input Monitoring & Screen Recording to record and replay.": {
+    "Screen Recording is required while visual evidence is enabled.": {
       "extractionState": "manual",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Grant Accessibility, Input Monitoring & Screen Recording to record and replay."
+            "value": "Screen Recording is required while visual evidence is enabled."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "授予“辅助功能”、“输入监控”和“屏幕录制”权限后即可录制和回放。"
+            "value": "启用视觉证据时，需要授予“屏幕录制”权限。"
           }
         }
       }
     },
-    "Grant the required permissions before recording video, keyframes and playable macro events.": {
+    "Optional. Required only for visual evidence and OCR.": {
       "extractionState": "manual",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Grant the required permissions before recording video, keyframes and playable macro events."
+            "value": "Optional. Required only for visual evidence and OCR."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "请先授予必需权限，再录制视频、关键帧和可回放宏事件。"
+            "value": "可选。只有使用视觉证据和 OCR 时才需要。"
           }
         }
       }
@@ -309,23 +330,6 @@
         }
       }
     },
-    "Open the blocked permission rows below, then check again before recording.": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Open the blocked permission rows below, then check again before recording."
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "打开下方被阻止的权限项，然后在录制前再次检查。"
-          }
-        }
-      }
-    },
     "Pick coordinate from screen": {
       "extractionState": "manual",
       "localizations": {
@@ -356,23 +360,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "从屏幕选取文本"
-          }
-        }
-      }
-    },
-    "Playable macro events still record; missing context is visible instead of being guessed.": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Playable macro events still record; missing context is visible instead of being guessed."
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "可回放宏事件仍会录制；缺失上下文会明确显示，而不是被猜测填充。"
           }
         }
       }
@@ -926,57 +913,6 @@
         }
       }
     },
-    "Semantic recording can start with limited context": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Semantic recording can start with limited context"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "语义录制可在有限上下文中开始"
-          }
-        }
-      }
-    },
-    "Semantic recording is blocked": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Semantic recording is blocked"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "语义录制已阻止"
-          }
-        }
-      }
-    },
-    "Semantic recording is ready": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Semantic recording is ready"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "语义录制已就绪"
-          }
-        }
-      }
-    },
     "Show floating HUD": {
       "extractionState": "manual",
       "localizations": {
@@ -1028,40 +964,6 @@
         }
       }
     },
-    "Start semantic recording": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Start semantic recording"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "开始语义录制"
-          }
-        }
-      }
-    },
-    "Start the next recording from the menu bar when you are ready.": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Start the next recording from the menu bar when you are ready."
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "准备好后，从菜单栏开始下一次录制。"
-          }
-        }
-      }
-    },
     "Stop recording": {
       "extractionState": "manual",
       "localizations": {
@@ -1092,23 +994,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "一款轻量的 macOS 宏录制工具，安静替你处理重复操作。"
-          }
-        }
-      }
-    },
-    "The next recording can save video, keyframes, OCR, AX context and window metadata together.": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "The next recording can save video, keyframes, OCR, AX context and window metadata together."
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "下一次录制可以同时保存视频、关键帧、OCR、AX 上下文和窗口元数据。"
           }
         }
       }
@@ -1164,40 +1049,6 @@
         }
       }
     },
-    "Video recording": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Video recording"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "视频录制"
-          }
-        }
-      }
-    },
-    "Video, keyframes, playable events and semantic observations are available.": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Video, keyframes, playable events and semantic observations are available."
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "视频、关键帧、可回放事件和语义观察均可用。"
-          }
-        }
-      }
-    },
     "Welcome to SparkleRecorder": {
       "extractionState": "manual",
       "localizations": {
@@ -1211,23 +1062,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "欢迎使用 SparkleRecorder"
-          }
-        }
-      }
-    },
-    "You can record now, or grant the recommended permission first for richer context.": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "You can record now, or grant the recommended permission first for richer context."
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "你可以现在录制，也可以先授予推荐权限以获得更完整的上下文。"
           }
         }
       }
@@ -1282,18 +1116,18 @@
         }
       }
     },
-    "No loaded actions to play. Select a macro and wait for it to load.": {
+    "No macro is ready to play. Select a macro and wait for its actions to load.": {
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "No loaded actions to play. Select a macro and wait for it to load."
+            "value": "No macro is ready to play. Select a macro and wait for its actions to load."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "没有已加载的动作。请选择宏并等待加载完成。"
+            "value": "当前没有可播放的宏。请选择一个宏，并等待操作加载完成。"
           }
         }
       }
@@ -1663,6 +1497,545 @@
             "value": "仅录制动作"
           }
         }
+      }
+    },
+    "Recording discarded.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Recording discarded." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "已丢弃本次录制。" } }
+      }
+    },
+    "Input Monitoring was revoked. Saved the partial recording as %@.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Input Monitoring was revoked. Saved the partial recording as %@." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "“输入监控”权限已被撤销，已将已录制的内容保存为 %@。" } }
+      }
+    },
+    "Input Monitoring was revoked before any events were captured.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Input Monitoring was revoked before any events were captured." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "“输入监控”权限已被撤销，本次尚未录制到任何事件。" } }
+      }
+    },
+    "Loading %@...": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Loading %@..." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "正在加载 %@…" } }
+      }
+    },
+    "Loaded %@.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Loaded %@." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "已加载 %@。" } }
+      }
+    },
+    "Failed to load %@.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Failed to load %@." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "无法加载 %@。" } }
+      }
+    },
+    "Choose the window this macro should control.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Choose the window this macro should control." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "请选择这个宏要控制的窗口。" } }
+      }
+    },
+    "Target window": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Target window" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "目标窗口" } }
+      }
+    },
+    "%dx%d recorded window": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "%1$dx%2$d recorded window" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "录制窗口尺寸：%1$d×%2$d" } }
+      }
+    },
+    "No target window is set. Playback uses the recorded screen coordinates.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "No target window is set. Playback uses the recorded screen coordinates." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "尚未设置目标窗口。播放时将使用录制时的屏幕坐标。" } }
+      }
+    },
+    "Target window set: %@.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Target window set: %@." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "已设置目标窗口：%@。" } }
+      }
+    },
+    "No app window was found there. Try again and click inside the window this macro should control.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "No app window was found there. Try again and click inside the window this macro should control." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "这里没有可选的应用窗口。请重试，并点击这个宏要控制的目标窗口内部。" } }
+      }
+    },
+    "Accessibility permission is required to choose a target window. Enable it in Settings, then try again.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Accessibility permission is required to choose a target window. Enable it in Settings, then try again." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "选择目标窗口需要“辅助功能”权限。请先在设置中启用该权限，然后重试。" } }
+      }
+    },
+    "Could not set the target window. Try again.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Could not set the target window. Try again." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "无法设置目标窗口，请重试。" } }
+      }
+    },
+    "No display is available for window selection.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "No display is available for window selection." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "当前没有可用于选择窗口的显示器。" } }
+      }
+    },
+    "Window selection cancelled.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Window selection cancelled." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "已取消窗口选择。" } }
+      }
+    },
+    "Choose a target window for %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Choose a target window for %@" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "为 %@ 选择目标窗口" } }
+      }
+    },
+    "Click the window to bind it. SparkleRecorder will not run any actions. Press ESC to cancel.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Click the window to bind it. SparkleRecorder will not run any actions. Press ESC to cancel." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "点击要绑定的窗口。SparkleRecorder 不会执行任何操作。按 Esc 取消。" } }
+      }
+    },
+    "Choose Target Window…": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Choose Target Window…" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "选择目标窗口…" } }
+      }
+    },
+    "Change Target Window…": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Change Target Window…" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "更换目标窗口…" } }
+      }
+    },
+    "Follow Target Window Position": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Follow Target Window Position" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "跟随目标窗口位置" } }
+      }
+    },
+    "Remove Target Window": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Remove Target Window" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "移除目标窗口" } }
+      }
+    },
+    "Target: %@ · %dx%d": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Target: %@ · %dx%d" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "目标：%@ · %dx%d" } }
+      }
+    },
+    "Follows window movement": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Follows window movement" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "跟随窗口移动" } }
+      }
+    },
+    "Target window removed.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Target window removed." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "已移除目标窗口。" } }
+      }
+    },
+    "Recording cancelled.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Recording cancelled." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "已取消录制。" } }
+      }
+    },
+    "Saved %@ · %d events.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Saved %@ · %d events." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "已保存 %@ · %d 个事件。" } }
+      }
+    },
+    "No events captured.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "No events captured." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "未录制到任何事件。" } }
+      }
+    },
+    "Checking visual recording permissions…": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Checking visual recording permissions…" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "正在检查视觉录制权限…" } }
+      }
+    },
+    "Visual recording can continue with limited context.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Visual recording can continue with limited context." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "可以继续视觉录制，但可用的上下文信息有限。" } }
+      }
+    },
+    "Visual recording is ready.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Visual recording is ready." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "视觉录制已就绪。" } }
+      }
+    },
+    "Visual recording blocked: %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Visual recording blocked: %@" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "无法进行视觉录制：%@" } }
+      }
+    },
+    "Recording with limited visual context.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Recording with limited visual context." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "正在录制，但视觉上下文有限。" } }
+      }
+    },
+    "Could not start. Grant Accessibility permission.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Could not start. Grant Accessibility permission." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "无法开始录制。请先授予“辅助功能”权限。" } }
+      }
+    },
+    "Could not start. Grant Accessibility and Input Monitoring permissions.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Could not start. Grant Accessibility and Input Monitoring permissions." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "无法开始录制。请先授予“辅助功能”和“输入监控”权限。" } }
+      }
+    },
+    "Could not start. Grant Input Monitoring permission.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Could not start. Grant Input Monitoring permission." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "无法开始录制。请先授予“输入监控”权限。" } }
+      }
+    },
+    "Could not start recording. Check permissions in Settings.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Could not start recording. Check permissions in Settings." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "无法开始录制。请在“设置”中检查相关权限。" } }
+      }
+    },
+    "Nothing is running.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Nothing is running." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "当前没有正在进行的录制或播放。" } }
+      }
+    },
+    "Recording setup cancelled.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Recording setup cancelled." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "已取消录制准备。" } }
+      }
+    },
+    "Visual recording failed: %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Visual recording failed: %@" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "视觉录制失败：%@" } }
+      }
+    },
+    "Visual evidence stopped to protect sensitive content. Action recording continues.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Visual evidence stopped to protect sensitive content. Action recording continues." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "为保护敏感内容，本次视觉证据采集已停止；动作录制会继续。" } }
+      }
+    },
+    "Recording text protection could not finish: %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Recording text protection could not finish: %@" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "录制文本保护未能完成：%@" } }
+      }
+    },
+    "Saved visual evidence, hid readable text from %d action(s), and left %d action(s) for review.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Saved visual evidence, hid readable text from %d action(s), and left %d action(s) for review." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "已保存视觉证据；已隐藏 %d 个操作中的可读文本，另有 %d 个操作需要审阅。" } }
+      }
+    },
+    "Saved visual evidence and hid readable text from %d action(s).": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Saved visual evidence and hid readable text from %d action(s)." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "已保存视觉证据，并隐藏了 %d 个操作中的可读文本。" } }
+      }
+    },
+    "Saved visual evidence. Review %d sensitive action(s) before changing the text used during playback.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Saved visual evidence. Review %d sensitive action(s) before changing the text used during playback." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "已保存视觉证据。%d 个包含敏感文本的操作需要先审阅，之后才能修改播放时使用的文本。" } }
+      }
+    },
+    "Playing %@ · ×%d…": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Playing %@ · ×%d…" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "正在播放 %@ · ×%d…" } }
+      }
+    },
+    "Playback chain stopped because it would repeat a macro already played in this run.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Playback chain stopped because it would repeat a macro already played in this run." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "宏链已停止，因为继续执行会重复本次运行中已经播放过的宏。" } }
+      }
+    },
+    "Chaining to %@…": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Chaining to %@…" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "正在继续播放 %@…" } }
+      }
+    },
+    "Preparing recording…": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Preparing recording…" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "正在准备录制…" } }
+      }
+    },
+    "Playback stopped. Start recording again when you are ready.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Playback stopped. Start recording again when you are ready." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "播放已停止。准备好后请重新开始录制。" } }
+      }
+    },
+    "Wait for the current recording to finish saving before starting another recording or playback.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Wait for the current recording to finish saving before starting another recording or playback." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "请等待当前录制保存完成，再开始新的录制或播放。" } }
+      }
+    },
+    "Recording stopped. Play again after saving finishes.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Recording stopped. Play again after saving finishes." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "录制已停止。保存完成后，请再次播放。" } }
+      }
+    },
+    "Finishing recording…": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Finishing recording…" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "正在完成录制…" } }
+      }
+    },
+    "Finishing visual evidence and saving this macro. SparkleRecorder stays responsive; recording and playback will be available when this finishes.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Finishing visual evidence and saving this macro. SparkleRecorder stays responsive; recording and playback will be available when this finishes." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "正在完成视觉证据和本次宏的保存。SparkleRecorder 仍可正常操作；完成后即可再次录制或播放。" } }
+      }
+    },
+    "Saved %@ · %d events. Visual recording failed: %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Saved %@ · %d events. Visual recording failed: %@" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "已保存 %@ · %d 个事件。视觉录制失败：%@" } }
+      }
+    },
+    "Saved the action recording. Visual evidence was stopped to protect sensitive content.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Saved the action recording. Visual evidence was stopped to protect sensitive content." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "动作录制已保存。为保护敏感内容，本次视觉证据采集已停止。" } }
+      }
+    },
+    "Saved the action recording. Visual evidence was unavailable: %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Saved the action recording. Visual evidence was unavailable: %@" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "动作录制已保存，但视觉证据不可用：%@" } }
+      }
+    },
+    "SparkleRecorder became active. Saved the interrupted recording as %@.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "SparkleRecorder became active. Saved the interrupted recording as %@." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "SparkleRecorder 被切到前台，录制已中断并保存为 %@。" } }
+      }
+    },
+    "SparkleRecorder became active before any events were captured.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "SparkleRecorder became active before any events were captured." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "SparkleRecorder 被切到前台时尚未捕获任何事件。" } }
+      }
+    },
+    "Playback stopped because SparkleRecorder became active. Return to the target app and start again.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Playback stopped because SparkleRecorder became active. Return to the target app and start again." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "SparkleRecorder 切到前台后，播放已停止。请返回目标应用并重新开始。" } }
+      }
+    },
+    "Cancel Recording": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Cancel Recording" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "取消录制" } }
+      }
+    },
+    "Discard Recording": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Discard Recording" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "丢弃录制" } }
+      }
+    },
+    "Finishing Recording…": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Finishing Recording…" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "正在完成录制…" } }
+      }
+    },
+    "Stop Playback": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Stop Playback" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "停止播放" } }
+      }
+    },
+    "Evidence detail": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Evidence detail" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "视觉证据强度" } }
+      }
+    },
+    "Video + keyframes": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Video + keyframes" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "视频 + 关键帧" } }
+      }
+    },
+    "Keyframes only": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Keyframes only" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "仅关键帧" } }
+      }
+    },
+    "Diagnostic": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Diagnostic" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "诊断级" } }
+      }
+    },
+    "Capture scope": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Capture scope" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "捕获范围" } }
+      }
+    },
+    "Current window": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Current window" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "当前窗口" } }
+      }
+    },
+    "Entire display": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Entire display" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "整个显示器" } }
+      }
+    },
+    "Continuous video with sparse high-value checkpoints. Recommended for robust AI reconstruction.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Continuous video with sparse high-value checkpoints. Recommended for robust AI reconstruction." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "持续录制视频，并仅保存少量高价值关键帧。推荐用于更鲁棒的 AI 重建。" } }
+      }
+    },
+    "No movie is recorded. Dense action checkpoints preserve visual state without continuous video.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "No movie is recorded. Dense action checkpoints preserve visual state without continuous video." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "不录制视频，通过更密集的动作关键帧保留界面状态。" } }
+      }
+    },
+    "Continuous video with dense action checkpoints. Uses more storage and post-processing.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Continuous video with dense action checkpoints. Uses more storage and post-processing." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "持续录制视频，并为更多动作保存关键帧。占用更多存储空间，录制后的处理也更重。" } }
+      }
+    },
+    "Captures the window where recording starts. Best for privacy and focused workflows.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Captures the window where recording starts. Best for privacy and focused workflows." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "只捕获开始录制时的窗口。隐私暴露更少，也更适合单窗口工作流。" } }
+      }
+    },
+    "Captures the whole display so app switches and system dialogs stay visible. Unrelated content on that display may also be recorded.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Captures the whole display so app switches and system dialogs stay visible. Unrelated content on that display may also be recorded." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "捕获整个显示器，可覆盖应用切换和系统对话框；该显示器上的无关内容也可能被录入。" } }
+      }
+    },
+    "Recording preparation was cancelled because SparkleRecorder became active. Return to the target app and start recording again.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Recording preparation was cancelled because SparkleRecorder became active. Return to the target app and start recording again." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "SparkleRecorder 被切到前台，本次录制准备已取消。请返回目标应用后重新开始录制。" } }
       }
     }
   },

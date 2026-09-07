@@ -53,7 +53,11 @@ public enum MacroCandidateValidator {
         }
     }
 
-    public static func normalize(_ document: MacroCandidateDocument, source: SavedMacro) throws -> SavedMacro {
+    public static func normalize(
+        _ document: MacroCandidateDocument,
+        source: SavedMacro,
+        surfaceAuthority: MacroCandidatePlaybackSurfaceAuthority = .sourceRevision
+    ) throws -> SavedMacro {
         let revision = try MacroCandidateIdentity.revision(of: source)
         guard document.sourceRevision == revision else {
             throw MacroCandidateValidationError.staleSource(expected: revision, actual: document.sourceRevision)
@@ -71,19 +75,58 @@ public enum MacroCandidateValidator {
               source.loops >= 0, source.loops <= 1_000_000 else {
             throw MacroCandidateValidationError.invalidConfiguration("Source speed or loop count is out of bounds.")
         }
-        try validateSurfaces(candidate.surfaces)
-        try validateEvents(candidate.events, surfaces: candidate.surfaces)
+        let executionSurfaces = surfaceAuthority == .sourceRevision ? source.surfaces : candidate.surfaces
+        try validateSurfaces(executionSurfaces)
+        if let violation = MacroCandidatePlaybackSurfaceContract.violation(
+            candidate: candidate.surfaces,
+            source: source.surfaces,
+            authority: surfaceAuthority
+        ) {
+            switch violation {
+            case .surfaceSetChanged:
+                throw MacroCandidateValidationError.invalidConfiguration(
+                    "External candidates must preserve the Source Revision Playback Surface set. Change event.surfaceId to choose a target; live window rebinding is app-owned."
+                )
+            case .surfaceChanged(let id):
+                throw MacroCandidateValidationError.invalidSurface(
+                    id: id,
+                    reason: "External candidates must preserve Source Revision Playback Surface identity and geometry. Live window rebinding is app-owned."
+                )
+            }
+        }
+        try validateEvents(candidate.events, surfaces: executionSurfaces)
         try validateCoverage(document, source: source)
         try validateSuppression(candidate, source: source)
         var normalized = source
         normalized.version = candidate.version
         normalized.events = candidate.events
-        normalized.surfaces = candidate.surfaces
+        normalized.surfaces = surfaceAuthority == .sourceRevision ? source.surfaces : candidate.surfaces
         normalized.refreshCachesFromEvents()
         return normalized
     }
 
     private static func validateEvents(_ events: [RecordedEvent], surfaces: [String: PlaybackSurface]) throws {
+        if let violation = MacroCandidateTextOperationContract.violation(events: events, surfaces: surfaces) {
+            switch violation {
+            case .missingTextAnchor(let index):
+                throw MacroCandidateValidationError.invalidEvent(index: index, reason: "Text operation requires a text anchor.")
+            case .missingSurface(let index):
+                throw MacroCandidateValidationError.invalidEvent(index: index, reason: "Text operation requires an explicit Playback Surface.")
+            case .unknownSurface(let index, let id):
+                throw MacroCandidateValidationError.invalidEvent(index: index, reason: "Text operation references missing Playback Surface \(id).")
+            case .locatorRequiresMouseEvent(let index):
+                throw MacroCandidateValidationError.invalidEvent(index: index, reason: "Text locator input is only supported for mouse events.")
+            case .locatorRequiresTargetWindowBinding(let index):
+                throw MacroCandidateValidationError.invalidEvent(index: index, reason: "Text locator mouse input must use target-window binding.")
+            case .locatorRequiresLocatorOnlyStrategy(let index):
+                throw MacroCandidateValidationError.invalidEvent(index: index, reason: "Text locator mouse input must use locator-only coordinate strategy.")
+            case .pointerGestureLocatorMismatch(let index, let downIndex):
+                throw MacroCandidateValidationError.invalidEvent(index: index, reason: "Text locator pointer gesture must keep the same Playback Surface, Text Anchor, fallback policy, and timeout as mouse-down event \(downIndex).")
+            case .locatorDrivenPointerGestureCannotDrag(let index, let downIndex):
+                throw MacroCandidateValidationError.invalidEvent(index: index, reason: "Text locator pointer gesture from mouse-down event \(downIndex) cannot contain drag movement.")
+            }
+        }
+
         var buttons = Set<Int64>()
         var keysDown = Set<UInt16>()
         var modifierFlags: UInt64 = 0
@@ -131,11 +174,18 @@ public enum MacroCandidateValidator {
                    !point.x.isFinite || !point.y.isFinite || !(0...1).contains(point.x) || !(0...1).contains(point.y) {
                     try fail("Invalid normalized locator fallback.")
                 }
+                if event.surfaceId == nil {
+                    try fail("Text operation requires an explicit Playback Surface.")
+                }
+                if let surfaceId = event.surfaceId,
+                   let contentFrame = surfaces[surfaceId]?.recordedContentFrame,
+                   !textAnchorGeometryIsConsistent(anchor, in: contentFrame) {
+                    try fail("Absolute and content-normalized text geometry disagree.")
+                }
                 if event.locatorFallbackPolicy == .allowCoordinateFallback,
                    anchor.coordinateFallback == nil && anchor.coordinateFallbackContentNormalized == nil {
                     try fail("Coordinate fallback policy requires an explicit fallback point.")
                 }
-                if anchor.coordinateFallbackContentNormalized != nil, event.surfaceId == nil { try fail("Normalized locator fallback requires a surface.") }
             }
             if let text = event.unicodeString, text.utf8.count > 1_000_000 { try fail("Readable input exceeds size limit.") }
             if let payload = event.scrollPayload {
@@ -166,6 +216,54 @@ public enum MacroCandidateValidator {
         guard buttons.isEmpty, keysDown.isEmpty, modifierFlags == 0 else {
             throw MacroCandidateValidationError.invalidEvent(index: max(0, events.count - 1), reason: "Input ends with a held mouse button, key or modifier.")
         }
+    }
+
+    private static func textAnchorGeometryIsConsistent(
+        _ anchor: TextAnchor,
+        in contentFrame: RectValue,
+        tolerance: CGFloat = 3
+    ) -> Bool {
+        func projected(_ normalized: RectValue) -> RectValue {
+            RectValue(
+                x: contentFrame.x + normalized.x * contentFrame.width,
+                y: contentFrame.y + normalized.y * contentFrame.height,
+                width: normalized.width * contentFrame.width,
+                height: normalized.height * contentFrame.height
+            )
+        }
+        func projected(_ normalized: PointValue) -> PointValue {
+            PointValue(
+                x: contentFrame.x + normalized.x * contentFrame.width,
+                y: contentFrame.y + normalized.y * contentFrame.height
+            )
+        }
+        func agrees(_ lhs: RectValue, _ rhs: RectValue) -> Bool {
+            abs(lhs.x - rhs.x) <= tolerance
+                && abs(lhs.y - rhs.y) <= tolerance
+                && abs(lhs.width - rhs.width) <= tolerance
+                && abs(lhs.height - rhs.height) <= tolerance
+        }
+        func agrees(_ lhs: PointValue, _ rhs: PointValue) -> Bool {
+            abs(lhs.x - rhs.x) <= tolerance && abs(lhs.y - rhs.y) <= tolerance
+        }
+
+        if let normalized = anchor.observedContentNormalizedFrame,
+           anchor.observedFrame.width > 0,
+           anchor.observedFrame.height > 0,
+           !agrees(projected(normalized), anchor.observedFrame) {
+            return false
+        }
+        if let normalized = anchor.searchContentNormalizedRegion,
+           let absolute = anchor.searchRegion,
+           !agrees(projected(normalized), absolute) {
+            return false
+        }
+        if let normalized = anchor.coordinateFallbackContentNormalized,
+           let absolute = anchor.coordinateFallback,
+           !agrees(projected(normalized), absolute) {
+            return false
+        }
+        return true
     }
 
     private static func buttonNumber(_ event: RecordedEvent) -> Int64 {
@@ -259,10 +357,7 @@ public enum MacroCandidateValidator {
         try keys(try self.object(value, at: "\(path).\(field)"), allowed: allowed, at: "\(path).\(field)")
     }
     private static func auditMacro(_ macro: [String: Any]) throws {
-        try keys(macro, allowed: ["id", "name", "events", "createdAt", "modifiedAt", "version", "loops", "speed", "surface", "surfaces", "followWindowOffset", "icon", "accent", "tags", "favorite", "hotkey", "notes", "chainTo", "semanticRecording", "playableSanitization", "playCount", "lastPlayedAt", "totalRunTime", "cachedDuration", "cachedEventCount", "cachedWaveformBars"], at: "macro")
-        guard !(macro["surface"] != nil && macro["surfaces"] != nil) else {
-            throw MacroCandidateValidationError.malformedDocument("Use surfaces, not both legacy surface and surfaces.")
-        }
+        try keys(macro, allowed: MacroCandidateSchema.acceptedMacroFields, at: "macro")
         let rect: Set<String> = ["x", "y", "width", "height"]
         let point: Set<String> = ["x", "y"]
         func surface(_ value: Any, path: String) throws {

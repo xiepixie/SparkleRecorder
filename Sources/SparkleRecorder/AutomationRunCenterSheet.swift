@@ -14,6 +14,7 @@ struct AutomationRunCenterSheet: View {
   @State private var commandInFlight = false
   @State private var commandFeedback: AutomationRunCenterCommandFeedback?
   @State private var storageUsage: AutomationRunStorageUsage?
+  @State private var storageUsageError: String?
 
   private let onOpenWorkflow: (UUID, UUID?) -> Void
   private let onPerformCommand:
@@ -195,7 +196,7 @@ struct AutomationRunCenterSheet: View {
           Text("Run data could not be saved", tableName: "Automation")
             .font(.caption)
             .fontWeight(.semibold)
-          Text(issue.message)
+          Text(AutomationRunCenterIssuePresenter.persistenceIssue(issue).detail)
             .font(.caption)
             .foregroundStyle(.secondary)
             .lineLimit(2)
@@ -210,11 +211,26 @@ struct AutomationRunCenterSheet: View {
       Divider()
     }
 
+    if let storageUsageError {
+      HStack(spacing: 8) {
+        Image(systemName: "externaldrive.badge.questionmark")
+          .foregroundStyle(Brand.sigAmber)
+        Text(storageUsageError)
+          .font(.caption)
+          .foregroundStyle(.secondary)
+          .lineLimit(2)
+        Spacer(minLength: 8)
+      }
+      .padding(.horizontal, 18)
+      .padding(.vertical, 9)
+      Divider()
+    }
+
     if let failureMessage = model.loadState.failureMessage {
       HStack(spacing: 8) {
         Image(systemName: "exclamationmark.arrow.triangle.2.circlepath")
           .foregroundStyle(Brand.sigAmber)
-        Text(failureMessage)
+        Text(AutomationRunCenterIssuePresenter.loadFailure(failureMessage).detail)
           .font(.caption)
           .foregroundStyle(.secondary)
           .lineLimit(2)
@@ -372,8 +388,7 @@ struct AutomationRunCenterSheet: View {
         primaryCommand: AutomationRunCenterCommandResolver.primaryCommand(for: selectedExecution),
         commandInFlight: commandInFlight,
         commandFeedback: commandFeedback,
-        storage: storageUsage?.breakdown(for: selectedExecution.executionID)
-          ?? AutomationRunStorageBreakdown(),
+        storage: storageUsage?.breakdown(for: selectedExecution.executionID),
         onPerformCommand: perform,
         onOpenWorkflow: {
           onOpenWorkflow(
@@ -468,7 +483,16 @@ struct AutomationRunCenterSheet: View {
 
   @MainActor
   private func refreshStorageUsage() async {
-    storageUsage = try? await onLoadStorageUsage()
+    do {
+      storageUsage = try await onLoadStorageUsage()
+      storageUsageError = nil
+    } catch {
+      storageUsage = nil
+      storageUsageError = String(
+        format: String(localized: "Run storage usage could not be calculated: %@", table: "Automation"),
+        error.localizedDescription
+      )
+    }
   }
 
   private var deletionAlertTitle: String {
@@ -483,8 +507,20 @@ struct AutomationRunCenterSheet: View {
   private var deletionAlertMessage: String {
     guard case .deleteExecution(_, let scope) = pendingDeletion,
           let execution = selectedExecution else { return "" }
-    let storage = storageUsage?.breakdown(for: execution.executionID)
-      ?? AutomationRunStorageBreakdown()
+    guard let storage = storageUsage?.breakdown(for: execution.executionID) else {
+      switch scope {
+      case .screenshots:
+        return String(localized: "This removes ending screenshots. Reports and run history stay available. Storage size is currently unavailable.", table: "Automation")
+      case .evidence:
+        return String(localized: "This removes reports, screenshots, and diagnostic evidence. A lightweight run record stays in history. Storage size is currently unavailable.", table: "Automation")
+      case .history:
+        return String(
+          format: String(localized: "This permanently removes %d run record(s) and their associated evidence. Storage size is currently unavailable.", table: "Automation"),
+          execution.runs.count
+        )
+      }
+    }
+
     let bytes = scope == .screenshots ? storage.screenshotByteCount : storage.evidenceByteCount
     let size = ByteCountFormatter.string(fromByteCount: bytes, countStyle: .file)
     switch scope {
@@ -578,7 +614,7 @@ private struct AutomationRunCenterExecutionDetail: View {
   let primaryCommand: AutomationRunCenterCommand?
   let commandInFlight: Bool
   let commandFeedback: AutomationRunCenterCommandFeedback?
-  let storage: AutomationRunStorageBreakdown
+  let storage: AutomationRunStorageBreakdown?
   let onPerformCommand: (AutomationRunCenterCommand) -> Void
   let onOpenWorkflow: () -> Void
 
@@ -654,7 +690,7 @@ private struct AutomationRunCenterExecutionDetail: View {
             scope: .screenshots
           ))
         }
-        .disabled(execution.hasActiveRun || storage.screenshotByteCount == 0)
+        .disabled(execution.hasActiveRun || (storage?.screenshotByteCount == 0))
         Button(
           String(localized: "Delete Evidence", table: "Automation"),
           systemImage: "doc.badge.minus",
@@ -665,7 +701,7 @@ private struct AutomationRunCenterExecutionDetail: View {
             scope: .evidence
           ))
         }
-        .disabled(execution.hasActiveRun || storage.evidenceByteCount == 0)
+        .disabled(execution.hasActiveRun || (storage?.evidenceByteCount == 0))
         Divider()
         Button(
           String(localized: "Delete Run History", table: "Automation"),
@@ -720,24 +756,29 @@ private struct AutomationRunCenterExecutionDetail: View {
       GridRow {
         metric(
           String(localized: "Evidence size", table: "Automation"),
-          formattedBytes(storage.evidenceByteCount)
+          storage.map { formattedBytes($0.evidenceByteCount) } ?? storageUnavailableLabel
         )
         metric(
           String(localized: "Reports", table: "Automation"),
-          formattedBytes(storage.reportByteCount)
+          storage.map { formattedBytes($0.reportByteCount) } ?? storageUnavailableLabel
         )
       }
       GridRow {
         metric(
           String(localized: "Screenshots", table: "Automation"),
-          formattedBytes(storage.screenshotByteCount)
+          storage.map { formattedBytes($0.screenshotByteCount) } ?? storageUnavailableLabel
         )
         metric(
           String(localized: "Diagnostics", table: "Automation"),
-          formattedBytes(storage.conditionEvidenceByteCount + storage.otherEvidenceByteCount)
+          storage.map { formattedBytes($0.conditionEvidenceByteCount + $0.otherEvidenceByteCount) }
+            ?? storageUnavailableLabel
         )
       }
     }
+  }
+
+  private var storageUnavailableLabel: String {
+    String(localized: "Storage size unavailable", table: "Automation")
   }
 
   private func formattedBytes(_ bytes: Int64) -> String {
@@ -1113,7 +1154,7 @@ extension AutomationRunRecommendedAction {
         localized: "Open the saved evidence before changing the automation.", table: "Automation")
     case .inspectTargetApplication:
       return String(
-        localized: "Check the target application and bound window.", table: "Automation")
+        localized: "Check the target application and target window.", table: "Automation")
     case .adjustTimeout:
       return String(localized: "Review the wait condition and timeout policy.", table: "Automation")
     case .adjustResourcePolicy:

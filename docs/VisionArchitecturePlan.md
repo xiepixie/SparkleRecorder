@@ -1,6 +1,6 @@
 # Vision Architecture & System Evolution Plan
 
-> 文档状态（2026-07-05）：视觉/OCR 约束仍有效。当前已采用 coordinate-first、vision-assisted 的方向，并已有 `TextAnchor` / `LocatorEngine` 等基础；复杂状态树、条件分支和 OCR outcome 路由不在本文件继续扩展，后续归入 `automation-engine/`。
+> 文档状态（2026-09-06）：视觉/OCR 约束仍有效。当前已采用 coordinate-first、vision-assisted 的方向；`TextAnchorGeometryProjection` / `TextAnchorMatchRanking` 在 Core 维护纯几何与匹配规则，`PlaybackTextTargetResolver` / `WindowContentFrameResolver` 在 App 边缘负责 OCR 与 macOS 窗口内容区。复杂状态树、条件分支和 OCR outcome 路由不在本文件继续扩展，后续归入 `automation-engine/`。
 
 ## 1. 核心理念 (Core Philosophy)
 系统遵循 **Coordinate-first, Vision-assisted** 的原则：
@@ -160,4 +160,4 @@ func resolve(anchor: TextAnchor, detections: [TextDetection]) -> TextDetection? 
 4. **失败截图保存**：若定位或断言失败，将当前 `searchRegion`（或全屏）的截图以及 Detection JSON 保存作为诊断证据。
 5. **不引入过度功能**：当前阶段不开发状态树、复杂 FlowGraph、AX Tree 语义映射或每次运行的全屏视频录制。
 
-2026-07-07 update: `LocatorEngine` already crops text-locator OCR to the selected `TextAnchor.searchRegion` / content-normalized region. Workflow OCR conditions now follow the same rule in `LiveAutomationConditionEvaluatorClient`: resolved regions are cropped before `VNRecognizeTextRequest`; unrestricted conditions are the only full-display scan path. Icon/button/pattern waits remain visual conditions, not OCR text recognition.
+2026-09-06 update: `PlaybackTextTargetResolver` crops text-target OCR to the selected `TextAnchor.searchRegion` / content-normalized region, while `TextAnchorMatchRanking` owns candidate ranking in pure Core and `LocatorEngine` only adds bounded polling for text-backed mouse targets. Workflow OCR conditions follow the same region-scoping principle in `LiveAutomationConditionEvaluatorClient`: resolved regions are cropped before `VNRecognizeTextRequest`; unrestricted conditions are the only full-display scan path. Icon/button/pattern waits remain visual conditions, not OCR text recognition.

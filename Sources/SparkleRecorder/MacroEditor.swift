@@ -7,10 +7,13 @@ import UniformTypeIdentifiers
 // MARK: - Window controller
 
 final class EditorWindowController: NSWindowController, NSWindowDelegate {
-    init<V: View>(rootView: V) {
+    var shouldClose: (() -> Bool)?
+    var onClose: (() -> Void)?
+
+    init<V: View>(rootView: V, title: String = String(localized: "Macro Editor", table: "EditorUX")) {
         let host = NSHostingController(rootView: rootView)
         let win = NSWindow(contentViewController: host)
-        win.title = String(localized: "Macro Editor", table: "EditorUX")
+        win.title = title
         win.setContentSize(NSSize(width: 1200, height: 800))
         win.styleMask = [.titled, .closable, .resizable, .miniaturizable, .fullSizeContentView]
         win.minSize = NSSize(width: 860, height: 620)
@@ -29,17 +32,18 @@ final class EditorWindowController: NSWindowController, NSWindowDelegate {
     }
     required init?(coder: NSCoder) { fatalError() }
 
+    func windowShouldClose(_ sender: NSWindow) -> Bool {
+        shouldClose?() ?? true
+    }
+
     func windowWillClose(_ notification: Notification) {
         CoordinatePreviewOverlay.shared.hide()
+        onClose?()
     }
 }
 
 
-
 // MARK: - Row model
-
-// Extracted ActionRow.swift
-
 
 struct DragEditSession {
     let groupID: UUID
@@ -51,8 +55,18 @@ struct DragEditSession {
 
 // MARK: - Editor view
 
+struct CandidateEditorContainer: View {
+    let controller: MenuBarController
+    @ObservedObject var session: MacroCandidateEditorSession
+
+    var body: some View {
+        EditorView(controller: controller, candidateSession: session)
+    }
+}
+
 struct EditorView: View {
     let controller: MenuBarController
+    let candidateSession: MacroCandidateEditorSession?
     @EnvironmentObject var recorder: Recorder
     @EnvironmentObject var library: MacroLibrary
     @EnvironmentObject var state: AppState
@@ -89,7 +103,14 @@ struct EditorView: View {
     @State private var repeatUntilDraftAlertMessage = ""
     @State private var isShowingRepeatUntilDraftAlert = false
 
+    init(controller: MenuBarController, candidateSession: MacroCandidateEditorSession? = nil) {
+        self.controller = controller
+        self.candidateSession = candidateSession
+    }
+
     var rows: [ActionRow] { cachedRows }
+    var editingMacro: SavedMacro? { candidateSession?.draftMacro ?? library.currentMacro }
+    var isEditingCandidate: Bool { candidateSession != nil }
 
     @discardableResult
     func updateCachedRows() -> [ActionRow] {
@@ -137,8 +158,13 @@ struct EditorView: View {
             PlayerStateListener()
 
             VStack(spacing: 0) {
+                if let candidateSession {
+                    candidateEditorBanner(candidateSession)
+                    Divider().opacity(0.45)
+                }
+
                 EditorToolbar(
-                    macro: library.currentMacro,
+                    macro: editingMacro,
                     rowCount: recorder.events.count,
                     duration: recorder.events.last?.time ?? 0,
                     health: macroEditorHealthSummary(for: rows.map(\.group), events: recorder.events),
@@ -146,7 +172,7 @@ struct EditorView: View {
                     showAllPaths: $showAllPaths,
                     showOverlayPreview: $showOverlayPreview,
                     smartMergeGestures: $smartMergeGestures,
-                    onExport:  { controller.exportAsScript() }
+                    onExport: isEditingCandidate ? nil : { controller.exportAsScript() }
                 )
 
                 HSplitView {
@@ -169,7 +195,29 @@ struct EditorView: View {
                         inspVerifyMustExist: $inspVerifyMustExist,
                         inspBehaviorName: $inspBehaviorName,
                         recorder: recorder,
-                        surfaces: library.currentMacro?.surfaces ?? [:],
+                        macroID: editingMacro?.id,
+                        surfaces: editingMacro?.surfaces ?? [:],
+                        followWindowOffset: editingMacro?.followWindowOffset ?? true,
+                        canEditFollowWindowOffset: !isEditingCandidate,
+                        allowsLibrarySideEffects: !isEditingCandidate,
+                        onChooseTargetWindow: { surfaceID in
+                            if let candidateSession {
+                                controller.chooseTargetWindow(for: candidateSession, surfaceID: surfaceID)
+                            } else if let id = library.currentMacro?.id {
+                                controller.chooseTargetWindow(for: id, surfaceID: surfaceID)
+                            }
+                        },
+                        onRemoveTargetWindow: { surfaceID in
+                            if let candidateSession {
+                                _ = candidateSession.removeSurface(surfaceID)
+                            } else if let id = library.currentMacro?.id {
+                                controller.removeTargetWindow(for: id, surfaceID: surfaceID)
+                            }
+                        },
+                        onSetFollowWindowOffset: { enabled in
+                            guard !isEditingCandidate, let id = library.currentMacro?.id else { return }
+                            library.setFollowWindowOffset(id: id, enabled: enabled)
+                        },
                         onLoadInspector: loadInspector,
                         onUpdatePreview: updatePreview,
                         onPickCoordinate: { isEndPoint in
@@ -215,6 +263,7 @@ struct EditorView: View {
                              health: macroEditorHealthSummary(for: rows.map(\.group), events: recorder.events))
             }
         }
+        .disabled(state.appInteractionLocked)
         .frame(minWidth: 820, minHeight: 580)
         .onAppear {
             updateCachedRows()
@@ -226,7 +275,7 @@ struct EditorView: View {
         .onChange(of: recorder.events) {
             guard !recorder.isRecording else { return }
             updateCachedRows()
-            controller.persistEdits()
+            persistEditingEvents()
         }
         .onChange(of: hideMouseMoves) {
             updateCachedRows()
@@ -243,12 +292,13 @@ struct EditorView: View {
         // The active macro changed under us (new recording saved, card clicked,
         // macro deleted) — stale indices would corrupt the new buffer.
         .onChange(of: library.currentMacroID) {
+            guard !isEditingCandidate else { return }
             selection.removeAll()
             CoordinatePreviewOverlay.shared.hide()
             updateCachedRows()
         }
         .onDisappear {
-            controller.persistEdits()
+            persistEditingEvents()
             CoordinatePreviewOverlay.shared.hide()
         }
         .sheet(item: $repeatUntilDraftPreviewState) { previewState in
@@ -267,6 +317,78 @@ struct EditorView: View {
             Button(String(localized: "OK", table: "Common"), role: .cancel) {}
         } message: {
             Text(repeatUntilDraftAlertMessage)
+        }
+    }
+
+    @ViewBuilder
+    func candidateEditorBanner(_ session: MacroCandidateEditorSession) -> some View {
+        VStack(spacing: 6) {
+            HStack(spacing: 10) {
+                Image(systemName: "wand.and.stars")
+                    .foregroundStyle(.tint)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Editing candidate draft", tableName: "EditorUX")
+                        .font(.system(size: 12, weight: .semibold))
+                    Text("Changes stay separate from the accepted macro. Saving creates a new candidate that must be tested again.", tableName: "EditorUX")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                    Text("Editor previews help you adjust the draft. Return to Review and use Test once to qualify the saved candidate for acceptance.", tableName: "EditorUX")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+                Spacer()
+
+                Button(String(localized: "Close", table: "Common")) {
+                    controller.closeCandidateEditor()
+                }
+                .disabled(session.isSaving)
+
+                Button {
+                    persistEditingEvents()
+                    Task {
+                        if await session.save() {
+                            controller.closeCandidateEditor()
+                        }
+                    }
+                } label: {
+                    if session.isSaving {
+                        ProgressView()
+                            .controlSize(.small)
+                    } else {
+                        Label(
+                            session.hasChanges
+                                ? String(localized: "Save as new candidate", table: "EditorUX")
+                                : String(localized: "Back to review", table: "EditorUX"),
+                            systemImage: session.hasChanges ? "square.and.arrow.down" : "arrow.uturn.backward"
+                        )
+                    }
+                }
+                .buttonStyle(.borderedProminent)
+                .disabled(session.isSaving)
+            }
+
+            if let error = session.errorMessage, !error.isEmpty {
+                Text(error)
+                    .font(.caption2)
+                    .foregroundStyle(.red)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            } else if !session.statusMessage.isEmpty {
+                Text(session.statusMessage)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 8)
+        .background(Color.accentColor.opacity(0.055))
+    }
+
+    func persistEditingEvents() {
+        if let candidateSession {
+            candidateSession.updateEvents(recorder.events)
+        } else {
+            controller.persistEdits()
         }
     }
 
@@ -373,7 +495,7 @@ struct EditorView: View {
             }
         }
         
-        let currentMacro = library.currentMacro
+        let currentMacro = editingMacro
         let events = recorder.events
         
         var actionsToPreview: [PreviewAction] = []
@@ -411,13 +533,32 @@ struct EditorView: View {
                 usesTextLocator = usesTextLocator || ev.coordinateStrategy == .locatorOnly || ev.textAnchor != nil
                 startPt = try? resolver.resolve(ev, context: context).get()
                 if let anchor = ev.textAnchor {
-                    let surfaceId = ev.surfaceId ?? currentMacro?.surfaces.keys.first
+                    let surfaceId = (try? MacroPlaybackSurfaceEditing.effectiveSurfaceID(
+                        in: events,
+                        eventIndices: grp.eventIndices,
+                        surfaces: currentMacro?.surfaces ?? [:]
+                    )) ?? nil
                     let contentFrame = surfaceId.flatMap { context.currentContentFrames[$0] }
-                    observedFrame = currentRect(normalized: anchor.observedContentNormalizedFrame, absolute: anchor.observedFrame, contentFrame: contentFrame)
-                    if let absoluteSearch = anchor.searchRegion {
-                        searchRegion = currentRect(normalized: anchor.searchContentNormalizedRegion, absolute: absoluteSearch, contentFrame: contentFrame)
+                    let currentWindowFrame = surfaceId.flatMap { context.currentSurfaceFrames[$0] }
+                    let recordedWindowFrame = surfaceId.flatMap { currentMacro?.surfaces[$0]?.recordedFrame }
+                    let geometry: ResolvedTextAnchorGeometry
+                    if let recordedWindowFrame, let currentWindowFrame {
+                        geometry = TextAnchorGeometryProjection.resolve(
+                            anchor,
+                            contentFrame: contentFrame,
+                            recordedWindowFrame: recordedWindowFrame,
+                            currentWindowFrame: currentWindowFrame
+                        )
+                    } else {
+                        geometry = TextAnchorGeometryProjection.resolve(anchor, contentFrame: contentFrame)
                     }
-                    fallbackPoint = currentPoint(normalized: anchor.coordinateFallbackContentNormalized, absolute: anchor.coordinateFallback, contentFrame: contentFrame)
+                    observedFrame = geometry.observedFrame.map {
+                        CGRect(x: $0.x, y: $0.y, width: $0.width, height: $0.height)
+                    }
+                    searchRegion = geometry.searchRegion.map {
+                        CGRect(x: $0.x, y: $0.y, width: $0.width, height: $0.height)
+                    }
+                    fallbackPoint = geometry.coordinateFallback.map { CGPoint(x: $0.x, y: $0.y) }
                     startPt = startPt ?? fallbackPoint ?? observedFrame.map { CGPoint(x: $0.midX, y: $0.midY) }
                 }
             }
@@ -544,29 +685,6 @@ struct EditorView: View {
         }
     }
     
-    func currentRect(normalized: RectValue?, absolute: RectValue, contentFrame: RectValue?) -> CGRect {
-        if let normalized, let contentFrame {
-            return CGRect(
-                x: contentFrame.x + normalized.x * contentFrame.width,
-                y: contentFrame.y + normalized.y * contentFrame.height,
-                width: normalized.width * contentFrame.width,
-                height: normalized.height * contentFrame.height
-            )
-        }
-        return CGRect(x: absolute.x, y: absolute.y, width: absolute.width, height: absolute.height)
-    }
-    
-    func currentPoint(normalized: PointValue?, absolute: PointValue?, contentFrame: RectValue?) -> CGPoint? {
-        if let normalized, let contentFrame {
-            return CGPoint(
-                x: contentFrame.x + normalized.x * contentFrame.width,
-                y: contentFrame.y + normalized.y * contentFrame.height
-            )
-        }
-        guard let absolute else { return nil }
-        return CGPoint(x: absolute.x, y: absolute.y)
-    }
-    
     func estimatedContentFrame(for surface: PlaybackSurface, currentFrame: RectValue) -> RectValue {
         guard let recordedContent = surface.recordedContentFrame else {
             let fallbackTop: CGFloat = surface.contentFrameSource == CoordinateMapper.ResolvedContentFrame.Source.fallbackOuterFrame.rawValue ? 0 : 28
@@ -577,13 +695,13 @@ struct EditorView: View {
                 height: max(1, currentFrame.height - fallbackTop)
             )
         }
-        
+
         let recordedFrame = surface.recordedFrame
         let leftInset = recordedContent.x - recordedFrame.x
         let topInset = recordedContent.y - recordedFrame.y
         let rightInset = (recordedFrame.x + recordedFrame.width) - (recordedContent.x + recordedContent.width)
         let bottomInset = (recordedFrame.y + recordedFrame.height) - (recordedContent.y + recordedContent.height)
-        
+
         return RectValue(
             x: currentFrame.x + leftInset,
             y: currentFrame.y + topInset,
@@ -615,10 +733,25 @@ struct EditorView: View {
     }
 
     func startPickingCoordinate(isEndPoint: Bool) {
+        guard controller.requireScreenPickingAvailable() else { return }
+        guard selection.count == 1, let selectedID = selection.first,
+              let selectedRow = rows.first(where: { $0.id == selectedID }) else { return }
+        if let macro = editingMacro, macro.followWindowOffset, macro.surfaces.count > 1,
+           ((try? MacroPlaybackSurfaceEditing.effectiveSurfaceID(
+                in: recorder.events,
+                eventIndices: selectedRow.group.eventIndices,
+                surfaces: macro.surfaces
+           )) ?? nil) == nil {
+            state.presentStatus(
+                String(localized: "Assign the selected action to one Playback Surface before retargeting its coordinates.", table: "EditorUX"),
+                tone: .warning
+            )
+            return
+        }
         // Hide the preview overlay during coordinate picking so it doesn't intercept mouse events
         CoordinatePreviewOverlay.shared.hide()
         
-        let editorWin = NSApp.windows.first(where: { $0.title == String(localized: "Macro Editor", table: "EditorUX") })
+        let editorWin = NSApp.keyWindow ?? NSApp.windows.first(where: { $0.title == String(localized: "Macro Editor", table: "EditorUX") })
         editorWin?.orderOut(nil)
         
         CoordinatePickerOverlay.shared.onPicked = { [weak recorder] pt in
@@ -628,20 +761,26 @@ struct EditorView: View {
                   let row = rows.first(where: { $0.id == selectId }) else { return }
             
             let grp = row.group
-            let currentMacro = library.currentMacro
+            let currentMacro = editingMacro
+            guard let rec = recorder else { return }
             
             var finalPt = pt
-            if let macro = currentMacro, macro.followWindowOffset, let surface = macro.surfaces.values.first {
+            if let macro = currentMacro, macro.followWindowOffset,
+               let surfaceID = (try? MacroPlaybackSurfaceEditing.effectiveSurfaceID(
+                    in: rec.events,
+                    eventIndices: grp.eventIndices,
+                    surfaces: macro.surfaces
+               )) ?? nil,
+               let surface = macro.surfaces[surfaceID] {
                 let tracker = WindowTracker()
-                let frames = tracker.resolveCurrentFrames(for: ["target": surface])
-                if let frame = frames["target"] {
+                let frames = tracker.resolveCurrentFrames(for: [surfaceID: surface])
+                if let frame = frames[surfaceID] {
                     let dx = frame.x - surface.recordedFrame.x
                     let dy = frame.y - surface.recordedFrame.y
                     finalPt = CGPoint(x: pt.x - dx, y: pt.y - dy)
                 }
             }
             
-            guard let rec = recorder else { return }
             if isEndPoint {
                 self.withUndo(String(localized: "Pick End Coordinate", table: "Common")) {
                     if let start = grp.startPoint, let end = grp.endPoint {
@@ -666,13 +805,37 @@ struct EditorView: View {
             self.updatePreview() // Restore the preview overlay
         }
         
-        CoordinatePickerOverlay.shared.start()
+        guard CoordinatePickerOverlay.shared.start() else {
+            editorWin?.makeKeyAndOrderFront(nil)
+            self.updatePreview()
+            state.presentStatus(
+                String(localized: "No display is available for coordinate picking.", table: "EditorUX"),
+                tone: .error
+            )
+            return
+        }
     }
 
     func startPickingAdditionalClickPoint() {
+        guard controller.requireScreenPickingAvailable() else { return }
+        guard selection.count == 1, let selectedID = selection.first,
+              let selectedRow = rows.first(where: { $0.id == selectedID }),
+              selectedRow.group.kind == .multiPointClick else { return }
+        if let macro = editingMacro, macro.followWindowOffset, macro.surfaces.count > 1,
+           ((try? MacroPlaybackSurfaceEditing.effectiveSurfaceID(
+                in: recorder.events,
+                eventIndices: selectedRow.group.eventIndices,
+                surfaces: macro.surfaces
+           )) ?? nil) == nil {
+            state.presentStatus(
+                String(localized: "Assign the selected action to one Playback Surface before retargeting its coordinates.", table: "EditorUX"),
+                tone: .warning
+            )
+            return
+        }
         CoordinatePreviewOverlay.shared.hide()
 
-        let editorWin = NSApp.windows.first(where: { $0.title == String(localized: "Macro Editor", table: "EditorUX") })
+        let editorWin = NSApp.keyWindow ?? NSApp.windows.first(where: { $0.title == String(localized: "Macro Editor", table: "EditorUX") })
         editorWin?.orderOut(nil)
 
         CoordinatePickerOverlay.shared.onPicked = { [weak recorder] pt in
@@ -682,11 +845,18 @@ struct EditorView: View {
                   let row = rows.first(where: { $0.id == selectId }),
                   row.group.kind == .multiPointClick else { return }
 
+            guard let rec = recorder else { return }
             var finalPt = pt
-            if let macro = library.currentMacro, macro.followWindowOffset, let surface = macro.surfaces.values.first {
+            if let macro = editingMacro, macro.followWindowOffset,
+               let surfaceID = (try? MacroPlaybackSurfaceEditing.effectiveSurfaceID(
+                    in: rec.events,
+                    eventIndices: row.group.eventIndices,
+                    surfaces: macro.surfaces
+               )) ?? nil,
+               let surface = macro.surfaces[surfaceID] {
                 let tracker = WindowTracker()
-                let frames = tracker.resolveCurrentFrames(for: ["target": surface])
-                if let frame = frames["target"] {
+                let frames = tracker.resolveCurrentFrames(for: [surfaceID: surface])
+                if let frame = frames[surfaceID] {
                     finalPt = CGPoint(
                         x: pt.x - (frame.x - surface.recordedFrame.x),
                         y: pt.y - (frame.y - surface.recordedFrame.y)
@@ -694,7 +864,6 @@ struct EditorView: View {
                 }
             }
 
-            guard let rec = recorder else { return }
             let previousLiveDuration = rec.liveDuration
             let previousLastEventTime = rec.events.last?.time
             self.withUndo(String(localized: "Add Click Point", table: "EditorUX")) {
@@ -713,36 +882,45 @@ struct EditorView: View {
             self.updatePreview()
         }
 
-        CoordinatePickerOverlay.shared.start()
+        guard CoordinatePickerOverlay.shared.start() else {
+            editorWin?.makeKeyAndOrderFront(nil)
+            self.updatePreview()
+            state.presentStatus(
+                String(localized: "No display is available for coordinate picking.", table: "EditorUX"),
+                tone: .error
+            )
+            return
+        }
     }
     
     @available(macOS 14.0, *)
     func startPickingText() {
+        guard controller.requireScreenPickingAvailable() else { return }
+        let targetRows = textTargetRowsForCurrentSelection()
+        guard !targetRows.isEmpty else { return }
         CoordinatePreviewOverlay.shared.hide()
         
-        let targetRows = textTargetRowsForCurrentSelection()
-        guard !targetRows.isEmpty else {
+        let targetEventIndices = Array(Set(targetRows.flatMap(\.group.eventIndices))).sorted()
+        guard let macro = editingMacro,
+              let finalSurfaceId = (try? MacroPlaybackSurfaceEditing.effectiveSurfaceID(
+                    in: recorder.events,
+                    eventIndices: targetEventIndices,
+                    surfaces: macro.surfaces
+              )) ?? nil,
+              let resolvedSurface = macro.surfaces[finalSurfaceId] else {
+            state.presentStatus(
+                String(localized: "Choose one Playback Surface for the selected text actions before picking text.", table: "EditorUX"),
+                tone: .warning
+            )
             return
         }
-        
-        let surfaceId = targetRows
-            .flatMap { row in
-                row.group.eventIndices.compactMap { index in
-                    recorder.events.indices.contains(index) ? recorder.events[index].surfaceId : nil
-                }
-            }
-            .first
-        let resolvedSurface = (surfaceId.flatMap { library.currentMacro?.surfaces[$0] }) ?? library.currentMacro?.surfaces.values.first
-        let finalSurfaceId = surfaceId ?? library.currentMacro?.surfaces.first(where: { $0.value == resolvedSurface })?.key
         
         TextPickerOverlay.shared.onPicked = { [weak recorder] anchor in
             guard let rec = recorder else { return }
             
             self.withUndo(String(localized: "Pick Target Text", table: "EditorUX")) {
                 for row in targetRows {
-                    if let sId = finalSurfaceId {
-                        rec.events.updateSurfaceId(at: row.group.eventIndices, surfaceId: sId)
-                    }
+                    rec.events.updateSurfaceId(at: row.group.eventIndices, surfaceId: finalSurfaceId)
                     if row.group.kind.editsSemanticTextTarget {
                         rec.events.updateSemanticAction(
                             at: row.group.eventIndices,
@@ -770,6 +948,16 @@ struct EditorView: View {
         TextPickerOverlay.shared.onCancelled = {
             self.updatePreview()
         }
+        TextPickerOverlay.shared.onFailed = { message in
+            self.state.presentStatus(
+                String(
+                    format: String(localized: "Could not capture the screen for text picking: %@", table: "EditorUX"),
+                    message
+                ),
+                tone: .error
+            )
+            self.updatePreview()
+        }
         
         TextPickerOverlay.shared.start(targetSurface: resolvedSurface)
     }
@@ -787,7 +975,7 @@ struct EditorView: View {
     }
 
     func createRepeatUntilDraftFromSelection(maxAttempts: Int, timeoutSeconds: TimeInterval, pollingSeconds: TimeInterval, failurePolicy: String) {
-        guard let currentMacro = library.currentMacro else {
+        guard let currentMacro = editingMacro else {
             showRepeatUntilDraftAlert(
                 title: String(localized: "No macro selected", table: "EditorUX"),
                 message: String(localized: "Select a saved macro before creating a Repeat-Until draft.", table: "EditorUX")
@@ -904,7 +1092,7 @@ struct EditorView: View {
                 recorder.events[idx].isDisabled = newState
             }
             _ = updateCachedRows()
-            controller.persistEdits()
+            persistEditingEvents()
         }
     }
     
@@ -918,23 +1106,10 @@ struct EditorView: View {
             mutableSlice[i].time = max(0, mutableSlice[i].time - shift)
         }
         
-        let macro = library.currentMacro
-        let speed = macro?.speed ?? state.speed
-        
-        controller.preparePlaybackContext(for: macro) { [weak controller] context in
-            guard let controller else { return }
-            controller.state.statusMessage = String(localized: "Playing preview…", table: "Common")
-            controller.player.play(
-                macroID: macro?.id,
-                events: mutableSlice,
-                loops: 1,
-                speed: speed,
-                context: context,
-                windowTracker: WindowTracker()
-            ) { _ in
-                controller.state.statusMessage = ""
-            }
-        }
+        controller.playEditorPreview(
+            events: mutableSlice,
+            sourceMacro: editingMacro
+        )
     }
 
     func playFromHere(anchor row: ActionRow) {
@@ -954,32 +1129,6 @@ struct EditorView: View {
 
 }
 
-// MARK: - Header
-
-// Extracted EditorToolbar.swift
-
-
-// Extracted PlayerStateListener.swift
-
-
-// MARK: - Timeline
-
-// Extracted TimelinePlayheadView.swift
-
-
-// Extracted EditorTimeline.swift
-
-
-// Extracted LegendChip.swift
-
-
-// MARK: - Sidebar (tools + inspector)
-
-// Extracted EditorSidebar.swift
-
-
-// MARK: - Table
-
 /// Fixed column widths shared by the events header + rows.
 enum EventCol {
     static let num: CGFloat = 46
@@ -987,35 +1136,3 @@ enum EventCol {
     static let pos: CGFloat = 160
     static let key: CGFloat = 80
 }
-
-// Extracted ActionRowDropDelegate.swift
-
-
-// Extracted ActionListView.swift
-
-
-// Extracted ActionRowView.swift
-
-
-// MARK: - Footer
-
-// Extracted EditorFooter.swift
-
-
-// MARK: - Helpers
-
-// Extracted EditorHelpers.swift
-
-// MARK: - On-Screen Coordinate Preview Overlay
-
-// Extracted CoordinatePreviewOverlay.swift
-
-// Extracted TargetCrosshairView.swift
-
-
-// MARK: - Screen Coordinate Picker Overlay
-
-// Extracted CoordinatePickerOverlay.swift
-
-/// Simple instruction label displayed during coordinate picking
-// Extracted PickerInstructionView.swift

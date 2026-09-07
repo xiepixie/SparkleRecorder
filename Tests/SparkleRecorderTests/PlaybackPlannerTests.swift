@@ -54,5 +54,10 @@ struct PlaybackPlannerTests {
 
         let emptyContext = PlaybackContext()
         #expect(PlaybackPlanner.targetSurfaceId(for: event, context: emptyContext) == "missing")
+
+        event.surfaceId = nil
+        let second = TestFixtures.surface(recordedFrame: RectValue(x: 200, y: 0, width: 100, height: 100))
+        let multiSurface = PlaybackContext(surfaces: ["surface-b": second, "surface-a": surface])
+        #expect(PlaybackPlanner.targetSurfaceId(for: event, context: multiSurface) == "surface-a")
     }
 }

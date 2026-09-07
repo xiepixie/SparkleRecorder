@@ -2,14 +2,14 @@ import Foundation
 import SparkleRecorderCore
 
 enum LivePlaybackTextObservation {
+    private static let textTargetResolver = PlaybackTextTargetResolver()
+
     static let client = PlaybackTextObservationClient { event, context in
         guard let anchor = event.textAnchor else { return .unavailable("Missing text anchor") }
         do {
-            _ = try await LocatorEngine().locate(event: event, context: context, strategies: [.ocr(anchor)])
+            _ = try await textTargetResolver.resolve(event: event, context: context, anchor: anchor)
             return .found
         } catch VisionDetectorError.textNotMatched {
-            return .absent
-        } catch VisionDetectorError.noTextFound {
             return .absent
         } catch {
             return .unavailable(String(describing: error))

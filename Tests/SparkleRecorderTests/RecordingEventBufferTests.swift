@@ -22,9 +22,9 @@ struct RecordingEventBufferTests {
         let drained = buffer.drainPending()
         let empty = buffer.drainPending()
 
-        #expect(drained.events == [first, second])
+        #expect(drained.playableEvents == [first, second])
         #expect(drained.surfaces == ["surface-1": surface])
-        #expect(empty.events.isEmpty)
+        #expect(empty.playableEvents.isEmpty)
         #expect(empty.surfaces == ["surface-1": surface])
     }
 
@@ -41,7 +41,7 @@ struct RecordingEventBufferTests {
         buffer.reset()
 
         let drained = buffer.drainPending()
-        #expect(drained.events.isEmpty)
+        #expect(drained.playableEvents.isEmpty)
         #expect(drained.surfaces.isEmpty)
     }
 
@@ -64,7 +64,7 @@ struct RecordingEventBufferTests {
         ])
 
         let drained = buffer.drainPending()
-        #expect(drained.events == [first, second])
+        #expect(drained.playableEvents == [first, second])
         #expect(drained.surfaces["surface-1"] == firstSurface)
         #expect(drained.surfaces["surface-2"] == secondSurface)
     }

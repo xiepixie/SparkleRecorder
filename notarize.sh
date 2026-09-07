@@ -1,7 +1,8 @@
 #!/bin/bash
 # Notarize and staple the installed SparkleRecorder.app so other people can run it
 # without Gatekeeper warnings. Requires:
-#   1. A Developer ID-signed build (run ./build.sh with a Developer ID cert).
+#   1. A Developer ID-signed distribution build (run build.sh with
+#      SPARKLERECORDER_BUILD_PROFILE=distribution and a Developer ID cert).
 #   2. Notary credentials stored ONCE in the keychain (no secrets live in this
 #      file). Create an app-specific password at https://appleid.apple.com →
 #      Sign-In & Security → App-Specific Passwords, then run:

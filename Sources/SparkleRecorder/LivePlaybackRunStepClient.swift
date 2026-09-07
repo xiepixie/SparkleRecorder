@@ -90,27 +90,28 @@ struct LivePlaybackRunStepClient: Sendable {
                     if let locatorClient {
                         point = try await locatorClient(event, runningContext, playbackClock)
                     } else {
-                        point = try await locate(event: event, context: runningContext, clock: playbackClock, cancelled: cancelled)
+                        point = try await LocatorEngine().locateTextTarget(
+                            event: event,
+                            context: runningContext,
+                            clock: playbackClock,
+                            cancelled: cancelled
+                        )
                     }
                 } catch {
                     if event.locatorFallbackPolicy == .allowCoordinateFallback {
-                        if let fallbackPoint = coordinateFallbackPoint(
-                            for: event,
+                        switch PlaybackLocatorFallback.resolve(
+                            event: event,
                             surfaceId: targetSurfaceId,
-                            context: runningContext
+                            context: runningContext,
+                            pointResolver: pointResolver
                         ) {
-                            point = fallbackPoint
-                        } else {
-                            let resolvedResult = pointResolver.resolve(event, context: runningContext)
-                            switch resolvedResult {
-                            case .success(let pt):
-                                point = pt
-                            case .failure(let fallbackError):
-                                #if DEBUG
-                                NSLog("SparkleRecorder: locator fallback error: \(fallbackError)")
-                                #endif
-                                return .failed(reason: "\(fallbackError)")
-                            }
+                        case .success(let pt):
+                            point = pt
+                        case .failure(let fallbackError):
+                            #if DEBUG
+                            NSLog("SparkleRecorder: locator fallback error: \(fallbackError)")
+                            #endif
+                            return .failed(reason: "\(fallbackError)")
                         }
                     } else {
                         #if DEBUG
@@ -139,70 +140,4 @@ struct LivePlaybackRunStepClient: Sendable {
         }
     }
 
-    static func locate(event: RecordedEvent, context: PlaybackContext, clock: PlaybackClockClient,
-                       cancelled: @escaping @Sendable () -> Bool = { Task.isCancelled }) async throws -> CGPoint {
-        let strategies: [LocatorStrategy] = event.textAnchor.map { [.ocr($0)] } ?? []
-        return try await locateWithOptionalWait(locator: LocatorEngine(), event: event,
-            context: context, strategies: strategies, clock: clock, cancelled: cancelled)
-    }
-
-    @available(macOS 14.0, *)
-    static func locateWithOptionalWait(
-        locator: LocatorEngine,
-        event: RecordedEvent,
-        context: PlaybackContext,
-        strategies: [LocatorStrategy],
-        clock: PlaybackClockClient = .live,
-        cancelled: @escaping @Sendable () -> Bool = { Task.isCancelled }
-    ) async throws -> CGPoint {
-        if cancelled() { throw CancellationError() }
-        guard event.kind.isMouse,
-              event.textAnchor != nil,
-              let timeout = event.textTimeout,
-              timeout > 0 else {
-            return try await locator.locate(event: event, context: context, strategies: strategies)
-        }
-
-        let startedAt = clock.now()
-        var lastError: Error = VisionDetectorError.textNotMatched
-        while clock.now() - startedAt < timeout {
-            if cancelled() { throw CancellationError() }
-            do {
-                return try await locator.locate(event: event, context: context, strategies: strategies)
-            } catch {
-                if cancelled() || error is CancellationError { throw CancellationError() }
-                lastError = error
-                await clock.sleep(0.25)
-            }
-        }
-        throw lastError
-    }
-
-    static func coordinateFallbackPoint(
-        for event: RecordedEvent,
-        surfaceId: String,
-        context: PlaybackContext
-    ) -> CGPoint? {
-        guard let anchor = event.textAnchor,
-              let windowFrame = context.currentSurfaceFrames[surfaceId] else { return nil }
-
-        let point: CGPoint?
-        if let normalized = anchor.coordinateFallbackContentNormalized,
-           let contentFrame = context.currentContentFrames[surfaceId] {
-            point = CGPoint(
-                x: contentFrame.x + normalized.x * contentFrame.width,
-                y: contentFrame.y + normalized.y * contentFrame.height
-            )
-        } else if let fallback = anchor.coordinateFallback {
-            point = CGPoint(x: fallback.x, y: fallback.y)
-        } else {
-            point = nil
-        }
-
-        guard let point,
-              CoordinateMapper().assertPointIsInsideWindow(point, in: windowFrame) else {
-            return nil
-        }
-        return point
-    }
 }

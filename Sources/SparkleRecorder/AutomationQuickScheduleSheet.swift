@@ -60,169 +60,174 @@ struct AutomationQuickScheduleSheet: View {
       Divider()
 
       Form {
-        Picker(String(localized: "Run", table: "Common"), selection: $draft.mode) {
-          ForEach(AutomationQuickScheduleMode.allCases) { mode in
-            Text(mode.title).tag(mode)
-          }
-        }
-        .pickerStyle(.segmented)
-
-        if draft.mode == .daily || draft.mode == .weekly {
-          if draft.mode == .weekly {
-            Picker(String(localized: "Day", table: "Common"), selection: $draft.weeklyWeekday) {
-              ForEach(1...7, id: \.self) { weekday in
-                Text(weekdayTitle(weekday)).tag(weekday)
-              }
+        Section(String(localized: "Schedule & Frequency", table: "Automation")) {
+          Picker(String(localized: "Run", table: "Common"), selection: $draft.mode) {
+            ForEach(AutomationQuickScheduleMode.allCases) { mode in
+              Text(mode.title).tag(mode)
             }
           }
-          DatePicker(
-            String(localized: "At", table: "Common"),
-            selection: $draft.startAt,
-            displayedComponents: [.hourAndMinute]
-          )
-        } else {
-          DatePicker(
-            draft.mode == .once
-              ? String(localized: "Run at", table: "Automation")
-              : String(localized: "Start", table: "Common"),
-            selection: $draft.startAt,
-            displayedComponents: [.date, .hourAndMinute]
-          )
-        }
+          .pickerStyle(.segmented)
 
-        if draft.mode == .custom {
-          LabeledContent(String(localized: "Every", table: "Common")) {
-            HStack(spacing: 8) {
-              TextField(
-                String(localized: "Count", table: "Common"),
-                value: $draft.repeatEvery,
-                format: .number
-              )
-              .textFieldStyle(.roundedBorder)
-              .frame(width: 58)
-
-              Picker(String(localized: "Unit", table: "Common"), selection: $draft.repeatUnit) {
-                ForEach(AutomationTimelineRepeatUnit.allCases) { unit in
-                  Text(unit.title).tag(unit)
+          if draft.mode == .daily || draft.mode == .weekly {
+            if draft.mode == .weekly {
+              Picker(String(localized: "Day", table: "Common"), selection: $draft.weeklyWeekday) {
+                ForEach(1...7, id: \.self) { weekday in
+                  Text(weekdayTitle(weekday)).tag(weekday)
                 }
               }
-              .labelsHidden()
-              .pickerStyle(.menu)
-              .frame(width: 104)
+            }
+            DatePicker(
+              String(localized: "At", table: "Common"),
+              selection: $draft.startAt,
+              displayedComponents: [.hourAndMinute]
+            )
+          } else {
+            DatePicker(
+              draft.mode == .once
+                ? String(localized: "Run at", table: "Automation")
+                : String(localized: "Start", table: "Common"),
+              selection: $draft.startAt,
+              displayedComponents: [.date, .hourAndMinute]
+            )
+          }
+
+          if draft.mode == .custom {
+            LabeledContent(String(localized: "Every", table: "Common")) {
+              HStack(spacing: 8) {
+                TextField(
+                  String(localized: "Count", table: "Common"),
+                  value: $draft.repeatEvery,
+                  format: .number
+                )
+                .textFieldStyle(.roundedBorder)
+                .frame(width: 58)
+
+                Picker(String(localized: "Unit", table: "Common"), selection: $draft.repeatUnit) {
+                  ForEach(AutomationTimelineRepeatUnit.allCases) { unit in
+                    Text(unit.title).tag(unit)
+                  }
+                }
+                .labelsHidden()
+                .pickerStyle(.menu)
+                .frame(width: 104)
+              }
             }
           }
         }
 
         if !macro.surfaces.isEmpty {
-          Picker(
-            String(localized: "Target application", table: "Automation"),
-            selection: $draft.targetApplicationPolicy
-          ) {
-            ForEach(AutomationTargetApplicationPolicy.allCases, id: \.self) { policy in
-              Text(policy.title).tag(policy)
+          Section(String(localized: "Target Application", table: "Automation")) {
+            LabeledContent(String(localized: "Target", table: "Common")) {
+              Text(boundApplicationNames)
+                .font(.system(.body, weight: .medium))
+                .lineLimit(1)
+                .truncationMode(.tail)
             }
-          }
 
-          LabeledContent(String(localized: "Bound to", table: "Automation")) {
-            Text(boundApplicationNames)
-              .lineLimit(1)
-              .truncationMode(.tail)
-          }
-
-          Text(draft.targetApplicationPolicy.detail)
-            .font(.caption)
-            .foregroundStyle(.secondary)
-
-          if draft.targetApplicationPolicy != .doNotActivate {
             Picker(
-              String(localized: "Wait after window appears", table: "Automation"),
-              selection: $draft.targetApplicationReadyDelay
+              String(localized: "Target application", table: "Automation"),
+              selection: $draft.targetApplicationPolicy
             ) {
-              Text("No wait", tableName: "Automation").tag(TimeInterval(0))
-              Text("2s").tag(TimeInterval(2))
-              Text("5s").tag(TimeInterval(5))
-              Text("10s").tag(TimeInterval(10))
-              Text("20s").tag(TimeInterval(20))
+              ForEach(AutomationTargetApplicationPolicy.allCases, id: \.self) { policy in
+                Text(policy.title).tag(policy)
+              }
             }
 
-            Text(
-              "Use this for startup loading. If login or navigation is required, create a sequence with preparation macros.",
-              tableName: "Automation"
-            )
-            .font(.caption)
-            .foregroundStyle(.secondary)
-          }
+            Text(draft.targetApplicationPolicy.detail)
+              .font(.caption)
+              .foregroundStyle(.secondary)
 
-          Picker(
-            String(localized: "After running", table: "Automation"),
-            selection: $draft.targetApplicationCleanupPolicy
-          ) {
-            ForEach(AutomationTargetApplicationCleanupPolicy.allCases, id: \.self) { policy in
-              Text(policy.title).tag(policy)
+            if draft.targetApplicationPolicy != .doNotActivate {
+              Picker(
+                String(localized: "Wait after window appears", table: "Automation"),
+                selection: $draft.targetApplicationReadyDelay
+              ) {
+                Text("No wait", tableName: "Automation").tag(TimeInterval(0))
+                Text("2s").tag(TimeInterval(2))
+                Text("5s").tag(TimeInterval(5))
+                Text("10s").tag(TimeInterval(10))
+                Text("20s").tag(TimeInterval(20))
+              }
+
+              Text(
+                "Use this for startup loading. If login or navigation is required, create a sequence with preparation macros.",
+                tableName: "Automation"
+              )
+              .font(.caption)
+              .foregroundStyle(.secondary)
             }
-          }
 
-          if draft.targetApplicationCleanupPolicy == .quitIfLaunched {
             Picker(
-              String(localized: "Wait before force quit", table: "Automation"),
-              selection: $draft.targetApplicationQuitTimeout
+              String(localized: "After running", table: "Automation"),
+              selection: $draft.targetApplicationCleanupPolicy
             ) {
-              Text("3s").tag(TimeInterval(3))
-              Text("5s").tag(TimeInterval(5))
-              Text("10s").tag(TimeInterval(10))
-              Text("30s").tag(TimeInterval(30))
+              ForEach(AutomationTargetApplicationCleanupPolicy.allCases, id: \.self) { policy in
+                Text(policy.title).tag(policy)
+              }
             }
 
-            Toggle(
-              String(localized: "Force quit if the app does not close", table: "Automation"),
-              isOn: $draft.targetApplicationForceQuitOnTimeout
-            )
+            if draft.targetApplicationCleanupPolicy == .quitIfLaunched {
+              Picker(
+                String(localized: "Wait before force quit", table: "Automation"),
+                selection: $draft.targetApplicationQuitTimeout
+              ) {
+                Text("3s").tag(TimeInterval(3))
+                Text("5s").tag(TimeInterval(5))
+                Text("10s").tag(TimeInterval(10))
+                Text("30s").tag(TimeInterval(30))
+              }
 
-            Text(
-              draft.targetApplicationForceQuitOnTimeout
-                ? String(
-                  localized: "Only the exact app process opened by this run can be force quit.",
-                  table: "Automation")
-                : String(
-                  localized: "The run finishes after the wait even if the app stays open.",
-                  table: "Automation")
-            )
-            .font(.caption)
-            .foregroundStyle(.secondary)
+              Toggle(
+                String(localized: "Force quit if the app does not close", table: "Automation"),
+                isOn: $draft.targetApplicationForceQuitOnTimeout
+              )
+
+              Text(
+                draft.targetApplicationForceQuitOnTimeout
+                  ? String(
+                    localized: "Only the exact app process opened by this run can be force quit.",
+                    table: "Automation")
+                  : String(
+                    localized: "The run finishes after the wait even if the app stays open.",
+                    table: "Automation")
+              )
+              .font(.caption)
+              .foregroundStyle(.secondary)
+            }
           }
         }
 
-        nextRuns
+        Section(String(localized: "Upcoming Run & Summary", table: "Automation")) {
+          nextRuns
 
-        if let validationMessage = cachedValidationMessage {
-          Label(validationMessage, systemImage: "exclamationmark.triangle.fill")
-            .font(.caption)
-            .foregroundStyle(.red)
+          if let validationMessage = cachedValidationMessage {
+            Label(validationMessage, systemImage: "exclamationmark.triangle.fill")
+              .font(.caption)
+              .foregroundStyle(.red)
+          }
+
+          LabeledContent(String(localized: "Playback", table: "Automation")) {
+            Text("Complete macro once", tableName: "Automation")
+              .foregroundStyle(.secondary)
+          }
+
+          Label(
+            String(
+              localized: "Keep SparkleRecorder open for on-time runs. Missed runs do not stack.",
+              table: "Automation"),
+            systemImage: "info.circle"
+          )
+          .font(.caption)
+          .foregroundStyle(.secondary)
         }
-
-        LabeledContent(String(localized: "Playback", table: "Automation")) {
-          Text("Complete macro once", tableName: "Automation")
-            .foregroundStyle(.secondary)
-        }
-
-        Label(
-          String(
-            localized: "Keep SparkleRecorder open for on-time runs. Missed runs do not stack.",
-            table: "Automation"),
-          systemImage: "info.circle"
-        )
-        .font(.caption)
-        .foregroundStyle(.secondary)
       }
       .formStyle(.grouped)
 
       Divider()
       footer
     }
-    .frame(
-      width: 520,
-      height: baseHeight + targetApplicationSectionHeight
-    )
+    .frame(minWidth: 520, idealWidth: 520, maxWidth: 540)
+    .frame(minHeight: 520, idealHeight: 580, maxHeight: 720)
     .onChange(of: draft) { _, newDraft in
       nextScheduledRun = newDraft.previewOccurrences().first?.scheduledAt
       cachedValidationMessage = newDraft.validationMessage()
@@ -240,17 +245,6 @@ struct AutomationQuickScheduleSheet: View {
     } message: {
       Text("The macro stays in Library and can still be run manually.", tableName: "Automation")
     }
-  }
-
-  private var baseHeight: CGFloat {
-    draft.mode == .custom || draft.mode == .weekly ? 404 : 366
-  }
-
-  private var targetApplicationSectionHeight: CGFloat {
-    guard !macro.surfaces.isEmpty else { return 0 }
-    let readinessHeight: CGFloat = draft.targetApplicationPolicy == .doNotActivate ? 0 : 74
-    return (draft.targetApplicationCleanupPolicy == .quitIfLaunched ? 260 : 152)
-      + readinessHeight
   }
 
   private var boundApplicationNames: String {
@@ -391,6 +385,7 @@ struct AutomationQuickScheduleSheet: View {
         dismiss()
       }
       .keyboardShortcut(.cancelAction)
+      .disabled(isSaving || isDeleting || isPreviewActive)
 
       Button {
         createSchedule()

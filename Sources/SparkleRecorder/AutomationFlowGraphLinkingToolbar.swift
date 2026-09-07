@@ -29,7 +29,7 @@ struct AutomationFlowGraphLinkingToolbar: View {
             .menuStyle(.borderlessButton)
             .fixedSize()
 
-            LocalizedSystemButton("Cancel link", tableName: L10nTable.automation, systemImage: "xmark", action: onCancel)
+            LocalizedSystemButton("Cancel link", tableName: L10nTable.common, systemImage: "xmark", action: onCancel)
                 .labelStyle(.iconOnly)
                 .buttonStyle(.plain)
                 .help(String(localized: "Cancel link", table: "Common"))

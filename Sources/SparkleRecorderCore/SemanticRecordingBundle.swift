@@ -6,6 +6,7 @@ public enum SemanticRecordingSchema {
     public static let manifestFileName = "manifest.json"
     public static let privateTimelineFileName = "timeline.jsonl"
     public static let aiSafeEventsFileName = "events.jsonl"
+    public static let inputEvidenceFileName = "input-evidence.jsonl"
     public static let suppressionsFileName = "suppressed.jsonl"
 }
 
@@ -189,7 +190,7 @@ public struct RecordingTimeRange: Codable, Equatable, Sendable {
     }
 }
 
-public enum RecordingCaptureMode: String, Codable, Equatable, Sendable {
+public enum RecordingCaptureMode: String, Codable, Equatable, Hashable, Sendable {
     case videoAndKeyframes
     case keyframesOnly
     case diagnosticRich
@@ -199,21 +200,89 @@ public struct RecordingCapturePolicy: Codable, Equatable, Sendable {
     public var mode: RecordingCaptureMode
     public var recordsVideo: Bool
     public var recordsKeyframes: Bool
-    public var localOnly: Bool
-    public var allowsAIFrameExport: Bool
+
+    // These two values remain in the wire format only so older bundles and older
+    // readers keep round-tripping. They never represented an export authorization
+    // boundary: explicit reconstruction export is the user-owned sharing decision.
+    private var legacyLocalOnly: Bool
+    private var legacyAllowsAIFrameExport: Bool
+
+    private enum CodingKeys: String, CodingKey {
+        case mode
+        case recordsVideo
+        case recordsKeyframes
+        case legacyLocalOnly = "localOnly"
+        case legacyAllowsAIFrameExport = "allowsAIFrameExport"
+    }
 
     public init(
         mode: RecordingCaptureMode = .videoAndKeyframes,
         recordsVideo: Bool? = nil,
-        recordsKeyframes: Bool? = nil,
-        localOnly: Bool = true,
-        allowsAIFrameExport: Bool = false
+        recordsKeyframes: Bool? = nil
     ) {
         self.mode = mode
         self.recordsVideo = recordsVideo ?? (mode != .keyframesOnly)
         self.recordsKeyframes = recordsKeyframes ?? true
-        self.localOnly = localOnly
-        self.allowsAIFrameExport = allowsAIFrameExport
+        self.legacyLocalOnly = true
+        self.legacyAllowsAIFrameExport = false
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        let mode = try container.decodeIfPresent(RecordingCaptureMode.self, forKey: .mode)
+            ?? .videoAndKeyframes
+        self.mode = mode
+        self.recordsVideo = try container.decodeIfPresent(Bool.self, forKey: .recordsVideo)
+            ?? (mode != .keyframesOnly)
+        self.recordsKeyframes = try container.decodeIfPresent(Bool.self, forKey: .recordsKeyframes)
+            ?? true
+        self.legacyLocalOnly = try container.decodeIfPresent(Bool.self, forKey: .legacyLocalOnly)
+            ?? true
+        self.legacyAllowsAIFrameExport = try container.decodeIfPresent(
+            Bool.self,
+            forKey: .legacyAllowsAIFrameExport
+        ) ?? false
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(mode, forKey: .mode)
+        try container.encode(recordsVideo, forKey: .recordsVideo)
+        try container.encode(recordsKeyframes, forKey: .recordsKeyframes)
+        try container.encode(legacyLocalOnly, forKey: .legacyLocalOnly)
+        try container.encode(legacyAllowsAIFrameExport, forKey: .legacyAllowsAIFrameExport)
+    }
+}
+
+public enum RecordingCaptureIssueKind: String, Codable, Equatable, Sendable {
+    case movieStartFailed
+    case movieFinishFailed
+    case keyframeCaptureFailed
+    case frameIndexFailed
+}
+
+public struct RecordingCaptureIssue: Codable, Equatable, Sendable, Identifiable {
+    public var id: UUID
+    public var kind: RecordingCaptureIssueKind
+    public var recordingTime: TimeInterval
+    public var frameSource: RecordingFrameCaptureSource?
+    public var surfaceID: String?
+    public var message: String
+
+    public init(
+        id: UUID = UUID(),
+        kind: RecordingCaptureIssueKind,
+        recordingTime: TimeInterval,
+        frameSource: RecordingFrameCaptureSource? = nil,
+        surfaceID: String? = nil,
+        message: String
+    ) {
+        self.id = id
+        self.kind = kind
+        self.recordingTime = max(0, recordingTime)
+        self.frameSource = frameSource
+        self.surfaceID = surfaceID
+        self.message = message
     }
 }
 
@@ -846,6 +915,9 @@ public enum SemanticRecordingBundleIssue: Equatable, Sendable {
     case duplicateSuppressionID(UUID)
     case duplicateRedactedFrameID(UUID)
     case duplicateRedactedVideoSegmentID(UUID)
+    case duplicateInputEvidenceSampleIndex(Int)
+    case invalidPlayableEvidenceLinkRange(playableEventIndex: Int)
+    case playableEvidenceLinkReferencesMissingSample(playableEventIndex: Int, evidenceSampleIndex: Int)
     case frameReferencesMissingVideoSegment(frameID: UUID, videoSegmentID: UUID)
     case timelineEventReferencesMissingFrame(eventID: UUID, frameID: UUID)
     case timelineEventReferencesMissingVideoSegment(eventID: UUID, videoSegmentID: UUID)
@@ -873,6 +945,7 @@ public struct SemanticRecordingBundle: Codable, Equatable, Sendable, Identifiabl
     public var createdAt: Date
     public var capturePolicy: RecordingCapturePolicy
     public var captureTarget: RecordingCaptureTarget?
+    public var captureIssues: [RecordingCaptureIssue]
     public var videoSegments: [RecordingVideoSegment]
     public var frames: [RecordingFrameReference]
     public var timelineEvents: [RecordingTimelineEvent]
@@ -884,6 +957,7 @@ public struct SemanticRecordingBundle: Codable, Equatable, Sendable, Identifiabl
     public var suppressions: [RecordingSuppressionRecord]
     public var redactedFrames: [SemanticRecordingRenderedFrameRedaction]
     public var redactedVideos: [SemanticRecordingRenderedVideoRedaction]
+    public var inputEvidenceSamples: [RecordingEvidenceSample]
 
     private enum CodingKeys: String, CodingKey {
         case reconstructionProvenance
@@ -892,6 +966,7 @@ public struct SemanticRecordingBundle: Codable, Equatable, Sendable, Identifiabl
         case createdAt
         case capturePolicy
         case captureTarget
+        case captureIssues
         case videoSegments
         case frames
         case timelineEvents
@@ -903,6 +978,7 @@ public struct SemanticRecordingBundle: Codable, Equatable, Sendable, Identifiabl
         case suppressions
         case redactedFrames
         case redactedVideos
+        case inputEvidenceSamples
     }
 
     public init(
@@ -911,6 +987,7 @@ public struct SemanticRecordingBundle: Codable, Equatable, Sendable, Identifiabl
         createdAt: Date = Date.now,
         capturePolicy: RecordingCapturePolicy = RecordingCapturePolicy(),
         captureTarget: RecordingCaptureTarget? = nil,
+        captureIssues: [RecordingCaptureIssue] = [],
         videoSegments: [RecordingVideoSegment] = [],
         frames: [RecordingFrameReference] = [],
         timelineEvents: [RecordingTimelineEvent] = [],
@@ -922,6 +999,7 @@ public struct SemanticRecordingBundle: Codable, Equatable, Sendable, Identifiabl
         suppressions: [RecordingSuppressionRecord] = [],
         redactedFrames: [SemanticRecordingRenderedFrameRedaction] = [],
         redactedVideos: [SemanticRecordingRenderedVideoRedaction] = [],
+        inputEvidenceSamples: [RecordingEvidenceSample] = [],
         reconstructionProvenance: RecordingReconstructionProvenance? = nil
     ) {
         self.reconstructionProvenance = reconstructionProvenance
@@ -930,6 +1008,7 @@ public struct SemanticRecordingBundle: Codable, Equatable, Sendable, Identifiabl
         self.createdAt = createdAt
         self.capturePolicy = capturePolicy
         self.captureTarget = captureTarget
+        self.captureIssues = captureIssues
         self.videoSegments = videoSegments
         self.frames = frames
         self.timelineEvents = timelineEvents
@@ -941,6 +1020,7 @@ public struct SemanticRecordingBundle: Codable, Equatable, Sendable, Identifiabl
         self.suppressions = suppressions
         self.redactedFrames = redactedFrames
         self.redactedVideos = redactedVideos
+        self.inputEvidenceSamples = inputEvidenceSamples
     }
 
     public init(from decoder: Decoder) throws {
@@ -960,6 +1040,10 @@ public struct SemanticRecordingBundle: Codable, Equatable, Sendable, Identifiabl
             RecordingCaptureTarget.self,
             forKey: .captureTarget
         )
+        self.captureIssues = try container.decodeIfPresent(
+            [RecordingCaptureIssue].self,
+            forKey: .captureIssues
+        ) ?? []
         self.videoSegments = try container.decodeIfPresent(
             [RecordingVideoSegment].self,
             forKey: .videoSegments
@@ -1003,6 +1087,10 @@ public struct SemanticRecordingBundle: Codable, Equatable, Sendable, Identifiabl
         self.redactedVideos = try container.decodeIfPresent(
             [SemanticRecordingRenderedVideoRedaction].self,
             forKey: .redactedVideos
+        ) ?? []
+        self.inputEvidenceSamples = try container.decodeIfPresent(
+            [RecordingEvidenceSample].self,
+            forKey: .inputEvidenceSamples
         ) ?? []
     }
 
@@ -1071,6 +1159,30 @@ public struct SemanticRecordingBundle: Codable, Equatable, Sendable, Identifiabl
         let sourcePreviewIDs = Set(sourcePreviews.map(\.id))
         let runtimeSampleIDs = Set(runtimeSamples.map(\.id))
         let suppressionIDs = Set(suppressions.map(\.id))
+        let inputEvidenceSampleIndices = Set(inputEvidenceSamples.map(\.index))
+
+        var seenEvidenceSampleIndices = Set<Int>()
+        var emittedEvidenceSampleIndices = Set<Int>()
+        for index in inputEvidenceSamples.map(\.index)
+            where !seenEvidenceSampleIndices.insert(index).inserted && emittedEvidenceSampleIndices.insert(index).inserted {
+            issues.append(.duplicateInputEvidenceSampleIndex(index))
+        }
+
+        if let provenance = reconstructionProvenance {
+            for link in provenance.playableEvidenceLinks {
+                guard link.evidenceSampleStartIndex <= link.evidenceSampleEndIndex else {
+                    issues.append(.invalidPlayableEvidenceLinkRange(playableEventIndex: link.playableEventIndex))
+                    continue
+                }
+                for evidenceIndex in link.evidenceSampleStartIndex...link.evidenceSampleEndIndex
+                    where !inputEvidenceSampleIndices.contains(evidenceIndex) {
+                    issues.append(.playableEvidenceLinkReferencesMissingSample(
+                        playableEventIndex: link.playableEventIndex,
+                        evidenceSampleIndex: evidenceIndex
+                    ))
+                }
+            }
+        }
 
         issues.append(
             contentsOf: Self.duplicateIssues(
@@ -1328,6 +1440,7 @@ public struct SemanticRecordingBundleSidecars: Equatable, Sendable {
     public var suppressions: [RecordingSuppressionRecord]?
     public var redactedFrames: [SemanticRecordingRenderedFrameRedaction]?
     public var redactedVideos: [SemanticRecordingRenderedVideoRedaction]?
+    public var inputEvidenceSamples: [RecordingEvidenceSample]?
 
     public init(
         videoSegments: [RecordingVideoSegment]? = nil,
@@ -1340,7 +1453,8 @@ public struct SemanticRecordingBundleSidecars: Equatable, Sendable {
         previewComparisons: [RecordingPreviewComparison]? = nil,
         suppressions: [RecordingSuppressionRecord]? = nil,
         redactedFrames: [SemanticRecordingRenderedFrameRedaction]? = nil,
-        redactedVideos: [SemanticRecordingRenderedVideoRedaction]? = nil
+        redactedVideos: [SemanticRecordingRenderedVideoRedaction]? = nil,
+        inputEvidenceSamples: [RecordingEvidenceSample]? = nil
     ) {
         self.videoSegments = videoSegments
         self.frames = frames
@@ -1353,6 +1467,7 @@ public struct SemanticRecordingBundleSidecars: Equatable, Sendable {
         self.suppressions = suppressions
         self.redactedFrames = redactedFrames
         self.redactedVideos = redactedVideos
+        self.inputEvidenceSamples = inputEvidenceSamples
     }
 }
 
@@ -1365,6 +1480,7 @@ public enum SemanticRecordingBundleSidecarKind: String, Codable, Equatable, Send
     case suppressions
     case redactedFrames
     case redactedVideos
+    case inputEvidenceSamples
 }
 
 public struct SemanticRecordingBundleSidecarLoadIssue: Codable, Equatable, Sendable {
@@ -1481,6 +1597,7 @@ public extension SemanticRecordingBundle {
             suppressions: sidecars.suppressions ?? suppressions,
             redactedFrames: sidecars.redactedFrames ?? redactedFrames,
             redactedVideos: sidecars.redactedVideos ?? redactedVideos,
+            inputEvidenceSamples: sidecars.inputEvidenceSamples ?? inputEvidenceSamples,
             reconstructionProvenance: reconstructionProvenance
         )
     }

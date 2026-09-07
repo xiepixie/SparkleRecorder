@@ -84,6 +84,8 @@ public struct SavedMacro: Codable, Identifiable, Equatable, Sendable {
     public var createdAt: Date
     public var modifiedAt: Date
     public var version: Int = 3
+    /// Stable position in the user's Library. Nil is the legacy/unassigned state.
+    public var libraryOrder: Int?
 
     // Playback configuration
     public var loops: Int = 1
@@ -138,7 +140,7 @@ public struct SavedMacro: Codable, Identifiable, Equatable, Sendable {
     public var scrollCount: Int { events.filter { $0.kind == .scrollWheel }.count }
 
     public enum CodingKeys: String, CodingKey {
-        case id, name, events, createdAt, modifiedAt, version
+        case id, name, events, createdAt, modifiedAt, version, libraryOrder
         case loops, speed, surface, surfaces, followWindowOffset
         case icon, accent, tags, favorite, hotkey, notes, chainTo
         case semanticRecording, playableSanitization
@@ -154,6 +156,7 @@ public struct SavedMacro: Codable, Identifiable, Equatable, Sendable {
                 createdAt: Date = Date(),
                 modifiedAt: Date = Date(),
                 version: Int = 3,
+                libraryOrder: Int? = nil,
                 loops: Int = 1,
                 speed: Double = 1.0,
                 surfaces: [String: PlaybackSurface] = [:],
@@ -176,6 +179,7 @@ public struct SavedMacro: Codable, Identifiable, Equatable, Sendable {
         self.createdAt = createdAt
         self.modifiedAt = modifiedAt
         self.version = version
+        self.libraryOrder = libraryOrder
         self.loops = loops
         self.speed = speed
         self.surfaces = surfaces
@@ -203,6 +207,7 @@ public struct SavedMacro: Codable, Identifiable, Equatable, Sendable {
         self.createdAt = try c.decode(Date.self, forKey: .createdAt)
         self.modifiedAt = try c.decode(Date.self, forKey: .modifiedAt)
         self.version = try c.decodeIfPresent(Int.self, forKey: .version) ?? 3
+        self.libraryOrder = try c.decodeIfPresent(Int.self, forKey: .libraryOrder)
         self.loops = try c.decodeIfPresent(Int.self, forKey: .loops) ?? 1
         self.speed = try c.decodeIfPresent(Double.self, forKey: .speed) ?? 1.0
         if let s = try c.decodeIfPresent(PlaybackSurface.self, forKey: .surface) {
@@ -245,6 +250,7 @@ public struct SavedMacro: Codable, Identifiable, Equatable, Sendable {
         try c.encode(createdAt, forKey: .createdAt)
         try c.encode(modifiedAt, forKey: .modifiedAt)
         try c.encode(version, forKey: .version)
+        try c.encodeIfPresent(libraryOrder, forKey: .libraryOrder)
         try c.encode(loops, forKey: .loops)
         try c.encode(speed, forKey: .speed)
         try c.encode(surfaces, forKey: .surfaces)

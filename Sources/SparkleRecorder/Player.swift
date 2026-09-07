@@ -162,6 +162,10 @@ private final class PlayerRunState: @unchecked Sendable {
 @MainActor
 final class Player: ObservableObject {
     @Published private(set) var isPlaying = false
+    /// True from automation-player reservation through target preparation,
+    /// playback, and target cleanup. App-shell window routing uses this to avoid
+    /// stealing foreground input before isPlaying turns true.
+    @Published private(set) var isPlaybackTargetReserved = false
     let clock = PlaybackClock()
     let feedback = PlaybackFeedbackState()
     @Published private(set) var currentLoop: Int = 0
@@ -202,6 +206,7 @@ final class Player: ObservableObject {
         guard !isPlaying, reservedAutomationRunID == nil else { return false }
         reservedAutomationRunID = runID
         reservedAutomationRunCancelled = false
+        isPlaybackTargetReserved = true
         return true
     }
 
@@ -215,6 +220,7 @@ final class Player: ObservableObject {
         if reservedAutomationRunID == runID {
             reservedAutomationRunID = nil
             reservedAutomationRunCancelled = false
+            isPlaybackTargetReserved = false
         }
     }
 
@@ -403,10 +409,18 @@ final class Player: ObservableObject {
 
     private func apply(_ snapshot: PlaybackRunSnapshot) {
         if !snapshot.isPlaying { feedback.action = nil }
-        isPlaying = snapshot.isPlaying
-        clock.progress = snapshot.progress
-        currentLoop = snapshot.currentLoop
-        totalLoops = snapshot.totalLoops
+        if isPlaying != snapshot.isPlaying {
+            isPlaying = snapshot.isPlaying
+        }
+        if clock.progress != snapshot.progress {
+            clock.progress = snapshot.progress
+        }
+        if currentLoop != snapshot.currentLoop {
+            currentLoop = snapshot.currentLoop
+        }
+        if totalLoops != snapshot.totalLoops {
+            totalLoops = snapshot.totalLoops
+        }
     }
 
     /// Synchronous playback for CLI mode — no MainActor hops, no published state.
@@ -461,10 +475,12 @@ final class Player: ObservableObject {
     }
 
     nonisolated private static func activateSurface(_ surface: PlaybackSurface) {
-        guard let bid = surface.bundleIdentifier,
-              let app = NSWorkspace.shared.runningApplications.first(where: { $0.bundleIdentifier == bid }) else {
-            return
-        }
+        guard let bid = surface.bundleIdentifier else { return }
+        let matchedWindow = WindowTracker().resolveCurrentWindows(for: ["target": surface])["target"]
+        let app = matchedWindow
+            .flatMap { NSRunningApplication(processIdentifier: $0.processID) }
+            ?? NSWorkspace.shared.runningApplications.first(where: { $0.bundleIdentifier == bid })
+        guard let app else { return }
 
         if #available(macOS 14.0, *) {
             app.activate()
@@ -489,30 +505,19 @@ final class Player: ObservableObject {
         for surfaces: [String: PlaybackSurface],
         tracker: WindowTracker
     ) -> [String: PlaybackSurfaceFrameResolution] {
-        let outerFrames = tracker.resolveCurrentFrames(for: surfaces)
-        return outerFrames.reduce(into: [:]) { resolutions, entry in
-            let (surfaceId, frame) = entry
-            guard let surface = surfaces[surfaceId] else { return }
-            resolutions[surfaceId] = resolvedFrameResolution(for: surface, outerFrame: frame)
+        let windows = tracker.resolveCurrentWindows(for: surfaces)
+        return windows.reduce(into: [:]) { resolutions, entry in
+            let (surfaceId, window) = entry
+            guard surfaces[surfaceId] != nil else { return }
+            let resolved = WindowContentFrameResolver.resolveContentFrame(
+                for: window.processID,
+                outerFrame: window.frame
+            )
+            resolutions[surfaceId] = PlaybackSurfaceFrameResolution(
+                outerFrame: window.frame,
+                contentFrame: RectValue(resolved.frame)
+            )
         }
-    }
-
-    nonisolated private static func resolvedFrameResolution(
-        for surface: PlaybackSurface,
-        outerFrame: RectValue
-    ) -> PlaybackSurfaceFrameResolution {
-        let bid = surface.bundleIdentifier
-        let pid = bid.flatMap { bundleId in
-            NSWorkspace.shared.runningApplications.first { $0.bundleIdentifier == bundleId }?.processIdentifier
-        }
-        let resolved = CoordinateMapper.resolveContentFrame(for: pid, outerFrame: outerFrame)
-        let contentFrame = RectValue(
-            x: resolved.frame.minX,
-            y: resolved.frame.minY,
-            width: resolved.frame.width,
-            height: resolved.frame.height
-        )
-        return PlaybackSurfaceFrameResolution(outerFrame: outerFrame, contentFrame: contentFrame)
     }
 
 }

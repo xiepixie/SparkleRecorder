@@ -4,6 +4,35 @@ import Testing
 
 @Suite("Automation Workflow Draft Preview Projection Tests")
 struct AutomationWorkflowDraftPreviewProjectionTests {
+    @Test("Draft issue rows preserve raw core diagnostics")
+    func draftIssueRowsPreserveRawCoreDiagnostics() {
+        let row = AutomationWorkflowDraftPreviewProjection.IssueRow(
+            message: AutomationCLIMessage(
+                code: AutomationWorkflowDraftIssueCode.missingMacroRef.rawValue,
+                message: "Task 'tap' needs macroRef.id or macroRef.name.",
+                path: "$.workflow.tasks[0].macroRef",
+                taskKey: "tap"
+            ),
+            severity: .error
+        )
+
+        #expect(row.message == "Task 'tap' needs macroRef.id or macroRef.name.")
+        #expect(row.subject == "tap")
+        #expect(row.path == "$.workflow.tasks[0].macroRef")
+    }
+
+    @Test("Unknown draft diagnostics keep their raw fallback message")
+    func unknownDraftDiagnosticsKeepRawFallbackMessage() {
+        let row = AutomationWorkflowDraftPreviewProjection.IssueRow(
+            message: AutomationCLIMessage(
+                code: "futureDiagnostic",
+                message: "Future diagnostic detail."
+            ),
+            severity: .warning
+        )
+
+        #expect(row.message == "Future diagnostic detail.")
+    }
     @Test("Preview projection resolves macro tasks and validation warnings")
     func previewProjectionResolvesMacroTasksAndValidationWarnings() throws {
         let macroID = UUID(uuidString: "40000000-0000-0000-0000-000000000001")!

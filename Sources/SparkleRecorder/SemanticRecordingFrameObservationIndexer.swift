@@ -224,19 +224,14 @@ private struct SemanticRecordingWindowSnapshot: Sendable {
         }
 
         return allWindows().first { window in
-            if let windowID = target.windowID, window.windowID != windowID {
-                return false
-            }
-            if let bundleIdentifier = target.appBundleIdentifier,
-               window.bundleIdentifier != bundleIdentifier {
-                return false
-            }
-            if let title = target.windowTitle,
-               !title.isEmpty,
-               window.title != title {
-                return false
-            }
-            return true
+            RecordingCaptureTargetMatcher.matches(
+                RecordingCaptureWindowIdentity(
+                    windowID: window.windowID,
+                    bundleIdentifier: window.bundleIdentifier,
+                    title: window.title
+                ),
+                target: target
+            )
         }
     }
 

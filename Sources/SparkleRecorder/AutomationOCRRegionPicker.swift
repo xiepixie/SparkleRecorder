@@ -7,6 +7,7 @@ enum AutomationOCRRegionPicker {
     static func pick(
         currentCondition: AutomationOCRCondition,
         targetSurface: PlaybackSurface?,
+        onFailure: @escaping (String) -> Void = { _ in },
         onPicked: @escaping (AutomationOCRCondition) -> Void
     ) {
         guard #available(macOS 14.0, *) else {
@@ -21,10 +22,18 @@ enum AutomationOCRRegionPicker {
             ))
             TextPickerOverlay.shared.onPicked = nil
             TextPickerOverlay.shared.onCancelled = nil
+            TextPickerOverlay.shared.onFailed = nil
         }
         TextPickerOverlay.shared.onCancelled = {
             TextPickerOverlay.shared.onPicked = nil
             TextPickerOverlay.shared.onCancelled = nil
+            TextPickerOverlay.shared.onFailed = nil
+        }
+        TextPickerOverlay.shared.onFailed = { message in
+            onFailure(message)
+            TextPickerOverlay.shared.onPicked = nil
+            TextPickerOverlay.shared.onCancelled = nil
+            TextPickerOverlay.shared.onFailed = nil
         }
         TextPickerOverlay.shared.start(targetSurface: targetSurface)
     }

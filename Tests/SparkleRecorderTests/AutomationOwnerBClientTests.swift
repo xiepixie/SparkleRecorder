@@ -1052,6 +1052,76 @@ struct AutomationOwnerBClientTests {
     #expect(await recorder.targetApplicationPolicies == [.launchIfNeeded])
   }
 
+  @Test("Effect runner repairs legacy unbound pointer input inside one recorded surface")
+  func effectRunnerRepairsLegacyUnboundPointerInput() async throws {
+    let runID = UUID()
+    let workflowID = UUID()
+    let taskID = UUID()
+    let macroID = UUID()
+    let startedAt = Date(timeIntervalSince1970: 840)
+    let surface = TestFixtures.surface(
+      appName: "Target",
+      bundleIdentifier: "com.example.Target",
+      windowTitle: "Target",
+      recordedContentFrame: RectValue(x: 100, y: 132, width: 800, height: 568)
+    )
+    var down = RecordedEvent(
+      kind: .leftMouseDown,
+      time: 0,
+      x: surface.recordedFrame.x + 100,
+      y: surface.recordedFrame.y + 120,
+      keyCode: 0,
+      flags: 0,
+      mouseButton: 0,
+      clickCount: 1,
+      scrollDeltaY: 0,
+      scrollDeltaX: 0
+    )
+    var up = down
+    up.kind = .leftMouseUp
+    up.time = 0.1
+    down.coordinateBinding = nil
+    up.coordinateBinding = nil
+    down.surfaceId = nil
+    up.surfaceId = nil
+    let macro = SavedMacro(
+      id: macroID,
+      name: "Legacy bound macro",
+      events: [down, up],
+      surfaces: [TestFixtures.surfaceId: surface],
+      followWindowOffset: true
+    )
+    let recorder = PlayerStartRecorder()
+    let player = AutomationPlayerClient(
+      start: { request in
+        await recorder.record(request)
+        return .started
+      },
+      cancel: { _ in }
+    )
+    let runner = AutomationEffectRunner(
+      resourceArbiter: .live(),
+      player: player,
+      loadMacro: { id in id == macroID ? macro : nil },
+      now: { startedAt },
+      sleep: { _ in }
+    )
+
+    _ = await runner.run(
+      .startPlayer(
+        runID: runID,
+        workflowID: workflowID,
+        taskID: taskID,
+        macroID: macroID,
+        targetApplicationPolicy: .launchIfNeeded
+      ))
+
+    let prepared = try #require(await recorder.macros.first)
+    #expect(prepared.events.map(\.surfaceId) == [TestFixtures.surfaceId, TestFixtures.surfaceId])
+    #expect(prepared.events.map(\.coordinateBinding) == [.targetWindow, .targetWindow])
+    #expect(prepared.events.allSatisfy { $0.contentNormalizedX != nil && $0.contentNormalizedY != nil })
+  }
+
   @Test("Effect runner cancels player through PlayerClient")
   func effectRunnerCancelsPlayer() async {
     let runID = UUID()
@@ -1580,6 +1650,7 @@ struct AutomationOwnerBClientTests {
 private actor PlayerStartRecorder {
   private var recordedRunIDs: [UUID] = []
   private var recordedMacroIDs: [UUID] = []
+  private var recordedMacros: [SavedMacro] = []
   private var recordedContexts: [PlaybackContext] = []
   private var recordedTargetApplicationPolicies: [AutomationTargetApplicationPolicy] = []
   private var recordedTargetApplicationReadyDelays: [TimeInterval] = []
@@ -1595,6 +1666,10 @@ private actor PlayerStartRecorder {
 
   var macroIDs: [UUID] {
     recordedMacroIDs
+  }
+
+  var macros: [SavedMacro] {
+    recordedMacros
   }
 
   var contexts: [PlaybackContext] {
@@ -1628,6 +1703,7 @@ private actor PlayerStartRecorder {
   func record(_ request: AutomationPlayerStartRequest) {
     recordedRunIDs.append(request.runID)
     recordedMacroIDs.append(request.macro.id)
+    recordedMacros.append(request.macro)
     recordedContexts.append(request.context)
     recordedTargetApplicationPolicies.append(request.targetApplicationPolicy)
     recordedTargetApplicationReadyDelays.append(request.targetApplicationReadyDelay)

@@ -477,6 +477,7 @@ public struct AutomationEffectRunner: Sendable {
           .playerFinished(runID: runID, outcome: .missingMacro(macroID: macroID), at: startedAt)
         ]
       }
+      macro = AutomationMacroPlaybackPreparation.prepare(macro)
       if let playbackLoops {
         macro.loops = max(1, playbackLoops)
       }

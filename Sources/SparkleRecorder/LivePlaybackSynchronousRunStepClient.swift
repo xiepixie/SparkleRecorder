@@ -127,20 +127,22 @@ struct LivePlaybackSynchronousRunStepClient: Sendable {
                         if let locatorClient {
                             resolvedPoint = try await locatorClient(event, contextSnapshot, playbackClock)
                         } else {
-                            resolvedPoint = try await LivePlaybackRunStepClient.locate(event: event, context: contextSnapshot,
-                                clock: playbackClock, cancelled: cancelled)
+                            resolvedPoint = try await LocatorEngine().locateTextTarget(
+                                event: event,
+                                context: contextSnapshot,
+                                clock: playbackClock,
+                                cancelled: cancelled
+                            )
                         }
                         return SynchronousPlaybackPointResolution.success(resolvedPoint)
                     } catch {
                         if event.locatorFallbackPolicy == .allowCoordinateFallback {
-                            if let fallbackPoint = LivePlaybackRunStepClient.coordinateFallbackPoint(
-                                for: event,
+                            switch PlaybackLocatorFallback.resolve(
+                                event: event,
                                 surfaceId: targetSurfaceId,
-                                context: contextSnapshot
+                                context: contextSnapshot,
+                                pointResolver: pointResolver
                             ) {
-                                return SynchronousPlaybackPointResolution.success(fallbackPoint)
-                            }
-                            switch pointResolver.resolve(event, context: contextSnapshot) {
                             case .success(let pt):
                                 return SynchronousPlaybackPointResolution.success(pt)
                             case .failure(let fallbackError):

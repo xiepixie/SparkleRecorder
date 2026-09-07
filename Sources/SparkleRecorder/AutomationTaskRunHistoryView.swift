@@ -9,7 +9,7 @@ struct AutomationTaskRunHistoryView: View {
     var retryPolicy: AutomationRetryPolicy = .none
     var initialSelectedRunID: UUID?
     var macros: [SavedMacro] = []
-    var onImportWorkflowFromDraftPreview: (AutomationWorkflow, URL?) -> Void = { _, _ in }
+    var onImportWorkflowFromDraftPreview: @MainActor (AutomationWorkflow, URL?) async throws -> Void = { _, _ in }
 
     @State private var selectedRunID: UUID?
 
@@ -21,7 +21,7 @@ struct AutomationTaskRunHistoryView: View {
         retryPolicy: AutomationRetryPolicy = .none,
         initialSelectedRunID: UUID? = nil,
         macros: [SavedMacro] = [],
-        onImportWorkflowFromDraftPreview: @escaping (AutomationWorkflow, URL?) -> Void = { _, _ in }
+        onImportWorkflowFromDraftPreview: @escaping @MainActor (AutomationWorkflow, URL?) async throws -> Void = { _, _ in }
     ) {
         self.runs = runs
         self.workflow = workflow

@@ -8,22 +8,34 @@ struct AutomationMainView: View {
   @State private var model: AutomationOverviewModel
   private let onAction: (AutomationAction) -> Void
   private let onRecordMacro: (() -> Void)?
+  private let onPreviewScheduledMacro: @MainActor (UUID, AutomationTask?) async throws -> Void
+  private let onRenameMacro: (UUID, String) -> Void
+  private let onSetMacroLoops: (UUID, Int) -> Void
 
   init(
     projection: AutomationOverviewProjection = .ownerCFixture(),
     onAction: @escaping (AutomationAction) -> Void = { _ in },
-    onRecordMacro: (() -> Void)? = nil
+    onRecordMacro: (() -> Void)? = nil,
+    onPreviewScheduledMacro: @escaping @MainActor (UUID, AutomationTask?) async throws -> Void = { _, _ in },
+    onRenameMacro: @escaping (UUID, String) -> Void = { _, _ in },
+    onSetMacroLoops: @escaping (UUID, Int) -> Void = { _, _ in }
   ) {
     _model = State(initialValue: AutomationOverviewModel(projection: projection))
     self.onAction = onAction
     self.onRecordMacro = onRecordMacro
+    self.onPreviewScheduledMacro = onPreviewScheduledMacro
+    self.onRenameMacro = onRenameMacro
+    self.onSetMacroLoops = onSetMacroLoops
   }
 
   init(
     snapshotClient: AutomationRepositorySnapshotClient,
     initialProjection: AutomationOverviewProjection = .ownerCFixture(),
     onAction: @escaping (AutomationAction) -> Void = { _ in },
-    onRecordMacro: (() -> Void)? = nil
+    onRecordMacro: (() -> Void)? = nil,
+    onPreviewScheduledMacro: @escaping @MainActor (UUID, AutomationTask?) async throws -> Void = { _, _ in },
+    onRenameMacro: @escaping (UUID, String) -> Void = { _, _ in },
+    onSetMacroLoops: @escaping (UUID, Int) -> Void = { _, _ in }
   ) {
     _model = State(
       initialValue: AutomationOverviewModel(
@@ -32,6 +44,9 @@ struct AutomationMainView: View {
       ))
     self.onAction = onAction
     self.onRecordMacro = onRecordMacro
+    self.onPreviewScheduledMacro = onPreviewScheduledMacro
+    self.onRenameMacro = onRenameMacro
+    self.onSetMacroLoops = onSetMacroLoops
   }
 
   init(
@@ -39,7 +54,10 @@ struct AutomationMainView: View {
     initialProjection: AutomationOverviewProjection = AutomationViewProjection.overview(
       from: AutomationRunState()),
     onAction: @escaping (AutomationAction) -> Void = { _ in },
-    onRecordMacro: (() -> Void)? = nil
+    onRecordMacro: (() -> Void)? = nil,
+    onPreviewScheduledMacro: @escaping @MainActor (UUID, AutomationTask?) async throws -> Void = { _, _ in },
+    onRenameMacro: @escaping (UUID, String) -> Void = { _, _ in },
+    onSetMacroLoops: @escaping (UUID, Int) -> Void = { _, _ in }
   ) {
     _model = State(
       initialValue: AutomationOverviewModel(
@@ -48,6 +66,9 @@ struct AutomationMainView: View {
       ))
     self.onAction = onAction
     self.onRecordMacro = onRecordMacro
+    self.onPreviewScheduledMacro = onPreviewScheduledMacro
+    self.onRenameMacro = onRenameMacro
+    self.onSetMacroLoops = onSetMacroLoops
   }
 
   var body: some View {
@@ -64,13 +85,18 @@ struct AutomationMainView: View {
             currentMacroID: library.currentMacroID,
             refreshState: model.refreshState,
             isRecordingMacro: appState.isRecording,
+            recordingFlowActive: appState.recordingFlowActive,
             recordHotkeyName: appState.recordHotkey.name,
+            requestedWorkspaceDestination: destination,
+            onConsumeWorkspaceDestination: { appState.automationWorkspaceDestination = nil },
             initialSelectedWorkflowID: destination?.workflowID,
             initialSelection: destination?.taskID.map(AutomationAuthoringSelection.task)
               ?? .workflow,
             onRefresh: refresh,
             onAction: handleAction,
+            onCommitAction: performAction,
             onRecordMacro: onRecordMacro,
+            onPreviewScheduledMacro: onPreviewScheduledMacro,
             onRenameMacro: renameMacro,
             onSetMacroLoops: setMacroLoops,
             onShowLibrary: { appState.workspace = .library }
@@ -86,12 +112,17 @@ struct AutomationMainView: View {
           currentMacroID: library.currentMacroID,
           refreshState: model.refreshState,
           isRecordingMacro: appState.isRecording,
+          recordingFlowActive: appState.recordingFlowActive,
           recordHotkeyName: appState.recordHotkey.name,
+          requestedWorkspaceDestination: destination,
+          onConsumeWorkspaceDestination: { appState.automationWorkspaceDestination = nil },
           initialSelectedWorkflowID: destination?.workflowID,
           initialSelection: destination?.taskID.map(AutomationAuthoringSelection.task) ?? .workflow,
           onRefresh: refresh,
           onAction: handleAction,
+          onCommitAction: performAction,
           onRecordMacro: onRecordMacro,
+          onPreviewScheduledMacro: onPreviewScheduledMacro,
           onRenameMacro: renameMacro,
           onSetMacroLoops: setMacroLoops,
           onShowLibrary: { appState.workspace = .library }
@@ -100,7 +131,6 @@ struct AutomationMainView: View {
     }
     .task {
       model.startAutoRefresh()
-      appState.automationWorkspaceDestination = nil
     }
     .onDisappear {
       model.stopAutoRefresh()
@@ -120,11 +150,17 @@ struct AutomationMainView: View {
     }
   }
 
+  @MainActor
+  private func performAction(_ action: AutomationAction) async throws {
+    onAction(action)
+    try await model.perform(action)
+  }
+
   private func renameMacro(_ macroID: UUID, to name: String) {
-    library.rename(id: macroID, to: name)
+    onRenameMacro(macroID, name)
   }
 
   private func setMacroLoops(_ macroID: UUID, to loops: Int) {
-    library.setLoops(id: macroID, loops: loops)
+    onSetMacroLoops(macroID, loops)
   }
 }

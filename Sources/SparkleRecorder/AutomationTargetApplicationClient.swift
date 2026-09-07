@@ -142,7 +142,7 @@ struct AutomationTargetApplicationClient: Sendable {
         let bundleIdentifiers = grouped.keys.filter { !$0.isEmpty }.sorted()
         if policy == .launchIfNeeded, bundleIdentifiers.isEmpty {
             return .failure(.init(message: String(
-                localized: "The bound window does not identify an application to open.",
+                localized: "The target window does not identify an application to open.",
                 table: "Automation"
             )))
         }
@@ -156,21 +156,21 @@ struct AutomationTargetApplicationClient: Sendable {
                 surfaces: Dictionary(uniqueKeysWithValues: entries.map { ($0.key, $0.value) }))
             if !candidates.isEmpty, app == nil {
                 return .failure(.init(message: String(
-                    format: String(localized: "Could not bring the bound window for %@ to the front. Open that window and retry; no actions were played.", table: "Automation"), appName
+                    format: String(localized: "Could not find the target window for %@. Open it, or choose a different target window for this macro, then try again. No actions were run.", table: "Automation"), appName
                 ), session: .init(launchedApplications: launchedApplications)))
             }
 
             if app == nil, policy == .launchIfNeeded {
                 guard let appURL = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleIdentifier) else {
                     return .failure(.init(message: String(
-                        format: String(localized: "Could not find the bound application %@.", table: "Automation"),
+                        format: String(localized: "Could not find the target application %@.", table: "Automation"),
                         appName
                     )))
                 }
                 NSApp.yieldActivation(toApplicationWithBundleIdentifier: bundleIdentifier)
                 guard NSWorkspace.shared.open(appURL) else {
                     return .failure(.init(message: String(
-                        format: String(localized: "Could not open the bound application %@.", table: "Automation"),
+                        format: String(localized: "Could not open the target application %@.", table: "Automation"),
                         appName
                     )))
                 }
@@ -181,7 +181,7 @@ struct AutomationTargetApplicationClient: Sendable {
                 )
                 guard app != nil else {
                     return .failure(.init(message: String(
-                        format: String(localized: "Timed out while opening the bound application %@.", table: "Automation"),
+                        format: String(localized: "Timed out while opening the target application %@.", table: "Automation"),
                         appName
                     )))
                 }
@@ -199,7 +199,7 @@ struct AutomationTargetApplicationClient: Sendable {
             guard await PlaybackTargetWindowForeground.prepare(app: app,
                 surfaces: Dictionary(uniqueKeysWithValues: entries.map { ($0.key, $0.value) })) else {
                 return .failure(.init(message: String(
-                    format: String(localized: "Could not bring the bound window for %@ to the front. Open that window and retry; no actions were played.", table: "Automation"), appName
+                    format: String(localized: "Could not find the target window for %@. Open it, or choose a different target window for this macro, then try again. No actions were run.", table: "Automation"), appName
                 ), session: .init(launchedApplications: launchedApplications)))
             }
 
@@ -212,7 +212,7 @@ struct AutomationTargetApplicationClient: Sendable {
                 )
                 if !didFindWindow {
                     return .failure(.init(message: String(
-                        format: String(localized: "The bound window for %@ did not appear in time.", table: "Automation"),
+                        format: String(localized: "The target window for %@ did not appear in time.", table: "Automation"),
                         appName
                     ), session: .init(launchedApplications: launchedApplications)))
                 }
@@ -273,6 +273,13 @@ struct AutomationTargetApplicationClient: Sendable {
         return nil
     }
 
+    static func allRequiredSurfacesResolved(
+        required: [String: PlaybackSurface],
+        resolvedFrames: [String: RectValue]
+    ) -> Bool {
+        required.keys.allSatisfy { resolvedFrames[$0] != nil }
+    }
+
     @MainActor
     private static func waitForWindow(
         entries: [(key: String, value: PlaybackSurface)],
@@ -283,7 +290,8 @@ struct AutomationTargetApplicationClient: Sendable {
         let surfaces = Dictionary(uniqueKeysWithValues: entries.map { ($0.key, $0.value) })
         let deadline = Date().addingTimeInterval(max(0, timeout))
         repeat {
-            if !windowTracker.resolveCurrentFrames(for: surfaces).isEmpty {
+            let resolvedFrames = windowTracker.resolveCurrentFrames(for: surfaces)
+            if allRequiredSurfacesResolved(required: surfaces, resolvedFrames: resolvedFrames) {
                 return true
             }
             await sleep(pollInterval)

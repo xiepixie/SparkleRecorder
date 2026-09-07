@@ -177,7 +177,7 @@ struct AutomationWorkflowDraftImportPreviewSection: View {
                             .foregroundStyle(.secondary)
                     }
                 }
-                Text(row.message)
+                Text(AutomationWorkflowDraftIssuePresentation.message(for: row))
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)

@@ -95,14 +95,33 @@ public actor SemanticRecordingLifecycle {
         try await activeSession.record(event, index: index, sessionTime: sessionTime)
     }
 
+    public func recordEvidence(
+        samples: [RecordingEvidenceSample],
+        playableLinks: [RecordingPlayableEvidenceLink],
+        omittedSampleCount: Int = 0
+    ) async throws {
+        let activeSession = try requireSession()
+        try await activeSession.recordEvidence(
+            samples: samples,
+            playableLinks: playableLinks,
+            omittedSampleCount: omittedSampleCount
+        )
+    }
+
     public func addSuppression(_ suppression: RecordingSuppressionRecord) async throws {
         let activeSession = try requireSession()
         await activeSession.addSuppression(suppression)
     }
 
-    public func finish(recordingTime: TimeInterval) async throws -> SemanticRecordingBundle {
+    public func finish(
+        recordingTime: TimeInterval,
+        finalPlayableEvents: [RecordedEvent]? = nil
+    ) async throws -> SemanticRecordingBundle {
         let activeSession = try requireSession()
-        let bundle = try await activeSession.finish(recordingTime: recordingTime)
+        let bundle = try await activeSession.finish(
+            recordingTime: recordingTime,
+            finalPlayableEvents: finalPlayableEvents
+        )
         didFinish = true
         session = nil
         return bundle

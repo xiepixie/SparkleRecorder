@@ -111,7 +111,7 @@ enum AutomationWorkflowPackagePresenter {
     static func importWorkflows(
         currentWorkflows: [AutomationWorkflow],
         availableMacroIDs: Set<UUID>,
-        onImport: @escaping ([AutomationWorkflow]) -> Void
+        onImport: @escaping @MainActor ([AutomationWorkflow]) async throws -> Void
     ) {
         let panel = NSOpenPanel()
         panel.title = String(localized: "Import Workflow Package", table: "Automation")
@@ -145,8 +145,29 @@ enum AutomationWorkflowPackagePresenter {
                 guard confirmMissingMacroReferences(in: workflows, availableMacroIDs: availableMacroIDs) else {
                     return
                 }
-                onImport(workflows)
-                persistVisualAssetPackageRoots(for: prepared)
+                Task { @MainActor in
+                    do {
+                        try await onImport(workflows)
+                    } catch {
+                        showError(
+                            title: String(localized: "Import failed", table: "Common"),
+                            message: error.localizedDescription
+                        )
+                        return
+                    }
+
+                    do {
+                        try await persistVisualAssetPackageRoots(for: prepared)
+                    } catch {
+                        showError(
+                            title: String(localized: "Visual assets could not be linked", table: "Automation"),
+                            message: String(
+                                localized: "The workflows were imported, but some visual assets could not be linked. Import the package again to retry the asset links.",
+                                table: "Automation"
+                            )
+                        )
+                    }
+                }
             } catch {
                 showError(
                     title: String(localized: "Import failed", table: "Common"),
@@ -260,7 +281,7 @@ enum AutomationWorkflowPackagePresenter {
 
     private static func persistVisualAssetPackageRoots(
         for importItems: [WorkflowPackageImportItem]
-    ) {
+    ) async throws {
         let associatedAt = Date()
         let roots = importItems.flatMap { item in
             AutomationVisualAssetPackageRoot.roots(
@@ -277,17 +298,11 @@ enum AutomationWorkflowPackagePresenter {
         }
 
         let client = AutomationVisualAssetPackageRootClient.fileBacked()
-        Task {
-            do {
-                if !roots.isEmpty {
-                    try await client.upsertRoots(roots)
-                }
-                if !unrootedWorkflowIDs.isEmpty {
-                    try await client.removeRoots(unrootedWorkflowIDs)
-                }
-            } catch {
-                NSLog("SparkleRecorder: Failed to persist imported workflow visual asset roots: \(error)")
-            }
+        if !roots.isEmpty {
+            try await client.upsertRoots(roots)
+        }
+        if !unrootedWorkflowIDs.isEmpty {
+            try await client.removeRoots(unrootedWorkflowIDs)
         }
     }
 

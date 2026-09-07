@@ -70,6 +70,26 @@ struct AutomationTargetApplicationClientTests {
     #expect(await probe.forceTerminated.isEmpty)
   }
 
+  @Test("Target window readiness requires every recorded surface")
+  func targetWindowReadinessRequiresEverySurface() {
+    let first = TestFixtures.surfaceId
+    let second = "surface-2"
+    let required = [
+      first: TestFixtures.surface(appName: "Target", bundleIdentifier: "com.example.Target", windowTitle: "A"),
+      second: TestFixtures.surface(appName: "Target", bundleIdentifier: "com.example.Target", windowTitle: "B")
+    ]
+    let frame = RectValue(x: 0, y: 0, width: 100, height: 100)
+
+    #expect(!AutomationTargetApplicationClient.allRequiredSurfacesResolved(
+      required: required,
+      resolvedFrames: [first: frame]
+    ))
+    #expect(AutomationTargetApplicationClient.allRequiredSurfacesResolved(
+      required: required,
+      resolvedFrames: [first: frame, second: frame]
+    ))
+  }
+
   @Test("Player rejects a run when target application preparation fails")
   @MainActor
   func playerRejectsFailedTargetPreparation() async throws {

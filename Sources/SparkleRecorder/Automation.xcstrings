@@ -103,19 +103,19 @@
         }
       }
     },
-    "Schedule created.": {
+    "Automatic run scheduled.": {
       "extractionState": "manual",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Schedule created."
+            "value": "Automatic run scheduled."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "日程已创建。"
+            "value": "已安排自动运行。"
           }
         }
       }
@@ -132,7 +132,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "已设定，下次运行：%@"
+            "value": "已安排，下次运行：%@"
           }
         }
       }
@@ -791,7 +791,21 @@
       }
     },
     "Compiled tasks": {
-      "extractionState": "manual"
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Compiled tasks"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已生成任务"
+          }
+        }
+      }
     },
     "Condition": {
       "extractionState": "manual",
@@ -1103,7 +1117,21 @@
       }
     },
     "Cycle detected at task %@": {
-      "extractionState": "manual"
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cycle detected at task %@"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "检测到循环依赖：任务 %@"
+          }
+        }
+      }
     },
     "DEPENDENCY": {
       "extractionState": "manual",
@@ -1124,7 +1152,21 @@
       "generatesSymbol": false
     },
     "DEPENDENCY ID MAP": {
-      "extractionState": "manual"
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "DEPENDENCY ID MAP"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "依赖 ID 映射"
+          }
+        }
+      }
     },
     "DRAFT DEPENDENCY EDIT": {
       "extractionState": "manual",
@@ -1247,13 +1289,55 @@
       "generatesSymbol": false
     },
     "Dependency %@ loops back to task %@": {
-      "extractionState": "manual"
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dependency %@ loops back to task %@"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "依赖 %@ 会形成回路并返回任务 %@"
+          }
+        }
+      }
     },
     "Dependency %@ references missing source task %@": {
-      "extractionState": "manual"
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dependency %@ references missing source task %@"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "依赖 %@ 引用了不存在的源任务 %@"
+          }
+        }
+      }
     },
     "Dependency %@ references missing target task %@": {
-      "extractionState": "manual"
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dependency %@ references missing target task %@"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "依赖 %@ 引用了不存在的目标任务 %@"
+          }
+        }
+      }
     },
     "Dependency section": {
       "extractionState": "manual",
@@ -1358,16 +1442,72 @@
       }
     },
     "Dry-run": {
-      "extractionState": "manual"
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dry-run"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "预检"
+          }
+        }
+      }
     },
     "Dry-run passed": {
-      "extractionState": "manual"
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dry-run passed"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "预检通过"
+          }
+        }
+      }
     },
     "Duplicate dependency ID %@": {
-      "extractionState": "manual"
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Duplicate dependency ID %@"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "依赖 ID %@ 重复"
+          }
+        }
+      }
     },
     "Duplicate task ID %@": {
-      "extractionState": "manual"
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Duplicate task ID %@"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "任务 ID %@ 重复"
+          }
+        }
+      }
     },
     "Edit Source Condition": {
       "extractionState": "manual",
@@ -1415,7 +1555,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "Else 分支"
+            "value": "否则分支"
           }
         }
       }
@@ -1568,7 +1708,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "证据绑定"
+            "value": "证据关联"
           }
         }
       }
@@ -1587,23 +1727,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "证据已取消"
-          }
-        }
-      }
-    },
-    "Evidence impact": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Evidence impact"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "证据影响"
           }
         }
       }
@@ -1662,20 +1785,20 @@
         }
       }
     },
-    "Evidence paused": {
+    "Evidence stopped for privacy": {
       "extractionState": "manual",
       "generatesSymbol": false,
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Evidence paused"
+            "value": "Evidence stopped for privacy"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "证据已暂停"
+            "value": "已为保护隐私停止证据采集"
           }
         }
       }
@@ -1831,13 +1954,27 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "失败运行"
+            "value": "运行失败"
           }
         }
       }
     },
     "IMPORT DRY-RUN": {
-      "extractionState": "manual"
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "IMPORT DRY-RUN"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "导入预检"
+          }
+        }
+      }
     },
     "Import Workflow": {
       "extractionState": "manual",
@@ -2234,7 +2371,21 @@
       }
     },
     "No compiled workflow": {
-      "extractionState": "manual"
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No compiled workflow"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "未生成可导入工作流"
+          }
+        }
+      }
     },
     "No reference images in this workflow yet.": {
       "extractionState": "manual",
@@ -2299,7 +2450,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "这个宏或运行没有找到语义录制关联；请先选择 bundle，再审阅帧、OCR 或视觉证据。"
+            "value": "当前宏或本次运行没有关联语义录制；请先选择一个记录包，再审阅画面、OCR 或视觉证据。"
           }
         }
       }
@@ -2390,23 +2541,6 @@
         }
       }
     },
-    "No visual evidence bundle is created while required permissions are blocked.": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "No visual evidence bundle is created while required permissions are blocked."
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "必需权限被阻止时，不会创建视觉证据包。"
-          }
-        }
-      }
-    },
     "No workflow mutation": {
       "extractionState": "manual",
       "localizations": {
@@ -2459,7 +2593,21 @@
       }
     },
     "Not run": {
-      "extractionState": "manual"
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Not run"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "未运行"
+          }
+        }
+      }
     },
     "Once, N times, or forever — at any speed.": {
       "extractionState": "manual",
@@ -2558,7 +2706,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "打开一个语义录制 bundle，用于查看帧时间线、视觉证据、区域选择，以及生成仅供审阅的草稿补丁。"
+            "value": "打开一个语义录制包，查看画面时间线、视觉证据、选择区域，并生成仅供审阅的草稿补丁。"
           }
         }
       }
@@ -2592,24 +2740,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "打开宏审阅不会直接修改 workflow；已审阅的变更仍需经过 Draft Preview 和确认导入。"
-          }
-        }
-      }
-    },
-    "Playable macro recording remains separate; visual evidence stays off until preflight passes.": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Playable macro recording remains separate; visual evidence stays off until preflight passes."
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "可回放宏录制保持独立；预检通过前视觉证据保持关闭。"
+            "value": "打开“宏审阅”不会直接修改工作流；审阅后的更改仍需先预览草稿并确认导入。"
           }
         }
       }
@@ -3030,23 +3161,6 @@
         }
       }
     },
-    "Retention and privacy exclusions below control local visual evidence before recording.": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Retention and privacy exclusions below control local visual evidence before recording."
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "下方的保留策略和隐私排除项会在录制前控制本地视觉证据。"
-          }
-        }
-      }
-    },
     "Run": {
       "extractionState": "manual",
       "localizations": {
@@ -3460,23 +3574,6 @@
         }
       }
     },
-    "Some semantic context will be omitted and shown as degraded evidence.": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Some semantic context will be omitted and shown as degraded evidence."
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "部分语义上下文会被省略，并显示为降级证据。"
-          }
-        }
-      }
-    },
     "Source condition": {
       "extractionState": "manual",
       "localizations": {
@@ -3529,7 +3626,21 @@
       }
     },
     "TASK ID MAP": {
-      "extractionState": "manual"
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "TASK ID MAP"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "任务 ID 映射"
+          }
+        }
+      }
     },
     "TASKS": {
       "extractionState": "manual",
@@ -3675,30 +3786,13 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "That key is already assigned."
+            "value": "That shortcut is already in use. Choose a different shortcut."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "这个快捷键已被占用。"
-          }
-        }
-      }
-    },
-    "The recording can proceed, but some semantic evidence will be omitted until the degraded permission is granted.": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "The recording can proceed, but some semantic evidence will be omitted until the degraded permission is granted."
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "录制可以继续，但在授予降级权限前，部分语义证据会被省略。"
+            "value": "这个快捷键已被占用，请换一个。"
           }
         }
       }
@@ -3732,7 +3826,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "所选 bundle 尚未证明属于本次运行；在 S2 提供已关联保存宏的 live bundle 前，只将它用于本地审阅。"
+            "value": "尚无法确认所选记录包来自本次运行，因此目前仅用于本地审阅；只有与已保存宏关联的实时记录包才能作为本次运行的证据。"
           }
         }
       }
@@ -3851,7 +3945,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "本次运行还没有单独的语义 bundle，因此这些审阅证据可用于修复，但不能作为 live 运行证明验收。"
+            "value": "本次运行尚未绑定独立的语义录制包；这些审阅证据可用于修复，但不能作为本次运行的正式证据。"
           }
         }
       }
@@ -3978,6 +4072,20 @@
     },
     "Trigger %@": {
       "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Trigger %@"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "触发：%@"
+          }
+        }
+      },
       "generatesSymbol": false
     },
     "Trigger from anywhere": {
@@ -4060,7 +4168,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "使用已保存宏附带的语义录制；当运行结果提供目标时，会预选最接近的事件或条件证据。"
+            "value": "使用已保存宏关联的语义录制；如果运行结果包含目标，会自动定位到最接近的事件或条件证据。"
           }
         }
       }
@@ -4567,36 +4675,36 @@
         }
       }
     },
-    "Bring the bound application forward only when it is already open.": {
+    "Bring the target application forward only when it is already open.": {
       "extractionState": "manual",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Bring the bound application forward only when it is already open."
+            "value": "Bring the target application forward only when it is already open."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "仅在绑定应用已经打开时将其切到前台。"
+            "value": "仅在目标应用已经打开时将其切到前台。"
           }
         }
       }
     },
-    "Open the bound application and wait for its window before running.": {
+    "Open the target application and wait for its window before running.": {
       "extractionState": "manual",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Open the bound application and wait for its window before running."
+            "value": "Open the target application and wait for its window before running."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "打开绑定应用并等待窗口出现后再运行。"
+            "value": "打开目标应用，并在目标窗口出现后再运行。"
           }
         }
       }
@@ -4618,104 +4726,87 @@
         }
       }
     },
-    "Bound to": {
+    "Could not find the target application %@.": {
       "extractionState": "manual",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Bound to"
+            "value": "Could not find the target application %1$@."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "已绑定"
+            "value": "找不到目标应用 %1$@。"
           }
         }
       }
     },
-    "Could not find the bound application %@.": {
+    "Could not open the target application %@.": {
       "extractionState": "manual",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Could not find the bound application %1$@."
+            "value": "Could not open the target application %1$@."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "找不到绑定的应用 %1$@。"
+            "value": "无法打开目标应用 %1$@。"
           }
         }
       }
     },
-    "Could not open the bound application %@.": {
+    "Timed out while opening the target application %@.": {
       "extractionState": "manual",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Could not open the bound application %1$@."
+            "value": "Timed out while opening the target application %1$@."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "无法打开绑定的应用 %1$@。"
+            "value": "打开目标应用 %1$@ 超时。"
           }
         }
       }
     },
-    "Timed out while opening the bound application %@.": {
+    "The target window for %@ did not appear in time.": {
       "extractionState": "manual",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Timed out while opening the bound application %1$@."
+            "value": "The target window for %1$@ did not appear in time."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "打开绑定应用 %1$@ 时超时。"
+            "value": "%1$@ 的目标窗口未及时出现。"
           }
         }
       }
     },
-    "The bound window for %@ did not appear in time.": {
+    "The target window does not identify an application to open.": {
       "extractionState": "manual",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "The bound window for %1$@ did not appear in time."
+            "value": "The target window does not identify an application to open."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "%1$@ 的绑定窗口未及时出现。"
-          }
-        }
-      }
-    },
-    "The bound window does not identify an application to open.": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "The bound window does not identify an application to open."
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "绑定窗口没有可用于打开应用的标识。"
+            "value": "目标窗口缺少可用于打开应用的标识。"
           }
         }
       }
@@ -5140,7 +5231,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "已关闭定时运行。"
+            "value": "已关闭自动运行。"
           }
         }
       }
@@ -5706,19 +5797,19 @@
         }
       }
     },
-    "Check the target application and bound window.": {
+    "Check the target application and target window.": {
       "extractionState": "manual",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Check the target application and bound window."
+            "value": "Check the target application and target window."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "检查目标应用和绑定窗口。"
+            "value": "请检查目标应用和目标窗口。"
           }
         }
       }
@@ -6381,75 +6472,92 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "成功运行证据"
+            "value": "成功运行的证据"
           }
         }
       }
     },
-    "Failed run evidence": {
+    "Run evidence needing attention": {
       "extractionState": "manual",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Failed run evidence"
+            "value": "Run evidence needing attention"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "失败运行证据"
+            "value": "需处理运行的证据"
           }
         }
       }
     },
-    "Run history metadata": {
+    "Run history records": {
       "extractionState": "manual",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Run history metadata"
+            "value": "Run history records"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "运行历史元数据"
+            "value": "运行历史记录"
           }
         }
       }
     },
-    "The current run, latest workflow run, latest failure, and latest evidence for each macro are always kept.": {
+    "Evidence includes reports, ending screenshots, condition evidence, and other run files. When evidence expires, the run result stays in history until its history retention period ends.": {
       "extractionState": "manual",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "The current run, latest workflow run, latest failure, and latest evidence for each macro are always kept."
+            "value": "Evidence includes reports, ending screenshots, condition evidence, and other run files. When evidence expires, the run result stays in history until its history retention period ends."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "当前运行、工作流最近一次运行、最近一次失败，以及每个宏的最新证据始终保留。"
+            "value": "证据包括运行报告、结束截图、条件证据和其他运行文件。证据到期清理后，运行结果仍会保留在历史中，直到运行历史的保留期结束。"
           }
         }
       }
     },
-    "Run history keeps at most 10,000 records. Choosing Never disables the age limit, not this capacity limit.": {
+    "Automatic cleanup keeps active runs, the latest execution for each workflow, the latest run needing attention, and the latest evidence for each macro.": {
       "extractionState": "manual",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Run history keeps at most 10,000 records. Choosing Never disables the age limit, not this capacity limit."
+            "value": "Automatic cleanup keeps active runs, the latest execution for each workflow, the latest run needing attention, and the latest evidence for each macro."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "运行历史最多保留 10,000 条记录。选择“永不”只会停用按时间清理，容量上限仍然生效。"
+            "value": "自动清理会保留正在运行的任务、每个工作流最近一次执行、最近一次需要处理的运行，以及每个宏的最新证据。"
+          }
+        }
+      }
+    },
+    "Run history targets at most 10,000 records. Protected or active runs may temporarily exceed this limit. Choosing Never disables only the age limit.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Run history targets at most 10,000 records. Protected or active runs may temporarily exceed this limit. Choosing Never disables only the age limit."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "运行历史以最多 10,000 条记录为目标；受保护或正在运行的记录可能暂时超过该上限。选择“永不”只会停用按时间清理。"
           }
         }
       }
@@ -6477,13 +6585,30 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "This will remove evidence from %d run(s), delete %d old history record(s), and free about %@. Protected recent runs will stay available."
+            "value": "This will remove evidence from %1$d run(s), delete %2$d old history record(s), and free about %3$@. Protected recent runs will stay available."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "将清理 %d 次运行的证据、删除 %d 条旧历史记录，预计释放 %@。受保护的近期运行仍会保留。"
+            "value": "将清理 %1$d 次运行的证据、删除 %2$d 条旧历史记录，预计释放 %3$@。受保护的近期运行仍会保留。"
+          }
+        }
+      }
+    },
+    "This will mark expired evidence from %d run(s) as cleaned and delete %d old history record(s). No local evidence files are currently taking space. Protected recent runs will stay available.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This will mark expired evidence from %1$d run(s) as cleaned and delete %2$d old history record(s). No local evidence files are currently taking space. Protected recent runs will stay available."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "将把 %1$d 次运行的过期证据标记为已清理，并删除 %2$d 条旧历史记录。当前没有这些证据对应的本地文件占用空间；受保护的近期运行仍会保留。"
           }
         }
       }
@@ -6545,13 +6670,30 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Cleaned up evidence from %d run(s) and removed %d old history record(s)."
+            "value": "Cleaned up evidence from %1$d run(s) and removed %2$d old history record(s)."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "已清理 %d 次运行的证据，并删除 %d 条旧历史记录。"
+            "value": "已清理 %1$d 次运行的证据，并删除 %2$d 条旧历史记录。"
+          }
+        }
+      }
+    },
+    "Updated %d expired evidence record(s) and removed %d old history record(s). No local evidence files needed deletion.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Updated %1$d expired evidence record(s) and removed %2$d old history record(s). No local evidence files needed deletion."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已更新 %1$d 条过期证据记录，并删除 %2$d 条旧历史记录；没有本地证据文件需要删除。"
           }
         }
       }
@@ -8613,19 +8755,19 @@
         }
       }
     },
-    "Open bound application": {
+    "Open target application": {
       "extractionState": "manual",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Open bound application"
+            "value": "Open target application"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "打开绑定应用"
+            "value": "打开目标应用"
           }
         }
       }
@@ -8936,19 +9078,53 @@
         }
       }
     },
-    "Last checked %@ · removed %d evidence item(s) and %d record(s) · freed %@ · next check %@": {
+    "Last checked %@ · nothing expired · earliest next check %@": {
       "extractionState": "manual",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Last checked %1$@ · removed %2$d evidence item(s) and %3$d record(s) · freed %4$@ · next check %5$@"
+            "value": "Last checked %1$@ · nothing expired · earliest next check %2$@"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "上次检查 %1$@ · 清理 %2$d 份证据和 %3$d 条记录 · 释放 %4$@ · 下次检查 %5$@"
+            "value": "上次检查 %1$@ · 没有到期内容 · 最早下次检查 %2$@"
+          }
+        }
+      }
+    },
+    "Last checked %@ · updated %d expired evidence record(s) and removed %d history record(s) · no local files to free · earliest next check %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Last checked %1$@ · updated %2$d expired evidence record(s) and removed %3$d history record(s) · no local files to free · earliest next check %4$@"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "上次检查 %1$@ · 更新 %2$d 条过期证据记录并删除 %3$d 条历史记录 · 没有本地文件需要释放 · 最早下次检查 %4$@"
+          }
+        }
+      }
+    },
+    "Last checked %@ · cleaned evidence from %d run(s) and removed %d history record(s) · freed %@ · earliest next check %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Last checked %1$@ · cleaned evidence from %2$d run(s) and removed %3$d history record(s) · freed %4$@ · earliest next check %5$@"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "上次检查 %1$@ · 清理 %2$d 次运行的证据并删除 %3$d 条历史记录 · 释放 %4$@ · 最早下次检查 %5$@"
           }
         }
       }
@@ -9106,6 +9282,23 @@
         }
       }
     },
+    "Ending screenshots use most of this storage. Turn off Save ending screenshots to reduce future growth; cleanup removes existing evidence only after its retention period expires.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ending screenshots use most of this storage. Turn off Save ending screenshots to reduce future growth; cleanup removes existing evidence only after its retention period expires."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "结束截图占用了大部分运行存储。关闭“保存结束截图”可以减少后续增长；现有证据只有达到设定保留期后才会被自动清理。"
+          }
+        }
+      }
+    },
     "Storage usage could not be calculated: %@": {
       "extractionState": "manual",
       "localizations": {
@@ -9208,20 +9401,502 @@
         }
       }
     },
-    "Could not bring the bound window for %@ to the front. Open that window and retry; no actions were played.": {
+    "Could not find the target window for %@. Open it, or choose a different target window for this macro, then try again. No actions were run.": {
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Could not bring the bound window for %@ to the front. Open that window and retry; no actions were played."
+            "value": "Could not find the target window for %@. Open it, or choose a different target window for this macro, then try again. No actions were run."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "无法将 %@ 的绑定窗口置前。请打开该窗口后重试；本次未执行任何动作。"
+            "value": "找不到 %@ 的目标窗口。请先打开该窗口；如果窗口已经更换，请为这个宏重新选择目标窗口后再试。本次未执行任何操作。"
           }
         }
+      }
+    },
+    "Schedule & Frequency": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Schedule & Frequency"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "执行周期与时间"
+          }
+        }
+      }
+    },
+    "Upcoming Run & Summary": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Upcoming Run & Summary"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "下次执行与生效预览"
+          }
+        }
+      }
+    },
+    "Cleaned up %d expired visual evidence artifact(s) and %d bundle(s).": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Cleaned up %d expired visual evidence artifact(s) and %d bundle(s)." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "已清理 %d 个过期视觉证据文件和 %d 个记录包。" } }
+      }
+    },
+    "Scheduled visual evidence cleanup failed: %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Scheduled visual evidence cleanup failed: %@" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "定期清理视觉证据失败：%@" } }
+      }
+    },
+    "This draft uses an unsupported workflow format.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "This draft uses an unsupported workflow format." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "此草稿使用了当前不支持的工作流格式。" } }
+      }
+    },
+    "Give the workflow a name.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Give the workflow a name." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "请为工作流命名。" } }
+      }
+    },
+    "A task is missing its key.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "A task is missing its key." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "有一个任务缺少标识。" } }
+      }
+    },
+    "A task key is used more than once.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "A task key is used more than once." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "存在重复的任务标识。" } }
+      }
+    },
+    "This task type is not supported.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "This task type is not supported." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "当前不支持这种任务类型。" } }
+      }
+    },
+    "Choose a macro for this task.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Choose a macro for this task." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "请为此任务选择一个宏。" } }
+      }
+    },
+    "This macro reference matches more than one macro.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "This macro reference matches more than one macro." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "这个宏引用匹配到多个宏，请明确选择一个。" } }
+      }
+    },
+    "Set a delay duration.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Set a delay duration." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "请设置延迟时长。" } }
+      }
+    },
+    "Enter a valid duration greater than zero.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Enter a valid duration greater than zero." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "请输入大于 0 的有效时长。" } }
+      }
+    },
+    "Configure a condition for this task.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Configure a condition for this task." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "请为此任务配置条件。" } }
+      }
+    },
+    "This condition type is not supported.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "This condition type is not supported." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "当前不支持这种条件类型。" } }
+      }
+    },
+    "Enter a notification title.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Enter a notification title." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "请输入通知标题。" } }
+      }
+    },
+    "Choose both ends of this dependency.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Choose both ends of this dependency." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "请同时指定这条依赖关系的起点和终点。" } }
+      }
+    },
+    "A task cannot depend on itself.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "A task cannot depend on itself." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "任务不能依赖自身。" } }
+      }
+    },
+    "This dependency trigger is not supported.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "This dependency trigger is not supported." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "当前不支持这种依赖触发条件。" } }
+      }
+    },
+    "This dependency is already defined.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "This dependency is already defined." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "这条依赖关系已存在。" } }
+      }
+    },
+    "This dependency would create a cycle.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "This dependency would create a cycle." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "这条依赖关系会形成循环依赖。" } }
+      }
+    },
+    "Add a timeout branch for this condition.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Add a timeout branch for this condition." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "请为此条件添加超时分支。" } }
+      }
+    },
+    "Review this task's schedule settings.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Review this task's schedule settings." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "请检查此任务的定时设置。" } }
+      }
+    },
+    "Review this task's retry settings.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Review this task's retry settings." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "请检查此任务的重试设置。" } }
+      }
+    },
+    "Review this task's join policy.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Review this task's join policy." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "请检查此任务的合并策略。" } }
+      }
+    },
+    "Review the target application policy.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Review the target application policy." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "请检查目标应用的启动策略。" } }
+      }
+    },
+    "Review the target application cleanup policy.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Review the target application cleanup policy." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "请检查目标应用的运行后处理策略。" } }
+      }
+    },
+    "Review the missed-run policy.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Review the missed-run policy." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "请检查错过计划运行时的处理方式。" } }
+      }
+    },
+    "Review the loop settings.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Review the loop settings." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "请检查循环设置。" } }
+      }
+    },
+    "Choose the visual reference required by this condition.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Choose the visual reference required by this condition." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "请选择此条件需要使用的视觉参考。" } }
+      }
+    },
+    "Pick a target pixel.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Pick a target pixel." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "请选择目标像素。" } }
+      }
+    },
+    "Enter a threshold between 0 and 1.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Enter a threshold between 0 and 1." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "请输入 0 到 1 之间的阈值。" } }
+      }
+    },
+    "Enter a valid pixel sample radius.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Enter a valid pixel sample radius." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "请输入有效的像素采样半径。" } }
+      }
+    },
+    "Choose a valid target color.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Choose a valid target color." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "请选择有效的目标颜色。" } }
+      }
+    },
+    "This region reference could not be resolved.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "This region reference could not be resolved." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "无法解析这个区域引用。" } }
+      }
+    },
+    "A visual asset key is used more than once.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "A visual asset key is used more than once." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "存在重复的视觉资源标识。" } }
+      }
+    },
+    "Review this visual asset.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Review this visual asset." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "请检查此视觉资源。" } }
+      }
+    },
+    "A referenced visual asset is missing.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "A referenced visual asset is missing." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "引用的视觉资源不存在。" } }
+      }
+    },
+    "Some workflow settings cannot be represented in this draft format.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Some workflow settings cannot be represented in this draft format." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "部分工作流设置无法完整表示为当前草稿格式。" } }
+      }
+    },
+    "This notification severity is not supported.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "This notification severity is not supported." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "当前不支持这种通知级别。" } }
+      }
+    },
+    "The compiled workflow did not pass validation.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "The compiled workflow did not pass validation." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "生成的工作流未通过校验。" } }
+      }
+    },
+    "Workflow changes could not be saved. Check available disk space and file permissions, then try again.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Workflow changes could not be saved. Check available disk space and file permissions, then try again." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "工作流更改未能保存。请检查磁盘空间和文件权限后重试。" } }
+      }
+    },
+    "Run progress could not be saved. Check available disk space and file permissions before running again.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Run progress could not be saved. Check available disk space and file permissions before running again." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "本次运行进度未能保存。再次运行前，请检查磁盘空间和文件权限。" } }
+      }
+    },
+    "Run history could not be refreshed. Try again in a moment.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Run history could not be refreshed. Try again in a moment." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "无法刷新运行记录，请稍后重试。" } }
+      }
+    },
+    "The draft could not be updated. Review the edit and try again.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "The draft could not be updated. Review the edit and try again." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "未能更新草稿。请检查本次修改后重试。" } }
+      }
+    },
+    "Choose valid tasks for both ends of this dependency.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Choose valid tasks for both ends of this dependency." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "请为这条依赖关系选择有效的起点和终点任务。" } }
+      }
+    },
+    "Choose a valid trigger for this dependency.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Choose a valid trigger for this dependency." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "请为这条依赖关系选择有效的触发条件。" } }
+      }
+    },
+    "The selected task is no longer in this draft.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "The selected task is no longer in this draft." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "所选任务已不在当前草稿中。请刷新草稿后重试。" } }
+      }
+    },
+    "Choose a dependency before editing it.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Choose a dependency before editing it." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "请先选择要编辑的依赖关系。" } }
+      }
+    },
+    "The selected dependency is no longer in this draft.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "The selected dependency is no longer in this draft." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "所选依赖关系已不在当前草稿中。请刷新草稿后重试。" } }
+      }
+    },
+    "More than one dependency matches this edit. Choose one specific dependency.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "More than one dependency matches this edit. Choose one specific dependency." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "这次修改匹配到多条依赖关系。请明确选择其中一条。" } }
+      }
+    },
+    "This draft patch contains an unsupported change.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "This draft patch contains an unsupported change." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "此草稿补丁包含当前不支持的修改。" } }
+      }
+    },
+    "This draft patch is missing information required for the change.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "This draft patch is missing information required for the change." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "此草稿补丁缺少完成修改所需的信息。" } }
+      }
+    },
+    "The workflow draft could not be exported. Check the destination and try again.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "The workflow draft could not be exported. Check the destination and try again." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "未能导出工作流草稿。请检查保存位置后重试。" } }
+      }
+    },
+    "The workflow was saved, but its visual assets could not be linked. Try importing again.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "The workflow was saved, but its visual assets could not be linked. Try importing again." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "工作流已保存，但未能关联视觉资源。请重新导入以完成关联。" } }
+      }
+    },
+    "Visual assets could not be linked": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Visual assets could not be linked" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "未能关联视觉资源" } }
+      }
+    },
+    "The workflows were imported, but some visual assets could not be linked. Import the package again to retry the asset links.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "The workflows were imported, but some visual assets could not be linked. Import the package again to retry the asset links." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "工作流已导入，但部分视觉资源未能关联。请重新导入该工作流包以重试资源关联。" } }
+      }
+    },
+    "Run history changed. Nothing needs cleanup now.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Run history changed. Nothing needs cleanup now." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "运行历史已发生变化，目前无需清理。" } }
+      }
+    },
+    "Run history changed. Review the updated cleanup plan before deleting anything.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Run history changed. Review the updated cleanup plan before deleting anything." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "运行历史已发生变化。删除前请重新确认更新后的清理方案。" } }
+      }
+    },
+    "Run storage usage could not be calculated: %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Run storage usage could not be calculated: %@" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "无法计算运行数据占用空间：%@" } }
+      }
+    },
+    "This removes ending screenshots. Reports and run history stay available. Storage size is currently unavailable.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "This removes ending screenshots. Reports and run history stay available. Storage size is currently unavailable." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "这会删除运行结束时的截图；报告和运行历史仍会保留。当前无法计算占用空间。" } }
+      }
+    },
+    "This removes reports, screenshots, and diagnostic evidence. A lightweight run record stays in history. Storage size is currently unavailable.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "This removes reports, screenshots, and diagnostic evidence. A lightweight run record stays in history. Storage size is currently unavailable." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "这会删除报告、截图和诊断证据，但会保留精简的运行记录。当前无法计算占用空间。" } }
+      }
+    },
+    "This permanently removes %d run record(s) and their associated evidence. Storage size is currently unavailable.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "This permanently removes %d run record(s) and their associated evidence. Storage size is currently unavailable." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "这会永久删除 %d 条运行记录及其关联证据。当前无法计算占用空间。" } }
+      }
+    },
+    "Workflow import failed and was rolled back: %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Workflow import failed and was rolled back: %@" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "工作流导入失败，已撤销本次导入：%@" } }
+      }
+    },
+    "Workflow import failed, and some imported changes could not be rolled back: %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Workflow import failed, and some imported changes could not be rolled back: %@" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "工作流导入失败，且部分已写入的更改未能撤销：%@" } }
+      }
+    },
+    "Storage size unavailable": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Storage size unavailable" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "暂无法计算空间" } }
       }
     }
   },

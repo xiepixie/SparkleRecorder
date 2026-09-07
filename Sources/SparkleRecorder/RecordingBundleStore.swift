@@ -139,7 +139,9 @@ actor RecordingBundleStore {
 
     func write(_ bundle: SemanticRecordingBundle, to directory: URL) throws {
         try createBundleSubdirectories(in: directory)
-        try writeJSON(bundle, to: directory.appendingPathComponent(SemanticRecordingSchema.manifestFileName))
+        var manifest = bundle
+        manifest.inputEvidenceSamples = []
+        try writeJSON(manifest, to: directory.appendingPathComponent(SemanticRecordingSchema.manifestFileName))
         try writeJSON(
             bundle.videoSegments,
             to: directory
@@ -159,6 +161,10 @@ actor RecordingBundleStore {
         try writeJSONLines(
             bundle.aiSafeEvents,
             to: directory.appendingPathComponent(SemanticRecordingSchema.aiSafeEventsFileName)
+        )
+        try writeJSONLines(
+            bundle.inputEvidenceSamples,
+            to: directory.appendingPathComponent(SemanticRecordingSchema.inputEvidenceFileName)
         )
         try writeJSONLines(
             bundle.visualObservations,
@@ -351,6 +357,14 @@ actor RecordingBundleStore {
                 [SemanticRecordingRenderedVideoRedaction].self,
                 kind: .redactedVideos,
                 relativePath: Self.redactedVideoIndexRelativePath,
+                in: directory,
+                diagnostics: &diagnostics,
+                toleratesFailures: toleratesSidecarFailures
+            ),
+            inputEvidenceSamples: try readSidecarJSONLinesIfPresent(
+                RecordingEvidenceSample.self,
+                kind: .inputEvidenceSamples,
+                relativePath: SemanticRecordingSchema.inputEvidenceFileName,
                 in: directory,
                 diagnostics: &diagnostics,
                 toleratesFailures: toleratesSidecarFailures
@@ -834,7 +848,10 @@ actor RecordingBundleStore {
     private static var encoder: JSONEncoder {
         let encoder = JSONEncoder()
         encoder.dateEncodingStrategy = .iso8601
-        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        // Manifests can contain thousands of OCR observations and timing anchors.
+        // Keep deterministic key order without paying the extra allocation/write
+        // cost of human-facing pretty printing on the recording finalization path.
+        encoder.outputFormatting = [.sortedKeys]
         return encoder
     }
 

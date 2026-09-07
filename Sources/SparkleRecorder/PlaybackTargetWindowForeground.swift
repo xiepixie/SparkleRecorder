@@ -10,7 +10,8 @@ enum PlaybackTargetWindowForeground {
         guard candidates.count > 1 else { return candidates.first }
         guard let surface = surfaces.sorted(by: { $0.key < $1.key }).first?.value else { return nil }
         let processes = Set(candidates.map(\.processIdentifier))
-        let windows = visibleWindows(onScreenOnly: false).filter { processes.contains($0.processID) }
+        let windows = WindowServerObservationAdapter.visibleWindows(onScreenOnly: false)
+            .filter { processes.contains($0.processID) }
         guard let pid = PlaybackForegroundWindowVerification.targetProcessID(
             recordedFrame: surface.recordedFrame, recordedWindowID: surface.recordedWindowId, windows: windows) else { return nil }
         return candidates.first { $0.processIdentifier == pid }
@@ -18,13 +19,12 @@ enum PlaybackTargetWindowForeground {
 
     static func prepare(app: NSRunningApplication, surfaces: [String: PlaybackSurface]) async -> Bool {
         guard let surface = surfaces.sorted(by: { $0.key < $1.key }).first?.value else { return false }
-        let expectedFrame: RectValue
-        if let windowID = surface.recordedWindowId {
-            guard let bound = visibleWindows(onScreenOnly: false).first(where: { $0.id == windowID && $0.processID == app.processIdentifier }) else { return false }
-            expectedFrame = bound.frame
-        } else {
-            expectedFrame = surface.recordedFrame
+        let allWindows = WindowServerObservationAdapter.visibleWindows(onScreenOnly: false)
+        let liveRecordedWindow = surface.recordedWindowId.flatMap { windowID in
+            allWindows.first { $0.id == windowID && $0.processID == app.processIdentifier }
         }
+        let expectedFrame = liveRecordedWindow?.frame ?? surface.recordedFrame
+        let allowTitleFallback = liveRecordedWindow == nil
         let application = AXUIElementCreateApplication(app.processIdentifier)
         AXUIElementSetMessagingTimeout(application, 0.3)
         // Wake and activate before querying AX: hidden Chromium windows may
@@ -35,8 +35,25 @@ enum PlaybackTargetWindowForeground {
                 NSApp.yieldActivation(to: app)
                 app.unhide()
                 _ = app.activate(from: .current, options: [])
-                if handles.target == nil {
-                    handles.target = matchingWindow(application: handles.application, surface: surface, frame: expectedFrame)
+                if liveRecordedWindow != nil {
+                    if handles.exactWindowCandidates.isEmpty {
+                        handles.exactWindowCandidates = windowCandidates(
+                            application: handles.application,
+                            frame: expectedFrame
+                        )
+                        .filter { $0.distance < 8 }
+                        .map(\.window)
+                    }
+                    if handles.target == nil || handles.shouldAdvanceExactCandidate {
+                        handles.target = handles.nextExactCandidate()
+                    }
+                } else if handles.target == nil {
+                    handles.target = matchingWindow(
+                        application: handles.application,
+                        surface: surface,
+                        frame: expectedFrame,
+                        allowTitleFallback: allowTitleFallback
+                    )
                 }
                 guard let target = handles.target else { return }
                 AXUIElementSetAttributeValue(target, kAXMinimizedAttribute as CFString, kCFBooleanFalse)
@@ -49,7 +66,9 @@ enum PlaybackTargetWindowForeground {
                 guard app.isActive, let target = handles.target else {
                     guard let entry = surfaces.sorted(by: { $0.key < $1.key }).first else { return false }
                     let ready = PlaybackForegroundWindowVerification.isReady(active: app.isActive,
-                        targetProcessID: app.processIdentifier, recordedFrame: entry.value.recordedFrame, recordedWindowID: entry.value.recordedWindowId, windows: visibleWindows())
+                        targetProcessID: app.processIdentifier, recordedFrame: entry.value.recordedFrame,
+                        recordedWindowID: entry.value.recordedWindowId,
+                        windows: WindowServerObservationAdapter.visibleWindows())
                     if ready { logger.notice("Foreground verified by window-server ordering") }
                     return ready
                 }
@@ -60,70 +79,133 @@ enum PlaybackTargetWindowForeground {
                     logger.notice("Foreground readiness: focusedStatus=\(status.rawValue, privacy: .public), matches=\(matches, privacy: .public)")
                     return false
                 }
-                if surface.recordedWindowId != nil {
-                    return PlaybackForegroundWindowVerification.isReady(active: app.isActive,
-                        targetProcessID: app.processIdentifier, recordedFrame: surface.recordedFrame,
-                        recordedWindowID: surface.recordedWindowId, windows: visibleWindows())
+                if liveRecordedWindow != nil {
+                    let ready = PlaybackForegroundWindowVerification.isReady(
+                        active: app.isActive,
+                        targetProcessID: app.processIdentifier,
+                        recordedFrame: surface.recordedFrame,
+                        recordedWindowID: surface.recordedWindowId,
+                        windows: WindowServerObservationAdapter.visibleWindows()
+                    )
+                    if !ready {
+                        handles.noteExactCandidateVerificationFailure()
+                    }
+                    return ready
                 }
+                // The recorded CGWindowID is no longer live. At this point AX has
+                // already verified that the uniquely matched replacement window is
+                // focused, so do not fail solely because the old window ID changed.
                 return true
             }
         }, sleep: { try await Task.sleep(for: .milliseconds(100)) })
         return await handoff.prepare()
     }
 
-    private static func visibleWindows(onScreenOnly: Bool = true) -> [PlaybackForegroundWindowObservation] {
-        guard let info = CGWindowListCopyWindowInfo(onScreenOnly ? [.optionOnScreenOnly, .excludeDesktopElements] : [.optionAll, .excludeDesktopElements], kCGNullWindowID) as? [[String: Any]] else { return [] }
-        return info.compactMap { window in
-            guard (window[kCGWindowLayer as String] as? Int) == 0,
-                  let id = window[kCGWindowNumber as String] as? UInt32,
-                  let pid = window[kCGWindowOwnerPID as String] as? Int32,
-                  let bounds = window[kCGWindowBounds as String] as? [String: Any],
-                  let x = bounds["X"] as? Double, let y = bounds["Y"] as? Double,
-                  let width = bounds["Width"] as? Double, let height = bounds["Height"] as? Double,
-                  width > 0, height > 0 else { return nil }
-            return .init(id: id, processID: pid, frame: .init(x: x, y: y, width: width, height: height))
-        }
-    }
-
-    private static func matchingWindow(application: AXUIElement, surface: PlaybackSurface, frame: RectValue) -> AXUIElement? {
+    private static func windowCandidates(
+        application: AXUIElement,
+        frame: RectValue
+    ) -> [ForegroundAXWindowCandidate] {
         var value: CFTypeRef?
         let status = AXUIElementCopyAttributeValue(application, kAXWindowsAttribute as CFString, &value)
         guard status == .success, let windows = value as? [AXUIElement] else {
             logger.notice("Window enumeration status=\(status.rawValue, privacy: .public)")
-            return nil
+            return []
         }
-        var best: AXUIElement?
-        var bestScore = -Double.infinity
-        var ambiguous = false
-        for window in windows {
+
+        return windows.compactMap { window in
             AXUIElementSetMessagingTimeout(window, 0.3)
             var titleValue: CFTypeRef?
             AXUIElementCopyAttributeValue(window, kAXTitleAttribute as CFString, &titleValue)
-            let title = titleValue as? String
+
             var positionValue: CFTypeRef?
             var sizeValue: CFTypeRef?
             guard AXUIElementCopyAttributeValue(window, kAXPositionAttribute as CFString, &positionValue) == .success,
                   AXUIElementCopyAttributeValue(window, kAXSizeAttribute as CFString, &sizeValue) == .success,
-                  let positionValue, let sizeValue,
-                  CFGetTypeID(positionValue) == AXValueGetTypeID(), CFGetTypeID(sizeValue) == AXValueGetTypeID() else { continue }
+                  let positionValue,
+                  let sizeValue,
+                  CFGetTypeID(positionValue) == AXValueGetTypeID(),
+                  CFGetTypeID(sizeValue) == AXValueGetTypeID() else {
+                return nil
+            }
+
             var point = CGPoint.zero
             var size = CGSize.zero
             guard AXValueGetValue(positionValue as! AXValue, .cgPoint, &point),
-                  AXValueGetValue(sizeValue as! AXValue, .cgSize, &size), size.width > 0, size.height > 0 else { continue }
-            let distance = abs(point.x - frame.x) + abs(point.y - frame.y) + abs(size.width - frame.width) + abs(size.height - frame.height)
-            let titleMatches = title?.isEmpty == false && title == surface.windowTitle
-            guard distance < 8 || (surface.recordedWindowId == nil && titleMatches) else { continue }
-            let score = (distance < 8 ? 10_000.0 : 0) + (titleMatches ? 1_000.0 : 0) - Double(distance)
-            if score > bestScore { bestScore = score; best = window; ambiguous = false }
-            else if abs(score - bestScore) < 0.001 { ambiguous = true }
+                  AXValueGetValue(sizeValue as! AXValue, .cgSize, &size),
+                  size.width > 0,
+                  size.height > 0 else {
+                return nil
+            }
+
+            let distance = abs(point.x - frame.x) + abs(point.y - frame.y)
+                + abs(size.width - frame.width) + abs(size.height - frame.height)
+            return ForegroundAXWindowCandidate(
+                window: window,
+                title: titleValue as? String,
+                distance: distance
+            )
+        }
+    }
+
+    private static func matchingWindow(
+        application: AXUIElement,
+        surface: PlaybackSurface,
+        frame: RectValue,
+        allowTitleFallback: Bool
+    ) -> AXUIElement? {
+        var best: AXUIElement?
+        var bestScore = -Double.infinity
+        var ambiguous = false
+        for candidate in windowCandidates(application: application, frame: frame) {
+            let titleMatches = candidate.title?.isEmpty == false && candidate.title == surface.windowTitle
+            guard candidate.distance < 8 || (allowTitleFallback && titleMatches) else { continue }
+            let score = (candidate.distance < 8 ? 10_000.0 : 0)
+                + (titleMatches ? 1_000.0 : 0)
+                - Double(candidate.distance)
+            if score > bestScore {
+                bestScore = score
+                best = candidate.window
+                ambiguous = false
+            } else if abs(score - bestScore) < 0.001 {
+                ambiguous = true
+            }
         }
         return ambiguous ? nil : best
     }
+}
+
+private struct ForegroundAXWindowCandidate {
+    let window: AXUIElement
+    let title: String?
+    let distance: CGFloat
 }
 
 @MainActor
 private final class ForegroundWindowHandles {
     let application: AXUIElement
     var target: AXUIElement?
-    init(application: AXUIElement) { self.application = application }
+    var exactWindowCandidates: [AXUIElement] = []
+    var shouldAdvanceExactCandidate = false
+    private var nextExactCandidateIndex = 0
+    private var exactCandidateVerificationFailures = 0
+
+    init(application: AXUIElement) {
+        self.application = application
+    }
+
+    func nextExactCandidate() -> AXUIElement? {
+        guard !exactWindowCandidates.isEmpty else { return nil }
+        let candidate = exactWindowCandidates[nextExactCandidateIndex % exactWindowCandidates.count]
+        nextExactCandidateIndex += 1
+        shouldAdvanceExactCandidate = false
+        exactCandidateVerificationFailures = 0
+        return candidate
+    }
+
+    func noteExactCandidateVerificationFailure() {
+        exactCandidateVerificationFailures += 1
+        if exactCandidateVerificationFailures >= 2 {
+            shouldAdvanceExactCandidate = true
+        }
+    }
 }

@@ -291,7 +291,7 @@ public enum ActionGroupProjection {
         includesCoordinateClickCandidates: Bool = true
     ) -> Bool {
         if editsSemanticTextTarget(group.kind) { return true }
-        guard canUseLocatorStrategy(group.kind) else { return false }
+        guard canUseTextLocator(group.kind) else { return false }
 
         let hasEvent = group.eventIndices.contains { events.indices.contains($0) }
         if group.textAnchor != nil { return hasEvent }
@@ -377,7 +377,7 @@ public enum ActionGroupProjection {
         }
     }
 
-    private static func canUseLocatorStrategy(_ kind: ActionGroupKind) -> Bool {
+    private static func canUseTextLocator(_ kind: ActionGroupKind) -> Bool {
         switch kind {
         case .click, .doubleClick, .repeatedClick, .longPress, .scroll:
             return true

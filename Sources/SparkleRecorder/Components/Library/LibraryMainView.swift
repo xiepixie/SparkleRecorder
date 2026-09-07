@@ -45,9 +45,6 @@ struct LibraryMainView: View {
   var body: some View {
     mainContent
       .overlay(alignment: .bottom) {
-        statusOverlay
-      }
-      .overlay(alignment: .bottom) {
         searchOverlay
       }
       .background {
@@ -85,8 +82,10 @@ struct LibraryMainView: View {
               _ = try await host.dispatch(.deleteWorkflow(workflowID: workflowID, at: Date()))
             }
             await refreshAutomaticRuns()
-            state.statusMessage = String(
-              localized: "Automatic runs turned off.", table: "Automation")
+            state.presentStatus(
+              String(localized: "Automatic runs turned off.", table: "Automation"),
+              tone: .success
+            )
           }
         ) { workflow, taskID in
           let host = controller.automationHost()
@@ -118,12 +117,18 @@ struct LibraryMainView: View {
               task.schedule?.nextOccurrence(onOrAfter: Date())?.scheduledAt
             }
           if let nextRun {
-            state.statusMessage = String(
-              format: String(localized: "Scheduled. Next run: %@", table: "Automation"),
-              nextRun.formatted(date: .abbreviated, time: .shortened)
+            state.presentStatus(
+              String(
+                format: String(localized: "Scheduled. Next run: %@", table: "Automation"),
+                nextRun.formatted(date: .abbreviated, time: .shortened)
+              ),
+              tone: .success
             )
           } else {
-            state.statusMessage = String(localized: "Schedule created.", table: "Automation")
+            state.presentStatus(
+              String(localized: "Automatic run scheduled.", table: "Automation"),
+              tone: .success
+            )
           }
         }
       }
@@ -169,13 +174,13 @@ struct LibraryMainView: View {
       .padding(.top, 12)
       .padding(.bottom, 8)
 
-      if !state.accessibilityGranted || !state.inputMonitoringGranted || !state.screenCaptureGranted
-      {
+      if !state.requiredPermissionsGranted {
         PermissionBanner(
           controller: controller,
           accessibilityGranted: state.accessibilityGranted,
           inputMonitoringGranted: state.inputMonitoringGranted,
-          screenCaptureGranted: state.screenCaptureGranted
+          screenCaptureGranted: state.screenCaptureGranted,
+          visualEvidenceEnabled: state.semanticRecordingEnabled
         )
         .padding(.horizontal, 12)
         .padding(.bottom, 8)
@@ -260,11 +265,12 @@ struct LibraryMainView: View {
     }
   }
 
+  @MainActor
   private func saveLinearSequence(
     _ document: AutomationWorkflowDraftDocument,
     openInWorkflow: Bool,
     runAfterSaving: Bool
-  ) {
+  ) async throws {
     let workflowID = UUID()
     var options = AutomationWorkflowDraftImportOptions(mode: .confirm)
     options.stableIDNamespace = workflowID.uuidString
@@ -277,51 +283,60 @@ struct LibraryMainView: View {
       options: options
     )
     guard var workflow = result.workflow else {
-      state.statusMessage = String(localized: "Could not create the sequence.", table: "Automation")
-      return
+      let message = String(localized: "Could not create the sequence.", table: "Automation")
+      state.presentStatus(message, tone: .error)
+      throw AutomationTargetApplicationPreparationFailure(message: message)
     }
     workflow.id = workflowID
 
-    Task {
-      do {
-        _ = try await controller.automationHost().dispatch(.upsertWorkflow(workflow, at: Date()))
-      } catch {
-        state.statusMessage = String(localized: "Could not save the sequence.", table: "Automation")
-        return
-      }
+    do {
+      _ = try await controller.automationHost().dispatch(.upsertWorkflow(workflow, at: Date()))
+    } catch {
+      let message = String(localized: "Could not save the sequence.", table: "Automation")
+      state.presentStatus(message, tone: .error)
+      throw AutomationTargetApplicationPreparationFailure(message: message)
+    }
 
-      let nextRun = workflow.tasks
-        .compactMap(\.schedule)
-        .compactMap { $0.nextOccurrence(onOrAfter: Date())?.scheduledAt }
-        .min()
-      state.statusMessage =
-        nextRun.map {
-          String(
-            format: String(localized: "Sequence saved. Next run: %@", table: "Automation"),
-            $0.formatted(date: .abbreviated, time: .shortened)
-          )
-        } ?? String(localized: "Sequence saved.", table: "Automation")
+    let nextRun = workflow.tasks
+      .compactMap(\.schedule)
+      .compactMap { $0.nextOccurrence(onOrAfter: Date())?.scheduledAt }
+      .min()
+    state.presentStatus(
+      nextRun.map {
+        String(
+          format: String(localized: "Sequence saved. Next run: %@", table: "Automation"),
+          $0.formatted(date: .abbreviated, time: .shortened)
+        )
+      } ?? String(localized: "Sequence saved.", table: "Automation"),
+      tone: .success
+    )
 
-      if openInWorkflow {
-        controller.showAutomationWorkspace(workflowID: workflow.id)
-        return
-      }
-      guard runAfterSaving, let firstTask = workflow.tasks.first else { return }
-      do {
-        _ = try await controller.automationHost().dispatch(
-          .manualStart(
-            workflowID: workflow.id,
-            taskID: firstTask.id,
-            requestedAt: Date()
-          ))
-        state.statusMessage = String(
-          localized: "Sequence saved. Test started.", table: "Automation")
-      } catch {
-        state.statusMessage = String(
+    if openInWorkflow {
+      controller.showAutomationWorkspace(workflowID: workflow.id)
+      return
+    }
+    guard runAfterSaving, let firstTask = workflow.tasks.first else { return }
+    do {
+      _ = try await controller.automationHost().dispatch(
+        .manualStart(
+          workflowID: workflow.id,
+          taskID: firstTask.id,
+          requestedAt: Date()
+        ))
+      state.presentStatus(
+        String(localized: "Sequence saved. Test started.", table: "Automation"),
+        tone: .success
+      )
+    } catch {
+      // Saving already succeeded. Do not keep the sheet open and risk creating a
+      // duplicate workflow on retry; report the secondary test failure instead.
+      state.presentStatus(
+        String(
           localized: "Sequence saved, but the test could not start.",
           table: "Automation"
-        )
-      }
+        ),
+        tone: .warning
+      )
     }
   }
 
@@ -563,44 +578,6 @@ struct LibraryMainView: View {
   }
 
   @ViewBuilder
-  private var statusOverlay: some View {
-    if !state.statusMessage.isEmpty {
-      HStack(spacing: 8) {
-        Image(systemName: "bell.fill")
-          .font(.system(size: 11))
-          .foregroundStyle(.white)
-        Text(verbatim: state.statusMessage)
-          .font(.system(size: 11.5, weight: .medium))
-          .foregroundStyle(.white)
-          .lineLimit(1)
-          .truncationMode(.middle)
-      }
-      .padding(.horizontal, 16)
-      .padding(.vertical, 10)
-      .background(
-        Capsule(style: .continuous)
-          .fill(Color(white: 0.15).opacity(0.85))
-          .shadow(color: .black.opacity(0.3), radius: 8, x: 0, y: 4)
-      )
-      .overlay(
-        Capsule(style: .continuous)
-          .strokeBorder(Color.white.opacity(0.15), lineWidth: 0.5)
-      )
-      .padding(.bottom, 60)
-      .transition(
-        .asymmetric(
-          insertion: .move(edge: .bottom).combined(with: .opacity).combined(
-            with: .scale(scale: 0.9)),
-          removal: .opacity.combined(with: .scale(scale: 0.95))
-        )
-      )
-      .animation(.spring(response: 0.4, dampingFraction: 0.7), value: state.statusMessage.isEmpty)
-      .onAppear { scheduleStatusClear() }
-      .onChange(of: state.statusMessage) { _, _ in scheduleStatusClear() }
-    }
-  }
-
-  @ViewBuilder
   private func macroCardView(for macro: SavedMacro) -> some View {
     MacroCard(
       macro: macro,
@@ -648,7 +625,7 @@ struct LibraryMainView: View {
       onToggleFavorite: { () -> Void in controller.toggleFavorite(macro.id) },
       onSetIcon: { icon in controller.setMacroIcon(macro.id, to: icon) },
       onAddTag: { () -> Void in showAddTag = macro },
-      onDragMove: { fromID, toID in library.move(id: fromID, before: toID) },
+      onDragMove: { fromID, toID in controller.moveMacro(fromID, before: toID) },
       onOpenNotes: { () -> Void in showNotesFor = macro },
       onSetSpeed: { speed in controller.setMacroSpeed(macro.id, to: speed) },
       onSetAccent: { color in controller.setMacroAccent(macro.id, to: color) },
@@ -684,6 +661,7 @@ struct LibraryMainView: View {
       onSchedule: { openAutomaticRunSheet(for: macro) },
       onShowEvidence: { showEvidenceFor = macro },
       onReconstruct: { showReconstructionFor = macro },
+      onChooseTargetWindow: { controller.chooseTargetWindow(for: macro.id) },
       onSetIcon: { icon in controller.setMacroIcon(macro.id, to: icon) },
       onAssignHotkey: { () -> Void in showAssignHotkey = macro }
     )
@@ -711,15 +689,6 @@ struct LibraryMainView: View {
     }
   }
 
-  func scheduleStatusClear() {
-    let snapshot = state.statusMessage
-    guard !snapshot.isEmpty else { return }
-    DispatchQueue.main.asyncAfter(deadline: .now() + 5) {
-      if state.statusMessage == snapshot {
-        withAnimation(.easeOut(duration: 0.25)) { state.statusMessage = "" }
-      }
-    }
-  }
 }
 
 private struct LibraryWorkflowActionStrip: View {

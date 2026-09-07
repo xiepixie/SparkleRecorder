@@ -5,7 +5,7 @@ import SparkleRecorderCore
 struct HotkeyAssignmentSheet: View {
     let macro: SavedMacro
     let currentHotkey: HotkeyBinding?
-    let allHotkeys: Set<UInt32>
+    let allHotkeys: Set<HotkeyIdentity>
     let onSave: (HotkeyBinding?) -> Void
     let onCancel: () -> Void
 

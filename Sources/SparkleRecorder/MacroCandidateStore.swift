@@ -1,12 +1,105 @@
 import Foundation
 import SparkleRecorderCore
 
+public enum MacroCandidateImportSource: String, Codable, Equatable, Sendable {
+    case standaloneCandidate
+    case reconstructionPackage
+}
+
+public struct MacroCandidateImportProvenance: Codable, Equatable, Sendable {
+    public var source: MacroCandidateImportSource
+    public var packageVersion: String?
+    public var contractVersion: String? = nil
+    public var harnessVersion: String? = nil
+    public var authoringContractVersion: String? = nil
+    public var packageSourceRevision: String?
+    public var capabilityVersion: String?
+    public var authoringPolicyVersion: String?
+    public var sourceContextVersion: String? = nil
+    public var actionContextVersion: String? = nil
+    public var candidateActionRevision: String? = nil
+    public var objective: MacroReconstructionObjective?
+    public var visualEvidenceIncluded: Bool?
+    public var mechanicalEvidenceIncluded: Bool?
+    public var sourceEventsMatchRecording: Bool?
+    public var artifactCount: Int?
+    public var warnings: [String]
+
+    public static let standalone = MacroCandidateImportProvenance(
+        source: .standaloneCandidate,
+        packageVersion: nil,
+        contractVersion: nil,
+        harnessVersion: nil,
+        authoringContractVersion: nil,
+        packageSourceRevision: nil,
+        capabilityVersion: nil,
+        authoringPolicyVersion: nil,
+        sourceContextVersion: nil,
+        actionContextVersion: nil,
+        candidateActionRevision: nil,
+        objective: nil,
+        visualEvidenceIncluded: nil,
+        mechanicalEvidenceIncluded: nil,
+        sourceEventsMatchRecording: nil,
+        artifactCount: nil,
+        warnings: []
+    )
+}
+
+public enum MacroCandidateAuthoringOrigin: String, Codable, Equatable, Sendable {
+    case externalAuthoring
+    case localCandidateEditor
+
+    var surfaceAuthority: MacroCandidatePlaybackSurfaceAuthority {
+        switch self {
+        case .externalAuthoring: .sourceRevision
+        case .localCandidateEditor: .appOwnedRebinding
+        }
+    }
+}
+
 public struct MacroStoredCandidate: Codable, Equatable, Sendable, Identifiable {
     public let id: UUID
     public let document: MacroCandidateDocument
     public let macro: SavedMacro
     public let normalizedDigest: String
     public let createdAt: Date
+    public let authoringOrigin: MacroCandidateAuthoringOrigin
+    let importProvenance: MacroCandidateImportProvenance?
+
+    init(
+        id: UUID,
+        document: MacroCandidateDocument,
+        macro: SavedMacro,
+        normalizedDigest: String,
+        createdAt: Date,
+        authoringOrigin: MacroCandidateAuthoringOrigin,
+        importProvenance: MacroCandidateImportProvenance? = nil
+    ) {
+        self.id = id
+        self.document = document
+        self.macro = macro
+        self.normalizedDigest = normalizedDigest
+        self.createdAt = createdAt
+        self.authoringOrigin = authoringOrigin
+        self.importProvenance = importProvenance
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case id, document, macro, normalizedDigest, createdAt, authoringOrigin, importProvenance
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(UUID.self, forKey: .id)
+        document = try container.decode(MacroCandidateDocument.self, forKey: .document)
+        macro = try container.decode(SavedMacro.self, forKey: .macro)
+        normalizedDigest = try container.decode(String.self, forKey: .normalizedDigest)
+        createdAt = try container.decode(Date.self, forKey: .createdAt)
+        authoringOrigin = try container.decodeIfPresent(MacroCandidateAuthoringOrigin.self, forKey: .authoringOrigin)
+            ?? .externalAuthoring
+        importProvenance = try container.decodeIfPresent(MacroCandidateImportProvenance.self, forKey: .importProvenance)
+    }
 }
 
 /// Issued only by the repository for a pinned normal-playback test. Not decodable from CLI input.
@@ -46,7 +139,7 @@ public enum MacroCandidateStoreError: Error, LocalizedError, Equatable, Sendable
     public var errorDescription: String? {
         switch self {
         case .staleSource:
-            String(localized: "The macro changed after candidate import. Export its current revision and import a new candidate.", table: "EditorUX")
+            String(localized: "This candidate was generated from an older macro revision. Export the current reconstruction package and generate a new candidate.", table: "EditorUX")
         case .testRequired:
             String(localized: "Complete a successful playback test of this candidate before accepting it.", table: "EditorUX")
         case .invalidTestToken:
@@ -80,6 +173,10 @@ struct MacroCandidateStore {
         let executionDigest: String?
     }
     private func url(_ name: String) -> URL { directory.appendingPathComponent(name) }
+    private func retainedSourceURL(revision: String) -> URL {
+        let filenameIdentity = revision.utf8.map { String(format: "%02x", $0) }.joined()
+        return url("source-\(filenameIdentity).json")
+    }
     private func read<T: Decodable>(_ type: T.Type, at url: URL) throws -> T {
         try JSONDecoder().decode(type, from: Data(contentsOf: url))
     }
@@ -106,21 +203,42 @@ struct MacroCandidateStore {
     func retainSource(_ source: SavedMacro) throws {
         // Digest is generated by Core, never a path supplied by the candidate.
         let identity = try MacroCandidateIdentity.revision(of: source)
-        let filenameIdentity = identity.utf8.map { String(format: "%02x", $0) }.joined()
-        let sourceURL = url("source-\(filenameIdentity).json")
+        let sourceURL = retainedSourceURL(revision: identity)
         if !FileManager.default.fileExists(atPath: sourceURL.path) { try write(source, at: sourceURL) }
         let originalURL = url("original.json")
         if !FileManager.default.fileExists(atPath: originalURL.path) { try write(source, at: originalURL) }
     }
+    func retainedSource(revision: String) throws -> SavedMacro? {
+        let sourceURL = retainedSourceURL(revision: revision)
+        guard FileManager.default.fileExists(atPath: sourceURL.path) else { return nil }
+        let source = try read(SavedMacro.self, at: sourceURL)
+        guard try MacroCandidateIdentity.revision(of: source) == revision else {
+            throw MacroCandidateStoreError.candidateIntegrityMismatch
+        }
+        return source
+    }
+
     func original() throws -> SavedMacro {
         guard FileManager.default.fileExists(atPath: url("original.json").path) else {
             throw MacroCandidateStoreError.noOriginalRevision
         }
         return try read(SavedMacro.self, at: url("original.json"))
     }
-    func insert(document: MacroCandidateDocument, normalized: SavedMacro) throws -> MacroStoredCandidate {
-        let candidate = MacroStoredCandidate(id: UUID(), document: document, macro: normalized,
-            normalizedDigest: try MacroCandidateIdentity.revision(of: normalized), createdAt: Date())
+    func insert(
+        document: MacroCandidateDocument,
+        normalized: SavedMacro,
+        authoringOrigin: MacroCandidateAuthoringOrigin,
+        importProvenance: MacroCandidateImportProvenance?
+    ) throws -> MacroStoredCandidate {
+        let candidate = MacroStoredCandidate(
+            id: UUID(),
+            document: document,
+            macro: normalized,
+            normalizedDigest: try MacroCandidateIdentity.revision(of: normalized),
+            createdAt: Date(),
+            authoringOrigin: authoringOrigin,
+            importProvenance: importProvenance
+        )
         try write(candidate, at: url("candidate-\(candidate.id.uuidString).json"))
         return candidate
     }
@@ -171,14 +289,54 @@ public extension MacroRepository {
         return macro
     }
 
-    func importCandidate(_ document: MacroCandidateDocument, for id: UUID) throws -> MacroStoredCandidate {
+    func importCandidate(
+        _ document: MacroCandidateDocument,
+        for id: UUID,
+        importProvenance: MacroCandidateImportProvenance? = .standalone
+    ) throws -> MacroStoredCandidate {
+        try importCandidate(
+            document,
+            for: id,
+            authoringOrigin: .externalAuthoring,
+            importProvenance: importProvenance
+        )
+    }
+
+    func importCandidateDraft(
+        _ document: MacroCandidateDocument,
+        for id: UUID,
+        importProvenance: MacroCandidateImportProvenance? = nil
+    ) throws -> MacroStoredCandidate {
+        try importCandidate(
+            document,
+            for: id,
+            authoringOrigin: .localCandidateEditor,
+            importProvenance: importProvenance
+        )
+    }
+
+    private func importCandidate(
+        _ document: MacroCandidateDocument,
+        for id: UUID,
+        authoringOrigin: MacroCandidateAuthoringOrigin,
+        importProvenance: MacroCandidateImportProvenance?
+    ) throws -> MacroStoredCandidate {
         let source = try loadMacro(for: id)
         let revision = try MacroCandidateIdentity.revision(of: source)
         guard document.sourceRevision == revision else { throw MacroCandidateStoreError.staleSource }
-        let normalized = try MacroCandidateValidator.normalize(document, source: source)
+        let normalized = try MacroCandidateValidator.normalize(
+            document,
+            source: source,
+            surfaceAuthority: authoringOrigin.surfaceAuthority
+        )
         let store = MacroCandidateStore(package: packageURL(for: id))
         try store.retainSource(source)
-        return try store.insert(document: document, normalized: normalized)
+        return try store.insert(
+            document: document,
+            normalized: normalized,
+            authoringOrigin: authoringOrigin,
+            importProvenance: importProvenance
+        )
     }
 
     func loadCandidate(candidateID: UUID, for id: UUID) throws -> MacroStoredCandidate {
@@ -189,6 +347,10 @@ public extension MacroRepository {
 
     func listCandidates(for id: UUID) throws -> [MacroStoredCandidate] {
         try MacroCandidateStore(package: packageURL(for: id)).candidates()
+    }
+
+    func loadRetainedSource(revision: String, for id: UUID) throws -> SavedMacro? {
+        try MacroCandidateStore(package: packageURL(for: id)).retainedSource(revision: revision)
     }
 
     func prepareCandidateTest(candidateID: UUID, for id: UUID) throws -> MacroCandidateTestRun {
@@ -226,7 +388,11 @@ public extension MacroRepository {
         try store.requireReceipt(candidate)
         // Re-normalizing against current metadata preserves notes, hotkeys, statistics,
         // identity and references changed since import without invalidating execution.
-        let accepted = try MacroCandidateValidator.normalize(candidate.document, source: loadMacro(for: id))
+        let accepted = try MacroCandidateValidator.normalize(
+            candidate.document,
+            source: loadMacro(for: id),
+            surfaceAuthority: candidate.authoringOrigin.surfaceAuthority
+        )
         try store.publish(accepted, fault: candidatePublicationFault)
         return accepted
     }
@@ -251,7 +417,11 @@ public extension MacroRepository {
         guard try MacroCandidateIdentity.revision(of: source) == candidate.document.sourceRevision else {
             throw MacroCandidateStoreError.staleSource
         }
-        let normalized = try MacroCandidateValidator.normalize(candidate.document, source: source)
+        let normalized = try MacroCandidateValidator.normalize(
+            candidate.document,
+            source: source,
+            surfaceAuthority: candidate.authoringOrigin.surfaceAuthority
+        )
         guard try MacroCandidateIdentity.revision(of: normalized) == candidate.normalizedDigest else {
             throw MacroCandidateStoreError.candidateIntegrityMismatch
         }

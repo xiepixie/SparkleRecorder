@@ -133,11 +133,27 @@ struct SemanticRecordingPreflightPresentationTests {
                 screenRecording: .authorized
             )).evaluate()
         ].map(SemanticRecordingPreflightPresenter.presentation)
-        let keys = Set(presentations.flatMap { presentation in
-            [presentation.title, presentation.summary] +
-                presentation.decisionRows.flatMap { [$0.title, $0.detail] }
-        })
-        let catalog = try localizationCatalog()
+        var keys = Set<String>()
+        for presentation in presentations {
+            keys.insert(presentation.title)
+            keys.insert(presentation.summary)
+            keys.insert(presentation.primaryAction.label)
+            if let secondaryAction = presentation.secondaryAction {
+                keys.insert(secondaryAction.label)
+            }
+            for row in presentation.decisionRows {
+                keys.insert(row.title)
+                keys.insert(row.detail)
+            }
+            keys.formUnion(presentation.availableCapabilityLabels)
+            for issue in presentation.issues {
+                keys.insert(issue.title)
+                keys.insert(issue.detail)
+                keys.insert(issue.action.label)
+                keys.formUnion(issue.affectedCapabilityLabels)
+            }
+        }
+        let catalog = try commonLocalizationCatalog()
 
         var missingEntries: [String] = []
         var missingEnglish: [String] = []
@@ -156,14 +172,14 @@ struct SemanticRecordingPreflightPresentationTests {
             }
         }
 
-        #expect(missingEntries.isEmpty, "Missing Localizable.xcstrings entries: \(missingEntries)")
+        #expect(missingEntries.isEmpty, "Missing Common.xcstrings entries: \(missingEntries)")
         #expect(missingEnglish.isEmpty, "Missing English localizations: \(missingEnglish)")
         #expect(missingSimplifiedChinese.isEmpty, "Missing Simplified Chinese localizations: \(missingSimplifiedChinese)")
     }
 
-    private func localizationCatalog() throws -> [String: Any] {
+    private func commonLocalizationCatalog() throws -> [String: Any] {
         let url = repositoryRoot()
-            .appendingPathComponent("Sources/SparkleRecorder/Localizable.xcstrings")
+            .appendingPathComponent("Sources/SparkleRecorder/Common.xcstrings")
         let data = try Data(contentsOf: url)
         let rootObject = try #require(
             try JSONSerialization.jsonObject(with: data) as? [String: Any]

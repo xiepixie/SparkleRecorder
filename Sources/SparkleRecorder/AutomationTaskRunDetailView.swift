@@ -9,7 +9,7 @@ struct AutomationTaskRunDetailView: View {
     let retryPolicy: AutomationRetryPolicy
     let hasLaterAttempt: Bool
     var macros: [SavedMacro] = []
-    var onImportWorkflowFromDraftPreview: (AutomationWorkflow, URL?) -> Void = { _, _ in }
+    var onImportWorkflowFromDraftPreview: @MainActor (AutomationWorkflow, URL?) async throws -> Void = { _, _ in }
 
     @State private var evidencePayload: AutomationTaskRunEvidencePayload?
     @State private var evidenceErrorMessage = ""

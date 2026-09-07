@@ -119,6 +119,18 @@ actor LiveSemanticRecordingSession {
         try await requireLifecycle().record(event, index: index, sessionTime: sessionTime)
     }
 
+    func recordEvidence(
+        samples: [RecordingEvidenceSample],
+        playableLinks: [RecordingPlayableEvidenceLink],
+        omittedSampleCount: Int = 0
+    ) async throws {
+        try await requireLifecycle().recordEvidence(
+            samples: samples,
+            playableLinks: playableLinks,
+            omittedSampleCount: omittedSampleCount
+        )
+    }
+
     func addSuppression(_ suppression: RecordingSuppressionRecord) async throws {
         try await requireLifecycle().addSuppression(suppression)
     }
@@ -134,14 +146,20 @@ actor LiveSemanticRecordingSession {
         return suppressions
     }
 
-    func finish(recordingTime: TimeInterval) async throws -> LiveSemanticRecordingFinishResult {
+    func finish(
+        recordingTime: TimeInterval,
+        finalPlayableEvents: [RecordedEvent]? = nil
+    ) async throws -> LiveSemanticRecordingFinishResult {
         let activeLifecycle = try requireLifecycle()
         guard let directory = bundleDirectory else {
             throw LiveSemanticRecordingSessionError.notStarted
         }
 
         do {
-            let bundle = try await activeLifecycle.finish(recordingTime: recordingTime)
+            let bundle = try await activeLifecycle.finish(
+                recordingTime: recordingTime,
+                finalPlayableEvents: finalPlayableEvents
+            )
             try await dependencies.store.write(bundle, to: directory)
             let redactionPlan = SemanticRecordingRedactionPlanner.plan(for: bundle)
             let redactionResult: RecordingBundleRedactionApplicationResult?

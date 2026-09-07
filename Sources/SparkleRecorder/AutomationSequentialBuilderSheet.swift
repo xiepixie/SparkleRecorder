@@ -458,16 +458,18 @@ struct AutomationSequentialBuilderSheet: View {
   @Environment(\.dismiss) private var dismiss
 
   let availableMacros: [SavedMacro]
-  let onCreate: (AutomationWorkflowDraftDocument, Bool, Bool) -> Void
+  let onCreate: @MainActor (AutomationWorkflowDraftDocument, Bool, Bool) async throws -> Void
 
   @State private var draft: AutomationLinearSequenceDraft
   @State private var isPreviewActive = false
+  @State private var isSaving = false
+  @State private var errorMessage: String?
 
   init(
     initialMacros: [SavedMacro],
     availableMacros: [SavedMacro],
     initialDraft: AutomationLinearSequenceDraft? = nil,
-    onCreate: @escaping (AutomationWorkflowDraftDocument, Bool, Bool) -> Void
+    onCreate: @escaping @MainActor (AutomationWorkflowDraftDocument, Bool, Bool) async throws -> Void
   ) {
     let firstName =
       initialMacros.first?.name ?? String(localized: "New sequence", table: "Automation")
@@ -550,7 +552,7 @@ struct AutomationSequentialBuilderSheet: View {
       sectionHeader(title: String(localized: "Start preparation", table: "Automation"), value: nil)
       HStack(spacing: 12) {
         Label(
-          String(localized: "Open bound application", table: "Automation"),
+          String(localized: "Open target application", table: "Automation"),
           systemImage: "macwindow.badge.plus"
         )
         .foregroundStyle(.secondary)
@@ -863,22 +865,39 @@ struct AutomationSequentialBuilderSheet: View {
     HStack(spacing: 10) {
       Button(String(localized: "Cancel", table: "Common")) { dismiss() }
         .keyboardShortcut(.cancelAction)
-      Spacer(minLength: 0)
+        .disabled(isSaving)
+
+      if let errorMessage {
+        Label(errorMessage, systemImage: "exclamationmark.triangle.fill")
+          .font(.caption)
+          .foregroundStyle(.red)
+          .lineLimit(2)
+          .frame(maxWidth: .infinity, alignment: .leading)
+      } else {
+        Spacer(minLength: 0)
+      }
+
       Button(String(localized: "Advanced edit…", table: "Automation")) {
         create(intent: .advancedEdit)
       }
-      .disabled(validationMessage != nil || isPreviewActive)
+      .disabled(validationMessage != nil || isPreviewActive || isSaving)
       AutomationLinearSequencePreviewButton(
-        isDisabled: validationMessage != nil,
+        isDisabled: validationMessage != nil || isSaving,
         onActivityChange: { isPreviewActive = $0 },
         onRun: { create(intent: .saveAndTest) }
       )
-      Button(String(localized: "Save sequence", table: "Automation")) {
+      Button {
         create(intent: .save)
+      } label: {
+        if isSaving {
+          ProgressView().controlSize(.small)
+        } else {
+          Text("Save sequence", tableName: "Automation")
+        }
       }
       .keyboardShortcut(.defaultAction)
       .buttonStyle(.borderedProminent)
-      .disabled(validationMessage != nil || isPreviewActive)
+      .disabled(validationMessage != nil || isPreviewActive || isSaving)
     }
     .padding(.horizontal, 18)
     .padding(.vertical, 12)
@@ -943,7 +962,8 @@ struct AutomationSequentialBuilderSheet: View {
       .surfaces.values.first
     AutomationOCRRegionPicker.pick(
       currentCondition: currentCondition,
-      targetSurface: targetSurface
+      targetSurface: targetSurface,
+      onFailure: { message in errorMessage = message }
     ) { condition in
       guard let refreshedIndex = draft.steps.firstIndex(where: { $0.id == stepID }) else { return }
       draft.steps[refreshedIndex].apply(condition)
@@ -969,9 +989,19 @@ struct AutomationSequentialBuilderSheet: View {
   }
 
   private func create(intent: AutomationLinearSequenceSaveIntent) {
-    guard validationMessage == nil else { return }
-    onCreate(draft.makeDocument(), intent.opensWorkflow, intent.runsAfterSaving)
-    dismiss()
+    guard validationMessage == nil, !isSaving else { return }
+    let document = draft.makeDocument()
+    isSaving = true
+    errorMessage = nil
+    Task { @MainActor in
+      do {
+        try await onCreate(document, intent.opensWorkflow, intent.runsAfterSaving)
+        dismiss()
+      } catch {
+        errorMessage = error.localizedDescription
+        isSaving = false
+      }
+    }
   }
 
   private func durationText(_ duration: TimeInterval) -> String {

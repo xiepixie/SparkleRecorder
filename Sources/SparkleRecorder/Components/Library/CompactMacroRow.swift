@@ -15,109 +15,36 @@ struct CompactMacroRow: View {
     let onSchedule: () -> Void
     let onShowEvidence: () -> Void
     let onReconstruct: () -> Void
+    let onChooseTargetWindow: () -> Void
     let onSetIcon: (String?) -> Void
     let onAssignHotkey: () -> Void
 
     @State private var hovered = false
-    @State private var playHovered = false
-    @State private var editHovered = false
-    @State private var scheduleHovered = false
 
     var body: some View {
         HStack(spacing: 12) {
             MacroIconView(macro: macro, onSetIcon: onSetIcon)
             
-            VStack(alignment: .leading, spacing: 3) {
-                Text(macro.name)
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(isCurrent ? Brand.libraryBlue : .primary)
-                    .lineLimit(1)
-                
-                HStack(spacing: 6) {
-                    Text(durationText)
-                        .font(.system(size: 10, weight: .medium, design: .monospaced))
-                        .foregroundStyle(.secondary)
-                    
-                    if let hk = macro.hotkey {
-                        Button(action: onAssignHotkey) {
-                            KeyCapView(text: hk.name, size: .sm)
-                        }
-                        .buttonStyle(.plain)
-                        .help(String(format: String(localized: "Hotkey: %@ — click to change", table: "EditorUX"), hk.name))
-                    }
-                    
-                    if macro.favorite {
-                        Image(systemName: "star.fill")
-                            .font(.system(size: 10, weight: .semibold))
-                            .foregroundStyle(AnyShapeStyle(.yellow))
-                    }
-
-                    if let automationSummary {
-                        Button(action: onSchedule) {
-                            Label(automationSummary.statusText, systemImage: "calendar.badge.checkmark")
-                                .font(.system(size: 10, weight: .medium))
-                                .foregroundStyle(.secondary)
-                                .lineLimit(1)
-                                .frame(maxWidth: 190, alignment: .leading)
-                        }
-                        .buttonStyle(.plain)
-                        .help(String(localized: "Edit automatic run…", table: "Automation"))
-                    }
-                }
-            }
+            CompactMacroRowMetadataView(
+                macro: macro,
+                automationSummary: automationSummary,
+                isCurrent: isCurrent,
+                onAssignHotkey: onAssignHotkey,
+                onSchedule: onSchedule
+            )
             
             Spacer(minLength: 8)
             
             if hovered || isCurrent {
-                Button(action: onReconstruct) { Image(systemName: "wand.and.stars") }
-                    .buttonStyle(.plain)
-                    .help(String(localized: "AI-assisted reconstruction…", table: "EditorUX"))
-                Button(action: onShowEvidence) {
-                    Image(systemName: "photo.on.rectangle.angled")
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(.secondary)
-                        .frame(width: 24, height: 24)
-                }
-                .buttonStyle(.plain)
-                .help(String(localized: "Latest run…", table: "Automation"))
-
-                Button(action: onSchedule) {
-                    Image(systemName: "calendar.badge.clock")
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(scheduleHovered ? Brand.sigAmber : .secondary)
-                        .frame(width: 24, height: 24)
-                        .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-                .onHover { scheduleHovered = $0 }
-                .help(String(localized: "Run automatically…", table: "Automation"))
-
-                Button(action: onEdit) {
-                    Image(systemName: "slider.horizontal.below.rectangle")
-                        .font(.system(size: 12, weight: .bold))
-                        .foregroundStyle(editHovered ? Brand.libraryBlue : .secondary)
-                        .frame(width: 24, height: 24)
-                        .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-                .onHover { editHovered = $0 }
-                .padding(.trailing, 4)
-                .help(String(localized: "Edit in Main Window", table: "Common"))
-                
-                Button(action: onPlay) {
-                    Image(systemName: "play.fill")
-                        .font(.system(size: 11, weight: .black))
-                        .foregroundStyle(.white)
-                        .frame(width: 28, height: 28)
-                        .background(
-                            Circle()
-                                .fill(Brand.libraryGreen.opacity(playHovered ? 1.0 : 0.85))
-                                .shadow(color: Brand.libraryGreen.opacity(0.3), radius: 4, y: 2)
-                        )
-                }
-                .buttonStyle(.plain)
-                .onHover { playHovered = $0 }
-                .help(String(localized: "Play", table: "Common"))
+                CompactMacroRowActionsView(
+                    hasTargetWindow: !macro.surfaces.isEmpty,
+                    onReconstruct: onReconstruct,
+                    onShowEvidence: onShowEvidence,
+                    onSchedule: onSchedule,
+                    onChooseTargetWindow: onChooseTargetWindow,
+                    onEdit: onEdit,
+                    onPlay: onPlay
+                )
             }
         }
         .padding(.horizontal, 12)
@@ -143,14 +70,6 @@ struct CompactMacroRow: View {
         .accessibilityAction(named: automationActionTitle) { onSchedule() }
     }
     
-    private var durationText: String {
-        let d = macro.duration
-        let m = Int(d) / 60
-        let s = Int(d) % 60
-        let cs = Int((d - floor(d)) * 100)
-        return String(format: "%02d:%02d.%02d", m, s, cs)
-    }
-
     private var automationActionTitle: String {
         automationSummary == nil
             ? String(localized: "Run automatically", table: "Automation")

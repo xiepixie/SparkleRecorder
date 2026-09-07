@@ -10,6 +10,89 @@ public enum ScreenCaptureError: Error {
     case captureFailed(Error?)
 }
 
+struct ScreenCaptureWindowDescriptor: Equatable, Sendable {
+    var windowID: CGWindowID
+    var bundleIdentifier: String?
+    var title: String?
+    var frame: CGRect
+    var hasOwningApplication: Bool
+}
+
+struct ScreenCaptureWindowRequest: Equatable, Sendable {
+    var bundleIdentifier: String?
+    var title: String?
+    var recordedWindowID: CGWindowID?
+    var expectedFrame: CGRect?
+}
+
+enum ScreenCaptureWindowMatcher {
+    static func bestMatchIndex(
+        candidates: [ScreenCaptureWindowDescriptor],
+        request: ScreenCaptureWindowRequest
+    ) -> Int? {
+        let eligible = candidates.indices.filter { index in
+            let candidate = candidates[index]
+            guard candidate.hasOwningApplication else { return false }
+            guard let expectedBundle = nonEmpty(request.bundleIdentifier) else { return true }
+            return nonEmpty(candidate.bundleIdentifier) == expectedBundle
+        }
+        guard !eligible.isEmpty else { return nil }
+
+        // A window title is mutable state in browsers. Once a recording has a
+        // WindowServer id, prefer that stable identity and only use title as a
+        // fallback for recordings that no longer resolve to the same OS window.
+        if let recordedWindowID = request.recordedWindowID,
+           let index = eligible.first(where: { candidates[$0].windowID == recordedWindowID }) {
+            return index
+        }
+
+        // Locator playback already resolved a concrete current window frame.
+        // Reuse that geometry before historical title matching so capture and
+        // click projection cannot silently refer to two different windows from
+        // the same application after a browser title change.
+        if let expectedFrame = request.expectedFrame,
+           let index = eligible.min(by: {
+               frameDistance(candidates[$0].frame, expectedFrame) < frameDistance(candidates[$1].frame, expectedFrame)
+           }),
+           frameDistance(candidates[index].frame, expectedFrame) <= 8 {
+            return index
+        }
+
+        if let expectedTitle = nonEmpty(request.title) {
+            let titleMatches = eligible.filter { nonEmpty(candidates[$0].title) == expectedTitle }
+            if let index = closestIndex(in: titleMatches, candidates: candidates, expectedFrame: request.expectedFrame) {
+                return index
+            }
+        }
+
+        return nil
+    }
+
+    private static func closestIndex(
+        in indices: [Int],
+        candidates: [ScreenCaptureWindowDescriptor],
+        expectedFrame: CGRect?
+    ) -> Int? {
+        guard !indices.isEmpty else { return nil }
+        guard let expectedFrame else { return indices.first }
+        return indices.min {
+            frameDistance(candidates[$0].frame, expectedFrame) < frameDistance(candidates[$1].frame, expectedFrame)
+        }
+    }
+
+    private static func frameDistance(_ lhs: CGRect, _ rhs: CGRect) -> CGFloat {
+        abs(lhs.minX - rhs.minX)
+            + abs(lhs.minY - rhs.minY)
+            + abs(lhs.width - rhs.width)
+            + abs(lhs.height - rhs.height)
+    }
+
+    private static func nonEmpty(_ value: String?) -> String? {
+        let trimmed = value?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        return trimmed.isEmpty ? nil : trimmed
+    }
+}
+
 @available(macOS 14.0, *)
 public actor ScreenCaptureService {
     private let logger = Logger(subsystem: "com.sparklerecorder.mac", category: "ScreenCaptureService")
@@ -17,22 +100,35 @@ public actor ScreenCaptureService {
     
     private init() {}
     
-    /// Captures a screenshot of a specific window by its bundle identifier and window title
-    public func captureWindow(bundleIdentifier: String?, title: String?) async throws -> CGImage {
+    /// Captures a screenshot of a specific window. Stable window identity and the
+    /// already-resolved playback frame take precedence over mutable browser titles.
+    public func captureWindow(
+        bundleIdentifier: String?,
+        title: String?,
+        recordedWindowID: CGWindowID? = nil,
+        expectedFrame: CGRect? = nil
+    ) async throws -> CGImage {
         let availableContent = try await SCShareableContent.current
-        
-        let window = availableContent.windows.first { w in
-            // Basic heuristic to match window. 
-            // In a real app we might match frame too, but bundleIdentifier is best effort
-            let bidMatch = bundleIdentifier == nil || w.owningApplication?.bundleIdentifier == bundleIdentifier
-            let titleMatch = title == nil || w.title == title
-            // Skip SparkleRecorder's own overlay windows if possible, but SCShareableContent handles basic windows
-            return bidMatch && titleMatch && w.owningApplication != nil
+        let descriptors = availableContent.windows.map { window in
+            ScreenCaptureWindowDescriptor(
+                windowID: window.windowID,
+                bundleIdentifier: window.owningApplication?.bundleIdentifier,
+                title: window.title,
+                frame: window.frame,
+                hasOwningApplication: window.owningApplication != nil
+            )
         }
-        
-        guard let targetWindow = window else {
+        let request = ScreenCaptureWindowRequest(
+            bundleIdentifier: bundleIdentifier,
+            title: title,
+            recordedWindowID: recordedWindowID,
+            expectedFrame: expectedFrame
+        )
+        guard let targetIndex = ScreenCaptureWindowMatcher.bestMatchIndex(candidates: descriptors, request: request),
+              availableContent.windows.indices.contains(targetIndex) else {
             throw ScreenCaptureError.noMatchingWindow
         }
+        let targetWindow = availableContent.windows[targetIndex]
         
         let filter = SCContentFilter(desktopIndependentWindow: targetWindow)
         let scale = await MainActor.run { NSScreen.main?.backingScaleFactor ?? 2.0 }

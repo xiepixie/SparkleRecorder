@@ -21,8 +21,9 @@ struct AutomationInspectorView: View {
     let onExportWorkflowDraft: (AutomationWorkflow) -> Void
     let onShareWorkflowPackage: (AutomationWorkflow) -> Void
     let onDeleteWorkflow: (UUID) -> Void
-    let onImportWorkflowFromDraftPreview: (AutomationWorkflow, URL?) -> Void
+    let onImportWorkflowFromDraftPreview: @MainActor (AutomationWorkflow, URL?) async throws -> Void
     let onAction: (AutomationAction) -> Void
+    let onCommitAction: @MainActor (AutomationAction) async throws -> Void
     let onCancelLink: () -> Void
 
     var body: some View {
@@ -79,7 +80,8 @@ struct AutomationInspectorView: View {
                                 onImportWorkflowFromDraftPreview: onImportWorkflowFromDraftPreview,
                                 onSelectTask: onSelectTask,
                                 onSelectDependency: onSelectDependency,
-                                onAction: onAction
+                                onAction: onAction,
+                                onCommitAction: onCommitAction
                             )
                         } else {
                             AutomationEmptyState(

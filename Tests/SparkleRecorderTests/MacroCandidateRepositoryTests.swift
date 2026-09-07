@@ -63,6 +63,18 @@ struct MacroCandidateRepositoryTests {
         #expect(retained.events == source.events)
     }
 
+    @Test func retainedSourceRevisionCanBeReloadedForEvidenceLineage() async throws {
+        let (root, repo, source, document) = try fixture()
+        defer { try? FileManager.default.removeItem(at: root) }
+        try await repo.saveMetadata(source)
+        try await repo.saveEvents(source.events, for: source.id)
+        _ = try await repo.importCandidate(document, for: source.id)
+
+        let revision = try MacroCandidateIdentity.revision(of: source)
+        #expect(try await repo.loadRetainedSource(revision: revision, for: source.id) == source)
+        #expect(try await repo.loadRetainedSource(revision: "missing", for: source.id) == nil)
+    }
+
     @Test func playbackLoadsWholeSnapshotWithoutSplitFallback() async throws {
         let id = UUID()
         let expected = SavedMacro(id: id, name: "Pinned", events: [event(3)], speed: 2)
@@ -153,6 +165,22 @@ struct MacroCandidateRepositoryTests {
         #expect(try Data(contentsOf: candidateURL) == candidateBytes)
     }
 
+    @Test func legacyStoredCandidateDefaultsToExternalSurfaceAuthority() async throws {
+        let (root, repo, source, document) = try fixture()
+        defer { try? FileManager.default.removeItem(at: root) }
+        try await repo.saveMetadata(source)
+        try await repo.saveEvents(source.events, for: source.id)
+        let candidate = try await repo.importCandidate(document, for: source.id)
+        let candidateURL = repo.packageURL(for: source.id)
+            .appendingPathComponent("reconstruction/candidate-\(candidate.id.uuidString).json")
+        var object = try #require(JSONSerialization.jsonObject(with: Data(contentsOf: candidateURL)) as? [String: Any])
+        object.removeValue(forKey: "authoringOrigin")
+        try JSONSerialization.data(withJSONObject: object).write(to: candidateURL, options: .atomic)
+
+        let reloaded = try await repo.loadCandidate(candidateID: candidate.id, for: source.id)
+        #expect(reloaded.authoringOrigin == .externalAuthoring)
+    }
+
     @Test func legacyCapabilityReceiptRequiresANewTest() async throws {
         let (root, repo, source, document) = try fixture()
         defer { try? FileManager.default.removeItem(at: root) }
@@ -164,7 +192,7 @@ struct MacroCandidateRepositoryTests {
         let receiptURL = repo.packageURL(for: source.id).appendingPathComponent("reconstruction/test-\(candidate.id.uuidString).json")
         var receipt = try #require(JSONSerialization.jsonObject(with: Data(contentsOf: receiptURL)) as? [String: Any])
         #expect(receipt["capabilityVersion"] as? String == MacroCandidateCapabilities.current.version)
-        receipt.removeValue(forKey: "capabilityVersion")
+        receipt["capabilityVersion"] = "macro-candidate/v3"
         try JSONSerialization.data(withJSONObject: receipt).write(to: receiptURL, options: .atomic)
         await #expect(throws: MacroCandidateStoreError.testRequired) {
             try await repo.acceptCandidate(candidateID: candidate.id, for: source.id)

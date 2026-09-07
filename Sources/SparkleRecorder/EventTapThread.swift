@@ -17,9 +17,15 @@ public final class EventTapThread: Thread, @unchecked Sendable {
     private let tapPlace: CGEventTapPlacement
     private let tapOptions: CGEventTapOptions
     
+    /// The tap and source are owned exclusively by this thread's `main()`.
+    /// Other threads may only request that the run loop stop; they must never
+    /// disable or invalidate these CoreGraphics objects directly.
     private var tap: CFMachPort?
     private var runLoopSource: CFRunLoopSource?
+
+    private let lifecycleLock = NSLock()
     private var runLoop: CFRunLoop?
+    private var stopRequested = false
 
     private let startupLock = NSLock()
     private let startupSemaphore = DispatchSemaphore(value: 0)
@@ -68,8 +74,22 @@ public final class EventTapThread: Thread, @unchecked Sendable {
     }
     
     public override func main() {
-        self.runLoop = CFRunLoopGetCurrent()
-        
+        guard let currentRunLoop = CFRunLoopGetCurrent() else {
+            signalStartup(false)
+            return
+        }
+
+        lifecycleLock.lock()
+        self.runLoop = currentRunLoop
+        let shouldAbortBeforeSetup = stopRequested
+        lifecycleLock.unlock()
+
+        if shouldAbortBeforeSetup {
+            signalStartup(false)
+            clearOwnedRunLoop(currentRunLoop)
+            return
+        }
+
         let callback: CGEventTapCallBack = { proxy, type, event, refcon in
             guard let refcon = refcon else { return Unmanaged.passUnretained(event) }
             let thread = Unmanaged<EventTapThread>.fromOpaque(refcon).takeUnretainedValue()
@@ -123,35 +143,67 @@ public final class EventTapThread: Thread, @unchecked Sendable {
         self.tap = newTap
         let source = CFMachPortCreateRunLoopSource(kCFAllocatorDefault, newTap, 0)
         self.runLoopSource = source
-        CFRunLoopAddSource(runLoop, source, .commonModes)
+        CFRunLoopAddSource(currentRunLoop, source, .commonModes)
+
+        if isStopRequested {
+            signalStartup(false)
+            teardownTap(on: currentRunLoop)
+            clearOwnedRunLoop(currentRunLoop)
+            return
+        }
+
         CGEvent.tapEnable(tap: newTap, enable: true)
         signalStartup(true)
-        
-        // Start run loop
-        CFRunLoopRun()
-        
-        // Teardown once loop stops
-        teardownTap()
-    }
-    
-    public func stop() {
-        // Stop the runloop asynchronously
-        if let runLoop = self.runLoop {
-            CFRunLoopStop(runLoop)
+
+        if !isStopRequested {
+            CFRunLoopRun()
         }
-        // Force teardown on the caller thread to ensure tap is immediately invalidated
-        teardownTap()
+
+        // Teardown has one owner: the event-tap thread. `stop()` only requests
+        // run-loop termination, so no other thread can race an invalidate against
+        // this final remove/invalidate sequence.
+        teardownTap(on: currentRunLoop)
+        clearOwnedRunLoop(currentRunLoop)
     }
-    
-    private func teardownTap() {
-        if let tap = tap {
-            CGEvent.tapEnable(tap: tap, enable: false)
+
+    public func stop() {
+        lifecycleLock.lock()
+        stopRequested = true
+        let ownedRunLoop = runLoop
+        lifecycleLock.unlock()
+
+        guard let ownedRunLoop else { return }
+        CFRunLoopStop(ownedRunLoop)
+        CFRunLoopWakeUp(ownedRunLoop)
+    }
+
+    private var isStopRequested: Bool {
+        lifecycleLock.lock()
+        defer { lifecycleLock.unlock() }
+        return stopRequested
+    }
+
+    private func clearOwnedRunLoop(_ ownedRunLoop: CFRunLoop) {
+        lifecycleLock.lock()
+        if runLoop === ownedRunLoop {
+            runLoop = nil
+        }
+        lifecycleLock.unlock()
+    }
+
+    /// Must be called only from `main()` on the EventTapThread.
+    private func teardownTap(on ownedRunLoop: CFRunLoop) {
+        if let source = runLoopSource {
+            CFRunLoopRemoveSource(ownedRunLoop, source, .commonModes)
+            runLoopSource = nil
+        }
+        if let tap {
+            // Invalidating the CFMachPort stops it receiving messages and also
+            // invalidates its run-loop source. Avoid a separate tapEnable(false)
+            // call during destruction; re-enabling is only needed for the
+            // timeout/Secure Input recovery path while the tap is still live.
             CFMachPortInvalidate(tap)
             self.tap = nil
-        }
-        if let source = runLoopSource, let runLoop = runLoop {
-            CFRunLoopRemoveSource(runLoop, source, .commonModes)
-            self.runLoopSource = nil
         }
     }
 

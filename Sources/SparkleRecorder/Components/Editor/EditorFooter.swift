@@ -25,7 +25,7 @@ struct EditorFooter: View {
                     .foregroundStyle(footerHealthTint)
                     .help(macroEditorHealthDetail(health))
                 Text("·").foregroundStyle(.tertiary)
-                Text(NSLocalizedString("Edits apply live", tableName: "Common", comment: ""))
+                Text("Edits apply live", tableName: "Common")
                     .font(.system(size: 10))
                     .foregroundStyle(.tertiary)
             }

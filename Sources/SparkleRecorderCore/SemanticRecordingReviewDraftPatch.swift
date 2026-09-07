@@ -1044,20 +1044,17 @@ public struct SemanticRecordingReviewRepeatUntilBodyResolution: Equatable, Senda
     public var bodyTasks: [AutomationWorkflowDraftTask]
     public var linkedMacroIDs: [UUID]
     public var bodyOptions: [SemanticRecordingReviewRepeatUntilBodyOption]
-    public var message: String
 
     public init(
         status: Status,
         bodyTasks: [AutomationWorkflowDraftTask] = [],
         linkedMacroIDs: [UUID] = [],
-        bodyOptions: [SemanticRecordingReviewRepeatUntilBodyOption] = [],
-        message: String
+        bodyOptions: [SemanticRecordingReviewRepeatUntilBodyOption] = []
     ) {
         self.status = status
         self.bodyTasks = bodyTasks
         self.linkedMacroIDs = linkedMacroIDs
         self.bodyOptions = bodyOptions
-        self.message = message
     }
 
     public var isResolved: Bool {
@@ -1095,8 +1092,7 @@ public enum SemanticRecordingReviewRepeatUntilBodyResolver {
         guard !linkedMacros.isEmpty else {
             return SemanticRecordingReviewRepeatUntilBodyResolution(
                 status: .noLinkedMacro,
-                bodyOptions: bodyOptions,
-                message: "Save or link this semantic recording to a macro before creating a Repeat-Until body."
+                bodyOptions: bodyOptions
             )
         }
 
@@ -1105,8 +1101,7 @@ public enum SemanticRecordingReviewRepeatUntilBodyResolver {
             return SemanticRecordingReviewRepeatUntilBodyResolution(
                 status: .ambiguousLinkedMacros,
                 linkedMacroIDs: linkedMacroIDs,
-                bodyOptions: bodyOptions,
-                message: "Multiple macros are linked to this recording. Choose one before creating a Repeat-Until body."
+                bodyOptions: bodyOptions
             )
         }
 
@@ -1133,8 +1128,7 @@ public enum SemanticRecordingReviewRepeatUntilBodyResolver {
                 )
             ],
             linkedMacroIDs: linkedMacroIDs,
-            bodyOptions: bodyOptions,
-            message: "Repeat-Until body will replay \(macro.name)."
+            bodyOptions: bodyOptions
         )
     }
 

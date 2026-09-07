@@ -3,7 +3,7 @@ import SparkleRecorderCore
 
 struct AutomationWorkflowDraftPreviewSheet: View {
     let existingWorkflowName: String?
-    let onImportWorkflow: (AutomationWorkflow, URL?) -> Void
+    let onImportWorkflow: @MainActor (AutomationWorkflow, URL?) async throws -> Void
     @Environment(\.dismiss) private var dismiss
     @State private var previewState: AutomationWorkflowDraftPreviewState
     @State private var isShowingImportConfirmation = false
@@ -16,11 +16,13 @@ struct AutomationWorkflowDraftPreviewSheet: View {
     @State private var patchApplyMessage = ""
     @State private var patchChangedTaskKeys: [String] = []
     @State private var patchChangedDependencyKeys: [String] = []
+    @State private var isImporting = false
+    @State private var importErrorMessage: String?
 
     init(
         state: AutomationWorkflowDraftPreviewState,
         existingWorkflowName: String?,
-        onImportWorkflow: @escaping (AutomationWorkflow, URL?) -> Void
+        onImportWorkflow: @escaping @MainActor (AutomationWorkflow, URL?) async throws -> Void
     ) {
         _previewState = State(initialValue: state)
         self.existingWorkflowName = existingWorkflowName
@@ -209,14 +211,27 @@ struct AutomationWorkflowDraftPreviewSheet: View {
         HStack(spacing: 10) {
             LocalizedSystemButton("Close", tableName: L10nTable.common, systemImage: "xmark", action: dismiss.callAsFunction)
                 .buttonStyle(.bordered)
+                .disabled(isImporting)
 
-            Spacer()
+            if let importErrorMessage {
+                Label(importErrorMessage, systemImage: "exclamationmark.triangle.fill")
+                    .font(.caption)
+                    .foregroundStyle(.red)
+                    .lineLimit(2)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            } else {
+                Spacer()
+            }
 
             Button(importButtonTitle, systemImage: importButtonImage, action: requestImport)
                 .buttonStyle(.bordered)
-                .disabled(!previewState.canImportCompiledWorkflow)
+                .disabled(!previewState.canImportCompiledWorkflow || isImporting)
                 .help(importButtonHelp)
                 .accessibilityLabel(importButtonTitle)
+
+            if isImporting {
+                ProgressView().controlSize(.small)
+            }
         }
         .padding(16)
     }
@@ -683,7 +698,7 @@ struct AutomationWorkflowDraftPreviewSheet: View {
                     }
                 }
 
-                Text(row.message)
+                Text(AutomationWorkflowDraftIssuePresentation.message(for: row))
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -937,18 +952,30 @@ struct AutomationWorkflowDraftPreviewSheet: View {
     }
 
     private func requestImport() {
-        guard previewState.canImportCompiledWorkflow else {
+        guard previewState.canImportCompiledWorkflow, !isImporting else {
             return
         }
+        importErrorMessage = nil
         isShowingImportConfirmation = true
     }
 
     private func confirmImport() {
-        guard let workflow = previewState.compiledWorkflow, previewState.canImportCompiledWorkflow else {
+        guard let workflow = previewState.compiledWorkflow,
+              previewState.canImportCompiledWorkflow,
+              !isImporting else {
             return
         }
-        onImportWorkflow(workflow, previewState.sourceDirectory)
-        dismiss()
+        isImporting = true
+        importErrorMessage = nil
+        Task { @MainActor in
+            do {
+                try await onImportWorkflow(workflow, previewState.sourceDirectory)
+                dismiss()
+            } catch {
+                importErrorMessage = error.localizedDescription
+                isImporting = false
+            }
+        }
     }
 
     private func selectInitialTaskForRemovalIfNeeded() {
@@ -985,8 +1012,7 @@ struct AutomationWorkflowDraftPreviewSheet: View {
             )
             rebuildPreview(with: result.document)
         } catch {
-            draftEditErrorMessage = String(describing: error)
-            isShowingDraftEditError = true
+            presentDraftEditError(error)
         }
     }
 
@@ -1011,8 +1037,7 @@ struct AutomationWorkflowDraftPreviewSheet: View {
             )
             rebuildPreview(with: result.document)
         } catch {
-            draftEditErrorMessage = String(describing: error)
-            isShowingDraftEditError = true
+            presentDraftEditError(error)
         }
     }
 
@@ -1026,8 +1051,7 @@ struct AutomationWorkflowDraftPreviewSheet: View {
             )
             rebuildPreview(with: result.document)
         } catch {
-            draftEditErrorMessage = String(describing: error)
-            isShowingDraftEditError = true
+            presentDraftEditError(error)
         }
     }
 
@@ -1054,8 +1078,7 @@ struct AutomationWorkflowDraftPreviewSheet: View {
             }
             rebuildPreview(with: result.document)
         } catch {
-            draftEditErrorMessage = String(describing: error)
-            isShowingDraftEditError = true
+            presentDraftEditError(error)
         }
     }
 
@@ -1105,9 +1128,13 @@ struct AutomationWorkflowDraftPreviewSheet: View {
             )
             rebuildPreview(with: editResult.document)
         case .failure(let error):
-            draftEditErrorMessage = String(describing: error)
-            isShowingDraftEditError = true
+            presentDraftEditError(error)
         }
+    }
+
+    private func presentDraftEditError(_ error: Error) {
+        draftEditErrorMessage = AutomationWorkflowDraftEditIssuePresentation.message(for: error)
+        isShowingDraftEditError = true
     }
 
     private func dependencyCount(attachedTo taskKey: String, in document: AutomationWorkflowDraftDocument) -> Int {

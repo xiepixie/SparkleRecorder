@@ -19,11 +19,13 @@ struct AutomationPlayerReservationTests {
         let start = Task { await first.start(firstRequest) }
         await gate.waitForEntry()
         #expect(player.ownsAutomationRun(firstRequest.runID))
+        #expect(player.isPlaybackTargetReserved)
         #expect(await second.start(request()) == .rejected(.rejected(reason: "Player is already running")))
         await first.cancel(firstRequest.runID)
         await gate.release()
         #expect(await start.value == .rejected(.cancelled(reason: "Automation cancelled during startup preparation")))
         #expect(!player.ownsAutomationRun(firstRequest.runID))
+        #expect(!player.isPlaybackTargetReserved)
         #expect(!player.isPlaying)
     }
 
@@ -54,6 +56,7 @@ struct AutomationPlayerReservationTests {
         #expect(player.reserveAutomationRun(current))
         await oldClient.cancel(UUID())
         #expect(player.ownsAutomationRun(current))
+        #expect(player.isPlaybackTargetReserved)
         #expect(!player.play(events: TestFixtures.clickPair(), runID: UUID()))
         #expect(!player.isPlaying)
         #expect(!player.stop(runID: UUID()))
@@ -63,6 +66,7 @@ struct AutomationPlayerReservationTests {
         #expect(!player.canStartAutomationRun(current))
         player.releaseAutomationRun(current)
         #expect(!player.ownsAutomationRun(current))
+        #expect(!player.isPlaybackTargetReserved)
     }
 
     @Test @MainActor
@@ -83,12 +87,14 @@ struct AutomationPlayerReservationTests {
         await preparation.release()
         await cleanup.waitForEntry()
         #expect(player.ownsAutomationRun(run.runID))
+        #expect(player.isPlaybackTargetReserved)
         #expect(await second.start(request()) == .rejected(.rejected(reason: "Player is already running")))
         let cancellation = Task { await first.cancel(run.runID) }
         await cleanup.release()
         _ = await task.value
         await cancellation.value
         #expect(!player.ownsAutomationRun(run.runID))
+        #expect(!player.isPlaybackTargetReserved)
     }
 
     @MainActor private func request() -> AutomationPlayerStartRequest {
