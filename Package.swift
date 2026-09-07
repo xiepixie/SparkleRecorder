@@ -39,6 +39,7 @@ let toolingAlwaysExcludedAppSources: Set<String> = [
     "AutomationTaskRunEditorView.swift",
     "AutomationVisualAssetPackageRootAssociation.swift",
     "AutomationWorkflowAuthoringState.swift",
+    "AutomationWorkflowPackageImportConflict.swift",
     "AutomationWorkflowRecordingHandoff.swift",
     "AuxiliaryCaptureActivityCenter.swift",
     "MacroCandidateEditorSession.swift",

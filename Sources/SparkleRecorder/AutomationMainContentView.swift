@@ -823,7 +823,7 @@ struct AutomationMainContentView: View {
 
   private func importWorkflowPackage() {
     AutomationWorkflowPackagePresenter.importWorkflows(
-      currentWorkflows: state.workflows,
+      currentWorkflows: currentWorkflows,
       availableMacroIDs: Set(macros.map(\.id))
     ) { workflows in
       guard !workflows.isEmpty else {

@@ -7,11 +7,6 @@ import UniformTypeIdentifiers
 enum AutomationWorkflowPackagePresenter {
     private static var sharedPackageURLs: [URL] = []
 
-    private struct WorkflowPackageImportItem {
-        var workflow: AutomationWorkflow
-        var packageDirectoryURL: URL
-    }
-
     static func export(workflow: AutomationWorkflow) {
         export(
             workflows: [workflow],
@@ -109,7 +104,7 @@ enum AutomationWorkflowPackagePresenter {
     }
 
     static func importWorkflows(
-        currentWorkflows: [AutomationWorkflow],
+        currentWorkflows: @escaping @MainActor () -> [AutomationWorkflow],
         availableMacroIDs: Set<UUID>,
         onImport: @escaping @MainActor ([AutomationWorkflow]) async throws -> Void
     ) {
@@ -132,13 +127,16 @@ enum AutomationWorkflowPackagePresenter {
                     let data = try Data(contentsOf: url)
                     let packageDirectoryURL = url.deletingLastPathComponent()
                     return try AutomationWorkflowPackage.decode(data).workflows.map {
-                        WorkflowPackageImportItem(
+                        AutomationWorkflowPackageImportItem(
                             workflow: $0,
                             packageDirectoryURL: packageDirectoryURL
                         )
                     }
                 }
-                guard let prepared = prepareForImport(importItems, currentWorkflows: currentWorkflows) else {
+                guard let prepared = prepareForImport(
+                    importItems,
+                    currentWorkflows: currentWorkflows()
+                ) else {
                     return
                 }
                 let workflows = prepared.map(\.workflow)
@@ -178,21 +176,18 @@ enum AutomationWorkflowPackagePresenter {
     }
 
     private static func prepareForImport(
-        _ importItems: [WorkflowPackageImportItem],
+        _ importItems: [AutomationWorkflowPackageImportItem],
         currentWorkflows: [AutomationWorkflow]
-    ) -> [WorkflowPackageImportItem]? {
+    ) -> [AutomationWorkflowPackageImportItem]? {
         guard !importItems.isEmpty else {
             return []
         }
 
-        let workflows = importItems.map(\.workflow)
-        let currentIDs = Set(currentWorkflows.map(\.id))
-        let importedIDs = workflows.map(\.id)
-        let duplicateIDs = duplicateValues(importedIDs)
-        let conflictsExisting = workflows.contains { currentIDs.contains($0.id) }
-        let conflictsWithinImport = !duplicateIDs.isEmpty
-
-        guard conflictsExisting || conflictsWithinImport else {
+        let conflictPlan = AutomationWorkflowPackageImportConflictPlan.make(
+            importItems: importItems,
+            currentWorkflows: currentWorkflows
+        )
+        guard conflictPlan.requiresResolution else {
             return importItems
         }
 
@@ -206,7 +201,7 @@ enum AutomationWorkflowPackagePresenter {
 
         switch alert.runModal() {
         case .alertFirstButtonReturn:
-            return importItemsWithCopiedConflicts(importItems, currentIDs: currentIDs)
+            return conflictPlan.addingCopies(importItems, now: Date())
         case .alertSecondButtonReturn:
             return importItems
         default:
@@ -254,33 +249,8 @@ enum AutomationWorkflowPackagePresenter {
             .sorted { $0.uuidString < $1.uuidString }
     }
 
-    private static func importItemsWithCopiedConflicts(
-        _ importItems: [WorkflowPackageImportItem],
-        currentIDs: Set<UUID>
-    ) -> [WorkflowPackageImportItem] {
-        var seenIDs = currentIDs
-        let now = Date()
-        return importItems.map { item in
-            var workflow = item.workflow
-            guard seenIDs.contains(workflow.id) else {
-                seenIDs.insert(workflow.id)
-                return item
-            }
-
-            workflow.id = UUID()
-            workflow.name = String(format: String(localized: "%@ Copy", table: "Common"), workflow.name)
-            workflow.createdAt = now
-            workflow.modifiedAt = now
-            seenIDs.insert(workflow.id)
-            return WorkflowPackageImportItem(
-                workflow: workflow,
-                packageDirectoryURL: item.packageDirectoryURL
-            )
-        }
-    }
-
     private static func persistVisualAssetPackageRoots(
-        for importItems: [WorkflowPackageImportItem]
+        for importItems: [AutomationWorkflowPackageImportItem]
     ) async throws {
         let association = AutomationVisualAssetPackageRootAssociation.fileBacked()
         let requests = importItems.map { item in
@@ -291,15 +261,6 @@ enum AutomationWorkflowPackagePresenter {
             )
         }
         try await association.persist(requests, associatedAt: Date())
-    }
-
-    private static func duplicateValues<T: Hashable>(_ values: [T]) -> [T] {
-        var seen: Set<T> = []
-        var duplicates: Set<T> = []
-        for value in values where !seen.insert(value).inserted {
-            duplicates.insert(value)
-        }
-        return Array(duplicates)
     }
 
     private static func safeFileName(_ name: String) -> String {
