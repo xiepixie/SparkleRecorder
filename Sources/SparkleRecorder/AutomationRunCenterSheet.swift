@@ -10,7 +10,7 @@ struct AutomationRunCenterSheet: View {
   @State private var selectedExecutionID: UUID?
   @State private var evidenceSelection: AutomationRunCenterEvidenceSelection?
   @State private var pendingCancellation: AutomationRunCenterCommand?
-  @State private var pendingDeletion: AutomationRunCenterCommand?
+  @State private var pendingDeletion: AutomationRunCenterDeletionConfirmation?
   @State private var commandInFlight = false
   @State private var commandFeedback: AutomationRunCenterCommandFeedback?
   @State private var storageUsage: AutomationRunStorageUsage?
@@ -130,9 +130,9 @@ struct AutomationRunCenterSheet: View {
         pendingDeletion = nil
       }
       Button(String(localized: "Delete", table: "Common"), role: .destructive) {
-        guard let command = pendingDeletion else { return }
+        guard let confirmation = pendingDeletion else { return }
         pendingDeletion = nil
-        Task { await execute(command) }
+        Task { await execute(confirmation.command) }
       }
     } message: {
       Text(deletionAlertMessage)
@@ -459,7 +459,11 @@ struct AutomationRunCenterSheet: View {
     case .cancelExecution:
       pendingCancellation = command
     case .deleteExecution:
-      pendingDeletion = command
+      pendingDeletion = AutomationRunCenterDeletionConfirmation.make(
+        command: command,
+        projection: model.projection,
+        storageUsage: storageUsage
+      )
     default:
       Task { await execute(command) }
     }
@@ -496,8 +500,8 @@ struct AutomationRunCenterSheet: View {
   }
 
   private var deletionAlertTitle: String {
-    guard case .deleteExecution(_, let scope) = pendingDeletion else { return "" }
-    switch scope {
+    guard let pendingDeletion else { return "" }
+    switch pendingDeletion.scope {
     case .screenshots: return String(localized: "Delete screenshots?", table: "Automation")
     case .evidence: return String(localized: "Delete evidence?", table: "Automation")
     case .history: return String(localized: "Delete this run history?", table: "Automation")
@@ -505,9 +509,9 @@ struct AutomationRunCenterSheet: View {
   }
 
   private var deletionAlertMessage: String {
-    guard case .deleteExecution(_, let scope) = pendingDeletion,
-          let execution = selectedExecution else { return "" }
-    guard let storage = storageUsage?.breakdown(for: execution.executionID) else {
+    guard let pendingDeletion else { return "" }
+    let scope = pendingDeletion.scope
+    guard let storage = pendingDeletion.storage else {
       switch scope {
       case .screenshots:
         return String(localized: "This removes ending screenshots. Reports and run history stay available. Storage size is currently unavailable.", table: "Automation")
@@ -516,7 +520,7 @@ struct AutomationRunCenterSheet: View {
       case .history:
         return String(
           format: String(localized: "This permanently removes %d run record(s) and their associated evidence. Storage size is currently unavailable.", table: "Automation"),
-          execution.runs.count
+          pendingDeletion.runCount
         )
       }
     }
@@ -537,7 +541,7 @@ struct AutomationRunCenterSheet: View {
     case .history:
       return String(
         format: String(localized: "This permanently removes %d run record(s) and about %@ of associated evidence.", table: "Automation"),
-        execution.runs.count,
+        pendingDeletion.runCount,
         size
       )
     }

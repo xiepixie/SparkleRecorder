@@ -991,8 +991,7 @@ struct AutomationMainContentView: View {
   }
 
   private func workflowStartTaskID(in workflow: AutomationWorkflow) -> UUID? {
-    let dependentTaskIDs = Set(workflow.dependencies.filter(\.isEnabled).map(\.toTaskID))
-    return workflow.tasks.first { !dependentTaskIDs.contains($0.id) }?.id
+    AutomationCatalogProjection.entryTaskIDs(for: workflow).first
       ?? workflow.tasks.first?.id
   }
 
@@ -1239,7 +1238,7 @@ struct AutomationMainContentView: View {
     case .ocrText:
       name = String(localized: "Text condition", table: "Automation")
     case .visual(let condition):
-      name = visualConditionName(for: condition)
+      name = AutomationVisualConditionPresentation.title(for: condition.type)
     case .previousOutcome:
       name = String(localized: "Previous outcome", table: "Common")
     }
@@ -1263,19 +1262,6 @@ struct AutomationMainContentView: View {
       return .backgroundReadOnly
     case .manualApproval, .externalSignal, .previousOutcome:
       return .none
-    }
-  }
-
-  private func visualConditionName(for condition: AutomationVisualCondition) -> String {
-    switch condition.type {
-    case .regionChanged:
-      return String(localized: "Region changed", table: "EditorUX")
-    case .imageAppeared:
-      return String(localized: "Image appeared", table: "Common")
-    case .imageDisappeared:
-      return String(localized: "Image disappeared", table: "Common")
-    case .pixelMatched:
-      return String(localized: "Pixel matched", table: "Common")
     }
   }
 
