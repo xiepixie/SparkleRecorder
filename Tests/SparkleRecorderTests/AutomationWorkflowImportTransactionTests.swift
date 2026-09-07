@@ -30,7 +30,7 @@ struct AutomationWorkflowImportTransactionTests {
         do {
             try await AutomationWorkflowImportTransaction.commit(
                 [replacement, added, failing],
-                replacing: [existing]
+                replacing: { [existing] }
             ) { action in
                 switch action {
                 case .upsertWorkflow(let workflow, _):
@@ -55,6 +55,46 @@ struct AutomationWorkflowImportTransactionTests {
     }
 
     @MainActor
+    @Test("Rollback does not overwrite workflow edits made after import UI opened")
+    func rollbackPreservesNewerWorkflowEdit() async {
+        let original = AutomationWorkflow(name: "Original")
+        var userEdited = original
+        userEdited.name = "User edit after file panel opened"
+        var replacement = original
+        replacement.name = "Imported replacement"
+        let failing = AutomationWorkflow(name: "Failing")
+        var stored = [original.id: userEdited]
+        let currentWorkflows = AutomationWorkflowImportCurrentStateBox([original])
+        let currentWorkflowsProvider = { @MainActor in currentWorkflows.workflows }
+        currentWorkflows.workflows = [userEdited]
+
+        do {
+            try await AutomationWorkflowImportTransaction.commit(
+                [replacement, failing],
+                replacing: currentWorkflowsProvider
+            ) { action in
+                switch action {
+                case .upsertWorkflow(let workflow, _):
+                    if workflow.id == failing.id {
+                        throw AutomationWorkflowImportTransactionTestError.importFailed
+                    }
+                    stored[workflow.id] = workflow
+                case .deleteWorkflow(let workflowID, _):
+                    stored.removeValue(forKey: workflowID)
+                default:
+                    break
+                }
+            }
+            Issue.record("Expected the import transaction to fail")
+        } catch is AutomationWorkflowImportTransactionFailure {
+        } catch {
+            Issue.record("Unexpected error: \(error)")
+        }
+
+        #expect(stored[original.id] == userEdited)
+    }
+
+    @MainActor
     @Test("Rollback failures are reported as partial-state risk")
     func reportsRollbackFailure() async {
         let added = AutomationWorkflow(name: "Added")
@@ -64,7 +104,7 @@ struct AutomationWorkflowImportTransactionTests {
         do {
             try await AutomationWorkflowImportTransaction.commit(
                 [added, failing],
-                replacing: []
+                replacing: { [] }
             ) { action in
                 switch action {
                 case .upsertWorkflow(let workflow, _):
@@ -87,5 +127,14 @@ struct AutomationWorkflowImportTransactionTests {
         }
 
         #expect(deleteAttempts == 1)
+    }
+}
+
+@MainActor
+private final class AutomationWorkflowImportCurrentStateBox {
+    var workflows: [AutomationWorkflow]
+
+    init(_ workflows: [AutomationWorkflow]) {
+        self.workflows = workflows
     }
 }

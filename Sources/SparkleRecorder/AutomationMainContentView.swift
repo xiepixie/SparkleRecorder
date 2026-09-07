@@ -42,6 +42,7 @@ struct AutomationMainContentView: View {
   let initialTaskListPreviewState: AutomationWorkflowTaskListPreviewState?
   let onRefresh: () -> Void
   let onAction: (AutomationAction) -> Void
+  let currentWorkflows: @MainActor () -> [AutomationWorkflow]
   let onCommitAction: @MainActor (AutomationAction) async throws -> Void
   let onRecordMacro: (() -> Void)?
   let onPreviewScheduledMacro: @MainActor (UUID, AutomationTask?) async throws -> Void
@@ -85,6 +86,7 @@ struct AutomationMainContentView: View {
     initialTaskListPreviewState: AutomationWorkflowTaskListPreviewState? = nil,
     onRefresh: @escaping () -> Void,
     onAction: @escaping (AutomationAction) -> Void,
+    currentWorkflows: (@MainActor () -> [AutomationWorkflow])? = nil,
     onCommitAction: @escaping @MainActor (AutomationAction) async throws -> Void = { _ in },
     onRecordMacro: (() -> Void)? = nil,
     onPreviewScheduledMacro: @escaping @MainActor (UUID, AutomationTask?) async throws -> Void = { _, _ in },
@@ -113,6 +115,7 @@ struct AutomationMainContentView: View {
     self.initialTaskListPreviewState = initialTaskListPreviewState
     self.onRefresh = onRefresh
     self.onAction = onAction
+    self.currentWorkflows = currentWorkflows ?? { state.workflows }
     self.onCommitAction = onCommitAction
     self.onRecordMacro = onRecordMacro
     self.onPreviewScheduledMacro = onPreviewScheduledMacro
@@ -830,7 +833,7 @@ struct AutomationMainContentView: View {
       let date = Date()
       try await AutomationWorkflowImportTransaction.commit(
         workflows,
-        replacing: state.workflows,
+        replacing: currentWorkflows,
         perform: onCommitAction,
         at: date
       )

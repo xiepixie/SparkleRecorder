@@ -23,10 +23,11 @@ struct AutomationWorkflowImportTransactionFailure: LocalizedError {
 enum AutomationWorkflowImportTransaction {
     static func commit(
         _ workflows: [AutomationWorkflow],
-        replacing existingWorkflows: [AutomationWorkflow],
+        replacing currentWorkflows: @MainActor () -> [AutomationWorkflow],
         perform: @MainActor (AutomationAction) async throws -> Void,
         at date: Date = Date()
     ) async throws {
+        let existingWorkflows = currentWorkflows()
         let existingByID = Dictionary(uniqueKeysWithValues: existingWorkflows.map { ($0.id, $0) })
         var committed: [AutomationWorkflow] = []
 
