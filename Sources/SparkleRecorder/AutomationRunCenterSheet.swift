@@ -13,8 +13,7 @@ struct AutomationRunCenterSheet: View {
   @State private var pendingDeletion: AutomationRunCenterDeletionConfirmation?
   @State private var commandInFlight = false
   @State private var commandFeedback: AutomationRunCenterCommandFeedback?
-  @State private var storageUsage: AutomationRunStorageUsage?
-  @State private var storageUsageError: String?
+  @State private var storageUsageState = AutomationRunCenterStorageUsageState()
 
   private let onOpenWorkflow: (UUID, UUID?) -> Void
   private let onPerformCommand:
@@ -211,7 +210,7 @@ struct AutomationRunCenterSheet: View {
       Divider()
     }
 
-    if let storageUsageError {
+    if let storageUsageError = storageUsageState.errorMessage {
       HStack(spacing: 8) {
         Image(systemName: "externaldrive.badge.questionmark")
           .foregroundStyle(Brand.sigAmber)
@@ -388,7 +387,7 @@ struct AutomationRunCenterSheet: View {
         primaryCommand: AutomationRunCenterCommandResolver.primaryCommand(for: selectedExecution),
         commandInFlight: commandInFlight,
         commandFeedback: commandFeedback,
-        storage: storageUsage?.breakdown(for: selectedExecution.executionID),
+        storage: storageUsageState.usage?.breakdown(for: selectedExecution.executionID),
         onPerformCommand: perform,
         onOpenWorkflow: {
           onOpenWorkflow(
@@ -462,7 +461,7 @@ struct AutomationRunCenterSheet: View {
       pendingDeletion = AutomationRunCenterDeletionConfirmation.make(
         command: command,
         projection: model.projection,
-        storageUsage: storageUsage
+        storageUsage: storageUsageState.usage
       )
     default:
       Task { await execute(command) }
@@ -487,15 +486,16 @@ struct AutomationRunCenterSheet: View {
 
   @MainActor
   private func refreshStorageUsage() async {
+    let refreshID = storageUsageState.beginRefresh()
     do {
-      storageUsage = try await onLoadStorageUsage()
-      storageUsageError = nil
+      let usage = try await onLoadStorageUsage()
+      storageUsageState.publish(usage, for: refreshID)
     } catch {
-      storageUsage = nil
-      storageUsageError = String(
+      let message = String(
         format: String(localized: "Run storage usage could not be calculated: %@", table: "Automation"),
         error.localizedDescription
       )
+      storageUsageState.publishFailure(message, for: refreshID)
     }
   }
 

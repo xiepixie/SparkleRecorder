@@ -79,6 +79,36 @@ struct AutomationRunCenterModelTests {
         #expect(model.loadState == .loaded(at: firstLoadedAt))
     }
 
+    @Test("A slower silent refresh cannot overwrite a newer runtime snapshot")
+    func staleSilentRefreshCannotOverwriteNewerSnapshot() async {
+        let oldState = refreshStateFixture(workflowName: "Old")
+        let newState = refreshStateFixture(workflowName: "New")
+        let gate = AutomationRunCenterRefreshGate(
+            oldResult: .loadedVersioned(
+                AutomationRuntimeSnapshot(state: oldState, revision: 1)
+            ),
+            newResult: .loadedVersioned(
+                AutomationRuntimeSnapshot(state: newState, revision: 2)
+            )
+        )
+        let model = AutomationRunCenterModel {
+            await gate.load()
+        }
+
+        let staleRefresh = Task { @MainActor in
+            await model.refresh(showsLoading: false)
+        }
+        await gate.waitUntilOldRefreshStarts()
+
+        await model.refresh(showsLoading: false)
+        #expect(model.projection.executions.first?.workflowName == "New")
+
+        await gate.releaseOldRefresh()
+        await staleRefresh.value
+
+        #expect(model.projection.executions.first?.workflowName == "New")
+    }
+
     @Test("Versioned polling skips projection work when runtime revision is unchanged")
     func versionedPollingSkipsUnchangedRevision() async {
         let firstLoadedAt = Date(timeIntervalSince1970: 900)
@@ -105,6 +135,21 @@ struct AutomationRunCenterModelTests {
         #expect(nowCallCount == callsAfterFirstRefresh)
     }
 
+    private func refreshStateFixture(workflowName: String) -> AutomationRunState {
+        let task = AutomationTask(name: "Step", kind: .delay(1))
+        let workflow = AutomationWorkflow(name: workflowName, tasks: [task])
+        let createdAt = Date(timeIntervalSince1970: 100)
+        let run = AutomationTaskRun(
+            workflowID: workflow.id,
+            taskID: task.id,
+            completedAt: Date(timeIntervalSince1970: 101),
+            status: .completed,
+            outcome: .succeeded(report: nil),
+            createdAt: createdAt
+        )
+        return AutomationRunState(workflows: [workflow], runs: [run], now: createdAt)
+    }
+
     private func stateFixture() -> (state: AutomationRunState, workflow: AutomationWorkflow) {
         let task = AutomationTask(name: "Export", kind: .delay(1))
         let workflow = AutomationWorkflow(name: "Morning report", tasks: [task])
@@ -122,5 +167,57 @@ struct AutomationRunCenterModelTests {
             AutomationRunState(workflows: [workflow], runs: [run], now: startedAt),
             workflow
         )
+    }
+}
+
+private actor AutomationRunCenterRefreshGate {
+    private let oldResult: AutomationRunCenterLoadResult
+    private let newResult: AutomationRunCenterLoadResult
+    private var loadCount = 0
+    private var oldRefreshStarted = false
+    private var startWaiters: [CheckedContinuation<Void, Never>] = []
+    private var oldReleaseContinuation: CheckedContinuation<Void, Never>?
+    private var oldRefreshReleased = false
+
+    init(
+        oldResult: AutomationRunCenterLoadResult,
+        newResult: AutomationRunCenterLoadResult
+    ) {
+        self.oldResult = oldResult
+        self.newResult = newResult
+    }
+
+    func load() async -> AutomationRunCenterLoadResult {
+        loadCount += 1
+        if loadCount == 1 {
+            oldRefreshStarted = true
+            let waiters = startWaiters
+            startWaiters.removeAll()
+            for waiter in waiters {
+                waiter.resume()
+            }
+            if !oldRefreshReleased {
+                await withCheckedContinuation { continuation in
+                    oldReleaseContinuation = continuation
+                }
+            }
+            return oldResult
+        }
+        return newResult
+    }
+
+    func waitUntilOldRefreshStarts() async {
+        if oldRefreshStarted {
+            return
+        }
+        await withCheckedContinuation { continuation in
+            startWaiters.append(continuation)
+        }
+    }
+
+    func releaseOldRefresh() {
+        oldRefreshReleased = true
+        oldReleaseContinuation?.resume()
+        oldReleaseContinuation = nil
     }
 }

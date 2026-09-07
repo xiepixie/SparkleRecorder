@@ -49,6 +49,8 @@ final class AutomationRunCenterModel {
     private var pollingTask: Task<Void, Never>?
     @ObservationIgnored
     private var lastRuntimeRevision: UInt64?
+    @ObservationIgnored
+    private var refreshGeneration: UInt64 = 0
 
     private(set) var projection: AutomationRunCenterProjection
     private(set) var loadState: AutomationRunCenterLoadState = .idle
@@ -109,18 +111,24 @@ final class AutomationRunCenterModel {
         forceProjection: Bool = false
     ) async {
         guard !loadState.isLoading else { return }
+        refreshGeneration &+= 1
+        let generation = refreshGeneration
         let lastLoadedAt = loadState.lastLoadedAt
         if showsLoading {
             loadState = .loading(lastLoadedAt: lastLoadedAt)
         }
 
-        switch await loader() {
+        let result = await loader()
+        guard generation == refreshGeneration else { return }
+
+        switch result {
         case .loaded(let state):
             await applyLoadedState(
                 state,
                 revision: nil,
                 showsLoading: showsLoading,
-                lastLoadedAt: lastLoadedAt
+                lastLoadedAt: lastLoadedAt,
+                generation: generation
             )
         case .loadedVersioned(let snapshot):
             if !forceProjection, lastRuntimeRevision == snapshot.revision {
@@ -133,7 +141,8 @@ final class AutomationRunCenterModel {
                 snapshot.state,
                 revision: snapshot.revision,
                 showsLoading: showsLoading,
-                lastLoadedAt: lastLoadedAt
+                lastLoadedAt: lastLoadedAt,
+                generation: generation
             )
         case .failed(let message):
             loadState = .failed(message: message, lastLoadedAt: lastLoadedAt)
@@ -144,7 +153,8 @@ final class AutomationRunCenterModel {
         _ state: AutomationRunState,
         revision: UInt64?,
         showsLoading: Bool,
-        lastLoadedAt: Date?
+        lastLoadedAt: Date?,
+        generation: UInt64
     ) async {
         let loadedAt = now()
         let refreshedProjection = await Task.detached(priority: .userInitiated) {
@@ -153,6 +163,8 @@ final class AutomationRunCenterModel {
                 generatedAt: loadedAt
             )
         }.value
+        guard generation == refreshGeneration else { return }
+
         let projectionChanged = projection.summary != refreshedProjection.summary
             || projection.executions != refreshedProjection.executions
             || projection.persistenceIssue != refreshedProjection.persistenceIssue
