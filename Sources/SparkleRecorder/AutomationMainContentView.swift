@@ -43,6 +43,7 @@ struct AutomationMainContentView: View {
   let onRefresh: () -> Void
   let onAction: (AutomationAction) -> Void
   let currentWorkflows: @MainActor () -> [AutomationWorkflow]
+  let currentAvailableMacroIDs: @MainActor () -> Set<UUID>
   let onCommitAction: @MainActor (AutomationAction) async throws -> Void
   let onRecordMacro: (() -> Void)?
   let onPreviewScheduledMacro: @MainActor (UUID, AutomationTask?) async throws -> Void
@@ -87,6 +88,7 @@ struct AutomationMainContentView: View {
     onRefresh: @escaping () -> Void,
     onAction: @escaping (AutomationAction) -> Void,
     currentWorkflows: (@MainActor () -> [AutomationWorkflow])? = nil,
+    currentAvailableMacroIDs: (@MainActor () -> Set<UUID>)? = nil,
     onCommitAction: @escaping @MainActor (AutomationAction) async throws -> Void = { _ in },
     onRecordMacro: (() -> Void)? = nil,
     onPreviewScheduledMacro: @escaping @MainActor (UUID, AutomationTask?) async throws -> Void = { _, _ in },
@@ -116,6 +118,7 @@ struct AutomationMainContentView: View {
     self.onRefresh = onRefresh
     self.onAction = onAction
     self.currentWorkflows = currentWorkflows ?? { state.workflows }
+    self.currentAvailableMacroIDs = currentAvailableMacroIDs ?? { Set(macros.map(\.id)) }
     self.onCommitAction = onCommitAction
     self.onRecordMacro = onRecordMacro
     self.onPreviewScheduledMacro = onPreviewScheduledMacro
@@ -824,7 +827,7 @@ struct AutomationMainContentView: View {
   private func importWorkflowPackage() {
     AutomationWorkflowPackagePresenter.importWorkflows(
       currentWorkflows: currentWorkflows,
-      availableMacroIDs: Set(macros.map(\.id))
+      currentAvailableMacroIDs: currentAvailableMacroIDs
     ) { workflows in
       guard !workflows.isEmpty else {
         return

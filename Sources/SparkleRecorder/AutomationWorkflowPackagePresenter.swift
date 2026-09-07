@@ -105,7 +105,7 @@ enum AutomationWorkflowPackagePresenter {
 
     static func importWorkflows(
         currentWorkflows: @escaping @MainActor () -> [AutomationWorkflow],
-        availableMacroIDs: Set<UUID>,
+        currentAvailableMacroIDs: @escaping @MainActor () -> Set<UUID>,
         onImport: @escaping @MainActor ([AutomationWorkflow]) async throws -> Void
     ) {
         let panel = NSOpenPanel()
@@ -133,14 +133,16 @@ enum AutomationWorkflowPackagePresenter {
                         )
                     }
                 }
-                guard let prepared = prepareForImport(
-                    importItems,
-                    currentWorkflows: currentWorkflows()
-                ) else {
+                let plan = AutomationWorkflowPackageImportConflictPlan.make(
+                    importItems: importItems,
+                    currentWorkflows: currentWorkflows(),
+                    availableMacroIDs: currentAvailableMacroIDs()
+                )
+                guard let prepared = prepareForImport(importItems, plan: plan) else {
                     return
                 }
                 let workflows = prepared.map(\.workflow)
-                guard confirmMissingMacroReferences(in: workflows, availableMacroIDs: availableMacroIDs) else {
+                guard confirmMissingMacroReferences(plan.missingMacroIDs) else {
                     return
                 }
                 Task { @MainActor in
@@ -177,17 +179,13 @@ enum AutomationWorkflowPackagePresenter {
 
     private static func prepareForImport(
         _ importItems: [AutomationWorkflowPackageImportItem],
-        currentWorkflows: [AutomationWorkflow]
+        plan: AutomationWorkflowPackageImportConflictPlan
     ) -> [AutomationWorkflowPackageImportItem]? {
         guard !importItems.isEmpty else {
             return []
         }
 
-        let conflictPlan = AutomationWorkflowPackageImportConflictPlan.make(
-            importItems: importItems,
-            currentWorkflows: currentWorkflows
-        )
-        guard conflictPlan.requiresResolution else {
+        guard plan.requiresResolution else {
             return importItems
         }
 
@@ -201,7 +199,7 @@ enum AutomationWorkflowPackagePresenter {
 
         switch alert.runModal() {
         case .alertFirstButtonReturn:
-            return conflictPlan.addingCopies(importItems, now: Date())
+            return plan.addingCopies(importItems, now: Date())
         case .alertSecondButtonReturn:
             return importItems
         default:
@@ -209,11 +207,7 @@ enum AutomationWorkflowPackagePresenter {
         }
     }
 
-    private static func confirmMissingMacroReferences(
-        in workflows: [AutomationWorkflow],
-        availableMacroIDs: Set<UUID>
-    ) -> Bool {
-        let missingMacroIDs = missingMacroIDs(in: workflows, availableMacroIDs: availableMacroIDs)
+    private static func confirmMissingMacroReferences(_ missingMacroIDs: [UUID]) -> Bool {
         guard !missingMacroIDs.isEmpty else {
             return true
         }
@@ -229,24 +223,6 @@ enum AutomationWorkflowPackagePresenter {
         alert.addButton(withTitle: String(localized: "Cancel", table: "Common"))
 
         return alert.runModal() == .alertFirstButtonReturn
-    }
-
-    private static func missingMacroIDs(
-        in workflows: [AutomationWorkflow],
-        availableMacroIDs: Set<UUID>
-    ) -> [UUID] {
-        let referencedIDs = workflows.flatMap { workflow in
-            workflow.tasks.compactMap { task -> UUID? in
-                guard case .macro(let macroID) = task.kind else {
-                    return nil
-                }
-                return macroID
-            }
-        }
-
-        return Set(referencedIDs)
-            .subtracting(availableMacroIDs)
-            .sorted { $0.uuidString < $1.uuidString }
     }
 
     private static func persistVisualAssetPackageRoots(

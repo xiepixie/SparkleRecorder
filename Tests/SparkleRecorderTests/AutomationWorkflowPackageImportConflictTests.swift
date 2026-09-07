@@ -17,7 +17,8 @@ struct AutomationWorkflowPackageImportConflictTests {
 
         let plan = AutomationWorkflowPackageImportConflictPlan.make(
             importItems: [item],
-            currentWorkflows: [existing]
+            currentWorkflows: [existing],
+            availableMacroIDs: []
         )
 
         #expect(plan.requiresResolution)
@@ -39,7 +40,8 @@ struct AutomationWorkflowPackageImportConflictTests {
 
         let plan = AutomationWorkflowPackageImportConflictPlan.make(
             importItems: [first, second],
-            currentWorkflows: []
+            currentWorkflows: [],
+            availableMacroIDs: []
         )
 
         #expect(plan.requiresResolution)
@@ -68,7 +70,8 @@ struct AutomationWorkflowPackageImportConflictTests {
         let copiedID = UUID(uuidString: "00000000-0000-0000-0000-000000000123")!
         let plan = AutomationWorkflowPackageImportConflictPlan.make(
             importItems: items,
-            currentWorkflows: [existing]
+            currentWorkflows: [existing],
+            availableMacroIDs: []
         )
 
         let result = plan.addingCopies(items, now: now, makeID: { copiedID })
@@ -95,11 +98,38 @@ struct AutomationWorkflowPackageImportConflictTests {
 
         let plan = AutomationWorkflowPackageImportConflictPlan.make(
             importItems: [item],
-            currentWorkflows: []
+            currentWorkflows: [],
+            availableMacroIDs: []
         )
 
         #expect(!plan.requiresResolution)
         #expect(plan.currentWorkflowIDs.isEmpty)
         #expect(plan.duplicateImportedIDs.isEmpty)
+    }
+
+    @Test("Missing macro references use the import-time macro catalog")
+    func reportsMissingMacroReferencesFromCurrentCatalog() {
+        let availableMacroID = UUID(uuidString: "00000000-0000-0000-0000-000000000101")!
+        let missingMacroID = UUID(uuidString: "00000000-0000-0000-0000-000000000202")!
+        let workflow = AutomationWorkflow(
+            name: "Macro references",
+            tasks: [
+                AutomationTask(name: "Available", kind: .macro(macroID: availableMacroID)),
+                AutomationTask(name: "Missing", kind: .macro(macroID: missingMacroID)),
+                AutomationTask(name: "Missing again", kind: .macro(macroID: missingMacroID))
+            ]
+        )
+        let item = AutomationWorkflowPackageImportItem(
+            workflow: workflow,
+            packageDirectoryURL: URL(fileURLWithPath: "/tmp/macros")
+        )
+
+        let plan = AutomationWorkflowPackageImportConflictPlan.make(
+            importItems: [item],
+            currentWorkflows: [],
+            availableMacroIDs: [availableMacroID]
+        )
+
+        #expect(plan.missingMacroIDs == [missingMacroID])
     }
 }

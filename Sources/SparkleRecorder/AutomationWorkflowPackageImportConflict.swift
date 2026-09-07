@@ -7,24 +7,37 @@ struct AutomationWorkflowPackageImportItem: Equatable {
 }
 
 struct AutomationWorkflowPackageImportConflictPlan: Equatable {
-    var currentWorkflowIDs: Set<UUID>
-    var duplicateImportedIDs: Set<UUID>
+    let currentWorkflowIDs: Set<UUID>
+    let duplicateImportedIDs: Set<UUID>
+    let missingMacroIDs: [UUID]
 
     var requiresResolution: Bool {
         !duplicateImportedIDs.isEmpty
             || !currentWorkflowIDs.isDisjoint(with: importedWorkflowIDs)
     }
 
-    private var importedWorkflowIDs: Set<UUID> = []
+    private let importedWorkflowIDs: Set<UUID>
 
     static func make(
         importItems: [AutomationWorkflowPackageImportItem],
-        currentWorkflows: [AutomationWorkflow]
+        currentWorkflows: [AutomationWorkflow],
+        availableMacroIDs: Set<UUID>
     ) -> AutomationWorkflowPackageImportConflictPlan {
         let importedIDs = importItems.map(\.workflow.id)
+        let referencedMacroIDs = importItems.flatMap { item in
+            item.workflow.tasks.compactMap { task -> UUID? in
+                guard case .macro(let macroID) = task.kind else {
+                    return nil
+                }
+                return macroID
+            }
+        }
         return AutomationWorkflowPackageImportConflictPlan(
             currentWorkflowIDs: Set(currentWorkflows.map(\.id)),
             duplicateImportedIDs: duplicateValues(importedIDs),
+            missingMacroIDs: Set(referencedMacroIDs)
+                .subtracting(availableMacroIDs)
+                .sorted { $0.uuidString < $1.uuidString },
             importedWorkflowIDs: Set(importedIDs)
         )
     }
