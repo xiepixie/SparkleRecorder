@@ -11,12 +11,6 @@ private enum AutomationWorkspaceSurface {
   case editor
 }
 
-private struct AutomationWorkflowRecordingIntent: Equatable {
-  var targetWorkflowID: UUID?
-  var existingMacroIDs: Set<UUID>
-  var didStartRecording = false
-}
-
 private struct AutomationInsertedMacroTask {
   var workflowID: UUID
   var task: AutomationTask
@@ -63,7 +57,7 @@ struct AutomationMainContentView: View {
   @State private var draftPreviewState: AutomationWorkflowDraftPreviewState?
   @State private var importNoticeState: AutomationWorkflowImportNoticeState?
   @State private var selectedInspectorRunID: UUID?
-  @State private var workflowRecordingIntent: AutomationWorkflowRecordingIntent?
+  @State private var workflowRecordingHandoff = AutomationWorkflowRecordingHandoff()
   @State private var recordedTaskReviewDraft: AutomationRecordedTaskReviewDraft?
   @State private var editingQuickScheduleWorkflow: AutomationWorkflow?
   @State private var editingSequenceWorkflow: AutomationWorkflow?
@@ -232,7 +226,7 @@ struct AutomationMainContentView: View {
   }
 
   private var isRecordingIntoWorkflow: Bool {
-    workflowRecordingIntent?.didStartRecording == true
+    workflowRecordingHandoff.isRecordingIntoWorkflow
   }
 
   private var recordMacroAction: (() -> Void)? {
@@ -480,7 +474,10 @@ struct AutomationMainContentView: View {
       handleWorkflowRecordingFlowEnded()
     }
     .onChange(of: macros.map(\.id)) {
-      completeWorkflowRecordingIntent(clearIfMissing: false)
+      guard let intentID = workflowRecordingHandoff.completionCheckID() else {
+        return
+      }
+      completeWorkflowRecordingIntent(expectedIntentID: intentID, clearIfMissing: false)
     }
     .sheet(item: $draftPreviewState) { state in
       AutomationWorkflowDraftPreviewSheet(
@@ -1029,7 +1026,7 @@ struct AutomationMainContentView: View {
 
     if !isRecordingMacro && !recordingFlowActive {
       recordedTaskReviewDraft = nil
-      workflowRecordingIntent = AutomationWorkflowRecordingIntent(
+      workflowRecordingHandoff.begin(
         targetWorkflowID: selectedRawWorkflow?.id ?? selectedWorkflowID,
         existingMacroIDs: Set(macros.map(\.id))
       )
@@ -1039,60 +1036,50 @@ struct AutomationMainContentView: View {
 
   private func handleWorkflowRecordingStateChange() {
     if isRecordingMacro {
-      guard var intent = workflowRecordingIntent else {
-        return
-      }
-      intent.didStartRecording = true
-      workflowRecordingIntent = intent
-    } else {
-      scheduleWorkflowRecordingCompletionCheck()
+      workflowRecordingHandoff.recordingStarted()
+    } else if let intentID = workflowRecordingHandoff.completionCheckID() {
+      scheduleWorkflowRecordingCompletionCheck(expectedIntentID: intentID)
     }
   }
 
   private func handleWorkflowRecordingFlowEnded() {
-    guard let intent = workflowRecordingIntent else { return }
-    if intent.didStartRecording {
-      scheduleWorkflowRecordingCompletionCheck()
-    } else {
-      workflowRecordingIntent = nil
+    guard let intentID = workflowRecordingHandoff.recordingFlowEnded() else {
+      return
     }
+    scheduleWorkflowRecordingCompletionCheck(expectedIntentID: intentID)
   }
 
-  private func scheduleWorkflowRecordingCompletionCheck() {
+  private func scheduleWorkflowRecordingCompletionCheck(expectedIntentID: UUID) {
     Task { @MainActor in
       try? await Task.sleep(nanoseconds: 250_000_000)
-      completeWorkflowRecordingIntent(clearIfMissing: true)
+      completeWorkflowRecordingIntent(
+        expectedIntentID: expectedIntentID,
+        clearIfMissing: true
+      )
     }
   }
 
-  private func completeWorkflowRecordingIntent(clearIfMissing: Bool) {
-    guard let intent = workflowRecordingIntent,
-      intent.didStartRecording,
-      !isRecordingMacro
+  private func completeWorkflowRecordingIntent(
+    expectedIntentID: UUID,
+    clearIfMissing: Bool
+  ) {
+    let completion = workflowRecordingHandoff.resolveCompletion(
+      expectedIntentID: expectedIntentID,
+      isRecordingMacro: isRecordingMacro,
+      currentMacroID: currentMacroID,
+      macros: macros,
+      clearIfMissing: clearIfMissing
+    )
+
+    guard case .recorded(let targetWorkflowID, let macroID) = completion,
+      let recordedMacro = macros.first(where: { $0.id == macroID })
     else {
       return
     }
 
-    let currentRecordedMacro = currentMacroID.flatMap { macroID in
-      macros.first { $0.id == macroID && !intent.existingMacroIDs.contains($0.id) }
+    if let targetWorkflowID {
+      selectedWorkflowID = targetWorkflowID
     }
-    let newestRecordedMacro =
-      macros
-      .filter { !intent.existingMacroIDs.contains($0.id) }
-      .max { $0.createdAt < $1.createdAt }
-    let recordedMacro = currentRecordedMacro ?? newestRecordedMacro
-
-    guard let recordedMacro else {
-      if clearIfMissing {
-        workflowRecordingIntent = nil
-      }
-      return
-    }
-
-    if let workflowID = intent.targetWorkflowID {
-      selectedWorkflowID = workflowID
-    }
-    workflowRecordingIntent = nil
     if let insertion = commitMacroTask(recordedMacro, position: nil, insertionIndex: nil) {
       recordedTaskReviewDraft = AutomationRecordedTaskReviewDraft(
         workflowID: insertion.workflowID,
