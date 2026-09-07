@@ -13,18 +13,20 @@ struct AutomationRunHistoryIndex: Sendable {
         var upstreamRunID: UUID
     }
 
-    private var runsByTask: [TaskKey: [AutomationTaskRun]]
+    private var scheduledStartTimesByTask: [TaskKey: Set<Date>]
     private var latestRunByTask: [TaskKey: AutomationTaskRun]
     private var latestDownstreamRunByKey: [DownstreamKey: AutomationTaskRun]
 
     init(runs: [AutomationTaskRun]) {
-        var runsByTask: [TaskKey: [AutomationTaskRun]] = [:]
+        var scheduledStartTimesByTask: [TaskKey: Set<Date>] = [:]
         var latestRunByTask: [TaskKey: AutomationTaskRun] = [:]
         var latestDownstreamRunByKey: [DownstreamKey: AutomationTaskRun] = [:]
 
         for run in runs {
             let taskKey = TaskKey(workflowID: run.workflowID, taskID: run.taskID)
-            runsByTask[taskKey, default: []].append(run)
+            if let scheduledStartTime = run.scheduledStartTime {
+                scheduledStartTimesByTask[taskKey, default: []].insert(scheduledStartTime)
+            }
             if let current = latestRunByTask[taskKey] {
                 if Self.isEarlier(current, than: run) {
                     latestRunByTask[taskKey] = run
@@ -50,13 +52,13 @@ struct AutomationRunHistoryIndex: Sendable {
             }
         }
 
-        self.runsByTask = runsByTask
+        self.scheduledStartTimesByTask = scheduledStartTimesByTask
         self.latestRunByTask = latestRunByTask
         self.latestDownstreamRunByKey = latestDownstreamRunByKey
     }
 
-    func runs(workflowID: UUID, taskID: UUID) -> [AutomationTaskRun] {
-        runsByTask[TaskKey(workflowID: workflowID, taskID: taskID)] ?? []
+    func scheduledStartTimes(workflowID: UUID, taskID: UUID) -> Set<Date> {
+        scheduledStartTimesByTask[TaskKey(workflowID: workflowID, taskID: taskID)] ?? []
     }
 
     func latestRun(workflowID: UUID, taskID: UUID) -> AutomationTaskRun? {
