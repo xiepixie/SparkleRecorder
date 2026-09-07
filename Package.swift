@@ -29,6 +29,10 @@ let toolingSourceSet = Set(toolingSources)
 // Keep newly introduced top-level App ownership explicit as a cache-safe fallback;
 // the directory scan remains the general source of truth.
 let toolingAlwaysExcludedAppSources: Set<String> = [
+    "AutomationTaskAdvancedEditorView.swift",
+    "AutomationTaskConditionEditorView.swift",
+    "AutomationTaskFlowEditorView.swift",
+    "AutomationTaskRunEditorView.swift",
     "AuxiliaryCaptureActivityCenter.swift",
     "MacroCandidateEditorSession.swift",
     "MacroReconstructionCandidateProvenancePresentation.swift",

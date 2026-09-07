@@ -18,65 +18,17 @@ struct AutomationTaskInspectorView: View {
 
     @State private var nameDraft = ""
     @State private var isEnabledDraft = true
-    @State private var targetApplicationPolicyDraft: AutomationTargetApplicationPolicy = .activateIfRunning
-    @State private var targetApplicationReadyDelayDraft: TimeInterval = 0
-    @State private var scheduleMode: ScheduleMode = .manual
-    @State private var onceDateDraft = Date()
-    @State private var repeatStartDraft = Date()
-    @State private var repeatEveryDraft = 1
-    @State private var repeatUnitDraft: RepeatUnit = .hours
-    @State private var hasTaskTimeoutDraft = false
-    @State private var taskTimeoutDraft = 60.0
-    @State private var retryAttemptsDraft = 1
-    @State private var joinPolicyDraft: AutomationJoinPolicy = .all
-    @State private var usesForegroundInputResourceDraft = false
-    @State private var usesScreenCaptureResourceDraft = false
-    @State private var usesAccessibilityResourceDraft = false
-    @State private var usesNetworkResourceDraft = false
-    @State private var resourcePriorityDraft: AutomationResourcePriority = .normal
-    @State private var hasMaxResourceWaitDraft = false
-    @State private var maxResourceWaitDraft = 10.0
+    @State private var scheduleDraft = AutomationTaskScheduleDraft()
+    @State private var executionDraft = AutomationTaskExecutionDraft()
+    @State private var resourceDraft = AutomationTaskResourceDraft()
     @State private var selectedMacroID: UUID?
     @State private var delayDurationDraft = 1.0
     @State private var notificationTitleDraft = ""
     @State private var notificationBodyDraft = ""
     @State private var notificationSeverityDraft: AutomationNotificationSeverity = .info
-    @State private var conditionNameDraft = ""
-    @State private var conditionMode: ConditionMode = .manualApproval
-    @State private var signalNameDraft = ""
-    @State private var ocrTextDraft = ""
-    @State private var ocrMatchModeDraft: TextMatchMode = .contains
-    @State private var ocrSearchRegionSpaceDraft: AutomationOCRSearchRegionSpace = .automatic
-    @State private var ocrRequiresVisibleDraft = true
-    @State private var hasOCRRegionDraft = false
-    @State private var ocrRegionXDraft = 0.0
-    @State private var ocrRegionYDraft = 0.0
-    @State private var ocrRegionWidthDraft = 0.0
-    @State private var ocrRegionHeightDraft = 0.0
+    @State private var conditionDraft = AutomationTaskConditionDraft()
     @State private var ocrRegionPreview: AutomationRegionCapturePreview?
-    @State private var visualTypeDraft: AutomationVisualConditionType = .regionChanged
-    @State private var visualRegionRefDraft = ""
-    @State private var visualSearchRegionSpaceDraft: AutomationOCRSearchRegionSpace = .automatic
-    @State private var hasVisualRegionDraft = false
-    @State private var visualRegionXDraft = 0.0
-    @State private var visualRegionYDraft = 0.0
-    @State private var visualRegionWidthDraft = 0.0
-    @State private var visualRegionHeightDraft = 0.0
     @State private var visualRegionPreview: AutomationRegionCapturePreview?
-    @State private var visualImageRefDraft = ""
-    @State private var visualBaselineRefDraft = ""
-    @State private var hasVisualPixelDraft = false
-    @State private var visualPixelXDraft = 0.0
-    @State private var visualPixelYDraft = 0.0
-    @State private var visualColorHexDraft = ""
-    @State private var visualPixelSampleRadiusDraft = AutomationVisualCondition.defaultPixelSampleRadius
-    @State private var hasVisualThresholdDraft = false
-    @State private var visualThresholdDraft = 0.9
-    @State private var visualRequiresVisibleDraft = true
-    @State private var outcomePredicateDraft = AutomationOutcomePredicate.anyTerminal.rawValue
-    @State private var hasConditionTimeoutDraft = false
-    @State private var conditionTimeoutDraft = 30.0
-    @State private var conditionPollingDraft = 0.25
     @State private var isConfirmingDeleteTask = false
     @State private var isCommitInFlight = false
     @State private var commitErrorMessage: String?
@@ -127,27 +79,6 @@ struct AutomationTaskInspectorView: View {
         return false
     }
 
-    private var isMacroTask: Bool {
-        if case .macro = task.kind {
-            return true
-        }
-        return false
-    }
-
-    private var isDelayTask: Bool {
-        if case .delay = task.kind {
-            return true
-        }
-        return false
-    }
-
-    private var isNotificationTask: Bool {
-        if case .notification = task.kind {
-            return true
-        }
-        return false
-    }
-
     private var tabPicker: some View {
         Picker("", selection: $selectedTab) {
             ForEach(TaskInspectorTab.allCases) { tab in
@@ -180,85 +111,51 @@ struct AutomationTaskInspectorView: View {
 
     private var flowTab: some View {
         VStack(alignment: .leading, spacing: 14) {
-            if isConditionTask {
-                AutomationTaskBranchPanelView(
-                    workflow: workflow,
-                    task: task,
-                    dependencyEdges: dependencyEdges,
-                    onSelectTask: onSelectTask,
-                    onSelectDependency: onSelectDependency,
-                    onAction: onAction
-                )
-            }
-
-            AutomationTaskDependencyAuthoringView(
+            AutomationTaskFlowEditorView(
                 workflow: workflow,
                 task: task,
+                dependencyEdges: dependencyEdges,
+                graphPosition: graphPosition,
+                taskProjection: taskProjection,
+                executionDraft: $executionDraft,
                 onSelectTask: onSelectTask,
                 onSelectDependency: onSelectDependency,
-                onAction: onAction
+                onAction: onAction,
+                onMoveTask: moveTask
             )
-
-            AutomationTaskJoinPolicyEditorView(
-                selection: $joinPolicyDraft,
-                incomingDependencyCount: taskProjection?.incomingDependencyCount ?? incomingDependencyCount
-            )
-            .padding(.vertical, 8)
-
-            if let graphPosition {
-                AutomationTaskPositionControlView(
-                    position: graphPosition,
-                    onMove: moveTask
-                )
-            }
-
             saveFooter
         }
     }
 
     private var runTab: some View {
-        let history = AutomationTaskRunHistoryPresentation.make(
-            runs: runs,
-            workflowID: workflow.id,
-            taskID: task.id,
-            initialSelectedRunID: initialSelectedRunID
-        )
-
-        return VStack(alignment: .leading, spacing: 14) {
-            AutomationTaskRunControlView(
-                taskName: task.name,
-                isEnabled: task.isEnabled,
-                resourceRequirement: task.resourceRequirement,
-                activeRunID: history.activeRunID,
-                onRun: runTask,
-                onCancel: { cancelActiveRun(history.activeRunID) }
-            )
-
-            if let taskProjection {
-                AutomationTaskRuntimeDetailView(projection: taskProjection)
-            }
-
-            scheduleSection
-
-            saveFooter
-
-            AutomationTaskRunHistoryView(
-                presentation: history,
+        VStack(alignment: .leading, spacing: 14) {
+            AutomationTaskRunEditorView(
                 workflow: workflow,
+                task: task,
+                taskProjection: taskProjection,
                 dependencyEdges: dependencyEdges,
-                resourceRequirement: task.resourceRequirement,
-                retryPolicy: task.retryPolicy,
-                initialSelectedRunID: initialSelectedRunID,
                 macros: macros,
+                runs: runs,
+                initialSelectedRunID: initialSelectedRunID,
+                selectedMacroHasSurfaces: selectedMacro?.surfaces.isEmpty == false,
+                scheduleDraft: $scheduleDraft,
+                executionDraft: $executionDraft,
+                onRun: runTask,
+                onCancel: cancelActiveRun,
                 onImportWorkflowFromDraftPreview: onImportWorkflowFromDraftPreview
             )
+            saveFooter
         }
     }
 
     private var advancedTab: some View {
         VStack(alignment: .leading, spacing: 14) {
-            executionPolicySection
-            resourceSection
+            AutomationTaskAdvancedEditorView(
+                task: task,
+                executionDraft: $executionDraft,
+                conditionDraft: $conditionDraft,
+                resourceDraft: $resourceDraft
+            )
             saveFooter
             dangerSection
         }
@@ -279,105 +176,17 @@ struct AutomationTaskInspectorView: View {
         .padding(.vertical, 8)
     }
 
-    private var scheduleSection: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            AutomationSectionHeader(title: String(localized: "SCHEDULE", table: "Common"))
-
-            Picker(String(localized: "Schedule", table: "Common"), selection: $scheduleMode) {
-                ForEach(ScheduleMode.allCases) { mode in
-                    Text(mode.title).tag(mode)
-                }
-            }
-            .pickerStyle(.segmented)
-
-            switch scheduleMode {
-            case .manual:
-                Label(String(localized: "Manual start only", table: "Common"), systemImage: "hand.tap")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            case .once:
-                DatePicker(
-                    String(localized: "Start", table: "Common"),
-                    selection: $onceDateDraft,
-                    displayedComponents: [.date, .hourAndMinute]
-                )
-            case .repeating:
-                DatePicker(
-                    String(localized: "Start", table: "Common"),
-                    selection: $repeatStartDraft,
-                    displayedComponents: [.date, .hourAndMinute]
-                )
-
-                HStack(spacing: 8) {
-                    LabeledContent(String(localized: "Every", table: "Common")) {
-                        TextField(String(localized: "Count", table: "Common"), value: $repeatEveryDraft, format: .number)
-                            .textFieldStyle(.roundedBorder)
-                            .frame(width: 58)
-                    }
-
-                    Picker(String(localized: "Unit", table: "Common"), selection: $repeatUnitDraft) {
-                        ForEach(RepeatUnit.allCases) { unit in
-                            Text(unit.title).tag(unit)
-                        }
-                    }
-                    .pickerStyle(.menu)
-                }
-            }
-
-            if isMacroTask, selectedMacro?.surfaces.isEmpty == false {
-                Picker(
-                    String(localized: "Target application", table: "Automation"),
-                    selection: $targetApplicationPolicyDraft
-                ) {
-                    ForEach(AutomationTargetApplicationPolicy.allCases, id: \.self) { policy in
-                        Text(policy.title).tag(policy)
-                    }
-                }
-                .pickerStyle(.menu)
-
-                Text(targetApplicationPolicyDraft.detail)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-
-                if targetApplicationPolicyDraft != .doNotActivate {
-                    Picker(
-                        String(localized: "Wait after window appears", table: "Automation"),
-                        selection: $targetApplicationReadyDelayDraft
-                    ) {
-                        Text("No wait", tableName: "Automation").tag(TimeInterval(0))
-                        Text("2s").tag(TimeInterval(2))
-                        Text("5s").tag(TimeInterval(5))
-                        Text("10s").tag(TimeInterval(10))
-                        Text("20s").tag(TimeInterval(20))
-                        Text("30s").tag(TimeInterval(30))
-                    }
-                    .pickerStyle(.menu)
-                }
-            }
-        }
-        .padding(.vertical, 8)
-    }
-
     private var conditionDefinitionSection: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            AutomationSectionHeader(title: String(localized: "CONDITION", table: "Automation"))
-
-            Form {
-                TextField(String(localized: "Name", table: "Common"), text: $conditionNameDraft)
-                    .textFieldStyle(.roundedBorder)
-
-                Picker(String(localized: "Condition type", table: "Automation"), selection: conditionIntentBinding) {
-                    ForEach(ConditionIntent.allCases) { intent in
-                        Label(intent.title, systemImage: intent.systemImage).tag(intent)
-                    }
-                }
-                .pickerStyle(.menu)
-
-                conditionSourceFields
-            }
-        }
-        .padding(.vertical, 8)
+        AutomationTaskConditionEditorView(
+            workflow: workflow,
+            task: task,
+            macros: macros,
+            draft: $conditionDraft,
+            ocrRegionPreview: $ocrRegionPreview,
+            visualRegionPreview: $visualRegionPreview,
+            onSave: saveTask(ocrConditionOverride:),
+            onError: { commitErrorMessage = $0 }
+        )
     }
 
     private var macroSection: some View {
@@ -437,228 +246,6 @@ struct AutomationTaskInspectorView: View {
                 }
                 .pickerStyle(.segmented)
             }
-        }
-        .padding(.vertical, 8)
-    }
-
-    @ViewBuilder
-    private var conditionSourceFields: some View {
-        switch conditionMode {
-        case .manualApproval:
-            LabeledContent(String(localized: "Prompt", table: "Common")) {
-                Label(String(localized: "Manual approval prompt", table: "Common"), systemImage: "hand.raised.fill")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-        case .externalSignal:
-            TextField(String(localized: "Signal Name", table: "Common"), text: $signalNameDraft)
-                .textFieldStyle(.roundedBorder)
-
-            LabeledContent("") {
-                AutomationExternalSignalSourceView(signalName: signalNameDraft)
-            }
-        case .ocrText:
-            TextField(String(localized: "Text to Find", table: "Common"), text: $ocrTextDraft)
-                .textFieldStyle(.roundedBorder)
-
-            AutomationConditionObservationCard(
-                systemImage: "text.viewfinder",
-                title: AutomationConditionObservationPresentation.ocrDetectorTitle(),
-                detail: AutomationConditionObservationPresentation.ocrDetectorDetail(),
-                tint: Brand.libraryBlue
-            )
-
-            AutomationConditionObservationCard(
-                systemImage: hasOCRRegionDraft ? "rectangle.dashed" : "display",
-                title: AutomationConditionObservationPresentation.scopeTitle(hasRegion: hasOCRRegionDraft),
-                detail: AutomationConditionObservationPresentation.ocrScopeDetail(hasRegion: hasOCRRegionDraft),
-                tint: hasOCRRegionDraft ? Brand.libraryGreen : Brand.sigAmber
-            )
-
-            Picker(String(localized: "Match Logic", table: "Common"), selection: $ocrMatchModeDraft) {
-                Text("Contains", tableName: "Common").tag(TextMatchMode.contains)
-                Text("Exact", tableName: "Common").tag(TextMatchMode.exact)
-            }
-            .pickerStyle(.segmented)
-
-            Picker(String(localized: "Region Space", table: "Common"), selection: $ocrSearchRegionSpaceDraft) {
-                ForEach(AutomationOCRSearchRegionSpace.allCases, id: \.self) { space in
-                    Text(space.title).tag(space)
-                }
-            }
-            .pickerStyle(.menu)
-
-            LabeledContent("") {
-                AutomationOCRRegionEditorView(
-                    spaceTitle: ocrSearchRegionSpaceDraft.title,
-                    statusTitle: ocrRegionStatusTitle,
-                    statusDetail: ocrRegionStatusDetail,
-                    statusImage: ocrRegionStatusImage,
-                    statusTint: ocrRegionStatusTint,
-                    hasRegion: hasOCRRegionDraft,
-                    isNormalizedSpace: ocrSearchRegionSpaceDraft.isNormalizedSpace,
-                    referenceSize: ocrRegionPreviewReferenceSize,
-                    preview: ocrRegionPreview,
-                    regionX: $ocrRegionXDraft,
-                    regionY: $ocrRegionYDraft,
-                    regionWidth: $ocrRegionWidthDraft,
-                    regionHeight: $ocrRegionHeightDraft,
-                    onPickText: pickOCRRegion,
-                    onDraw: drawOCRRegion,
-                    onClear: clearOCRRegion
-                )
-            }
-
-            Toggle(String(localized: "Require Visible Text", table: "Common"), isOn: $ocrRequiresVisibleDraft)
-                .toggleStyle(.switch)
-        case .visual:
-            AutomationVisualConditionEditorView(
-                regionStatusTitle: visualRegionStatusTitle,
-                regionStatusDetail: visualRegionStatusDetail,
-                regionStatusImage: visualRegionStatusImage,
-                regionStatusTint: visualRegionStatusTint,
-                referenceSize: visualRegionPreviewReferenceSize,
-                regionPreview: visualRegionPreview,
-                supportsBoundsPicker: true,
-                showsTypePicker: false,
-                regionReferenceOptions: visualRegionReferenceOptions,
-                imageReferenceOptions: visualImageReferenceOptions,
-                baselineReferenceOptions: visualBaselineReferenceOptions,
-                type: $visualTypeDraft,
-                regionRef: $visualRegionRefDraft,
-                searchRegionSpace: $visualSearchRegionSpaceDraft,
-                hasRegion: $hasVisualRegionDraft,
-                regionX: $visualRegionXDraft,
-                regionY: $visualRegionYDraft,
-                regionWidth: $visualRegionWidthDraft,
-                regionHeight: $visualRegionHeightDraft,
-                imageRef: $visualImageRefDraft,
-                baselineRef: $visualBaselineRefDraft,
-                hasPixel: $hasVisualPixelDraft,
-                pixelX: $visualPixelXDraft,
-                pixelY: $visualPixelYDraft,
-                colorHex: $visualColorHexDraft,
-                pixelSampleRadius: $visualPixelSampleRadiusDraft,
-                hasThreshold: $hasVisualThresholdDraft,
-                threshold: $visualThresholdDraft,
-                requiresVisible: $visualRequiresVisibleDraft,
-                onDrawRegion: drawVisualRegion,
-                onClearRegion: clearVisualRegion,
-                onPickPixel: applyPickedVisualPixel
-            )
-        case .previousOutcome:
-            Picker(String(localized: "Outcome", table: "Common"), selection: $outcomePredicateDraft) {
-                ForEach(outcomeOptions, id: \.tag) { option in
-                    Text(option.title).tag(option.tag)
-                }
-            }
-            .pickerStyle(.menu)
-        }
-    }
-
-    private var executionPolicySection: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            AutomationSectionHeader(title: String(localized: "EXECUTION POLICY", table: "Common"))
-
-            Toggle(String(localized: "Time limit", table: "Common"), isOn: $hasTaskTimeoutDraft)
-                .toggleStyle(.switch)
-
-            if hasTaskTimeoutDraft {
-                numericField(
-                    String(localized: "Seconds", table: "Common"),
-                    value: $taskTimeoutDraft,
-                    width: 78
-                )
-            }
-
-            LabeledContent(String(localized: "Retry attempts", table: "Common")) {
-                TextField(String(localized: "Count", table: "Common"), value: $retryAttemptsDraft, format: .number)
-                    .textFieldStyle(.roundedBorder)
-                    .frame(width: 58)
-            }
-
-            if isConditionTask {
-                Divider().opacity(0.5)
-                conditionWaitPolicyEditor
-            }
-        }
-        .padding(.vertical, 8)
-    }
-
-    private var conditionWaitPolicyEditor: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Label(String(localized: "Condition wait", table: "Automation"), systemImage: "timer")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-
-            Toggle(String(localized: "Enable Timeout", table: "Common"), isOn: $hasConditionTimeoutDraft)
-                .toggleStyle(.switch)
-
-            if hasConditionTimeoutDraft {
-                numericField(
-                    String(localized: "Timeout (s)", table: "Common"),
-                    value: $conditionTimeoutDraft,
-                    width: 78
-                )
-            }
-
-            numericField(
-                String(localized: "Polling (s)", table: "Common"),
-                value: $conditionPollingDraft,
-                width: 78
-            )
-        }
-    }
-
-    private var resourcePolicyEditor: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Label(String(localized: "Resource policy", table: "Common"), systemImage: "slider.horizontal.3")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-
-            VStack(alignment: .leading, spacing: 6) {
-                ForEach(resourceOptions, id: \.resource) { option in
-                    Toggle(isOn: resourceBinding(option.resource)) {
-                        Label(option.title, systemImage: option.systemImage)
-                    }
-                    .toggleStyle(.checkbox)
-                    .disabled(requiredResources.contains(option.resource))
-                }
-            }
-
-            if !requiredResources.isEmpty {
-                Text("Required resources are locked by this task type.", tableName: "Automation")
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-
-            Picker(String(localized: "Priority", table: "Common"), selection: $resourcePriorityDraft) {
-                ForEach(resourcePriorityOptions, id: \.self) { priority in
-                    Text(resourcePriorityTitle(priority)).tag(priority)
-                }
-            }
-            .pickerStyle(.segmented)
-            .disabled(draftedResourceRequirement.resources.isEmpty)
-
-            Toggle(String(localized: "Max resource wait", table: "EditorUX"), isOn: $hasMaxResourceWaitDraft)
-                .toggleStyle(.switch)
-                .disabled(draftedResourceRequirement.resources.isEmpty)
-
-            if hasMaxResourceWaitDraft, !draftedResourceRequirement.resources.isEmpty {
-                numericField(
-                    String(localized: "Wait (s)", table: "EditorUX"),
-                    value: $maxResourceWaitDraft,
-                    width: 78
-                )
-            }
-        }
-    }
-
-    private var resourceSection: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            AutomationSectionHeader(title: String(localized: "RESOURCES", table: "Common"))
-            resourcePolicyEditor
         }
         .padding(.vertical, 8)
     }
@@ -743,49 +330,14 @@ struct AutomationTaskInspectorView: View {
     }
 
     private var draftedResourceRequirement: AutomationResourceRequirement {
-        let resources = selectedResources.union(requiredResources)
-        return AutomationResourceRequirement(
-            resources: resources,
-            priority: resourcePriorityDraft,
-            leaseTimeout: task.resourceRequirement.leaseTimeout,
-            maxWaitDuration: resources.isEmpty || !hasMaxResourceWaitDraft
-                ? nil
-                : max(0, maxResourceWaitDraft)
+        resourceDraft.requirement(
+            preserving: task.resourceRequirement,
+            requiredResources: requiredResources
         )
     }
 
-    private var selectedResources: Set<AutomationResource> {
-        var resources = Set<AutomationResource>()
-        if usesForegroundInputResourceDraft {
-            resources.insert(.foregroundInput)
-        }
-        if usesScreenCaptureResourceDraft {
-            resources.insert(.screenCapture)
-        }
-        if usesAccessibilityResourceDraft {
-            resources.insert(.accessibility)
-        }
-        if usesNetworkResourceDraft {
-            resources.insert(.network)
-        }
-        return resources
-    }
-
     private var requiredResources: Set<AutomationResource> {
-        isConditionTask && conditionMode.requiresScreenCapture ? [.screenCapture] : []
-    }
-
-    private var resourceOptions: [(resource: AutomationResource, title: String, systemImage: String)] {
-        [
-            (.foregroundInput, resourceTitle(.foregroundInput), "keyboard"),
-            (.screenCapture, resourceTitle(.screenCapture), "display"),
-            (.accessibility, resourceTitle(.accessibility), "accessibility"),
-            (.network, resourceTitle(.network), "network")
-        ]
-    }
-
-    private var resourcePriorityOptions: [AutomationResourcePriority] {
-        [.low, .normal, .high]
+        isConditionTask ? conditionDraft.requiredResources : []
     }
 
     private func notificationSeverityTitle(_ severity: AutomationNotificationSeverity) -> String {
@@ -812,17 +364,6 @@ struct AutomationTaskInspectorView: View {
         }
     }
 
-    private func resourcePriorityTitle(_ priority: AutomationResourcePriority) -> String {
-        switch priority {
-        case .low:
-            return String(localized: "Low", table: "Common")
-        case .normal:
-            return String(localized: "Normal", table: "Common")
-        case .high:
-            return String(localized: "High", table: "Common")
-        }
-    }
-
     private func resourceSortIndex(_ resource: AutomationResource) -> Int {
         switch resource {
         case .foregroundInput:
@@ -836,373 +377,22 @@ struct AutomationTaskInspectorView: View {
         }
     }
 
-    private func resourceBinding(_ resource: AutomationResource) -> Binding<Bool> {
-        Binding(
-            get: {
-                switch resource {
-                case .foregroundInput:
-                    return usesForegroundInputResourceDraft
-                case .screenCapture:
-                    return usesScreenCaptureResourceDraft || requiredResources.contains(.screenCapture)
-                case .accessibility:
-                    return usesAccessibilityResourceDraft
-                case .network:
-                    return usesNetworkResourceDraft
-                }
-            },
-            set: { newValue in
-                switch resource {
-                case .foregroundInput:
-                    usesForegroundInputResourceDraft = newValue
-                case .screenCapture:
-                    usesScreenCaptureResourceDraft = newValue
-                case .accessibility:
-                    usesAccessibilityResourceDraft = newValue
-                case .network:
-                    usesNetworkResourceDraft = newValue
-                }
-            }
-        )
-    }
-
-    private var conditionIntentBinding: Binding<ConditionIntent> {
-        Binding(
-            get: {
-                switch conditionMode {
-                case .manualApproval:
-                    return .manualApproval
-                case .externalSignal:
-                    return .externalSignal
-                case .ocrText:
-                    return .ocrText
-                case .visual:
-                    return ConditionIntent(visualType: visualTypeDraft)
-                case .previousOutcome:
-                    return .previousOutcome
-                }
-            },
-            set: { intent in
-                switch intent {
-                case .manualApproval:
-                    conditionMode = .manualApproval
-                case .externalSignal:
-                    conditionMode = .externalSignal
-                case .ocrText:
-                    conditionMode = .ocrText
-                case .regionChanged:
-                    conditionMode = .visual
-                    visualTypeDraft = .regionChanged
-                case .imageAppeared:
-                    conditionMode = .visual
-                    visualTypeDraft = .imageAppeared
-                case .imageDisappeared:
-                    conditionMode = .visual
-                    visualTypeDraft = .imageDisappeared
-                case .pixelMatched:
-                    conditionMode = .visual
-                    visualTypeDraft = .pixelMatched
-                case .previousOutcome:
-                    conditionMode = .previousOutcome
-                }
-            }
-        )
-    }
-
-    private var incomingDependencyCount: Int {
-        workflow.dependencies(to: task.id).count
-    }
-
-    private var outcomeOptions: [(tag: String, title: String)] {
-        [
-            (AutomationOutcomePredicate.anyTerminal.rawValue, String(localized: "Any terminal", table: "Common")),
-            (AutomationOutcomePredicate.success.rawValue, String(localized: "Success", table: "Common")),
-            (AutomationOutcomePredicate.failure.rawValue, String(localized: "Failure", table: "Common")),
-            (AutomationOutcomePredicate.timeout.rawValue, String(localized: "Timeout", table: "Common")),
-            (AutomationOutcomePredicate.cancelled.rawValue, String(localized: "Cancelled", table: "Common")),
-            (AutomationOutcomePredicate.conditionMatched.rawValue, String(localized: "Condition matched", table: "Automation")),
-            (AutomationOutcomePredicate.conditionNotMatched.rawValue, String(localized: "Condition not matched", table: "Automation"))
-        ]
-    }
-
-    private var draftedOCRCondition: AutomationOCRCondition {
-        existingOCRCondition.updatingTextMatchRegionAndSpace(
-            text: ocrTextDraft.trimmingCharacters(in: .whitespacesAndNewlines),
-            matchMode: ocrMatchModeDraft,
-            searchRegion: draftedOCRRegion,
-            searchRegionSpace: ocrSearchRegionSpaceDraft,
-            requireVisible: ocrRequiresVisibleDraft
-        )
-    }
-
-    private var draftedOCRRegion: RectValue? {
-        guard hasOCRRegionDraft else {
-            return nil
-        }
-
-        return RectValue(
-            x: CGFloat(max(0, ocrRegionXDraft)),
-            y: CGFloat(max(0, ocrRegionYDraft)),
-            width: CGFloat(max(0, ocrRegionWidthDraft)),
-            height: CGFloat(max(0, ocrRegionHeightDraft))
-        )
-    }
-
-    private var ocrRegionStatusTitle: String {
-        switch ocrSearchRegionSpaceDraft {
-        case .automatic, .displayAbsolute:
-            return String(localized: "Display coordinates", table: "Common")
-        case .displayNormalized:
-            return String(localized: "Display-relative coordinates", table: "Common")
-        case .windowLocal:
-            return String(localized: "Window coordinates", table: "Common")
-        case .windowNormalized:
-            return String(localized: "Window-relative coordinates", table: "Common")
-        case .contentLocal:
-            return String(localized: "Content coordinates", table: "Common")
-        case .contentNormalized:
-            return String(localized: "Content-relative coordinates", table: "Common")
-        }
-    }
-
-    private var ocrRegionStatusDetail: String {
-        switch ocrSearchRegionSpaceDraft {
-        case .automatic, .displayAbsolute:
-            let displayCount = NSScreen.screens.count
-            if displayCount > 1 {
-                return String(localized: "Draw Region records bounds on the display where you drag. Use this when the automation should stay tied to that monitor.", table: "Automation")
-            }
-            return String(localized: "Draw Region records display-pixel bounds. Use this when the automation should inspect a fixed screen area.", table: "Automation")
-        case .displayNormalized:
-            return String(localized: "Bounds are normalized to the selected display, which makes the region more tolerant of display size changes.", table: "EditorUX")
-        case .windowLocal, .windowNormalized:
-            if let targetSurfaceForOCRPicker {
-                return String(
-                    format: String(localized: "Window context is available from %@. Draw Region can refresh it from the window under the pointer.", table: "EditorUX"),
-                    targetSurfaceForOCRPicker.windowContextLabel
-                )
-            }
-            return String(localized: "No linked window context is available yet. Draw Region over the target window, or switch to display coordinates.", table: "EditorUX")
-        case .contentLocal, .contentNormalized:
-            if let targetSurfaceForOCRPicker,
-               targetSurfaceForOCRPicker.recordedContentFrame != nil {
-                return String(
-                    format: String(localized: "Content context is available from %@. Use this for OCR inside the app content area.", table: "EditorUX"),
-                    targetSurfaceForOCRPicker.windowContextLabel
-                )
-            }
-            return String(localized: "Content bounds are not available yet. Draw Region over the app content, or switch to window/display coordinates.", table: "EditorUX")
-        }
-    }
-
-    private var ocrRegionStatusImage: String {
-        switch ocrSearchRegionSpaceDraft {
-        case .automatic, .displayAbsolute, .displayNormalized:
-            return "display"
-        case .windowLocal, .windowNormalized:
-            return targetSurfaceForOCRPicker == nil ? "exclamationmark.triangle" : "macwindow"
-        case .contentLocal, .contentNormalized:
-            return targetSurfaceForOCRPicker?.recordedContentFrame == nil ? "exclamationmark.triangle" : "rectangle.inset.filled"
-        }
-    }
-
-    private var ocrRegionStatusTint: Color {
-        switch ocrSearchRegionSpaceDraft {
-        case .automatic, .displayAbsolute, .displayNormalized:
-            return Brand.libraryBlue
-        case .windowLocal, .windowNormalized:
-            return targetSurfaceForOCRPicker == nil ? Brand.sigAmber : Brand.libraryGreen
-        case .contentLocal, .contentNormalized:
-            return targetSurfaceForOCRPicker?.recordedContentFrame == nil ? Brand.sigAmber : Brand.libraryGreen
-        }
-    }
-
-    private var ocrRegionPreviewReferenceSize: CGSize? {
-        switch ocrSearchRegionSpaceDraft {
-        case .automatic, .displayAbsolute:
-            return displayReferenceSize
-        case .displayNormalized, .windowNormalized, .contentNormalized:
-            return CGSize(width: 1, height: 1)
-        case .windowLocal:
-            return targetSurfaceForOCRPicker.map {
-                CGSize(width: $0.recordedFrame.width, height: $0.recordedFrame.height)
-            }
-        case .contentLocal:
-            return targetSurfaceForOCRPicker?.recordedContentFrame.map {
-                CGSize(width: $0.width, height: $0.height)
-            }
-        }
-    }
-
-    private var visualRegionStatusTitle: String {
-        switch visualSearchRegionSpaceDraft {
-        case .automatic, .displayAbsolute, .displayNormalized:
-            return String(localized: "Display bounds", table: "Common")
-        case .windowLocal, .windowNormalized:
-            return targetSurfaceForOCRPicker == nil
-                ? String(localized: "Window context missing", table: "Common")
-                : String(localized: "Window bounds", table: "Common")
-        case .contentLocal, .contentNormalized:
-            return targetSurfaceForOCRPicker?.recordedContentFrame == nil
-                ? String(localized: "Content context missing", table: "Common")
-                : String(localized: "Content bounds", table: "Common")
-        }
-    }
-
-    private var visualRegionStatusDetail: String {
-        switch visualSearchRegionSpaceDraft {
-        case .automatic, .displayAbsolute:
-            return String(localized: "Draw Bounds records display-pixel bounds for the watched visual area.", table: "Common")
-        case .displayNormalized:
-            return String(localized: "Bounds are normalized to the selected display for more tolerant screen-size changes.", table: "Common")
-        case .windowLocal, .windowNormalized:
-            if let targetSurfaceForOCRPicker {
-                return String(
-                    format: String(localized: "Window context is available from %@. Draw over the target window to bind this visual wait.", table: "Common"),
-                    targetSurfaceForOCRPicker.windowContextLabel
-                )
-            }
-            return String(localized: "No linked window context is available yet. Draw over the target window, or switch to display coordinates.", table: "Common")
-        case .contentLocal, .contentNormalized:
-            if let targetSurfaceForOCRPicker,
-               targetSurfaceForOCRPicker.recordedContentFrame != nil {
-                return String(
-                    format: String(localized: "Content context is available from %@. Use this for app-content visual waits.", table: "Common"),
-                    targetSurfaceForOCRPicker.windowContextLabel
-                )
-            }
-            return String(localized: "Content bounds are not available yet. Draw over app content, or switch to window/display coordinates.", table: "Common")
-        }
-    }
-
-    private var visualRegionStatusImage: String {
-        switch visualSearchRegionSpaceDraft {
-        case .automatic, .displayAbsolute, .displayNormalized:
-            return "display"
-        case .windowLocal, .windowNormalized:
-            return targetSurfaceForOCRPicker == nil ? "exclamationmark.triangle" : "macwindow"
-        case .contentLocal, .contentNormalized:
-            return targetSurfaceForOCRPicker?.recordedContentFrame == nil ? "exclamationmark.triangle" : "rectangle.inset.filled"
-        }
-    }
-
-    private var visualRegionStatusTint: Color {
-        switch visualSearchRegionSpaceDraft {
-        case .automatic, .displayAbsolute, .displayNormalized:
-            return Brand.libraryBlue
-        case .windowLocal, .windowNormalized:
-            return targetSurfaceForOCRPicker == nil ? Brand.sigAmber : Brand.libraryGreen
-        case .contentLocal, .contentNormalized:
-            return targetSurfaceForOCRPicker?.recordedContentFrame == nil ? Brand.sigAmber : Brand.libraryGreen
-        }
-    }
-
-    private var visualRegionPreviewReferenceSize: CGSize? {
-        switch visualSearchRegionSpaceDraft {
-        case .automatic, .displayAbsolute:
-            return displayReferenceSize
-        case .displayNormalized, .windowNormalized, .contentNormalized:
-            return CGSize(width: 1, height: 1)
-        case .windowLocal:
-            return targetSurfaceForOCRPicker.map {
-                CGSize(width: $0.recordedFrame.width, height: $0.recordedFrame.height)
-            }
-        case .contentLocal:
-            return targetSurfaceForOCRPicker?.recordedContentFrame.map {
-                CGSize(width: $0.width, height: $0.height)
-            }
-        }
-    }
-
-    private var visualRegionReferenceOptions: [AutomationVisualReferenceOption] {
-        workflow.visualAssets?.regions.map { region in
-            AutomationVisualReferenceOption(
-                key: region.key,
-                label: region.label,
-                detail: visualRegionDetail(region)
-            )
-        } ?? []
-    }
-
-    private var visualImageReferenceOptions: [AutomationVisualReferenceOption] {
-        workflow.visualAssets?.images.map { asset in
-            AutomationVisualReferenceOption(
-                key: asset.key,
-                label: asset.label,
-                detail: visualImageAssetDetail(asset)
-            )
-        } ?? []
-    }
-
-    private var visualBaselineReferenceOptions: [AutomationVisualReferenceOption] {
-        workflow.visualAssets?.baselines.map { asset in
-            AutomationVisualReferenceOption(
-                key: asset.key,
-                label: asset.label,
-                detail: visualImageAssetDetail(asset)
-            )
-        } ?? []
-    }
-
-    private func visualRegionDetail(_ region: AutomationWorkflowDraftVisualRegion) -> String {
-        String(
-            format: String(localized: "%@ bounds %@, %@, %@ x %@", table: "Common"),
-            region.space.titleForVisualCondition,
-            formattedVisualAssetValue(Double(region.bounds.x)),
-            formattedVisualAssetValue(Double(region.bounds.y)),
-            formattedVisualAssetValue(Double(region.bounds.width)),
-            formattedVisualAssetValue(Double(region.bounds.height))
-        )
-    }
-
-    private func visualImageAssetDetail(_ asset: AutomationWorkflowDraftVisualImageAsset) -> String? {
-        let path = asset.path?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmptyForTaskInspector
-        let checksum = asset.sha256?.trimmingCharacters(in: .whitespacesAndNewlines)
-            .nilIfEmptyForTaskInspector
-            .map { sha in
-                String(format: String(localized: "SHA %@", table: "Common"), String(sha.prefix(8)))
-            }
-        return [path, checksum]
-            .compactMap { $0 }
-            .joined(separator: " · ")
-            .nilIfEmptyForTaskInspector
-    }
-
-    private func formattedVisualAssetValue(_ value: Double) -> String {
-        value.formatted(.number.precision(.fractionLength(0...3)))
-    }
-
-    private var displayReferenceSize: CGSize? {
-        guard let screen = NSScreen.main ?? NSScreen.screens.first else {
-            return nil
-        }
-
-        return CGSize(
-            width: screen.frame.width * screen.backingScaleFactor,
-            height: screen.frame.height * screen.backingScaleFactor
-        )
-    }
-
     private func resetDraft() {
         commitErrorMessage = nil
         nameDraft = task.name
         isEnabledDraft = task.isEnabled
-        targetApplicationPolicyDraft = task.targetApplicationPolicy
-        targetApplicationReadyDelayDraft = task.targetApplicationReadyDelay
-        resetScheduleDraft()
-        hasTaskTimeoutDraft = task.timeout != nil
-        taskTimeoutDraft = task.timeout ?? 60
-        retryAttemptsDraft = task.retryPolicy.maxAttempts
-        joinPolicyDraft = task.joinPolicy
+        scheduleDraft = AutomationTaskScheduleDraft(schedule: task.schedule)
+        executionDraft = AutomationTaskExecutionDraft(task: task)
+        resourceDraft = AutomationTaskResourceDraft(requirement: task.resourceRequirement)
         resetTaskKindDraft()
-        resetResourceRequirementDraft()
     }
 
     private func resetTaskKindDraft() {
         switch task.kind {
         case .macro(let macroID):
             selectedMacroID = macroID
-        case .condition:
-            resetConditionDraft()
+        case .condition(let condition):
+            conditionDraft = AutomationTaskConditionDraft(condition: condition)
         case .delay(let duration):
             delayDurationDraft = duration
         case .notification(let notification):
@@ -1210,142 +400,6 @@ struct AutomationTaskInspectorView: View {
             notificationBodyDraft = notification.body
             notificationSeverityDraft = notification.severity
         }
-    }
-
-    private func resetScheduleDraft() {
-        switch task.schedule {
-        case .manual, nil:
-            scheduleMode = .manual
-        case .once(let date):
-            scheduleMode = .once
-            onceDateDraft = date
-        case .repeating(let rule):
-            scheduleMode = .repeating
-            repeatStartDraft = rule.anchor
-            switch rule.interval {
-            case .minutes(let count):
-                repeatEveryDraft = count
-                repeatUnitDraft = .minutes
-            case .hours(let count):
-                repeatEveryDraft = count
-                repeatUnitDraft = .hours
-            case .days(let count):
-                repeatEveryDraft = count
-                repeatUnitDraft = .days
-            case .weeks(let count):
-                repeatEveryDraft = count
-                repeatUnitDraft = .weeks
-            }
-        }
-    }
-
-    private func resetResourceRequirementDraft() {
-        let requirement = task.resourceRequirement
-        usesForegroundInputResourceDraft = requirement.resources.contains(.foregroundInput)
-        usesScreenCaptureResourceDraft = requirement.resources.contains(.screenCapture)
-        usesAccessibilityResourceDraft = requirement.resources.contains(.accessibility)
-        usesNetworkResourceDraft = requirement.resources.contains(.network)
-        resourcePriorityDraft = requirement.priority
-        hasMaxResourceWaitDraft = requirement.maxWaitDuration != nil
-        maxResourceWaitDraft = requirement.maxWaitDuration ?? 10
-    }
-
-    private func resetConditionDraft() {
-        guard case .condition(let condition) = task.kind else {
-            return
-        }
-
-        conditionNameDraft = condition.name
-        hasConditionTimeoutDraft = condition.timeout != nil
-        conditionTimeoutDraft = condition.timeout ?? 30
-        conditionPollingDraft = condition.pollingInterval
-        signalNameDraft = ""
-        ocrTextDraft = ""
-        ocrMatchModeDraft = .contains
-        ocrSearchRegionSpaceDraft = .automatic
-        ocrRequiresVisibleDraft = true
-        resetOCRRegionDraft(from: nil)
-        resetVisualConditionDraft(from: nil)
-        outcomePredicateDraft = AutomationOutcomePredicate.anyTerminal.rawValue
-
-        switch condition.kind {
-        case .manualApproval:
-            conditionMode = .manualApproval
-        case .externalSignal(let signalName):
-            conditionMode = .externalSignal
-            signalNameDraft = signalName
-        case .ocrText(let ocr):
-            conditionMode = .ocrText
-            ocrTextDraft = ocr.text
-            ocrMatchModeDraft = ocr.matchMode
-            ocrSearchRegionSpaceDraft = ocr.searchRegionSpace
-            ocrRequiresVisibleDraft = ocr.requireVisible
-            resetOCRRegionDraft(from: ocr.searchRegion)
-        case .visual(let visual):
-            conditionMode = .visual
-            resetVisualConditionDraft(from: visual)
-        case .previousOutcome(let predicate):
-            conditionMode = .previousOutcome
-            outcomePredicateDraft = predicate.rawValue
-        }
-    }
-
-    private func resetOCRRegionDraft(from region: RectValue?) {
-        guard let region else {
-            hasOCRRegionDraft = false
-            ocrRegionXDraft = 0
-            ocrRegionYDraft = 0
-            ocrRegionWidthDraft = 0
-            ocrRegionHeightDraft = 0
-            return
-        }
-
-        hasOCRRegionDraft = true
-        ocrRegionXDraft = Double(region.x)
-        ocrRegionYDraft = Double(region.y)
-        ocrRegionWidthDraft = Double(region.width)
-        ocrRegionHeightDraft = Double(region.height)
-    }
-
-    private func resetVisualConditionDraft(from condition: AutomationVisualCondition?) {
-        visualTypeDraft = condition?.type ?? .regionChanged
-        visualRegionRefDraft = condition?.regionRef ?? ""
-        visualSearchRegionSpaceDraft = condition?.searchRegionSpace ?? .automatic
-        resetVisualRegionDraft(from: condition?.searchRegion)
-        visualImageRefDraft = condition?.imageRef ?? ""
-        visualBaselineRefDraft = condition?.baselineRef ?? ""
-        if let pixel = condition?.pixel {
-            hasVisualPixelDraft = true
-            visualPixelXDraft = pixel.x
-            visualPixelYDraft = pixel.y
-        } else {
-            hasVisualPixelDraft = false
-            visualPixelXDraft = 0
-            visualPixelYDraft = 0
-        }
-        visualColorHexDraft = condition?.targetColorHex ?? ""
-        visualPixelSampleRadiusDraft = condition?.pixelSampleRadius
-            ?? AutomationVisualCondition.defaultPixelSampleRadius
-        hasVisualThresholdDraft = condition?.threshold != nil
-        visualThresholdDraft = condition?.threshold ?? 0.9
-        visualRequiresVisibleDraft = condition?.requireVisible ?? true
-    }
-
-    private func resetVisualRegionDraft(from region: RectValue?) {
-        guard let region else {
-            hasVisualRegionDraft = false
-            visualRegionXDraft = 0
-            visualRegionYDraft = 0
-            visualRegionWidthDraft = 0
-            visualRegionHeightDraft = 0
-            return
-        }
-
-        hasVisualRegionDraft = true
-        visualRegionXDraft = Double(region.x)
-        visualRegionYDraft = Double(region.y)
-        visualRegionWidthDraft = Double(region.width)
-        visualRegionHeightDraft = Double(region.height)
     }
 
     @MainActor
@@ -1362,12 +416,8 @@ struct AutomationTaskInspectorView: View {
         var updated = task
         updated.name = trimmedName
         updated.isEnabled = isEnabledDraft
-        updated.targetApplicationPolicy = targetApplicationPolicyDraft
-        updated.targetApplicationReadyDelay = targetApplicationReadyDelayDraft
-        updated.schedule = schedule()
-        updated.timeout = hasTaskTimeoutDraft ? max(0, taskTimeoutDraft) : nil
-        updated.retryPolicy = AutomationRetryPolicy(maxAttempts: max(1, retryAttemptsDraft))
-        updated.joinPolicy = joinPolicyDraft
+        executionDraft.apply(to: &updated)
+        updated.schedule = scheduleDraft.schedule
         updated.kind = draftedTaskKind(ocrConditionOverride: ocrConditionOverride)
         updated.resourceRequirement = draftedResourceRequirement
 
@@ -1386,7 +436,13 @@ struct AutomationTaskInspectorView: View {
         case .macro(let macroID):
             return .macro(macroID: selectedMacroID ?? macroID)
         case .condition:
-            return .condition(conditionSpec(ocrConditionOverride: ocrConditionOverride))
+            return .condition(
+                conditionDraft.conditionSpec(
+                    taskName: trimmedName,
+                    preserving: existingOCRCondition,
+                    ocrConditionOverride: ocrConditionOverride
+                )
+            )
         case .delay:
             return .delay(max(0, delayDurationDraft))
         case .notification:
@@ -1444,174 +500,11 @@ struct AutomationTaskInspectorView: View {
         )
     }
 
-    private func schedule() -> AutomationSchedule {
-        switch scheduleMode {
-        case .manual:
-            return .manual
-        case .once:
-            return .once(onceDateDraft)
-        case .repeating:
-            return .repeating(
-                AutomationRepeatRule(
-                    anchor: repeatStartDraft,
-                    interval: repeatInterval()
-                )
-            )
-        }
-    }
 
-    private func repeatInterval() -> AutomationRepeatInterval {
-        let count = max(1, repeatEveryDraft)
-        switch repeatUnitDraft {
-        case .minutes:
-            return .minutes(count)
-        case .hours:
-            return .hours(count)
-        case .days:
-            return .days(count)
-        case .weeks:
-            return .weeks(count)
-        }
-    }
-
-    private func conditionSpec(ocrConditionOverride: AutomationOCRCondition?) -> AutomationConditionSpec {
-        let conditionName = conditionNameDraft.trimmingCharacters(in: .whitespacesAndNewlines)
-        return AutomationConditionSpec(
-            name: conditionName.isEmpty ? trimmedName : conditionName,
-            kind: conditionKind(ocrConditionOverride: ocrConditionOverride),
-            timeout: hasConditionTimeoutDraft ? max(0, conditionTimeoutDraft) : nil,
-            pollingInterval: max(0.05, conditionPollingDraft)
-        )
-    }
-
-    private func conditionKind(ocrConditionOverride: AutomationOCRCondition?) -> AutomationConditionKind {
-        switch conditionMode {
-        case .manualApproval:
-            return .manualApproval
-        case .externalSignal:
-            return .externalSignal(signalNameDraft.trimmingCharacters(in: .whitespacesAndNewlines))
-        case .ocrText:
-            if let ocrConditionOverride {
-                return .ocrText(ocrConditionOverride)
-            }
-            return .ocrText(existingOCRCondition.updatingTextMatchRegionAndSpace(
-                text: ocrTextDraft.trimmingCharacters(in: .whitespacesAndNewlines),
-                matchMode: ocrMatchModeDraft,
-                searchRegion: draftedOCRRegion,
-                searchRegionSpace: ocrSearchRegionSpaceDraft,
-                requireVisible: ocrRequiresVisibleDraft
-            ))
-        case .visual:
-            return .visual(draftedVisualCondition)
-        case .previousOutcome:
-            let predicate = AutomationOutcomePredicate(rawValue: outcomePredicateDraft) ?? .anyTerminal
-            return .previousOutcome(predicate)
-        }
-    }
-
-    private func pickOCRRegion() {
-        AutomationOCRRegionPicker.pick(
-            currentCondition: draftedOCRCondition,
-            targetSurface: targetSurfaceForOCRPicker,
-            onFailure: { message in commitErrorMessage = message },
-            onPicked: applyPickedOCRCondition
-        )
-    }
-
-    private func drawOCRRegion() {
-        AutomationOCRRegionPicker.pickArea(
-            currentCondition: draftedOCRCondition,
-            searchRegionSpace: ocrSearchRegionSpaceDraft,
-            onPicked: { condition, preview in
-                applyPickedOCRCondition(condition, preview: preview)
-            }
-        )
-    }
-
-    private func applyPickedOCRCondition(_ condition: AutomationOCRCondition) {
-        applyPickedOCRCondition(condition, preview: nil)
-    }
-
-    private func applyPickedOCRCondition(
-        _ condition: AutomationOCRCondition,
-        preview: AutomationRegionCapturePreview?
-    ) {
-        ocrTextDraft = condition.text
-        ocrMatchModeDraft = condition.matchMode
-        ocrSearchRegionSpaceDraft = condition.searchRegionSpace
-        ocrRequiresVisibleDraft = condition.requireVisible
-        resetOCRRegionDraft(from: condition.searchRegion)
-        ocrRegionPreview = preview
-        Task { await saveTask(ocrConditionOverride: condition) }
-    }
-
-    private func clearOCRRegion() {
-        resetOCRRegionDraft(from: nil)
-        ocrRegionPreview = nil
-        Task { await saveTask() }
-    }
-
-    private func drawVisualRegion() {
-        AutomationOCRRegionPicker.pickArea(
-            currentCondition: AutomationOCRCondition(text: ""),
-            searchRegionSpace: visualSearchRegionSpaceDraft,
-            onPicked: { condition, preview in
-                applyPickedVisualRegion(condition, preview: preview)
-            }
-        )
-    }
-
-    private func applyPickedVisualRegion(_ condition: AutomationOCRCondition) {
-        applyPickedVisualRegion(condition, preview: nil)
-    }
-
-    private func applyPickedVisualRegion(
-        _ condition: AutomationOCRCondition,
-        preview: AutomationRegionCapturePreview?
-    ) {
-        visualSearchRegionSpaceDraft = condition.searchRegionSpace
-        resetVisualRegionDraft(from: condition.searchRegion)
-        visualRegionPreview = preview
-        Task { await saveTask() }
-    }
-
-    private func clearVisualRegion() {
-        resetVisualRegionDraft(from: nil)
-        visualRegionPreview = nil
-        Task { await saveTask() }
-    }
-
-    private func applyPickedVisualPixel(_ sample: AutomationRegionCapturePixelSample) {
-        hasVisualPixelDraft = true
-        visualPixelXDraft = sample.normalizedX
-        visualPixelYDraft = sample.normalizedY
-        if let colorHex = sample.colorHex {
-            visualColorHexDraft = colorHex
-        }
-        Task { await saveTask() }
-    }
 
     private func clearRegionPreviews() {
         ocrRegionPreview = nil
         visualRegionPreview = nil
-    }
-
-    private var targetSurfaceForOCRPicker: PlaybackSurface? {
-        let upstreamTaskIDs = workflow.dependencies
-            .filter { $0.toTaskID == task.id }
-            .map(\.fromTaskID)
-        let upstreamTasks = upstreamTaskIDs.compactMap { workflow.task(id: $0) }
-        let candidates = upstreamTasks + workflow.tasks
-
-        for candidate in candidates {
-            guard case .macro(let macroID) = candidate.kind,
-                  let macro = macros.first(where: { $0.id == macroID }),
-                  let surface = macro.surfaces.sorted(by: { $0.key < $1.key }).first?.value else {
-                continue
-            }
-            return surface
-        }
-        return nil
     }
 
     private var existingOCRCondition: AutomationOCRCondition {
@@ -1620,43 +513,6 @@ struct AutomationTaskInspectorView: View {
             return AutomationOCRCondition(text: "")
         }
         return ocr
-    }
-
-    private var draftedVisualCondition: AutomationVisualCondition {
-        AutomationVisualCondition(
-            type: visualTypeDraft,
-            regionRef: visualRegionRefDraft,
-            searchRegion: draftedVisualRegion,
-            searchRegionSpace: visualSearchRegionSpaceDraft,
-            imageRef: visualTypeDraft.usesImageReference ? visualImageRefDraft : nil,
-            baselineRef: visualTypeDraft == .regionChanged ? visualBaselineRefDraft : nil,
-            pixel: visualTypeDraft == .pixelMatched ? draftedVisualPixel : nil,
-            targetColorHex: visualTypeDraft == .pixelMatched ? visualColorHexDraft : nil,
-            pixelSampleRadius: visualTypeDraft == .pixelMatched
-                ? visualPixelSampleRadiusDraft
-                : nil,
-            threshold: hasVisualThresholdDraft ? visualThresholdDraft : nil,
-            requireVisible: visualRequiresVisibleDraft
-        )
-    }
-
-    private var draftedVisualRegion: RectValue? {
-        guard hasVisualRegionDraft, visualRegionWidthDraft > 0, visualRegionHeightDraft > 0 else {
-            return nil
-        }
-        return RectValue(
-            x: CGFloat(visualRegionXDraft),
-            y: CGFloat(visualRegionYDraft),
-            width: CGFloat(visualRegionWidthDraft),
-            height: CGFloat(visualRegionHeightDraft)
-        )
-    }
-
-    private var draftedVisualPixel: AutomationGraphPoint? {
-        guard hasVisualPixelDraft else {
-            return nil
-        }
-        return AutomationGraphPoint(x: visualPixelXDraft, y: visualPixelYDraft)
     }
 
     private func numericField(_ label: String, value: Binding<Double>, width: CGFloat) -> some View {
@@ -1678,24 +534,6 @@ struct AutomationTaskInspectorView: View {
                 .lineLimit(2)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-    }
-}
-
-private extension RectValue {
-    var summary: String {
-        "\(Int(x)), \(Int(y)) · \(Int(width))×\(Int(height))"
-    }
-}
-
-private extension PlaybackSurface {
-    var windowContextLabel: String {
-        if let windowTitle, !windowTitle.isEmpty {
-            return windowTitle
-        }
-        if let appName, !appName.isEmpty {
-            return appName
-        }
-        return String(localized: "linked macro surface", table: "EditorUX")
     }
 }
 
@@ -1731,188 +569,5 @@ private enum TaskInspectorTab: String, CaseIterable, Identifiable {
         case .advanced:
             return "slider.horizontal.3"
         }
-    }
-}
-
-private enum ScheduleMode: String, CaseIterable, Identifiable {
-    case manual
-    case once
-    case repeating
-
-    var id: Self { self }
-
-    var title: String {
-        switch self {
-        case .manual:
-            return String(localized: "Manual", table: "Common")
-        case .once:
-            return String(localized: "Once", table: "Common")
-        case .repeating:
-            return String(localized: "Repeating", table: "Common")
-        }
-    }
-}
-
-private enum RepeatUnit: String, CaseIterable, Identifiable {
-    case minutes
-    case hours
-    case days
-    case weeks
-
-    var id: Self { self }
-
-    var title: String {
-        switch self {
-        case .minutes:
-            return String(localized: "Minutes", table: "Common")
-        case .hours:
-            return String(localized: "Hours", table: "Common")
-        case .days:
-            return String(localized: "Days", table: "Common")
-        case .weeks:
-            return String(localized: "Weeks", table: "Common")
-        }
-    }
-}
-
-private enum ConditionMode: String, CaseIterable, Identifiable {
-    case manualApproval
-    case externalSignal
-    case ocrText
-    case visual
-    case previousOutcome
-
-    var id: Self { self }
-
-    static var editableModes: [ConditionMode] {
-        [.manualApproval, .externalSignal, .ocrText, .visual, .previousOutcome]
-    }
-
-    var title: String {
-        switch self {
-        case .manualApproval:
-            return String(localized: "Manual approval", table: "Common")
-        case .externalSignal:
-            return String(localized: "External signal", table: "Common")
-        case .ocrText:
-            return String(localized: "Screen text", table: "Recording")
-        case .visual:
-            return String(localized: "Visual condition", table: "Common")
-        case .previousOutcome:
-            return String(localized: "Previous outcome", table: "Common")
-        }
-    }
-
-    var requiresScreenCapture: Bool {
-        switch self {
-        case .ocrText, .visual:
-            return true
-        case .manualApproval, .externalSignal, .previousOutcome:
-            return false
-        }
-    }
-}
-
-private enum ConditionIntent: String, CaseIterable, Identifiable {
-    case manualApproval
-    case externalSignal
-    case ocrText
-    case imageAppeared
-    case imageDisappeared
-    case regionChanged
-    case pixelMatched
-    case previousOutcome
-
-    var id: Self { self }
-
-    init(visualType: AutomationVisualConditionType) {
-        switch visualType {
-        case .regionChanged:
-            self = .regionChanged
-        case .imageAppeared:
-            self = .imageAppeared
-        case .imageDisappeared:
-            self = .imageDisappeared
-        case .pixelMatched:
-            self = .pixelMatched
-        }
-    }
-
-    var title: String {
-        switch self {
-        case .manualApproval:
-            return String(localized: "Manual approval", table: "Common")
-        case .externalSignal:
-            return String(localized: "External signal", table: "Common")
-        case .ocrText:
-            return String(localized: "OCR text", table: "EditorUX")
-        case .imageAppeared:
-            return AutomationVisualConditionPresentation.title(for: AutomationVisualConditionType.imageAppeared)
-        case .imageDisappeared:
-            return AutomationVisualConditionPresentation.title(for: AutomationVisualConditionType.imageDisappeared)
-        case .regionChanged:
-            return AutomationVisualConditionPresentation.title(for: AutomationVisualConditionType.regionChanged)
-        case .pixelMatched:
-            return AutomationVisualConditionPresentation.title(for: AutomationVisualConditionType.pixelMatched)
-        case .previousOutcome:
-            return String(localized: "Previous outcome", table: "Common")
-        }
-    }
-
-    var systemImage: String {
-        switch self {
-        case .manualApproval:
-            return "hand.raised.fill"
-        case .externalSignal:
-            return "antenna.radiowaves.left.and.right"
-        case .ocrText:
-            return "text.viewfinder"
-        case .imageAppeared:
-            return AutomationVisualConditionPresentation.systemImage(for: AutomationVisualConditionType.imageAppeared)
-        case .imageDisappeared:
-            return AutomationVisualConditionPresentation.systemImage(for: AutomationVisualConditionType.imageDisappeared)
-        case .regionChanged:
-            return AutomationVisualConditionPresentation.systemImage(for: AutomationVisualConditionType.regionChanged)
-        case .pixelMatched:
-            return AutomationVisualConditionPresentation.systemImage(for: AutomationVisualConditionType.pixelMatched)
-        case .previousOutcome:
-            return "arrow.uturn.backward"
-        }
-    }
-}
-
-private extension AutomationOCRSearchRegionSpace {
-    var title: String {
-        switch self {
-        case .automatic:
-            return String(localized: "Automatic", table: "Common")
-        case .displayAbsolute:
-            return String(localized: "Display absolute", table: "Common")
-        case .displayNormalized:
-            return String(localized: "Display normalized", table: "Common")
-        case .windowLocal:
-            return String(localized: "Window local", table: "Common")
-        case .windowNormalized:
-            return String(localized: "Window normalized", table: "Common")
-        case .contentLocal:
-            return String(localized: "Content local", table: "Common")
-        case .contentNormalized:
-            return String(localized: "Content normalized", table: "Common")
-        }
-    }
-
-    var isNormalizedSpace: Bool {
-        switch self {
-        case .displayNormalized, .windowNormalized, .contentNormalized:
-            return true
-        case .automatic, .displayAbsolute, .windowLocal, .contentLocal:
-            return false
-        }
-    }
-}
-
-private extension String {
-    var nilIfEmptyForTaskInspector: String? {
-        isEmpty ? nil : self
     }
 }
