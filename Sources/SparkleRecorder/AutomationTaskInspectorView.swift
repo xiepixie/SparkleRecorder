@@ -8,8 +8,7 @@ struct AutomationTaskInspectorView: View {
     let graphPosition: AutomationGraphPoint?
     let taskProjection: AutomationTaskNodeProjection?
     let macros: [SavedMacro]
-    let taskRuns: [AutomationTaskRun]
-    let activeRunID: UUID?
+    let runs: [AutomationTaskRun]
     let initialSelectedRunID: UUID?
     let onImportWorkflowFromDraftPreview: @MainActor (AutomationWorkflow, URL?) async throws -> Void
     let onSelectTask: (UUID) -> Void
@@ -218,14 +217,21 @@ struct AutomationTaskInspectorView: View {
     }
 
     private var runTab: some View {
-        VStack(alignment: .leading, spacing: 14) {
+        let history = AutomationTaskRunHistoryPresentation.make(
+            runs: runs,
+            workflowID: workflow.id,
+            taskID: task.id,
+            initialSelectedRunID: initialSelectedRunID
+        )
+
+        return VStack(alignment: .leading, spacing: 14) {
             AutomationTaskRunControlView(
                 taskName: task.name,
                 isEnabled: task.isEnabled,
                 resourceRequirement: task.resourceRequirement,
-                activeRunID: activeRunID,
+                activeRunID: history.activeRunID,
                 onRun: runTask,
-                onCancel: cancelActiveRun
+                onCancel: { cancelActiveRun(history.activeRunID) }
             )
 
             if let taskProjection {
@@ -237,7 +243,7 @@ struct AutomationTaskInspectorView: View {
             saveFooter
 
             AutomationTaskRunHistoryView(
-                runs: taskRuns,
+                presentation: history,
                 workflow: workflow,
                 dependencyEdges: dependencyEdges,
                 resourceRequirement: task.resourceRequirement,
@@ -1398,7 +1404,7 @@ struct AutomationTaskInspectorView: View {
         onAction(intent.reducerAction(at: Date.now))
     }
 
-    private func cancelActiveRun() {
+    private func cancelActiveRun(_ activeRunID: UUID?) {
         guard let activeRunID else {
             return
         }

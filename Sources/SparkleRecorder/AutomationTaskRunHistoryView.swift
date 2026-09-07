@@ -2,7 +2,7 @@ import SwiftUI
 import SparkleRecorderCore
 
 struct AutomationTaskRunHistoryView: View {
-    let runs: [AutomationTaskRun]
+    let presentation: AutomationTaskRunHistoryPresentation
     let workflow: AutomationWorkflow
     let dependencyEdges: [AutomationDependencyEdgeProjection]
     var resourceRequirement: AutomationResourceRequirement?
@@ -14,7 +14,7 @@ struct AutomationTaskRunHistoryView: View {
     @State private var selectedRunID: UUID?
 
     init(
-        runs: [AutomationTaskRun],
+        presentation: AutomationTaskRunHistoryPresentation,
         workflow: AutomationWorkflow,
         dependencyEdges: [AutomationDependencyEdgeProjection],
         resourceRequirement: AutomationResourceRequirement? = nil,
@@ -23,7 +23,7 @@ struct AutomationTaskRunHistoryView: View {
         macros: [SavedMacro] = [],
         onImportWorkflowFromDraftPreview: @escaping @MainActor (AutomationWorkflow, URL?) async throws -> Void = { _, _ in }
     ) {
-        self.runs = runs
+        self.presentation = presentation
         self.workflow = workflow
         self.dependencyEdges = dependencyEdges
         self.resourceRequirement = resourceRequirement
@@ -35,16 +35,16 @@ struct AutomationTaskRunHistoryView: View {
     }
 
     var body: some View {
-        let visibleRuns = Array(runs.prefix(5))
+        let visibleRuns = presentation.recentRuns
         let selectedRun = selectedRun(from: visibleRuns)
 
         VStack(alignment: .leading, spacing: 10) {
             AutomationSectionHeader(
                 title: String(localized: "RUN HISTORY", table: "Automation"),
-                count: runs.count
+                count: presentation.totalCount
             )
 
-            if runs.isEmpty {
+            if presentation.totalCount == 0 {
                 Label {
                     VStack(alignment: .leading, spacing: 3) {
                         Text("No task runs yet", tableName: "Automation")
@@ -98,8 +98,8 @@ struct AutomationTaskRunHistoryView: View {
                     )
                 }
 
-                if runs.count > visibleRuns.count {
-                    Text(String(format: String(localized: "%d older runs hidden", table: "Automation"), runs.count - visibleRuns.count))
+                if presentation.totalCount > visibleRuns.count {
+                    Text(String(format: String(localized: "%d older runs hidden", table: "Automation"), presentation.totalCount - visibleRuns.count))
                         .font(.caption)
                         .foregroundStyle(.tertiary)
                 }
@@ -113,16 +113,13 @@ struct AutomationTaskRunHistoryView: View {
 
     private func selectedRun(from visibleRuns: [AutomationTaskRun]) -> AutomationTaskRun? {
         if let selectedRunID,
-           let selected = runs.first(where: { $0.id == selectedRunID }) {
+           let selected = presentation.run(id: selectedRunID) {
             return selected
         }
         return visibleRuns.first
     }
 
     private func hasLaterAttempt(after run: AutomationTaskRun) -> Bool {
-        runs.contains {
-            $0.executionID == run.executionID &&
-                $0.attempt > run.attempt
-        }
+        presentation.hasLaterAttempt(after: run)
     }
 }

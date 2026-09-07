@@ -74,8 +74,7 @@ struct AutomationInspectorView: View {
                                 graphPosition: selectedTaskPosition,
                                 taskProjection: selectedTaskProjection,
                                 macros: macros,
-                                taskRuns: taskRuns(for: task.id),
-                                activeRunID: activeRunID(for: task.id),
+                                runs: runs,
                                 initialSelectedRunID: initialSelectedRunID,
                                 onImportWorkflowFromDraftPreview: onImportWorkflowFromDraftPreview,
                                 onSelectTask: onSelectTask,
@@ -122,17 +121,6 @@ struct AutomationInspectorView: View {
         }
     }
 
-    private func activeRunID(for taskID: UUID) -> UUID? {
-        guard let workflowID = workflow?.id else {
-            return nil
-        }
-
-        return runs
-            .filter { $0.workflowID == workflowID && $0.taskID == taskID && !$0.isTerminal }
-            .max { latestActivityDate(for: $0) < latestActivityDate(for: $1) }?
-            .id
-    }
-
     private var nextScheduledTaskName: String? {
         guard let taskID = workflowProjection?.nextScheduledTaskID else {
             return nil
@@ -140,19 +128,6 @@ struct AutomationInspectorView: View {
         return workflow?.task(id: taskID)?.name
     }
 
-    private func taskRuns(for taskID: UUID) -> [AutomationTaskRun] {
-        guard let workflowID = workflow?.id else {
-            return []
-        }
-
-        return runs
-            .filter { $0.workflowID == workflowID && $0.taskID == taskID }
-            .sorted { latestActivityDate(for: $0) > latestActivityDate(for: $1) }
-    }
-
-    private func latestActivityDate(for run: AutomationTaskRun) -> Date {
-        run.actualStartTime ?? run.earliestStartTime ?? run.scheduledStartTime ?? run.createdAt
-    }
 }
 
 private struct AutomationWorkflowInspectorSummaryView: View {

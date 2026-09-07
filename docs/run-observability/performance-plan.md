@@ -24,6 +24,8 @@ Updated: 2026-09-07
 11. Workflow Editor projection builds one lightweight run-history index per refresh for latest Task state, represented schedule starts, and same-Execution downstream lookup instead of rescanning the complete Run History per Task or dependency.
 12. Resource Timeline is a current execution-context projection, not a second history browser. For each Workflow it keeps every active Execution and its completed upstream/retry Runs; when nothing is active it keeps the latest completed Execution. Run Center and Task Run History retain the complete historical Interface.
 13. Workflow graph levels use a linear DAG traversal for valid Workflows. A bounded relaxation fallback exists only to keep corrupt or legacy cyclic data renderable, so ordinary graph projection stays O(T + D).
+14. `AutomationOverviewModel` builds changed overview/catalog/Run Center projections off `MainActor`, publishes only the newest generation, keeps a separate working reducer state so overlapping user actions never reduce from a stale visible projection, and rejects repository snapshots whose refresh began before a newer local state mutation.
+15. Task Inspector does not scan complete Run History while the user edits Block, Flow, or Advanced settings. Opening the Run tab builds one bounded task-history presentation containing the five recent rows, total count, active Run, selected historical Run, and per-Execution attempt maxima.
 
 ## Risks And Recovery
 
@@ -45,4 +47,6 @@ Updated: 2026-09-07
 - Workflow projection tests prove indexed latest/downstream/schedule semantics across large Run History without changing branch outcomes.
 - Resource Timeline selection tests prove active Execution context is complete while old terminal history remains in Run Center rather than Timeline projection.
 - Graph-level tests prove longest-path DAG layout semantics, ignored disabled/broken links, bounded corrupt-cycle fallback, and a 1,000-Task linear Workflow without repeated graph relaxation.
+- Overview-model tests force overlapping projection builds and prove an older revision cannot overwrite a newer one; concurrent local edits prove reducer state advances independently of projection completion, and a gated repository refresh proves an older snapshot cannot overwrite a later local edit.
+- Task Run History presentation tests cover 10,002 matching Runs while retaining only five visible rows plus explicitly selected historical evidence and retry/active metadata.
 - Retention tests prove the metadata count cap while preserving active/latest/failure/evidence protections.
