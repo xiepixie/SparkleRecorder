@@ -11,6 +11,7 @@ struct AutomationMainView: View {
   private let onPreviewScheduledMacro: @MainActor (UUID, AutomationTask?) async throws -> Void
   private let onRenameMacro: (UUID, String) -> Void
   private let onSetMacroLoops: (UUID, Int) -> Void
+  private let visualAssetPackageRootAssociation: AutomationVisualAssetPackageRootAssociation
 
   init(
     projection: AutomationOverviewProjection = .ownerCFixture(),
@@ -18,7 +19,8 @@ struct AutomationMainView: View {
     onRecordMacro: (() -> Void)? = nil,
     onPreviewScheduledMacro: @escaping @MainActor (UUID, AutomationTask?) async throws -> Void = { _, _ in },
     onRenameMacro: @escaping (UUID, String) -> Void = { _, _ in },
-    onSetMacroLoops: @escaping (UUID, Int) -> Void = { _, _ in }
+    onSetMacroLoops: @escaping (UUID, Int) -> Void = { _, _ in },
+    visualAssetPackageRootAssociation: AutomationVisualAssetPackageRootAssociation = .fileBacked()
   ) {
     _model = State(initialValue: AutomationOverviewModel(projection: projection))
     self.onAction = onAction
@@ -26,6 +28,7 @@ struct AutomationMainView: View {
     self.onPreviewScheduledMacro = onPreviewScheduledMacro
     self.onRenameMacro = onRenameMacro
     self.onSetMacroLoops = onSetMacroLoops
+    self.visualAssetPackageRootAssociation = visualAssetPackageRootAssociation
   }
 
   init(
@@ -35,7 +38,8 @@ struct AutomationMainView: View {
     onRecordMacro: (() -> Void)? = nil,
     onPreviewScheduledMacro: @escaping @MainActor (UUID, AutomationTask?) async throws -> Void = { _, _ in },
     onRenameMacro: @escaping (UUID, String) -> Void = { _, _ in },
-    onSetMacroLoops: @escaping (UUID, Int) -> Void = { _, _ in }
+    onSetMacroLoops: @escaping (UUID, Int) -> Void = { _, _ in },
+    visualAssetPackageRootAssociation: AutomationVisualAssetPackageRootAssociation = .fileBacked()
   ) {
     _model = State(
       initialValue: AutomationOverviewModel(
@@ -47,6 +51,7 @@ struct AutomationMainView: View {
     self.onPreviewScheduledMacro = onPreviewScheduledMacro
     self.onRenameMacro = onRenameMacro
     self.onSetMacroLoops = onSetMacroLoops
+    self.visualAssetPackageRootAssociation = visualAssetPackageRootAssociation
   }
 
   init(
@@ -57,7 +62,8 @@ struct AutomationMainView: View {
     onRecordMacro: (() -> Void)? = nil,
     onPreviewScheduledMacro: @escaping @MainActor (UUID, AutomationTask?) async throws -> Void = { _, _ in },
     onRenameMacro: @escaping (UUID, String) -> Void = { _, _ in },
-    onSetMacroLoops: @escaping (UUID, Int) -> Void = { _, _ in }
+    onSetMacroLoops: @escaping (UUID, Int) -> Void = { _, _ in },
+    visualAssetPackageRootAssociation: AutomationVisualAssetPackageRootAssociation = .fileBacked()
   ) {
     _model = State(
       initialValue: AutomationOverviewModel(
@@ -69,6 +75,7 @@ struct AutomationMainView: View {
     self.onPreviewScheduledMacro = onPreviewScheduledMacro
     self.onRenameMacro = onRenameMacro
     self.onSetMacroLoops = onSetMacroLoops
+    self.visualAssetPackageRootAssociation = visualAssetPackageRootAssociation
   }
 
   var body: some View {
@@ -99,6 +106,7 @@ struct AutomationMainView: View {
             onPreviewScheduledMacro: onPreviewScheduledMacro,
             onRenameMacro: renameMacro,
             onSetMacroLoops: setMacroLoops,
+            visualAssetPackageRootAssociation: visualAssetPackageRootAssociation,
             onShowLibrary: { appState.workspace = .library }
           )
         }
@@ -125,6 +133,7 @@ struct AutomationMainView: View {
           onPreviewScheduledMacro: onPreviewScheduledMacro,
           onRenameMacro: renameMacro,
           onSetMacroLoops: setMacroLoops,
+          visualAssetPackageRootAssociation: visualAssetPackageRootAssociation,
           onShowLibrary: { appState.workspace = .library }
         )
       }

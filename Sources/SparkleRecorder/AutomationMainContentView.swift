@@ -53,6 +53,7 @@ struct AutomationMainContentView: View {
   let onPreviewScheduledMacro: @MainActor (UUID, AutomationTask?) async throws -> Void
   let onRenameMacro: ((UUID, String) -> Void)?
   let onSetMacroLoops: ((UUID, Int) -> Void)?
+  let visualAssetPackageRootAssociation: AutomationVisualAssetPackageRootAssociation
   let onShowLibrary: () -> Void
 
   @State private var selectedWorkflowID: UUID?
@@ -99,6 +100,7 @@ struct AutomationMainContentView: View {
     onPreviewScheduledMacro: @escaping @MainActor (UUID, AutomationTask?) async throws -> Void = { _, _ in },
     onRenameMacro: ((UUID, String) -> Void)? = nil,
     onSetMacroLoops: ((UUID, Int) -> Void)? = nil,
+    visualAssetPackageRootAssociation: AutomationVisualAssetPackageRootAssociation = .inMemory(),
     onShowLibrary: @escaping () -> Void = {}
   ) {
     self.state = state
@@ -126,6 +128,7 @@ struct AutomationMainContentView: View {
     self.onPreviewScheduledMacro = onPreviewScheduledMacro
     self.onRenameMacro = onRenameMacro
     self.onSetMacroLoops = onSetMacroLoops
+    self.visualAssetPackageRootAssociation = visualAssetPackageRootAssociation
     self.onShowLibrary = onShowLibrary
     _selectedWorkflowID = State(initialValue: initialSelectedWorkflowID)
     _selection = State(initialValue: initialSelection)
@@ -901,10 +904,14 @@ struct AutomationMainContentView: View {
 
     try await onCommitAction(.upsertWorkflow(workflowToImport, at: date))
     do {
-      try await persistVisualAssetPackageRoot(
-        for: workflowToImport,
-        sourceDirectory: sourceDirectory,
-        source: .aiDraftImport,
+      try await visualAssetPackageRootAssociation.persist(
+        [
+          AutomationVisualAssetPackageRootAssociation.Request(
+            workflow: workflowToImport,
+            packageDirectoryURL: sourceDirectory,
+            source: .aiDraftImport
+          )
+        ],
         associatedAt: date
       )
     } catch {
@@ -929,32 +936,6 @@ struct AutomationMainContentView: View {
       isReplacement: existingWorkflow != nil,
       previousWorkflow: existingWorkflow
     )
-  }
-
-  private func persistVisualAssetPackageRoot(
-    for workflow: AutomationWorkflow,
-    sourceDirectory: URL?,
-    source: AutomationVisualAssetPackageRootSource,
-    associatedAt: Date
-  ) async throws {
-    let roots: [AutomationVisualAssetPackageRoot]
-    if let sourceDirectory {
-      roots = AutomationVisualAssetPackageRoot.roots(
-        for: [workflow],
-        packageDirectoryURL: sourceDirectory,
-        source: source,
-        associatedAt: associatedAt
-      )
-    } else {
-      roots = []
-    }
-
-    let client = AutomationVisualAssetPackageRootClient.fileBacked()
-    if roots.isEmpty {
-      try await client.removeRoots(Set([workflow.id]))
-    } else {
-      try await client.upsertRoots(roots)
-    }
   }
 
   private func updateNextSchedule(to edit: AutomationTimelineScheduleEdit) {

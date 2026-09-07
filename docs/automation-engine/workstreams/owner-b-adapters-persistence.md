@@ -75,6 +75,7 @@ Owner B owns the boundary between pure AutomationEngine state and the real macOS
 19. [x] Add OCR search-region coordinate spaces and runtime context injection for display/window/content remapping.
 20. [x] Freeze `.sparkrec_workflow` as a static workflow package codec with version, duplicate ID, and DAG validation.
 21. [x] Add App-host runtime handoff mailbox first pass for CLI manual-start/cancel-run delivery when the App is already running.
+22. [x] Keep visual-asset package-root persistence behind `AutomationVisualAssetPackageRootClient`; package import and AI Draft import share `AutomationVisualAssetPackageRootAssociation` so rooted/unrooted cleanup is centralized outside SwiftUI.
 
 ## Acceptance Criteria
 

@@ -282,28 +282,15 @@ enum AutomationWorkflowPackagePresenter {
     private static func persistVisualAssetPackageRoots(
         for importItems: [WorkflowPackageImportItem]
     ) async throws {
-        let associatedAt = Date()
-        let roots = importItems.flatMap { item in
-            AutomationVisualAssetPackageRoot.roots(
-                for: [item.workflow],
+        let association = AutomationVisualAssetPackageRootAssociation.fileBacked()
+        let requests = importItems.map { item in
+            AutomationVisualAssetPackageRootAssociation.Request(
+                workflow: item.workflow,
                 packageDirectoryURL: item.packageDirectoryURL,
-                source: .workflowPackageImport,
-                associatedAt: associatedAt
+                source: .workflowPackageImport
             )
         }
-        let rootedWorkflowIDs = Set(roots.map(\.workflowID))
-        let unrootedWorkflowIDs = Set(importItems.map(\.workflow.id)).subtracting(rootedWorkflowIDs)
-        guard !roots.isEmpty || !unrootedWorkflowIDs.isEmpty else {
-            return
-        }
-
-        let client = AutomationVisualAssetPackageRootClient.fileBacked()
-        if !roots.isEmpty {
-            try await client.upsertRoots(roots)
-        }
-        if !unrootedWorkflowIDs.isEmpty {
-            try await client.removeRoots(unrootedWorkflowIDs)
-        }
+        try await association.persist(requests, associatedAt: Date())
     }
 
     private static func duplicateValues<T: Hashable>(_ values: [T]) -> [T] {
