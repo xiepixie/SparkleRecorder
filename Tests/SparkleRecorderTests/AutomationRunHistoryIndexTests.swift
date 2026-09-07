@@ -4,31 +4,48 @@ import Testing
 
 @Suite("Automation Run History Index Tests")
 struct AutomationRunHistoryIndexTests {
-    @Test("Task lookup preserves run order and isolates workflow scope")
-    func taskLookupPreservesRunOrderAndWorkflowScope() {
+    @Test("Scheduled starts are deduplicated and isolated by workflow task")
+    func scheduledStartsAreDeduplicatedAndIsolatedByWorkflowTask() {
         let workflowID = UUID()
         let otherWorkflowID = UUID()
         let taskID = UUID()
-        let first = makeRun(
+        let firstStart = date(10)
+        let secondStart = date(20)
+        var first = makeRun(
             workflowID: workflowID,
             taskID: taskID,
-            createdAt: date(10)
+            createdAt: date(1)
         )
-        let second = makeRun(
+        first.scheduledStartTime = firstStart
+        var duplicate = makeRun(
             workflowID: workflowID,
             taskID: taskID,
-            createdAt: date(20)
+            createdAt: date(2)
         )
-        let other = makeRun(
+        duplicate.scheduledStartTime = firstStart
+        var second = makeRun(
+            workflowID: workflowID,
+            taskID: taskID,
+            createdAt: date(3)
+        )
+        second.scheduledStartTime = secondStart
+        var other = makeRun(
             workflowID: otherWorkflowID,
             taskID: taskID,
-            createdAt: date(30)
+            createdAt: date(4)
         )
+        other.scheduledStartTime = date(30)
 
-        let index = AutomationRunHistoryIndex(runs: [first, other, second])
+        let index = AutomationRunHistoryIndex(runs: [first, other, duplicate, second])
 
-        #expect(index.runs(workflowID: workflowID, taskID: taskID).map(\.id) == [first.id, second.id])
-        #expect(index.runs(workflowID: otherWorkflowID, taskID: taskID).map(\.id) == [other.id])
+        #expect(
+            index.scheduledStartTimes(workflowID: workflowID, taskID: taskID)
+                == Set([firstStart, secondStart])
+        )
+        #expect(
+            index.scheduledStartTimes(workflowID: otherWorkflowID, taskID: taskID)
+                == Set([date(30)])
+        )
     }
 
     @Test("Latest run uses the existing timeline ordering and preserves first tie")
@@ -148,6 +165,9 @@ struct AutomationRunHistoryIndexTests {
                 executionID: UUID(),
                 createdAt: date(TimeInterval(index))
             )
+            if index % 3 == 0 {
+                run.scheduledStartTime = date(TimeInterval(index + 1))
+            }
             if index % 5 == 0 {
                 run.actualStartTime = date(TimeInterval(index + 2))
             }
@@ -161,13 +181,20 @@ struct AutomationRunHistoryIndexTests {
 
         for workflowID in workflowIDs {
             for taskID in taskIDs {
-                let expected = runs
-                    .filter { $0.workflowID == workflowID && $0.taskID == taskID }
-                    .max {
-                        AutomationRunHistoryIndex.timelineSortDate($0)
-                            < AutomationRunHistoryIndex.timelineSortDate($1)
-                    }
+                let matchingRuns = runs.filter {
+                    $0.workflowID == workflowID && $0.taskID == taskID
+                }
+                let expected = matchingRuns.max {
+                    AutomationRunHistoryIndex.timelineSortDate($0)
+                        < AutomationRunHistoryIndex.timelineSortDate($1)
+                }
+                let expectedScheduledStarts = Set(matchingRuns.compactMap(\.scheduledStartTime))
+
                 #expect(index.latestRun(workflowID: workflowID, taskID: taskID)?.id == expected?.id)
+                #expect(
+                    index.scheduledStartTimes(workflowID: workflowID, taskID: taskID)
+                        == expectedScheduledStarts
+                )
             }
         }
     }
