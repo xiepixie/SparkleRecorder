@@ -1,18 +1,26 @@
 import Foundation
 
 public enum AutomationViewProjection {
-    private struct RunTaskInfo {
+    private struct WorkflowTaskKey: Hashable {
+        var workflowID: UUID
         var taskID: UUID
-        var title: String
+    }
+
+    private struct RunTaskInfo {
+        var task: AutomationTask
+
+        var taskID: UUID { task.id }
+        var title: String { task.name }
     }
 
     public static func overview(from state: AutomationRunState) -> AutomationOverviewProjection {
         let generatedAt = state.now ?? Date.now
         let taskInfoByRunID = taskInfoByRunID(from: state)
+        let runHistory = AutomationRunHistoryIndex(runs: state.runs)
         let workflows = state.workflows.map { workflow in
             workflowProjection(
                 for: workflow,
-                runs: state.runs,
+                runHistory: runHistory,
                 leases: state.leases,
                 taskInfoByRunID: taskInfoByRunID,
                 generatedAt: generatedAt
@@ -21,7 +29,7 @@ public enum AutomationViewProjection {
         let timelineItems = state.runs.compactMap { run in
             timelineItem(
                 for: run,
-                state: state,
+                leases: state.leases,
                 taskInfoByRunID: taskInfoByRunID,
                 generatedAt: generatedAt
             )
@@ -45,7 +53,7 @@ public enum AutomationViewProjection {
 
     private static func workflowProjection(
         for workflow: AutomationWorkflow,
-        runs: [AutomationTaskRun],
+        runHistory: AutomationRunHistoryIndex,
         leases: [AutomationResourceLease],
         taskInfoByRunID: [UUID: RunTaskInfo],
         generatedAt: Date
@@ -57,8 +65,11 @@ public enum AutomationViewProjection {
             nodeProjection(
                 for: task,
                 workflowID: workflow.id,
-                run: latestRun(for: task, workflowID: workflow.id, runs: runs),
-                runs: runs.filter { $0.workflowID == workflow.id && $0.taskID == task.id },
+                run: runHistory.latestRun(workflowID: workflow.id, taskID: task.id),
+                scheduledStartTimes: runHistory.scheduledStartTimes(
+                    workflowID: workflow.id,
+                    taskID: task.id
+                ),
                 leases: leases,
                 taskInfoByRunID: taskInfoByRunID,
                 generatedAt: generatedAt,
@@ -78,7 +89,12 @@ public enum AutomationViewProjection {
             }
         let nodeByID = Dictionary(uniqueKeysWithValues: nodes.map { ($0.taskID, $0) })
         let edges = workflow.dependencies.compactMap { dependency in
-            edgeProjection(for: dependency, workflowID: workflow.id, nodeByID: nodeByID, runs: runs)
+            edgeProjection(
+                for: dependency,
+                workflowID: workflow.id,
+                nodeByID: nodeByID,
+                runHistory: runHistory
+            )
         }
 
         return AutomationWorkflowProjection(
@@ -96,33 +112,30 @@ public enum AutomationViewProjection {
     }
 
     private static func taskInfoByRunID(from state: AutomationRunState) -> [UUID: RunTaskInfo] {
-        var taskByWorkflowAndTaskID: [String: AutomationTask] = [:]
+        var taskByWorkflowAndTaskID: [WorkflowTaskKey: AutomationTask] = [:]
         for workflow in state.workflows {
             for task in workflow.tasks {
-                taskByWorkflowAndTaskID[taskLookupKey(workflowID: workflow.id, taskID: task.id)] = task
+                taskByWorkflowAndTaskID[
+                    WorkflowTaskKey(workflowID: workflow.id, taskID: task.id)
+                ] = task
             }
         }
 
         return Dictionary(uniqueKeysWithValues: state.runs.compactMap { run in
-            guard let task = taskByWorkflowAndTaskID[taskLookupKey(
-                workflowID: run.workflowID,
-                taskID: run.taskID
-            )] else {
+            guard let task = taskByWorkflowAndTaskID[
+                WorkflowTaskKey(workflowID: run.workflowID, taskID: run.taskID)
+            ] else {
                 return nil
             }
-            return (run.id, RunTaskInfo(taskID: task.id, title: task.name))
+            return (run.id, RunTaskInfo(task: task))
         })
-    }
-
-    private static func taskLookupKey(workflowID: UUID, taskID: UUID) -> String {
-        "\(workflowID.uuidString):\(taskID.uuidString)"
     }
 
     private static func nodeProjection(
         for task: AutomationTask,
         workflowID: UUID,
         run: AutomationTaskRun?,
-        runs: [AutomationTaskRun],
+        scheduledStartTimes: Set<Date>,
         leases: [AutomationResourceLease],
         taskInfoByRunID: [UUID: RunTaskInfo],
         generatedAt: Date,
@@ -138,7 +151,7 @@ public enum AutomationViewProjection {
             scheduleLabel: scheduleLabel(for: task.schedule),
             nextScheduledOccurrence: nextScheduledOccurrence(
                 for: task,
-                runs: runs,
+                existingScheduledStarts: scheduledStartTimes,
                 generatedAt: generatedAt
             ),
             resourceLabel: resourceLabel(for: task.resourceRequirement),
@@ -164,13 +177,12 @@ public enum AutomationViewProjection {
 
     private static func nextScheduledOccurrence(
         for task: AutomationTask,
-        runs: [AutomationTaskRun],
+        existingScheduledStarts: Set<Date>,
         generatedAt: Date
     ) -> Date? {
         guard let schedule = task.schedule, task.isEnabled else {
             return nil
         }
-        let existingScheduledStarts = Set(runs.compactMap(\.scheduledStartTime))
         return schedule
             .nextOccurrence(
                 onOrAfter: generatedAt,
@@ -183,24 +195,22 @@ public enum AutomationViewProjection {
         for dependency: AutomationDependency,
         workflowID: UUID,
         nodeByID: [UUID: AutomationTaskNodeProjection],
-        runs: [AutomationTaskRun]
+        runHistory: AutomationRunHistoryIndex
     ) -> AutomationDependencyEdgeProjection? {
         guard let source = nodeByID[dependency.fromTaskID],
               let target = nodeByID[dependency.toTaskID] else {
             return nil
         }
 
-        let sourceRun = latestRun(
-            forTaskID: dependency.fromTaskID,
+        let sourceRun = runHistory.latestRun(
             workflowID: workflowID,
-            runs: runs
+            taskID: dependency.fromTaskID
         )
         let targetRun = sourceRun.flatMap { sourceRun in
-            downstreamRun(
-                for: dependency,
-                sourceRun: sourceRun,
+            runHistory.downstreamRun(
                 workflowID: workflowID,
-                runs: runs
+                targetTaskID: dependency.toTaskID,
+                sourceRun: sourceRun
             )
         }
         let start = AutomationGraphPoint(
@@ -229,48 +239,13 @@ public enum AutomationViewProjection {
         )
     }
 
-    private static func downstreamRun(
-        for dependency: AutomationDependency,
-        sourceRun: AutomationTaskRun,
-        workflowID: UUID,
-        runs: [AutomationTaskRun]
-    ) -> AutomationTaskRun? {
-        runs
-            .filter { run in
-                run.workflowID == workflowID &&
-                    run.taskID == dependency.toTaskID &&
-                    run.executionID == sourceRun.executionID &&
-                    run.upstreamRunIDs.contains(sourceRun.id)
-            }
-            .max { timelineSortDate($0) < timelineSortDate($1) }
-    }
-
-    private static func latestRun(
-        for task: AutomationTask,
-        workflowID: UUID,
-        runs: [AutomationTaskRun]
-    ) -> AutomationTaskRun? {
-        latestRun(forTaskID: task.id, workflowID: workflowID, runs: runs)
-    }
-
-    private static func latestRun(
-        forTaskID taskID: UUID,
-        workflowID: UUID,
-        runs: [AutomationTaskRun]
-    ) -> AutomationTaskRun? {
-        runs
-            .filter { $0.workflowID == workflowID && $0.taskID == taskID }
-            .max { timelineSortDate($0) < timelineSortDate($1) }
-    }
-
     private static func timelineItem(
         for run: AutomationTaskRun,
-        state: AutomationRunState,
+        leases: [AutomationResourceLease],
         taskInfoByRunID: [UUID: RunTaskInfo],
         generatedAt: Date
     ) -> AutomationResourceTimelineItem? {
-        guard let workflow = state.workflow(id: run.workflowID),
-              let task = workflow.task(id: run.taskID) else {
+        guard let task = taskInfoByRunID[run.id]?.task else {
             return nil
         }
 
@@ -294,7 +269,7 @@ public enum AutomationViewProjection {
             resourceWaiting: resourceWaitingProjection(
                 for: task,
                 run: run,
-                leases: state.leases,
+                leases: leases,
                 taskInfoByRunID: taskInfoByRunID,
                 generatedAt: generatedAt
             ),
