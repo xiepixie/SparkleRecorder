@@ -448,13 +448,14 @@ struct AutomationRunCenterSheet: View {
 
   private func perform(_ command: AutomationRunCenterCommand) {
     switch command {
-    case .inspectEvidence(let runID, let failedEventIndex):
-      guard let run = selectedExecution?.runs.first(where: { $0.id == runID }) else { return }
-      evidenceSelection = AutomationRunCenterEvidenceSelection(
-        run: run,
-        taskName: selectedExecution?.failureFocus?.taskName,
-        failedEventIndex: failedEventIndex
-      )
+    case .inspectEvidence:
+      guard let selection = AutomationRunCenterEvidenceSelection.make(
+        command: command,
+        projection: model.projection
+      ) else {
+        return
+      }
+      evidenceSelection = selection
     case .cancelExecution:
       pendingCancellation = command
     case .deleteExecution:
@@ -986,14 +987,6 @@ extension AutomationRunCenterCommand {
     return false
   }
 
-}
-
-struct AutomationRunCenterEvidenceSelection: Identifiable {
-  let run: AutomationTaskRun
-  let taskName: String?
-  let failedEventIndex: Int?
-
-  var id: UUID { run.id }
 }
 
 struct AutomationRunCenterEvidenceSheet: View {

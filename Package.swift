@@ -30,6 +30,7 @@ let toolingSourceSet = Set(toolingSources)
 // the directory scan remains the general source of truth.
 let toolingAlwaysExcludedAppSources: Set<String> = [
     "AutomationRunCenterDeletionConfirmation.swift",
+    "AutomationRunCenterEvidenceSelection.swift",
     "AutomationRunCenterStorageUsageState.swift",
     "AutomationTaskAdvancedEditorView.swift",
     "AutomationTaskConditionEditorView.swift",
