@@ -1090,7 +1090,7 @@ struct SettingsPanel: View {
                         .fixedSize(horizontal: false, vertical: true)
                     Spacer(minLength: 8)
                     Button {
-                        controller.refreshSemanticRecordingPreflightPresentation()
+                        controller.refreshSemanticRecordingPreflightPresentation(notifyUser: true)
                     } label: {
                         Label(String(localized: "Check", table: "Common"), systemImage: "arrow.clockwise")
                     }
@@ -1125,7 +1125,7 @@ struct SettingsPanel: View {
                         .fixedSize(horizontal: false, vertical: true)
                     Spacer(minLength: 8)
                     Button {
-                        controller.refreshSemanticRecordingPreflightPresentation()
+                        controller.refreshSemanticRecordingPreflightPresentation(notifyUser: true)
                     } label: {
                         Label(String(localized: "Check", table: "Common"), systemImage: "arrow.clockwise")
                     }
@@ -1590,7 +1590,7 @@ struct SettingsPanel: View {
                 controller.openSemanticRecordingPermissionSettings(permission)
             }
         case .retryPreflight:
-            controller.refreshSemanticRecordingPreflightPresentation()
+            controller.refreshSemanticRecordingPreflightPresentation(notifyUser: true)
         case .startRecording, .continueDegraded:
             break
         }

@@ -9,40 +9,46 @@ struct LibrarySidebar: View {
     private let filterItems: [LibraryFilter] = [.all, .favorites, .recent, .mostPlayed, .withHotkey]
 
     var body: some View {
+        let projection = LibrarySidebarProjection(macros: library.macros)
+
         VStack(alignment: .leading, spacing: 0) {
             ScrollView {
                 VStack(alignment: .leading, spacing: 4) {
                     sectionHeader(String(localized: "Library", table: "Common"))
                     ForEach(filterItems, id: \.self) { item in
-                        sidebarRow(item)
+                        sidebarRow(item, count: projection.count(for: item))
                     }
 
-                    if !library.allAccents.isEmpty {
+                    if !projection.accents.isEmpty {
                         sectionHeader(String(localized: "Colors", table: "Common"))
                             .padding(.top, 14)
-                        ForEach(library.allAccents, id: \.self) { name in
-                            sidebarRow(.accent(name))
+                        ForEach(projection.accents, id: \.self) { name in
+                            sidebarRow(.accent(name), count: projection.count(for: .accent(name)))
                         }
                     }
 
-                    if !library.allTags.isEmpty {
+                    if !projection.tags.isEmpty {
                         sectionHeader(String(localized: "Tags", table: "Common"))
                             .padding(.top, 14)
-                        ForEach(library.allTags, id: \.self) { t in
-                            sidebarRow(.tag(t))
+                        ForEach(projection.tags, id: \.self) { tag in
+                            sidebarRow(.tag(tag), count: projection.count(for: .tag(tag)))
                         }
                     }
 
 	                    sectionHeader(String(localized: "Stats", table: "Common"))
 	                        .padding(.top, 14)
-	                    StatsSummary()
+	                    StatsSummary(
+                            totalMacros: projection.totalMacros,
+                            totalPlays: projection.totalPlays,
+                            totalSaved: projection.totalSaved
+                        )
                 }
                 .padding(.horizontal, 12)
                 .padding(.top, 16)
                 .padding(.bottom, 12)
             }
         }
-        .background(VisualEffectBackground(material: .sidebar, blendingMode: .behindWindow))
+        .background(VisualEffectBackground(material: .sidebar, blendingMode: .withinWindow))
     }
 
     func sectionHeader(_ text: String) -> some View {
@@ -55,9 +61,8 @@ struct LibrarySidebar: View {
     }
 
     @ViewBuilder
-    func sidebarRow(_ item: LibraryFilter) -> some View {
+    func sidebarRow(_ item: LibraryFilter, count: Int) -> some View {
         let selected = filter == item
-        let count: Int = library.macros(for: item, search: "").count
         Button {
             withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) { filter = item }
         } label: {
@@ -99,5 +104,66 @@ struct LibrarySidebar: View {
                 .foregroundStyle(selected ? AnyShapeStyle(.white) : AnyShapeStyle(.secondary))
                 .frame(width: 16)
         }
+    }
+}
+
+struct LibrarySidebarProjection {
+    var counts: [LibraryFilter: Int]
+    var tags: [String]
+    var accents: [String]
+    var totalMacros: Int
+    var totalPlays: Int
+    var totalSaved: TimeInterval
+
+    init(macros: [SavedMacro], now: Date = Date()) {
+        let recentCutoff = now.addingTimeInterval(-86_400 * 7)
+        var counts: [LibraryFilter: Int] = [.all: macros.count]
+        var tagNames = Set<String>()
+        var accentNamesInUse = Set<String>()
+        var totalPlays = 0
+        var totalSaved: TimeInterval = 0
+
+        for macro in macros {
+            if macro.favorite {
+                counts[.favorites, default: 0] += 1
+            }
+            if (macro.lastPlayedAt ?? macro.modifiedAt) >= recentCutoff {
+                counts[.recent, default: 0] += 1
+            }
+            if macro.playCount > 0 {
+                counts[.mostPlayed, default: 0] += 1
+            }
+            if macro.hotkey != nil {
+                counts[.withHotkey, default: 0] += 1
+            }
+
+            for tag in Set(macro.tags) {
+                tagNames.insert(tag)
+                counts[.tag(tag), default: 0] += 1
+            }
+            if let accent = normalizedAccentName(macro.accent) {
+                accentNamesInUse.insert(accent)
+                counts[.accent(accent), default: 0] += 1
+            }
+
+            totalPlays += macro.playCount
+            totalSaved += macro.totalRunTime
+        }
+
+        self.counts = counts
+        self.tags = tagNames.sorted()
+        self.accents = accentNamesInUse.sorted {
+            let left = accentSortIndex($0)
+            let right = accentSortIndex($1)
+            if left != right { return left < right }
+            return accentDisplayName($0).localizedCaseInsensitiveCompare(accentDisplayName($1)) == .orderedAscending
+        }
+        self.totalMacros = macros.count
+        self.totalPlays = totalPlays
+        self.totalSaved = totalSaved
+    }
+
+    func count(for filter: LibraryFilter) -> Int {
+        counts[filter, default: 0]
     }
 }

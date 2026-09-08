@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 import SparkleRecorderCore
 import UniformTypeIdentifiers
@@ -24,18 +25,44 @@ struct AutomationFlowGraphView: View {
     @State private var draggedNode: DraggedNode?
     @State private var isGraphDropTargeted = false
     @State private var graphDropLocation: CGPoint?
+    @State private var visibleGraphRect: CGRect?
 
     private let dragThreshold = 3.0
     private let graphInset = 32.0
 
     var body: some View {
+        let graphSize = dynamicGraphSize
+        let edges = dynamicEdges
+        let cullingEnabled = AutomationFlowGraphViewportProjection.shouldCull(
+            nodeCount: workflow.nodes.count,
+            voiceOverEnabled: NSWorkspace.shared.isVoiceOverEnabled
+        )
+        let retainedTaskIDs = Set(
+            [selectedTaskID, draggedNode?.taskID, pendingDependencySourceID, linkPreview?.sourceTaskID]
+                .compactMap { $0 }
+        )
+        let nodes = AutomationFlowGraphViewportProjection.visibleNodes(
+            workflow: workflow,
+            visibleRect: visibleGraphRect,
+            retainedTaskIDs: retainedTaskIDs,
+            cullingEnabled: cullingEnabled
+        )
+        let retainedDependencyIDs = Set([selectedDependencyID].compactMap { $0 })
+        let visibleEdges = AutomationFlowGraphViewportProjection.visibleEdges(
+            edges,
+            visibleNodes: nodes,
+            visibleRect: visibleGraphRect,
+            retainedDependencyIDs: retainedDependencyIDs,
+            cullingEnabled: cullingEnabled
+        )
+
         ZStack(alignment: .topLeading) {
             ScrollView([.horizontal, .vertical]) {
                 ZStack(alignment: .topLeading) {
-                    AutomationFlowGraphEdgeCanvas(edges: dynamicEdges)
+                    AutomationFlowGraphEdgeCanvas(edges: visibleEdges)
                         .frame(
-                            width: CGFloat(dynamicGraphSize.width),
-                            height: CGFloat(dynamicGraphSize.height)
+                            width: CGFloat(graphSize.width),
+                            height: CGFloat(graphSize.height)
                         )
 
                     if let linkPreview,
@@ -45,25 +72,25 @@ struct AutomationFlowGraphView: View {
                             end: linkPreview.end
                         )
                             .frame(
-                                width: CGFloat(dynamicGraphSize.width),
-                                height: CGFloat(dynamicGraphSize.height)
+                                width: CGFloat(graphSize.width),
+                                height: CGFloat(graphSize.height)
                             )
                     }
 
                     AutomationFlowGraphEdgeListView(
-                        edges: dynamicEdges,
+                        edges: visibleEdges,
                         selectedDependencyID: selectedDependencyID,
                         onSelectDependency: onSelectDependency,
                         onDeleteDependency: onDeleteDependency
                     )
 
-                    ForEach(workflow.nodes) { node in
+                    ForEach(nodes) { node in
                         nodeView(for: node)
                     }
                 }
                 .frame(
-                    width: CGFloat(dynamicGraphSize.width),
-                    height: CGFloat(dynamicGraphSize.height),
+                    width: CGFloat(graphSize.width),
+                    height: CGFloat(graphSize.height),
                     alignment: .topLeading
                 )
                 .contentShape(Rectangle())
@@ -79,6 +106,7 @@ struct AutomationFlowGraphView: View {
                 .coordinateSpace(name: "AutomationFlowGraphCanvas")
             }
             .scrollIndicators(.hidden)
+            .modifier(AutomationFlowGraphScrollTrackingModifier(visibleRect: $visibleGraphRect))
 
             // Header Overlay
             HStack(alignment: .top) {
@@ -200,6 +228,7 @@ struct AutomationFlowGraphView: View {
             height: max(workflow.graphSize.height, movedMaxY)
         )
     }
+
 
     private var graphDropOverlay: some View {
         ZStack(alignment: .topLeading) {
@@ -469,6 +498,25 @@ private struct AutomationFlowGraphEmptyCanvasView: View {
                 .foregroundStyle(.tertiary)
         }
         .padding(20)
+    }
+}
+
+private struct AutomationFlowGraphScrollTrackingModifier: ViewModifier {
+    @Binding var visibleRect: CGRect?
+
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        if #available(macOS 15.0, *) {
+            content.onScrollGeometryChange(for: CGRect.self) { geometry in
+                geometry.visibleRect
+            } action: { _, newValue in
+                if visibleRect != newValue {
+                    visibleRect = newValue
+                }
+            }
+        } else {
+            content
+        }
     }
 }
 

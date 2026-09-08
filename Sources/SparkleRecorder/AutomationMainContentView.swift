@@ -29,6 +29,7 @@ struct AutomationMainContentView: View {
   let projection: AutomationOverviewProjection
   let catalogProjection: AutomationCatalogProjection
   let runCenterProjection: AutomationRunCenterProjection
+  let catalogRunIndex: AutomationCatalogRunIndex
   let macros: [SavedMacro]
   let currentMacroID: UUID?
   let refreshState: AutomationRepositoryRefreshState
@@ -70,6 +71,7 @@ struct AutomationMainContentView: View {
     projection: AutomationOverviewProjection,
     catalogProjection: AutomationCatalogProjection? = nil,
     runCenterProjection: AutomationRunCenterProjection? = nil,
+    catalogRunIndex: AutomationCatalogRunIndex? = nil,
     macros: [SavedMacro],
     currentMacroID: UUID? = nil,
     refreshState: AutomationRepositoryRefreshState,
@@ -102,8 +104,10 @@ struct AutomationMainContentView: View {
     self.catalogProjection =
       catalogProjection
       ?? AutomationCatalogProjection.make(state: state, overview: projection)
-    self.runCenterProjection =
-      runCenterProjection ?? AutomationRunCenterProjection.make(state: state)
+    let resolvedRunCenter = runCenterProjection ?? AutomationRunCenterProjection.make(state: state)
+    self.runCenterProjection = resolvedRunCenter
+    self.catalogRunIndex = catalogRunIndex
+      ?? AutomationCatalogRunIndex(executions: resolvedRunCenter.executions)
     self.macros = macros
     self.currentMacroID = currentMacroID
     self.refreshState = refreshState
@@ -160,8 +164,14 @@ struct AutomationMainContentView: View {
     authoringState.selectedInspectorRunID
   }
 
-  private var authoringRepairSignature: AutomationWorkflowAuthoringRepairSignature {
-    AutomationWorkflowAuthoringRepairSignature(workflows: state.workflows)
+  private var activeAuthoringRepairSignature: AutomationWorkflowAuthoringRepairSignature? {
+    guard workspaceSurface == .editor else { return nil }
+    return AutomationWorkflowAuthoringRepairSignature(workflows: state.workflows)
+  }
+
+  private var activeProjectionWorkflowIDs: [UUID] {
+    guard workspaceSurface == .editor else { return [] }
+    return projection.workflows.map(\.id)
   }
 
   private var selectedWorkflow: AutomationWorkflowProjection? {
@@ -291,17 +301,18 @@ struct AutomationMainContentView: View {
   }
 
   var body: some View {
-    let workflow = selectedWorkflow
-    let timelineItems = selectedTimelineItems
+    let workflow = workspaceSurface == .editor ? selectedWorkflow : nil
+    let timelineItems = workspaceSurface == .editor ? selectedTimelineItems : []
 
     ZStack {
-      VisualEffectBackground(material: .windowBackground, blendingMode: .behindWindow)
+      VisualEffectBackground(material: .windowBackground, blendingMode: .withinWindow)
         .ignoresSafeArea()
 
       if workspaceSurface == .catalog {
         AutomationCatalogView(
           catalog: catalogProjection,
           runs: runCenterProjection,
+          runIndex: catalogRunIndex,
           refreshState: refreshState,
           onOpen: openAutomation,
           onRun: runAutomation,
@@ -338,8 +349,15 @@ struct AutomationMainContentView: View {
             Divider().opacity(0.5)
           }
 
-          HStack(spacing: 0) {
-            if isLeftSidebarVisible {
+          GeometryReader { geometry in
+            let availableWidth = geometry.size.width
+            let showsLeftSidebar = isLeftSidebarVisible
+              && (availableWidth >= 610 || !isRightSidebarVisible)
+            let showsRightSidebar = isRightSidebarVisible
+              && (availableWidth >= 970 || !isLeftSidebarVisible)
+
+            HStack(spacing: 0) {
+            if showsLeftSidebar {
               AutomationWorkflowListView(
                 projection: projection,
                 macros: macros,
@@ -434,7 +452,7 @@ struct AutomationMainContentView: View {
               }
               .frame(maxWidth: .infinity, maxHeight: .infinity)
 
-              if isRightSidebarVisible {
+              if showsRightSidebar {
                 Divider().opacity(0.5)
 
                 AutomationInspectorView(
@@ -475,6 +493,7 @@ struct AutomationMainContentView: View {
               )
               .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
+            }
           }
         }
       }
@@ -484,7 +503,7 @@ struct AutomationMainContentView: View {
         repairSelection()
       }
     }
-    .onChange(of: projection.workflows.map(\.id)) { old, new in
+    .onChange(of: activeProjectionWorkflowIDs) { old, new in
       if !applyRequestedWorkspaceDestination(), new.count > old.count {
         let addedIDs = Set(new).subtracting(old)
         if let newID = addedIDs.first {
@@ -494,7 +513,8 @@ struct AutomationMainContentView: View {
       repairSelection()
       repairImportNotice()
     }
-    .onChange(of: authoringRepairSignature) {
+    .onChange(of: activeAuthoringRepairSignature) { _, signature in
+      guard signature != nil else { return }
       repairSelection()
     }
     .onChange(of: requestedWorkspaceDestination) {

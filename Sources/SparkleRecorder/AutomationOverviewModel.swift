@@ -6,13 +6,16 @@ struct AutomationOverviewProjectionSet: Equatable, Sendable {
   var overview: AutomationOverviewProjection
   var catalog: AutomationCatalogProjection
   var runCenter: AutomationRunCenterProjection
+  var catalogRunIndex: AutomationCatalogRunIndex
 
   static func make(state: AutomationRunState) -> AutomationOverviewProjectionSet {
     let overview = AutomationViewProjection.overview(from: state)
+    let runCenter = AutomationRunCenterProjection.make(state: state)
     return AutomationOverviewProjectionSet(
       overview: overview,
       catalog: AutomationCatalogProjection.make(state: state, overview: overview),
-      runCenter: AutomationRunCenterProjection.make(state: state)
+      runCenter: runCenter,
+      catalogRunIndex: AutomationCatalogRunIndex(executions: runCenter.executions)
     )
   }
 
@@ -52,6 +55,7 @@ final class AutomationOverviewModel {
   private(set) var projection: AutomationOverviewProjection
   private(set) var catalogProjection: AutomationCatalogProjection
   private(set) var runCenterProjection: AutomationRunCenterProjection
+  private(set) var catalogRunIndex: AutomationCatalogRunIndex
   private(set) var refreshState: AutomationRepositoryRefreshState
 
   init(
@@ -65,7 +69,9 @@ final class AutomationOverviewModel {
     self.state = state
     self.projection = projection
     self.catalogProjection = AutomationCatalogProjection.make(state: state, overview: projection)
-    self.runCenterProjection = AutomationRunCenterProjection.make(state: state)
+    let initialRunCenter = AutomationRunCenterProjection.make(state: state)
+    self.runCenterProjection = initialRunCenter
+    self.catalogRunIndex = AutomationCatalogRunIndex(executions: initialRunCenter.executions)
     self.refreshState = .idle
     self.snapshotClient = nil
     self.runtimeHost = nil
@@ -90,7 +96,9 @@ final class AutomationOverviewModel {
       state: initialState,
       overview: initialProjection
     )
-    self.runCenterProjection = AutomationRunCenterProjection.make(state: initialState)
+    let initialRunCenter = AutomationRunCenterProjection.make(state: initialState)
+    self.runCenterProjection = initialRunCenter
+    self.catalogRunIndex = AutomationCatalogRunIndex(executions: initialRunCenter.executions)
     self.refreshState = .idle
     self.snapshotClient = snapshotClient
     self.runtimeHost = nil
@@ -116,7 +124,9 @@ final class AutomationOverviewModel {
       state: initialState,
       overview: initialProjection
     )
-    self.runCenterProjection = AutomationRunCenterProjection.make(state: initialState)
+    let initialRunCenter = AutomationRunCenterProjection.make(state: initialState)
+    self.runCenterProjection = initialRunCenter
+    self.catalogRunIndex = AutomationCatalogRunIndex(executions: initialRunCenter.executions)
     self.refreshState = .idle
     self.snapshotClient = nil
     self.runtimeHost = runtimeHost
@@ -142,7 +152,9 @@ final class AutomationOverviewModel {
       state: initialState,
       overview: initialProjection
     )
-    self.runCenterProjection = AutomationRunCenterProjection.make(state: initialState)
+    let initialRunCenter = AutomationRunCenterProjection.make(state: initialState)
+    self.runCenterProjection = initialRunCenter
+    self.catalogRunIndex = AutomationCatalogRunIndex(executions: initialRunCenter.executions)
     self.refreshState = .idle
     self.snapshotClient = nil
     self.runtimeHost = nil
@@ -258,6 +270,10 @@ final class AutomationOverviewModel {
   }
 
   private func publish(_ newState: AutomationRunState) async {
+    guard newState != workingState else {
+      return
+    }
+
     workingState = newState
     publishGeneration &+= 1
     let generation = publishGeneration
@@ -278,6 +294,9 @@ final class AutomationOverviewModel {
     }
     if runCenterProjection != refreshed.runCenter {
       runCenterProjection = refreshed.runCenter
+    }
+    if catalogRunIndex != refreshed.catalogRunIndex {
+      catalogRunIndex = refreshed.catalogRunIndex
     }
   }
 }

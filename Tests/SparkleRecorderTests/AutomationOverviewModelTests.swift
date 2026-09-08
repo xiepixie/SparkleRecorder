@@ -34,6 +34,31 @@ struct AutomationOverviewModelTests {
         #expect(model.runCenterProjection == firstRunCenter)
     }
 
+    @Test("A newer runtime revision with identical state skips projection work")
+    func newerRevisionWithIdenticalStateSkipsProjectionWork() async {
+        let state = AutomationRunState(
+            workflows: [AutomationWorkflow(name: "Stable", tasks: [])]
+        )
+        var snapshot = AutomationRuntimeSnapshot(state: state, revision: 1)
+        let counter = AutomationProjectionBuildCounter()
+        let model = AutomationOverviewModel(
+            runtimeSnapshotLoader: { snapshot },
+            projectionBuilder: { state in
+                await counter.recordBuild()
+                return AutomationOverviewProjectionSet.make(state: state)
+            }
+        )
+
+        await model.refreshRuntimeState()
+        #expect(await counter.buildCount() == 1)
+
+        snapshot = AutomationRuntimeSnapshot(state: state, revision: 2)
+        await model.refreshRuntimeState()
+
+        #expect(await counter.buildCount() == 1)
+        #expect(model.state == state)
+    }
+
     @Test("Runtime polling publishes a new revision")
     func runtimePollingPublishesChangedRevision() async {
         let firstState = AutomationRunState(
@@ -146,6 +171,18 @@ struct AutomationOverviewModelTests {
         try? await firstEdit.value
 
         #expect(Set(model.state.workflows.map(\.id)) == Set([firstWorkflow.id, secondWorkflow.id]))
+    }
+}
+
+private actor AutomationProjectionBuildCounter {
+    private var count = 0
+
+    func recordBuild() {
+        count += 1
+    }
+
+    func buildCount() -> Int {
+        count
     }
 }
 

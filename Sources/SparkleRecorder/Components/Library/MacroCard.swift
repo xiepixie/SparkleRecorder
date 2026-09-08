@@ -81,10 +81,6 @@ struct MacroCard: View {
       : String(localized: "Edit automatic run…", table: "Automation")
   }
 
-  private var hoverStrokeColor: Color {
-    hovered && !isSelected && !isCurrent && !dragOver ? Brand.libraryBlue.opacity(0.20) : .clear
-  }
-
   private var hoverAnimation: Animation {
     reduceMotion ? .linear(duration: 0.01) : Brand.hoverAnimation
   }
@@ -177,14 +173,18 @@ struct MacroCard: View {
         RoundedRectangle(cornerRadius: 12, style: .continuous)
           .strokeBorder(strokeColor, lineWidth: isCurrent ? 1.0 : 0.5)
       )
-      .overlay(
-        RoundedRectangle(cornerRadius: 12, style: .continuous)
-          .strokeBorder(hoverStrokeColor, lineWidth: 0.75)
-      )
-      .overlay(
-        RoundedRectangle(cornerRadius: 12, style: .continuous)
-          .strokeBorder(Brand.libraryBlue.opacity(cardFocused ? 0.58 : 0), lineWidth: 2)
-      )
+      .overlay {
+        if hovered && !isSelected && !isCurrent && !dragOver {
+          RoundedRectangle(cornerRadius: 12, style: .continuous)
+            .strokeBorder(Brand.libraryBlue.opacity(0.20), lineWidth: 0.75)
+        }
+      }
+      .overlay {
+        if cardFocused {
+          RoundedRectangle(cornerRadius: 12, style: .continuous)
+            .strokeBorder(Brand.libraryBlue.opacity(0.58), lineWidth: 2)
+        }
+      }
       .overlay(alignment: .leading) {
         if let accentName {
           RoundedRectangle(cornerRadius: 2, style: .continuous)
@@ -196,9 +196,9 @@ struct MacroCard: View {
         }
       }
       .shadow(
-        color: .black.opacity(isLifted ? 0.12 : 0.065),
-        radius: isLifted ? 5 : 2.5,
-        y: isLifted ? 2 : 1
+        color: .black.opacity(isLifted ? 0.12 : 0),
+        radius: isLifted ? 5 : 0,
+        y: isLifted ? 2 : 0
       )
   }
 
@@ -740,7 +740,6 @@ struct MacroCard: View {
 
   @ViewBuilder
   func chainSubmenu() -> some View {
-    let candidates = chainCandidates.filter { $0.0 != macro.id }
     Menu(String(localized: "Chain To", table: "Common")) {
       Button {
         onSetChain(nil)
@@ -751,15 +750,17 @@ struct MacroCard: View {
           Text("None", tableName: "Common")
         }
       }
-      if !candidates.isEmpty { Divider() }
-      ForEach(candidates, id: \.0) { (id, name) in
-        Button {
-          onSetChain(id)
-        } label: {
-          if macro.chainTo == id {
-            Label(name, systemImage: "checkmark")
-          } else {
-            Text(name)
+      if chainCandidates.count > 1 { Divider() }
+      ForEach(chainCandidates, id: \.0) { (id, name) in
+        if id != macro.id {
+          Button {
+            onSetChain(id)
+          } label: {
+            if macro.chainTo == id {
+              Label(name, systemImage: "checkmark")
+            } else {
+              Text(name)
+            }
           }
         }
       }

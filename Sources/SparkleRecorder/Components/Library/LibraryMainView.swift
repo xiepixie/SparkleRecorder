@@ -34,14 +34,6 @@ struct LibraryMainView: View {
 
   let handleCardSelect: (SavedMacro, NSEvent.ModifierFlags) -> Void
 
-  private var chainCandidates: [(UUID, String)] {
-    library.macros.map { ($0.id, $0.name) }
-  }
-
-  private var chainNameByID: [UUID: String] {
-    Dictionary(uniqueKeysWithValues: chainCandidates)
-  }
-
   var body: some View {
     mainContent
       .overlay(alignment: .bottom) {
@@ -160,7 +152,9 @@ struct LibraryMainView: View {
   @ViewBuilder
   private var mainContent: some View {
     let filtered = filteredMacros
-    let visibleSelection = selection.intersection(Set(filtered.map(\.id)))
+    let visibleSelection = selection.isEmpty
+      ? Set<UUID>()
+      : selection.intersection(Set(filtered.map(\.id)))
 
     VStack(spacing: 0) {
       LibraryHeader(
@@ -554,13 +548,20 @@ struct LibraryMainView: View {
       .padding(.bottom, 6)
 
       if isWindow {
+        let chainCandidates = library.macros.map { ($0.id, $0.name) }
+        let chainNameByID = Dictionary(uniqueKeysWithValues: chainCandidates)
+
         LazyVGrid(
           columns: [GridItem(.adaptive(minimum: 280), spacing: 12, alignment: .top)],
           spacing: 12
         ) {
           ForEach(filtered) { macro in
-            macroCardView(for: macro)
-              .frame(maxWidth: .infinity, alignment: .topLeading)
+            macroCardView(
+              for: macro,
+              chainCandidates: chainCandidates,
+              chainNameByID: chainNameByID
+            )
+            .frame(maxWidth: .infinity, alignment: .topLeading)
           }
         }
         .padding(.horizontal, 12)
@@ -578,7 +579,11 @@ struct LibraryMainView: View {
   }
 
   @ViewBuilder
-  private func macroCardView(for macro: SavedMacro) -> some View {
+  private func macroCardView(
+    for macro: SavedMacro,
+    chainCandidates: [(UUID, String)],
+    chainNameByID: [UUID: String]
+  ) -> some View {
     MacroCard(
       macro: macro,
       controller: controller,

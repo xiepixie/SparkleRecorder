@@ -3,11 +3,9 @@ import SwiftUI
 import SparkleRecorderCore
 
 struct StatsSummary: View {
-    @EnvironmentObject var library: MacroLibrary
-
-    private var totalMacros: Int { library.macros.count }
-    private var totalPlays: Int { library.macros.reduce(0) { $0 + $1.playCount } }
-    private var totalSaved: TimeInterval { library.macros.reduce(0) { $0 + $1.totalRunTime } }
+    let totalMacros: Int
+    let totalPlays: Int
+    let totalSaved: TimeInterval
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {

@@ -21,6 +21,7 @@ private enum AutomationCatalogFilter: String, CaseIterable, Identifiable {
 struct AutomationCatalogView: View {
   let catalog: AutomationCatalogProjection
   let runs: AutomationRunCenterProjection
+  let runIndex: AutomationCatalogRunIndex
   let refreshState: AutomationRepositoryRefreshState
   let onOpen: (UUID) -> Void
   let onRun: (UUID) -> Void
@@ -65,15 +66,16 @@ struct AutomationCatalogView: View {
     runs.executions.filter { $0.workflowID == workflowID }
   }
 
+
   var body: some View {
     VStack(spacing: 0) {
       header
       Divider().opacity(0.5)
       HSplitView {
         masterPane
-          .frame(minWidth: 310, idealWidth: 360, maxWidth: 420)
+          .frame(minWidth: 280, idealWidth: 330, maxWidth: 400)
         detailPane
-          .frame(minWidth: 560, maxWidth: .infinity, maxHeight: .infinity)
+          .frame(minWidth: 360, maxWidth: .infinity, maxHeight: .infinity)
       }
     }
     .onAppear { repairSelection() }
@@ -249,7 +251,7 @@ struct AutomationCatalogView: View {
     if let item = selectedItem {
       AutomationDetailView(
         item: item,
-        executions: executions(for: item.workflowID),
+        executionSummary: runIndex.summary(for: item.workflowID),
         onRun: { onRun(item.workflowID) },
         onEdit: { onOpen(item.workflowID) },
         onSetEnabled: { onSetEnabled(item.workflowID, $0) },
@@ -345,7 +347,7 @@ private struct AutomationMasterRow: View {
 
 private struct AutomationDetailView: View {
   let item: AutomationCatalogItemProjection
-  let executions: [AutomationExecutionProjection]
+  let executionSummary: AutomationCatalogExecutionSummary
   let onRun: () -> Void
   let onEdit: () -> Void
   let onSetEnabled: (Bool) -> Void
@@ -448,12 +450,7 @@ private struct AutomationDetailView: View {
     guard item.status == .blocked || item.status == .failed || item.status == .timedOut else {
       return nil
     }
-    for execution in executions {
-      if execution.status == .needsAttention {
-        return execution
-      }
-    }
-    return nil
+    return executionSummary.latestNeedsAttention
   }
 
   private func blockedDiagnosticBanner(for execution: AutomationExecutionProjection) -> some View {
@@ -536,7 +533,7 @@ private struct AutomationDetailView: View {
           title: String(localized: "Run history", table: "Automation"),
           value: String(
             format: String(localized: "%d executions", table: "Automation"),
-            executions.count
+            executionSummary.totalCount
           ),
           systemImage: "clock.arrow.circlepath"
         )
@@ -558,13 +555,13 @@ private struct AutomationDetailView: View {
         Text("Recent runs", tableName: "Automation")
           .font(.headline)
         Spacer()
-        if !executions.isEmpty {
+        if !executionSummary.isEmpty {
           Button(String(localized: "View all", table: "Common"), action: onOpenHistory)
             .buttonStyle(.link)
         }
       }
 
-      if executions.isEmpty {
+      if executionSummary.isEmpty {
         HStack(spacing: 10) {
           Image(systemName: "clock.badge.questionmark")
             .foregroundStyle(.secondary)
@@ -582,7 +579,7 @@ private struct AutomationDetailView: View {
         .padding(.vertical, 16)
       } else {
         VStack(spacing: 0) {
-          ForEach(executions.prefix(5)) { execution in
+          ForEach(executionSummary.recentExecutions) { execution in
             AutomationExecutionRow(execution: execution) {
               onOpenExecution(execution)
             }

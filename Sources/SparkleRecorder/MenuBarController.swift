@@ -2015,13 +2015,15 @@ final class MenuBarController: NSObject, NSPopoverDelegate {
         }
     }
 
-    func refreshSemanticRecordingPreflightPresentation() {
+    func refreshSemanticRecordingPreflightPresentation(notifyUser: Bool = false) {
         Task { @MainActor [weak self] in
             guard let self else { return }
-            state.presentStatus(
-                String(localized: "Checking visual recording permissions…", table: "Recording"),
-                tone: .progress
-            )
+            if notifyUser {
+                state.presentStatus(
+                    String(localized: "Checking visual recording permissions…", table: "Recording"),
+                    tone: .progress
+                )
+            }
             let result = await SemanticRecordingPreflightClient.live.evaluate(
                 policy: SemanticRecordingPreflightPolicy(
                     capturePolicy: state.semanticRecordingCapturePolicy
@@ -2030,18 +2032,20 @@ final class MenuBarController: NSObject, NSPopoverDelegate {
             state.semanticRecordingPreflightPresentation = SemanticRecordingPreflightPresenter.presentation(
                 for: result
             )
-            if result.isReadyToStart {
-                state.presentStatus(
-                    result.isDegraded
-                        ? String(localized: "Visual recording can continue with limited context.", table: "Recording")
-                        : String(localized: "Visual recording is ready.", table: "Recording"),
-                    tone: result.isDegraded ? .warning : .success
-                )
-            } else {
-                state.presentStatus(
-                    visualRecordingBlockedStatus(result.blockingIssues),
-                    tone: .error
-                )
+            if notifyUser {
+                if result.isReadyToStart {
+                    state.presentStatus(
+                        result.isDegraded
+                            ? String(localized: "Visual recording can continue with limited context.", table: "Recording")
+                            : String(localized: "Visual recording is ready.", table: "Recording"),
+                        tone: result.isDegraded ? .warning : .success
+                    )
+                } else {
+                    state.presentStatus(
+                        visualRecordingBlockedStatus(result.blockingIssues),
+                        tone: .error
+                    )
+                }
             }
         }
     }
