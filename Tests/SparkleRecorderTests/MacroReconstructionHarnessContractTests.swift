@@ -29,11 +29,25 @@ struct MacroReconstructionHarnessContractTests {
         #expect(values.reconstructionObjective == MacroReconstructionObjective.allCases.map(\.rawValue))
     }
 
+    @Test("Authoring contract declares every core RecordedEvent field required by Codable")
+    func authoringContractDeclaresRequiredEventFields() throws {
+        let data = try JSONEncoder().encode(MacroReconstructionAuthoringContract(objective: .robust))
+        let root = try #require(JSONSerialization.jsonObject(with: data) as? [String: Any])
+        let capabilities = try #require(root["capabilities"] as? [String: Any])
+        let requiredFields = Set(try #require(capabilities["requiredEventFields"] as? [String]))
+        let expected: Set<String> = [
+            "kind", "time", "x", "y", "keyCode", "flags",
+            "mouseButton", "clickCount", "scrollDeltaY", "scrollDeltaX"
+        ]
+
+        #expect(requiredFields == expected)
+    }
+
     @Test("Authoring contract exposes the major strict-validator rule families")
     func authoringRulesCoverValidatorFamilies() {
         let ids = Set(MacroReconstructionAuthoringContract.authoringRules.map(\.id))
         let expected: Set<String> = [
-            "schema.knownFieldsOnly", "schema.supportedMacroVersion",
+            "schema.knownFieldsOnly", "schema.requiredEventFields", "schema.supportedMacroVersion",
             "timeline.nonDecreasing", "coordinates.finiteBounds", "coordinates.completePairs",
             "pointer.fieldBounds", "input.balancedPointer", "input.balancedKeyboard",
             "surface.referenceExists", "surface.explicitTargetWindow", "surface.validDefinition", "surface.sourceOwned",

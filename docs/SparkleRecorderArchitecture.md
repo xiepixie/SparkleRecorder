@@ -1,6 +1,6 @@
 # SparkleRecorder 项目架构
 
-> 文档状态（2026-09-06）：这是当前产品心智模型和架构快照。Swift 6、录制/播放、自动化 reducer/runtime、FlowGraph、语义录制与 reconstruction 已有产品代码和直接测试；尚未完成的 live acceptance、后台生命周期与产品化缺口以 [DOCUMENTATION_STATUS.md](DOCUMENTATION_STATUS.md) 及各工作台文档为准。
+> 文档状态（2026-09-07）：这是当前产品心智模型和架构快照。Swift 6、录制/播放、自动化 reducer/runtime、FlowGraph、语义录制与 reconstruction 已有产品代码和直接测试；尚未完成的 live acceptance、后台生命周期与产品化缺口以 [DOCUMENTATION_STATUS.md](DOCUMENTATION_STATUS.md) 及各工作台文档为准。
 
 本文记录 SparkleRecorder 当前的数据结构、动作设计、用户使用逻辑和功能边界，便于后续继续重构或扩展。
 
@@ -30,9 +30,9 @@ SparkleRecorder 是一个原生 macOS 宏录制和回放工具。它的核心目
 | 宏库 | `MacroLibrary.swift`, `SavedMacro.swift` | 保存宏、筛选、统计、标签、收藏、链式播放 |
 | 录制引擎 | `Recorder.swift`, `EventTapThread.swift`, `RecordingSurfaceTracker.swift` | 监听输入事件，计算时间戳，采集窗口 surface，批量刷新 UI |
 | 播放引擎 | `Player.swift`, `MouseKeyboardSynthesizer.swift` | 按时间轴调度事件，发送合成输入，检测用户打断 |
-| 坐标解析 | `PointResolver.swift`, `CoordinateMapper.swift`, `WindowTracker.swift`, `WindowContentFrameResolver.swift` | Core 只处理纯坐标投影；App Adapter 负责实时窗口/内容区解析与 macOS Accessibility 查询 |
+| 坐标解析 | `PointResolver.swift`, `CoordinateMapper.swift`, `WindowTracker.swift`, `WindowContentFrameResolver.swift`, `LivePlaybackSurfaceGeometry.swift` | Core 只处理纯坐标投影；App Adapter 统一解析实时 Playback Surface 外框/内容区，Player 与 Macro Editor 共享同一 live geometry 链路 |
 | OCR/定位 | `ScreenCaptureService.swift`, `VisionDetector.swift`, `PlaybackTextTargetResolver.swift`, `LocatorEngine.swift`, `TextAnchorGeometryProjection.swift`, `TextAnchorMatchRanking.swift`, `PlaybackLocatorFallback.swift` | 统一解析文本锚点：稳定 Playback Surface、content-normalized geometry、OCR 候选、纯 Core 匹配排序与坐标兜底 |
-| 编辑器 | `MacroEditor.swift`, `MacroTransformer.swift`, `Components/Editor/*` | 时间线、动作列表、侧边栏、文本/坐标 picker、批量编辑 |
+| 编辑器 | `MacroEditor.swift`, `MacroTransformer.swift`, `Components/Editor/MacroEditorPreviewProjection.swift`, `PreviewSurfaceGeometryProjection.swift`, `PreviewSearchRegionProjector.swift`, `Components/Editor/*` | 时间线、动作列表、侧边栏、文本/坐标 picker、批量编辑；`Preview` 只负责所选动作的详细/可编辑层，`Paths` 独立负责全宏被动概览，两者共享唯一 Preview Playback Context；所有坐标动作继续走 `PointResolver`，目标窗口不可用时只由 Preview Surface 投影补入模拟 geometry，搜索区域移动/缩放由纯 Core 投影维护边界与最小尺寸 |
 | 导入导出 | `MacroImport.swift`, `TextMacroFormat.swift` | native JSON、legacy `.rec`、TRM 文本格式转换 |
 
 ## 3. 核心数据结构

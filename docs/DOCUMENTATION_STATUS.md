@@ -1,6 +1,6 @@
 # SparkleRecorder Documentation Status
 
-Updated: 2026-09-06
+Updated: 2026-09-07
 
 This is the authoritative documentation index. Code and direct tests remain the source of truth for implementation claims; plans describe future work unless they link to accepted implementation evidence.
 
@@ -21,6 +21,7 @@ All new or materially updated planning documents must include an `Updated: YYYY-
 | --- | --- | --- | --- |
 | Swift 6 and Swift Testing | Current reference | `Package.swift`, `Tests/SparkleRecorderTests/` | Keep all new tests on Swift Testing. |
 | Recording and playback engines | Current reference, first-pass boundaries | `Sources/SparkleRecorderCore/Recording*`, `Playback*`, corresponding tests | Continue extracting reusable behavior from app lifecycle shells. |
+| Macro Editor preview geometry | Current reference | `LivePlaybackSurfaceGeometry.swift`, `Components/Editor/MacroEditorPreviewProjection.swift`, `PreviewSurfaceGeometryProjection.swift`, `PreviewSearchRegionProjector.swift`, preview projection tests | `Preview` owns selected-action detail/editing and `Paths` independently owns whole-macro passive overview; both share one live/simulated Playback Surface context and keep coordinate resolution on `PointResolver`, while search-region editing remains pure tested geometry instead of SwiftUI-local rules. |
 | Automation reducer/runtime | Current reference, first pass | `docs/automation-engine/`, `AutomationContract.swift`, `AutomationReducer.swift`, runtime/client tests | Background wakeup, richer resource policy, and push progress remain open. |
 | Workflow UI | Active productization | `docs/workflow-page-productization/` | Quick scheduling, execution-level Run Center, evidence recovery, and live product acceptance remain open. |
 | Schedule readiness | First local slice implemented | `AutomationWorkflowActivationProjection`, `AutomationWorkflowActivationCard`, projection tests | Permission/macro capability checks, presets, pause semantics, and background scheduling remain open. |

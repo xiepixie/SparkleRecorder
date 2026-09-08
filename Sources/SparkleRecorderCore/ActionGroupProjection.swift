@@ -66,26 +66,46 @@ public enum TextTargetReadiness: String, Codable, Equatable, Sendable {
 }
 
 public enum ActionPreviewAffordance: String, Codable, Equatable, Sendable {
+    /// The action has no meaningful screen-space target (keyboard input, waits, behavior containers).
     case none
+    /// A discrete pointer target such as click, double click, repeated click, or long press.
     case inputPoint
+    /// A continuous gesture whose actual path matters, currently drag.
     case inputPath
+    /// Multiple discrete targets whose order matters but whose connecting line is not pointer motion.
     case pointSequence
-    case textClickTarget
+    /// A scroll gesture anchored at a point. Direction/amount matter more than a click-style crosshair.
+    case scrollGesture
+    /// Cursor relocation. The destination matters, but it must not look like a click.
+    case pointerMove
+    /// A text locator is the primary target for an input action; any coordinate is only a fallback.
+    /// The action kind still owns the input semantics (click, long press, scroll, and so on).
+    case locatorInputTarget
+    /// A bounded region in which text must appear.
     case waitTextRegion
+    /// A bounded region in which text must disappear.
     case waitTextGoneRegion
+    /// A bounded region whose text presence/absence is asserted.
     case verifyTextRegion
 
     public var showsClickPulse: Bool {
-        switch self {
-        case .inputPoint, .textClickTarget:
-            return true
-        default:
-            return false
-        }
+        self == .inputPoint
+    }
+
+    /// Whether the preview should render the recorded/resolved point path as meaningful geometry.
+    /// Scroll event positions are intentionally excluded: they are sampling anchors, not pointer travel.
+    public var showsPath: Bool {
+        self == .inputPath || self == .pointSequence
+    }
+
+    /// Whether the overlay should intercept pointer input around the primary anchor.
+    /// Informational anchors (scroll and mouse move) deliberately remain click-through.
+    public var hasInteractiveAnchor: Bool {
+        self == .inputPoint || self == .inputPath
     }
 
     public var showsLocatorFallbackPoint: Bool {
-        self == .textClickTarget
+        self == .locatorInputTarget
     }
 
     public var showsConditionRegion: Bool {
@@ -99,7 +119,7 @@ public enum ActionPreviewAffordance: String, Codable, Equatable, Sendable {
 
     public var showsTargetRegionLabel: Bool {
         switch self {
-        case .textClickTarget, .waitTextRegion, .waitTextGoneRegion, .verifyTextRegion:
+        case .locatorInputTarget, .waitTextRegion, .waitTextGoneRegion, .verifyTextRegion:
             return true
         default:
             return false
@@ -359,10 +379,12 @@ public enum ActionGroupProjection {
             return .pointSequence
         case .drag:
             return .inputPath
+        case .scroll:
+            return usesTextLocator ? .locatorInputTarget : .scrollGesture
+        case .mouseMove:
+            return .pointerMove
         case .click, .doubleClick, .longPress, .repeatedClick:
-            return usesTextLocator ? .textClickTarget : .inputPoint
-        case .scroll, .mouseMove:
-            return .inputPoint
+            return usesTextLocator ? .locatorInputTarget : .inputPoint
         default:
             return .none
         }

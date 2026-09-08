@@ -129,7 +129,12 @@ enum MacroReconstructionPackageValidation {
             throw MacroReconstructionCandidateInputError.packageContractMismatch("source-context.json")
         }
 
-        let expectedTemplate = try MacroReconstructionCandidateTemplate.strictDocument(source: acceptedSource)
+        var expectedTemplate = try MacroReconstructionCandidateTemplate.strictDocument(source: acceptedSource)
+        // modifiedAt is library metadata, not part of MacroCandidateIdentity.revision.
+        // It may legitimately advance after package export while the executable source
+        // remains identical, so it cannot participate in stale/tamper detection here.
+        // All other system-maintained template fields remain strictly compared.
+        expectedTemplate.macro.modifiedAt = template.macro.modifiedAt
         guard template == expectedTemplate else {
             throw MacroReconstructionCandidateInputError.packageContractMismatch("candidate-template.json")
         }

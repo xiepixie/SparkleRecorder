@@ -3,6 +3,7 @@ import Foundation
 public extension MacroReconstructionAuthoringContract {
     static let authoringRules: [MacroReconstructionAuthoringRule] = [
         .init(id: "schema.knownFieldsOnly", scope: "candidate JSON", requirement: "Use only authoringMacroFields, eventFields, textAnchorFields, and the documented candidate/coverage keys. Unknown playback fields are rejected rather than ignored."),
+        .init(id: "schema.requiredEventFields", scope: "every candidate event", requirement: "Every event must include all capabilities.requiredEventFields. These are the non-optional RecordedEvent Codable fields and must not be removed during candidate compaction."),
         .init(id: "schema.supportedMacroVersion", scope: "candidate macro", requirement: "macro.version must be one of capabilities.macroVersions and the event count must not exceed maximumEventCount."),
         .init(id: "timeline.nonDecreasing", scope: "events", requirement: "Event times are finite, nonnegative, nondecreasing, and no later than maximumDuration."),
         .init(id: "coordinates.finiteBounds", scope: "event geometry", requirement: "Absolute/local coordinates are finite and within maximumCoordinateMagnitude; normalized coordinates remain in capabilities.normalizedCoordinateRange."),

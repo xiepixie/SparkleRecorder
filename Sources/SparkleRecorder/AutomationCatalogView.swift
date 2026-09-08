@@ -359,6 +359,9 @@ private struct AutomationDetailView: View {
         detailHeader
         Divider().opacity(0.35)
         overviewSection
+        if let blockedExecution = latestBlockedOrFailedExecution {
+          blockedDiagnosticBanner(for: blockedExecution)
+        }
         Divider().opacity(0.35)
         recentRunsSection
       }
@@ -402,7 +405,7 @@ private struct AutomationDetailView: View {
       .buttonStyle(.borderedProminent)
       .disabled(!item.isEnabled)
       Button(
-        String(localized: "Edit", table: "Common"), systemImage: "slider.horizontal.3",
+        editButtonTitle, systemImage: "slider.horizontal.3",
         action: onEdit
       )
       .buttonStyle(.bordered)
@@ -428,6 +431,89 @@ private struct AutomationDetailView: View {
       .fixedSize()
     }
     .padding(.bottom, 18)
+  }
+
+  private var editButtonTitle: String {
+    switch item.tier {
+    case .linearSequence:
+      return String(localized: "Edit sequence", table: "Automation")
+    case .singleMacro:
+      return String(localized: "Edit schedule", table: "Automation")
+    case .advancedWorkflow:
+      return String(localized: "Edit workflow", table: "Automation")
+    }
+  }
+
+  private var latestBlockedOrFailedExecution: AutomationExecutionProjection? {
+    guard item.status == .blocked || item.status == .failed || item.status == .timedOut else {
+      return nil
+    }
+    for execution in executions {
+      if execution.status == .needsAttention {
+        return execution
+      }
+    }
+    return nil
+  }
+
+  private func blockedDiagnosticBanner(for execution: AutomationExecutionProjection) -> some View {
+    let focus = execution.failureFocus
+    let taskName = focus?.taskName ?? item.name
+    let attempt = focus?.attempt ?? execution.attemptCount
+
+    return HStack(spacing: 12) {
+      Image(systemName: "exclamationmark.triangle.fill")
+        .font(.system(size: 18))
+        .foregroundStyle(Brand.sigAmber)
+
+      VStack(alignment: .leading, spacing: 3) {
+        HStack(spacing: 6) {
+          Text(String(localized: "Blocked step:", table: "Automation"))
+            .font(.subheadline.weight(.medium))
+            .foregroundStyle(.secondary)
+          Text(taskName)
+            .font(.subheadline.weight(.semibold))
+            .foregroundStyle(.primary)
+        }
+        Text(
+          String(
+            format: String(localized: "Attempt %d · %@", table: "Automation"),
+            attempt,
+            execution.status.title
+          )
+        )
+        .font(.caption)
+        .foregroundStyle(.secondary)
+      }
+
+      Spacer(minLength: 12)
+
+      if execution.hasEvidence {
+        Button {
+          onOpenExecution(execution)
+        } label: {
+          Label(String(localized: "View evidence", table: "Automation"), systemImage: "paperclip")
+        }
+        .buttonStyle(.bordered)
+        .controlSize(.small)
+      }
+
+      Button(action: onRun) {
+        Label(String(localized: "Retry", table: "Common"), systemImage: "arrow.clockwise")
+      }
+      .buttonStyle(.borderedProminent)
+      .controlSize(.small)
+    }
+    .padding(12)
+    .background(
+      RoundedRectangle(cornerRadius: 8, style: .continuous)
+        .fill(Brand.sigAmber.opacity(0.08))
+    )
+    .overlay(
+      RoundedRectangle(cornerRadius: 8, style: .continuous)
+        .strokeBorder(Brand.sigAmber.opacity(0.25), lineWidth: 1)
+    )
+    .padding(.vertical, 14)
   }
 
   private var overviewSection: some View {
@@ -654,6 +740,8 @@ private struct AutomationExecutionDetailSheet: View {
   let execution: AutomationExecutionProjection
   @State private var evidenceSelection: AutomationRunCenterEvidenceSelection?
 
+  @State private var isCopied = false
+
   var body: some View {
     VStack(spacing: 0) {
       HStack(spacing: 12) {
@@ -669,12 +757,21 @@ private struct AutomationExecutionDetailSheet: View {
         }
         Spacer()
         Button(
-          String(localized: "Copy diagnostics", table: "Automation"), systemImage: "doc.on.doc"
+          isCopied
+            ? String(localized: "Diagnostics copied to clipboard", table: "Automation")
+            : String(localized: "Copy diagnostics", table: "Automation"),
+          systemImage: isCopied ? "checkmark" : "doc.on.doc"
         ) {
           NSPasteboard.general.clearContents()
           NSPasteboard.general.setString(diagnosticText, forType: .string)
+          isCopied = true
+          Task {
+            try? await Task.sleep(nanoseconds: 1_500_000_000)
+            isCopied = false
+          }
         }
         .buttonStyle(.bordered)
+        .disabled(isCopied)
         Button(String(localized: "Done", table: "Common")) { dismiss() }
       }
       .padding(16)
@@ -784,21 +881,96 @@ private struct AutomationExecutionDetailSheet: View {
   }
 
   private var diagnosticText: String {
-    var lines = [
-      "Automation: \(execution.workflowName)",
-      "Execution ID: \(execution.executionID.uuidString)",
-      "Status: \(execution.status.title)",
-      "Created: \(execution.createdAt.ISO8601Format())",
-      "Latest activity: \(execution.latestActivityAt.ISO8601Format())",
-      "Steps: \(execution.completedRunCount)/\(execution.taskRunCount)",
-      "Attempts: \(execution.attemptCount)",
-      "Recommendation: \(execution.recommendedAction.title)",
-    ]
-    for run in execution.runs {
-      let display = AutomationTaskRunDisplay(run: run)
-      lines.append("- \(run.id.uuidString): \(display.title) — \(display.detail)")
+    var sections: [String] = []
+
+    sections.append("【SparkleRecorder 自动化运行诊断报告】")
+    sections.append("--------------------------------------------")
+
+    var basicLines = ["■ 基本信息"]
+    basicLines.append("• 自动化名称: \(execution.workflowName)")
+    basicLines.append("• 运行状态: \(execution.status.title)")
+    basicLines.append("• 开始时间: \(execution.createdAt.formatted(date: .abbreviated, time: .standard))")
+    basicLines.append("• 最近活动: \(execution.latestActivityAt.formatted(date: .abbreviated, time: .standard))")
+    basicLines.append("• 步骤进度: \(execution.completedRunCount)/\(execution.taskRunCount) 步完成")
+    basicLines.append("• 尝试次数: \(execution.attemptCount) 次")
+    sections.append(basicLines.joined(separator: "\n"))
+
+    if let failure = execution.failureFocus {
+      var failureLines = ["■ 故障定位"]
+      failureLines.append("• 故障步骤: \(failure.taskName)")
+      if let eventIndex = failure.failedEventIndex {
+        failureLines.append("• 失败动作: 第 \(eventIndex + 1) 个动作")
+      }
+      let reason = outcomeDescription(failure.outcome)
+      failureLines.append("• 失败原因: \(reason)")
+      failureLines.append("• 建议操作: \(execution.recommendedAction.title)")
+      sections.append(failureLines.joined(separator: "\n"))
+    } else {
+      var okLines = ["■ 建议操作"]
+      okLines.append("• \(execution.recommendedAction.title)")
+      sections.append(okLines.joined(separator: "\n"))
     }
-    return lines.joined(separator: "\n")
+
+    if !execution.runs.isEmpty {
+      var stepLines = ["■ 步骤明细"]
+      for (index, run) in execution.runs.enumerated() {
+        let display = AutomationTaskRunDisplay(run: run)
+        var line = "  \(index + 1). \(display.title): \(display.detail)"
+        if let cond = run.conditionEvidence {
+          line += " [\(cond.observedSummary)]"
+        }
+        stepLines.append(line)
+      }
+      sections.append(stepLines.joined(separator: "\n"))
+    }
+
+    var evidenceLines = ["■ 现场证据与文件"]
+    evidenceLines.append("• 现场证据: \(execution.hasEvidence ? "已捕获并就绪" : "无现场证据")")
+    sections.append(evidenceLines.joined(separator: "\n"))
+
+    var envLines = ["■ 系统环境与调试标识"]
+    envLines.append("• 系统版本: macOS \(ProcessInfo.processInfo.operatingSystemVersionString)")
+    #if arch(arm64)
+    envLines.append("• 硬件架构: Apple Silicon (arm64)")
+    #elseif arch(x86_64)
+    envLines.append("• 硬件架构: Intel (x86_64)")
+    #endif
+    envLines.append("• 执行编号: \(execution.executionID.uuidString)")
+    sections.append(envLines.joined(separator: "\n"))
+    sections.append("--------------------------------------------")
+
+    return sections.joined(separator: "\n\n")
+  }
+
+  private func outcomeDescription(_ outcome: AutomationOutcome) -> String {
+    switch outcome {
+    case .failed(let report):
+      if let msg = report?.errorMessage, !msg.isEmpty {
+        return msg
+      }
+      return String(localized: "Playback error", table: "Common")
+    case .timedOut:
+      return String(localized: "Timeout", table: "Common")
+    case .permissionDenied(let perm, let msg):
+      return "系统权限不足 (\(perm.rawValue)): \(msg)"
+    case .missingMacro:
+      return String(localized: "Missing macro", table: "EditorUX")
+    case .conditionNotMatched:
+      return String(localized: "Else branch", table: "Automation")
+    case .conditionMatched:
+      return String(localized: "Then branch", table: "Common")
+    case .cancelled(let reason):
+      return reason ?? String(localized: "Cancelled run", table: "Common")
+    case .resourceConflict(let resource):
+      if let res = resource {
+        return "资源冲突 (\(res.rawValue))"
+      }
+      return String(localized: "Resource conflict", table: "Common")
+    case .rejected(let reason):
+      return reason
+    case .succeeded:
+      return String(localized: "Completed run", table: "Common")
+    }
   }
 
   private func shortID(_ id: UUID) -> String {

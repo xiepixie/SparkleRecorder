@@ -577,29 +577,37 @@ struct MacroCard: View {
   }
 
   private var cardActionControls: some View {
-    HStack(spacing: 4) {
+    let showExpandedActions = hovered || isCurrent || isSelected
+    return HStack(spacing: 4) {
       CardActionButton(
         systemImage: "play.fill", tint: Brand.libraryGreen,
         label: String(format: String(localized: "Play %@", table: "Common"), macro.name)
       ) { onPlay() }
       .help(String(localized: "Play", table: "Common"))
-      CardActionButton(
-        systemImage: automationSummary == nil ? "calendar.badge.clock" : "calendar.badge.checkmark",
-        tint: Brand.sigAmber,
-        label: automationActionTitle
-      ) { onSchedule() }
-      .help(automationActionMenuTitle)
-      CardActionButton(
-        systemImage: "photo.on.rectangle.angled", tint: Brand.libraryBlue,
-        label: String(localized: "Latest run", table: "Automation")
-      ) { onShowEvidence() }
-      .help(String(localized: "Latest run…", table: "Automation"))
-      LoopChip(loops: macro.loops, onChange: onSetLoops)
+
+      if showExpandedActions {
+        CardActionButton(
+          systemImage: automationSummary == nil ? "calendar.badge.clock" : "calendar.badge.checkmark",
+          tint: Brand.sigAmber,
+          label: automationActionTitle
+        ) { onSchedule() }
+        .help(automationActionMenuTitle)
+
+        CardActionButton(
+          systemImage: "photo.on.rectangle.angled", tint: Brand.libraryBlue,
+          label: String(localized: "Latest run", table: "Automation")
+        ) { onShowEvidence() }
+        .help(String(localized: "Latest run…", table: "Automation"))
+
+        LoopChip(loops: macro.loops, onChange: onSetLoops)
+      }
+
       CardActionButton(
         systemImage: "slider.horizontal.below.rectangle", tint: Brand.libraryBlue,
         label: String(format: String(localized: "Edit %@", table: "Common"), macro.name)
       ) { onEdit() }
       .help(String(localized: "Edit", table: "Common"))
+
       Menu {
         cardMenuItems(includePlayEdit: false)
       } label: {

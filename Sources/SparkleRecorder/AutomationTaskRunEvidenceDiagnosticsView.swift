@@ -6,7 +6,7 @@ struct AutomationTaskRunEvidenceDiagnosticsView: View {
     let payload: AutomationTaskRunEvidencePayload
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 5) {
+        VStack(alignment: .leading, spacing: 6) {
             AutomationTaskRunDetailRowView(
                 title: String(localized: "Focus", table: "Common"),
                 value: focusLabel
@@ -16,10 +16,28 @@ struct AutomationTaskRunEvidenceDiagnosticsView: View {
                 value: previewLabel
             )
 
-            Label(nextCheckLabel, systemImage: nextCheckImage)
-                .font(.caption)
-                .foregroundStyle(nextCheckStyle)
-                .fixedSize(horizontal: false, vertical: true)
+            HStack(alignment: .top, spacing: 8) {
+                Image(systemName: nextCheckImage)
+                    .foregroundStyle(nextCheckStyle)
+                    .font(.caption.weight(.semibold))
+                    .padding(.top, 1)
+
+                Text(nextCheckLabel)
+                    .font(.caption)
+                    .foregroundStyle(.primary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .padding(8)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(
+                RoundedRectangle(cornerRadius: 6)
+                    .fill(payload.report.isSuccess ? Color.primary.opacity(0.03) : Brand.sigAmber.opacity(0.08))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 6)
+                    .strokeBorder(payload.report.isSuccess ? Color.primary.opacity(0.06) : Brand.sigAmber.opacity(0.22), lineWidth: 0.8)
+            )
+            .padding(.top, 2)
         }
     }
 

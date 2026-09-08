@@ -42,6 +42,7 @@ let toolingAlwaysExcludedAppSources: Set<String> = [
     "AutomationWorkflowPackageImportConflict.swift",
     "AutomationWorkflowRecordingHandoff.swift",
     "AuxiliaryCaptureActivityCenter.swift",
+    "LivePlaybackSurfaceGeometry.swift",
     "MacroCandidateEditorSession.swift",
     "MacroReconstructionCandidateProvenancePresentation.swift",
     "MacroReconstructionLegacyV3PackageDecoder.swift",

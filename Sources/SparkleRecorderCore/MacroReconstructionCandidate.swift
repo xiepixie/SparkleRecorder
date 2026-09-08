@@ -165,6 +165,9 @@ public struct MacroCandidateCapabilities: Codable, Equatable, Sendable {
     public let locatorKinds: [String]
     public let authoringMacroFields: [String]
     public let eventFields: [String]
+    /// Core non-optional RecordedEvent fields that must be present in every authored event.
+    /// Optional so older exported authoring contracts remain decodable.
+    public let requiredEventFields: [String]?
     public let textAnchorFields: [String]
     public let maximumEventCount: Int
     public let maximumDuration: Double
@@ -182,6 +185,7 @@ public struct MacroCandidateCapabilities: Codable, Equatable, Sendable {
         eventKinds: RecordedEvent.Kind.allCases.map(\.rawValue),
         locatorKinds: ["text"], authoringMacroFields: MacroCandidateSchema.authoringMacroFields.sorted(),
         eventFields: MacroCandidateSchema.eventFields.sorted(),
+        requiredEventFields: MacroCandidateSchema.requiredEventFields.sorted(),
         textAnchorFields: MacroCandidateSchema.anchorFields.sorted(),
         maximumEventCount: 100_000, maximumDuration: 86_400, maximumTextTimeout: 3_600,
         maximumCoordinateMagnitude: 1_000_000, normalizedCoordinateRange: [0, 1],
@@ -203,6 +207,38 @@ public struct MacroCandidateCapabilities: Codable, Equatable, Sendable {
         candidateActionRevision: MacroReconstructionContractVersions.candidateActionRevision,
         protectedExecutionFields: ["loops", "speed", "followWindowOffset", "chainTo"]
     )
+
+    /// Older v4 reconstruction packages predate `requiredEventFields`. That field
+    /// documents an already-enforced Codable requirement; it did not change playback
+    /// semantics, so those packages remain safe to import when every other capability
+    /// agrees with the current contract.
+    public static func supportsImportVersion(_ version: String) -> Bool {
+        version == current.version || version == "macro-candidate/v4"
+    }
+
+    public func isImportCompatibleWithCurrent() -> Bool {
+        let expected = Self.current
+        guard Self.supportsImportVersion(version) else { return false }
+        guard macroVersions == expected.macroVersions,
+              eventKinds == expected.eventKinds,
+              locatorKinds == expected.locatorKinds,
+              authoringMacroFields == expected.authoringMacroFields,
+              eventFields == expected.eventFields,
+              textAnchorFields == expected.textAnchorFields,
+              maximumEventCount == expected.maximumEventCount,
+              maximumDuration == expected.maximumDuration,
+              maximumTextTimeout == expected.maximumTextTimeout,
+              maximumCoordinateMagnitude == expected.maximumCoordinateMagnitude,
+              normalizedCoordinateRange == expected.normalizedCoordinateRange,
+              surfaceAuthoringPolicy == expected.surfaceAuthoringPolicy,
+              textOperationPolicy == expected.textOperationPolicy,
+              textVerificationPolicy == expected.textVerificationPolicy,
+              candidateActionRevision == expected.candidateActionRevision,
+              protectedExecutionFields == expected.protectedExecutionFields else {
+            return false
+        }
+        return requiredEventFields == nil || requiredEventFields == expected.requiredEventFields
+    }
 }
 
 // Shared with the strict JSON boundary so the exported manifest cannot drift.
@@ -217,13 +253,15 @@ enum MacroCandidateSchema {
     /// Compatibility-only input accepted from v3 standalone candidates. New v4
     /// packages omit source-owned Surface bodies and reference them by event.surfaceId.
     static let acceptedMacroFields = authoringMacroFields.union(["surfaces"])
-    static let eventFields: Set<String> = [
-        "kind", "time", "x", "y", "keyCode", "flags", "mouseButton", "clickCount", "scrollDeltaY", "scrollDeltaX",
+    static let requiredEventFields: Set<String> = [
+        "kind", "time", "x", "y", "keyCode", "flags", "mouseButton", "clickCount", "scrollDeltaY", "scrollDeltaX"
+    ]
+    static let eventFields: Set<String> = requiredEventFields.union([
         "scrollPayload", "unicodeString", "windowLocalX", "windowLocalY", "windowNormalizedX", "windowNormalizedY",
         "contentLocalX", "contentLocalY", "contentNormalizedX", "contentNormalizedY", "coordinateBinding",
         "coordinateStrategy", "locatorFallbackPolicy", "surfaceId", "textAnchor", "textTimeout", "verifyMustExist",
         "behaviorGroupID", "behaviorGroupName", "isDisabled"
-    ]
+    ])
     static let anchorFields: Set<String> = [
         "text", "matchMode", "observedFrame", "searchRegion", "occurrenceHint", "coordinateFallback",
         "observedContentNormalizedFrame", "searchContentNormalizedRegion", "coordinateFallbackContentNormalized"

@@ -650,6 +650,10 @@ private struct EditorPreviewAffordanceEvidenceView: View {
   init() {
     let state = OverlayState()
     state.actions = Self.fixtureActions
+    let selectedActionID = AutomationProductEvidenceSnapshotScenario.fixedUUID(
+      "7f000000-0000-0000-0000-000000000001")
+    state.detailActionIDs = [selectedActionID]
+    state.selectedActionID = selectedActionID
     _overlayState = StateObject(wrappedValue: state)
   }
 
@@ -676,7 +680,7 @@ private struct EditorPreviewAffordanceEvidenceView: View {
         .font(.system(size: 34, weight: .semibold))
         .foregroundStyle(.white)
       Text(
-        "Fixture evidence for the UI owner rule: wait/verify actions are labeled condition regions, while click and text-click actions keep click pulse affordances."
+        "Fixture evidence for text-target editing: long labels wrap, search regions have explicit handles, fallback remains visible before playback, and missing Playback Surfaces use stable window previews."
       )
       .font(.system(size: 15, weight: .medium))
       .foregroundStyle(Color.white.opacity(0.64))
@@ -759,24 +763,29 @@ private struct EditorPreviewAffordanceEvidenceView: View {
   private var evidenceRail: some View {
     VStack(alignment: .leading, spacing: 14) {
       railItem(
-        title: "Wait text",
-        detail: "Region label only; no click pulse.",
+        title: "Search condition",
+        detail: "The full target text wraps outside the region. Drag the top handle to move the scope; corner handles resize it.",
         color: Color(red: 0.95, green: 0.63, blue: 0.21)
       )
       railItem(
-        title: "Verify text",
-        detail: "Condition region uses verify styling, not a coordinate click.",
+        title: "Unavailable window",
+        detail: "A bound Playback Surface that is hidden or closed is centered as a recorded-layout window instead of leaking stale screen coordinates.",
+        color: Color(red: 0.95, green: 0.63, blue: 0.21)
+      )
+      railItem(
+        title: "Unbound action",
+        detail: "When no Playback Surface is bound, the last recorded position is kept while it remains on-screen; the outline makes the missing binding explicit.",
         color: Color(red: 0.60, green: 0.50, blue: 0.96)
       )
       railItem(
-        title: "Click text",
-        detail: "Text locator shows the region and click pulse because it sends input.",
-        color: Color(red: 0.37, green: 0.72, blue: 0.96)
+        title: "Coordinate action",
+        detail: "Ordinary bound clicks use the same simulated Playback Surface when the real window is unavailable, so Paths never drops their position.",
+        color: Color(red: 0.45, green: 0.82, blue: 0.48)
       )
       railItem(
-        title: "Click position",
-        detail: "Ordinary coordinate click keeps the pulse target.",
-        color: Color(red: 0.45, green: 0.82, blue: 0.48)
+        title: "Fallback",
+        detail: "Coordinate fallback is always visible when enabled. It becomes directly draggable when its action is selected, so the backup can be maintained before playback.",
+        color: Color(red: 0.37, green: 0.72, blue: 0.96)
       )
       Spacer(minLength: 0)
       Text(
@@ -814,7 +823,20 @@ private struct EditorPreviewAffordanceEvidenceView: View {
   }
 
   private static var fixtureActions: [RelativePreviewAction] {
-    [
+    let unavailableWindow = PreviewSurfaceBackdrop(
+      id: "unavailable-checkout",
+      frame: CGRect(x: 38, y: 72, width: 388, height: 470),
+      mode: .recordedLayout,
+      title: "Checkout · Review order"
+    )
+    let unboundWindow = PreviewSurfaceBackdrop(
+      id: "unbound-confirmation",
+      frame: CGRect(x: 470, y: 108, width: 340, height: 400),
+      mode: .unboundLastPosition,
+      title: nil
+    )
+
+    return [
       RelativePreviewAction(
         id: AutomationProductEvidenceSnapshotScenario.fixedUUID(
           "7f000000-0000-0000-0000-000000000001"),
@@ -823,8 +845,13 @@ private struct EditorPreviewAffordanceEvidenceView: View {
         selectedPoint: nil,
         dragPath: [],
         observedFrame: nil,
-        searchRegion: CGRect(x: 86, y: 178, width: 250, height: 54),
+        searchRegion: CGRect(x: 86, y: 182, width: 270, height: 88),
         fallbackPoint: nil,
+        targetText: "Your order has been confirmed and the receipt is ready to download",
+        surfaceBackdrop: unavailableWindow,
+        targetSurfaceFrame: unavailableWindow.frame,
+        searchRegionIsExplicit: true,
+        allowsGeometryEditing: true,
         themeColor: Color(red: 0.95, green: 0.63, blue: 0.21),
         order: 1
       ),
@@ -836,8 +863,13 @@ private struct EditorPreviewAffordanceEvidenceView: View {
         selectedPoint: nil,
         dragPath: [],
         observedFrame: nil,
-        searchRegion: CGRect(x: 530, y: 180, width: 218, height: 58),
+        searchRegion: CGRect(x: 470, y: 108, width: 340, height: 400),
         fallbackPoint: nil,
+        targetText: "Success",
+        surfaceBackdrop: unboundWindow,
+        targetSurfaceFrame: unboundWindow.frame,
+        searchRegionIsExplicit: false,
+        allowsGeometryEditing: true,
         themeColor: Color(red: 0.60, green: 0.50, blue: 0.96),
         order: 2
       ),
@@ -845,12 +877,18 @@ private struct EditorPreviewAffordanceEvidenceView: View {
         id: AutomationProductEvidenceSnapshotScenario.fixedUUID(
           "7f000000-0000-0000-0000-000000000003"),
         kind: .click,
-        affordance: .textClickTarget,
-        selectedPoint: CGPoint(x: 198, y: 486),
-        dragPath: [CGPoint(x: 198, y: 486)],
-        observedFrame: CGRect(x: 118, y: 456, width: 160, height: 60),
-        searchRegion: CGRect(x: 94, y: 438, width: 208, height: 96),
-        fallbackPoint: CGPoint(x: 198, y: 486),
+        affordance: .locatorInputTarget,
+        selectedPoint: CGPoint(x: 220, y: 430),
+        dragPath: [CGPoint(x: 220, y: 430)],
+        observedFrame: CGRect(x: 120, y: 384, width: 168, height: 48),
+        searchRegion: CGRect(x: 88, y: 352, width: 250, height: 116),
+        fallbackPoint: CGPoint(x: 344, y: 444),
+        targetText: "Continue",
+        surfaceBackdrop: unavailableWindow,
+        targetSurfaceFrame: unavailableWindow.frame,
+        searchRegionIsExplicit: true,
+        allowsGeometryEditing: true,
+        usesCoordinateFallback: true,
         themeColor: Color(red: 0.37, green: 0.72, blue: 0.96),
         order: 3
       ),
@@ -859,11 +897,13 @@ private struct EditorPreviewAffordanceEvidenceView: View {
           "7f000000-0000-0000-0000-000000000004"),
         kind: .click,
         affordance: .inputPoint,
-        selectedPoint: CGPoint(x: 636, y: 492),
-        dragPath: [CGPoint(x: 636, y: 492)],
+        selectedPoint: CGPoint(x: 382, y: 312),
+        dragPath: [CGPoint(x: 382, y: 312)],
         observedFrame: nil,
         searchRegion: nil,
         fallbackPoint: nil,
+        surfaceBackdrop: unavailableWindow,
+        targetSurfaceFrame: unavailableWindow.frame,
         themeColor: Color(red: 0.45, green: 0.82, blue: 0.48),
         order: 4
       ),

@@ -9,7 +9,7 @@ struct EditorToolbar: View {
     let health: MacroEditorHealthSummary
     @Binding var hideMouseMoves: Bool
     @Binding var showAllPaths: Bool
-    @Binding var showOverlayPreview: Bool
+    @Binding var showSelectedPreview: Bool
     @Binding var smartMergeGestures: Bool
     let onExport: (() -> Void)?
 
@@ -42,16 +42,16 @@ struct EditorToolbar: View {
 
 	                HStack(spacing: 6) {
 	                    EditorToolbarToggle(
-	                        isOn: $showOverlayPreview,
+	                        isOn: $showSelectedPreview,
 	                        title: String(localized: "Preview", table: "Common"),
-	                        help: String(localized: "Show or hide the on-screen coordinate preview overlay", table: "Recording"),
+	                        help: String(localized: "Show the selected action's detailed on-screen preview", table: "EditorUX"),
 	                        icon: "eye",
 	                        tint: Brand.sigTeal
 	                    )
 	                    EditorToolbarToggle(
 	                        isOn: $showAllPaths,
 	                        title: String(localized: "Paths", table: "Common"),
-	                        help: String(localized: "Show paths for all actions instead of only the selection", table: "EditorUX"),
+	                        help: String(localized: "Show all action targets and gesture paths as an overview", table: "EditorUX"),
 	                        icon: "point.topleft.down.to.point.bottomright.curvepath",
 	                        tint: Brand.sigViolet
 	                    )

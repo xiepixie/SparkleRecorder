@@ -7,11 +7,6 @@ struct AutomationTaskRunEvidenceReadinessView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            AutomationSectionHeader(
-                title: String(localized: "DRILL-IN READINESS", table: "Common"),
-                count: rows.count
-            )
-
             ForEach(rows) { row in
                 readinessRow(row)
             }

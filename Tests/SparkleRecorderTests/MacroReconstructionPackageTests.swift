@@ -65,8 +65,11 @@ struct MacroReconstructionPackageTests {
 
         #expect(harness.version == MacroReconstructionHarnessIndex.currentVersion)
         #expect(harness.contracts == .current)
+        #expect(harness.contracts.candidateCapabilityVersion == "macro-candidate/v4")
         #expect(authoring.version == harness.contracts.authoringContractVersion)
         #expect(authoring.capabilities == .current)
+        #expect(authoring.capabilities.version == "macro-candidate/v4")
+        #expect(Set(authoring.capabilities.requiredEventFields ?? []) == MacroCandidateSchema.requiredEventFields)
         #expect(report.packageVersion == harness.contracts.packageVersion)
         #expect(sourceContext.version == harness.contracts.sourceContextVersion)
         #expect(actionContext.version == harness.contracts.actionContextVersion)

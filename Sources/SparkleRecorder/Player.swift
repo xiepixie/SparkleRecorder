@@ -493,31 +493,15 @@ final class Player: ObservableObject {
         WindowContextClient(
             resolveFrameResolutions: { surfaces in
                 guard let tracker else { return [:] }
-                return Player.resolvedFrameResolutions(for: surfaces, tracker: tracker)
+                return LivePlaybackSurfaceGeometry.resolveFrameResolutions(
+                    for: surfaces,
+                    tracker: tracker
+                )
             },
             activateSurface: { surface in
                 Player.activateSurface(surface)
             }
         )
-    }
-
-    nonisolated private static func resolvedFrameResolutions(
-        for surfaces: [String: PlaybackSurface],
-        tracker: WindowTracker
-    ) -> [String: PlaybackSurfaceFrameResolution] {
-        let windows = tracker.resolveCurrentWindows(for: surfaces)
-        return windows.reduce(into: [:]) { resolutions, entry in
-            let (surfaceId, window) = entry
-            guard surfaces[surfaceId] != nil else { return }
-            let resolved = WindowContentFrameResolver.resolveContentFrame(
-                for: window.processID,
-                outerFrame: window.frame
-            )
-            resolutions[surfaceId] = PlaybackSurfaceFrameResolution(
-                outerFrame: window.frame,
-                contentFrame: RectValue(resolved.frame)
-            )
-        }
     }
 
 }

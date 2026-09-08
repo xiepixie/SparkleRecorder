@@ -27,17 +27,19 @@ struct AutomationTaskRunEvidenceSectionView: View {
                     .disabled(run.macroID == nil || isLoading || run.artifactRetention?.status == .pruned)
             }
 
-            if let evidenceID = run.evidenceID {
-                AutomationTaskRunDetailRowView(
-                    title: String(localized: "Evidence ID", table: "Common"),
-                    value: shortID(evidenceID)
-                )
-            }
+            if payload == nil {
+                if let evidenceID = run.evidenceID {
+                    AutomationTaskRunDetailRowView(
+                        title: String(localized: "Evidence ID", table: "Common"),
+                        value: shortID(evidenceID)
+                    )
+                }
 
-            Text(evidenceSummary)
-                .font(.caption)
-                .foregroundStyle(.tertiary)
-                .fixedSize(horizontal: false, vertical: true)
+                Text(evidenceSummary)
+                    .font(.caption)
+                    .foregroundStyle(.tertiary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
 
             if run.artifactRetention?.status == .pruned {
                 Label(prunedEvidenceMessage, systemImage: "clock.badge.checkmark")
@@ -138,30 +140,8 @@ struct AutomationTaskRunEvidenceSectionView: View {
 
     @ViewBuilder
     private func evidencePayloadContent(_ payload: AutomationTaskRunEvidencePayload) -> some View {
-        VStack(alignment: .leading, spacing: 5) {
-            AutomationTaskRunDetailRowView(
-                title: String(localized: "Source", table: "Common"),
-                value: sourceLabel(payload.source)
-            )
-            AutomationTaskRunEvidenceBindingView(run: run, payload: payload)
-            ViewThatFits(in: .horizontal) {
-                HStack(spacing: 8) {
-                    evidenceFileButtons(payload)
-                }
-                VStack(alignment: .leading, spacing: 6) {
-                    evidenceFileButtons(payload)
-                }
-            }
-            if let actionFeedback {
-                evidenceActionFeedbackView(actionFeedback)
-            }
-            if let manifest = payload.manifest {
-                AutomationTaskRunEvidenceManifestView(manifest: manifest)
-            }
-            AutomationTaskRunDetailRowView(
-                title: String(localized: "Report run", table: "Common"),
-                value: shortID(payload.report.runID)
-            )
+        VStack(alignment: .leading, spacing: 7) {
+            // 1. 核心结果指标
             AutomationTaskRunDetailRowView(
                 title: String(localized: "Result", table: "Common"),
                 value: payload.report.isSuccess
@@ -189,20 +169,73 @@ struct AutomationTaskRunEvidenceSectionView: View {
                     value: errorMessage
                 )
             }
+
+            // 2. 诊断与行动建议
             AutomationTaskRunEvidenceDiagnosticsView(run: run, payload: payload)
+
+            // 3. 现场证据截图
             if let screenshotData = payload.screenshotData {
                 AutomationTaskRunEvidenceScreenshotPreviewView(
                     screenshotData: screenshotData,
                     loadedAt: payload.loadedAt
                 )
+            } else {
+                Label(missingScreenshotLabel(for: payload), systemImage: "photo.badge.exclamationmark")
+                    .font(.caption)
+                    .foregroundStyle(.tertiary)
+                    .padding(.vertical, 2)
             }
-            AutomationTaskRunEvidenceReadinessView(run: run, payload: payload)
-        }
 
-        if payload.screenshotData == nil {
-            Label(missingScreenshotLabel(for: payload), systemImage: "photo.badge.exclamationmark")
-                .font(.caption)
-                .foregroundStyle(.tertiary)
+            // 4. 操作按钮组与反馈
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 8) {
+                    evidenceFileButtons(payload)
+                }
+                VStack(alignment: .leading, spacing: 6) {
+                    evidenceFileButtons(payload)
+                }
+            }
+            if let actionFeedback {
+                evidenceActionFeedbackView(actionFeedback)
+            }
+
+            // 5. 技术诊断与存储详情（折叠式收纳）
+            technicalDetailsDisclosure(payload)
+        }
+    }
+
+    @ViewBuilder
+    private func technicalDetailsDisclosure(_ payload: AutomationTaskRunEvidencePayload) -> some View {
+        DisclosureGroup {
+            VStack(alignment: .leading, spacing: 5) {
+                if let evidenceID = run.evidenceID {
+                    AutomationTaskRunDetailRowView(
+                        title: String(localized: "Evidence ID", table: "Common"),
+                        value: shortID(evidenceID)
+                    )
+                }
+                AutomationTaskRunDetailRowView(
+                    title: String(localized: "Report run", table: "Common"),
+                    value: shortID(payload.report.runID)
+                )
+                AutomationTaskRunDetailRowView(
+                    title: String(localized: "Source", table: "Common"),
+                    value: sourceLabel(payload.source)
+                )
+                AutomationTaskRunEvidenceBindingView(run: run, payload: payload)
+                if let manifest = payload.manifest {
+                    AutomationTaskRunEvidenceManifestView(manifest: manifest)
+                }
+                AutomationTaskRunEvidenceReadinessView(run: run, payload: payload)
+            }
+            .padding(.top, 4)
+        } label: {
+            Label(
+                String(localized: "Technical diagnostics", table: "Automation"),
+                systemImage: "wrench.and.screwdriver"
+            )
+            .font(.caption.weight(.medium))
+            .foregroundStyle(.secondary)
         }
     }
 

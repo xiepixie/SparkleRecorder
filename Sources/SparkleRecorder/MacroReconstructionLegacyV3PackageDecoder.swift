@@ -33,7 +33,7 @@ enum MacroReconstructionLegacyV3PackageDecoder {
         guard contract.packageVersion == packageVersion else {
             throw MacroReconstructionCandidateInputError.unsupportedPackageVersion(contract.packageVersion)
         }
-        guard contract.candidateCapabilityVersion == MacroReconstructionContractVersions.candidateCapability else {
+        guard MacroCandidateCapabilities.supportsImportVersion(contract.candidateCapabilityVersion) else {
             throw MacroReconstructionCandidateInputError.unsupportedCapabilityVersion(contract.candidateCapabilityVersion)
         }
         guard contract.authoringPolicyVersion == MacroReconstructionContractVersions.authoringPolicy else {
@@ -50,7 +50,8 @@ enum MacroReconstructionLegacyV3PackageDecoder {
             MacroCandidateCapabilities.self,
             from: Data(contentsOf: capabilitiesURL, options: .mappedIfSafe)
         )
-        guard capabilities == MacroCandidateCapabilities.current else {
+        guard capabilities.version == contract.candidateCapabilityVersion,
+              capabilities.isImportCompatibleWithCurrent() else {
             throw MacroReconstructionCandidateInputError.unsupportedCapabilityVersion(capabilities.version)
         }
         let policy = try decoder.decode(

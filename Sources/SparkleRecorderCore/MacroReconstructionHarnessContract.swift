@@ -82,4 +82,25 @@ public struct MacroReconstructionAuthoringContract: Codable, Equatable, Sendable
         )
         rules = Self.authoringRules
     }
+
+    /// Accepts the exact current authoring contract plus the two v4 capability
+    /// snapshots emitted before and during the required-event metadata rollout.
+    /// Other rule/capability edits remain rejected as package tampering or drift.
+    public func isImportCompatible(objective: MacroReconstructionObjective) -> Bool {
+        let expected = Self(objective: objective)
+        if self == expected { return true }
+        guard version == expected.version,
+              capabilities.isImportCompatibleWithCurrent(),
+              policy == expected.policy,
+              executableEventKinds == expected.executableEventKinds,
+              reconstructionActionKinds == expected.reconstructionActionKinds,
+              enumValues == expected.enumValues else {
+            return false
+        }
+
+        if rules == expected.rules { return true }
+        guard capabilities.requiredEventFields == nil else { return false }
+        let legacyRules = expected.rules.filter { $0.id != "schema.requiredEventFields" }
+        return rules == legacyRules
+    }
 }

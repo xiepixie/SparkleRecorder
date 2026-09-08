@@ -23,11 +23,16 @@ enum MacroReconstructionV4PackageDecoder {
         guard harness.version == MacroReconstructionHarnessIndex.currentVersion else {
             throw MacroReconstructionCandidateInputError.unsupportedContractVersion(harness.version)
         }
-        guard harness == MacroReconstructionHarnessIndex(
+        var expectedHarness = MacroReconstructionHarnessIndex(
             sourceRevision: harness.sourceRevision,
             macroID: harness.macroID,
             objective: harness.objective
-        ) else {
+        )
+        // Capability compatibility is validated against authoring-contract.json below.
+        // Keep the rest of the system-maintained harness strict while allowing the
+        // known v4 capability ledger value to survive a backward-compatible metadata rollout.
+        expectedHarness.contracts.candidateCapabilityVersion = harness.contracts.candidateCapabilityVersion
+        guard harness == expectedHarness else {
             throw MacroReconstructionCandidateInputError.packageContractMismatch("harness.json")
         }
 
@@ -49,8 +54,9 @@ enum MacroReconstructionV4PackageDecoder {
         guard contract.authoringContractVersion == MacroReconstructionContractVersions.authoringContract else {
             throw MacroReconstructionCandidateInputError.packageContractMismatch("authoringContractVersion")
         }
-        guard contract.candidateCapabilityVersion == MacroReconstructionContractVersions.candidateCapability,
-              authoring.capabilities == MacroCandidateCapabilities.current else {
+        guard contract.candidateCapabilityVersion == authoring.capabilities.version,
+              MacroCandidateCapabilities.supportsImportVersion(contract.candidateCapabilityVersion),
+              authoring.capabilities.isImportCompatibleWithCurrent() else {
             throw MacroReconstructionCandidateInputError.unsupportedCapabilityVersion(authoring.capabilities.version)
         }
         guard contract.authoringPolicyVersion == MacroReconstructionContractVersions.authoringPolicy,
@@ -68,7 +74,7 @@ enum MacroReconstructionV4PackageDecoder {
               authoring.capabilities.candidateActionRevision == contract.candidateActionRevision else {
             throw MacroReconstructionCandidateInputError.packageContractMismatch("candidateActionRevision")
         }
-        guard authoring == MacroReconstructionAuthoringContract(objective: harness.objective) else {
+        guard authoring.isImportCompatible(objective: harness.objective) else {
             throw MacroReconstructionCandidateInputError.packageContractMismatch("authoring-contract.json")
         }
 

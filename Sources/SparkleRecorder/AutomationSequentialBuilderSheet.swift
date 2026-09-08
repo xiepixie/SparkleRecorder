@@ -487,89 +487,92 @@ struct AutomationSequentialBuilderSheet: View {
   var body: some View {
     VStack(spacing: 0) {
       header
-      Divider()
-      readinessEditor
-      Divider()
-      sequenceEditor
-      Divider()
-      scheduleEditor
-      Divider()
-      summary
-      Divider()
+        .padding(.horizontal, 22)
+        .padding(.vertical, 14)
+        .background(Color(nsColor: .windowBackgroundColor))
+
+      Divider().opacity(0.35)
+
+      ScrollView {
+        VStack(spacing: 18) {
+          readinessSection
+          sequenceSection
+          scheduleSection
+          summarySection
+        }
+        .padding(.horizontal, 22)
+        .padding(.vertical, 16)
+      }
+      .background(Color.primary.opacity(0.015))
+
+      Divider().opacity(0.35)
+
       footer
+        .padding(.horizontal, 22)
+        .padding(.vertical, 12)
+        .background(Color(nsColor: .windowBackgroundColor))
     }
-    .frame(width: 900, height: 720)
+    .frame(width: 880, height: 700)
   }
 
   private var header: some View {
     HStack(spacing: 12) {
       Image(systemName: "point.3.connected.trianglepath.dotted")
-        .font(.system(size: 21, weight: .semibold))
+        .font(.system(size: 20, weight: .semibold))
         .foregroundStyle(Brand.libraryBlue)
-        .frame(width: 30, height: 30)
+        .frame(width: 28, height: 28)
+
       Text("Quick sequence", tableName: "Automation")
         .font(.headline)
+
       TextField(String(localized: "Sequence name", table: "Automation"), text: $draft.name)
         .textFieldStyle(.roundedBorder)
-        .frame(maxWidth: 360)
-    }
-    .padding(.horizontal, 18)
-    .padding(.vertical, 14)
-  }
+        .frame(maxWidth: 320)
 
-  private var sequenceEditor: some View {
-    VStack(alignment: .leading, spacing: 0) {
-      sectionHeader(
-        title: String(localized: "Steps", table: "Automation"),
-        value: "\(draft.steps.count)"
-      )
-      ScrollView {
-        LazyVStack(spacing: 8) {
-          ForEach(draft.steps) { step in
-            stepRow(stepID: step.id)
-          }
-        }
-        .padding(12)
-      }
-      Divider()
-      Menu {
-        ForEach(availableMacros) { macro in
-          Button(macro.name) {
-            draft.add(macro)
-          }
-        }
+      Spacer(minLength: 12)
+
+      Button {
+        dismiss()
       } label: {
-        Label(String(localized: "Add macro", table: "Automation"), systemImage: "plus")
+        Image(systemName: "xmark.circle.fill")
+          .font(.system(size: 16))
+          .foregroundStyle(.tertiary)
       }
-      .menuStyle(.borderlessButton)
-      .padding(12)
+      .buttonStyle(.plain)
+      .help(String(localized: "Cancel", table: "Common"))
     }
-    .frame(minWidth: 570, maxWidth: .infinity)
   }
 
-  private var readinessEditor: some View {
-    VStack(alignment: .leading, spacing: 0) {
-      sectionHeader(title: String(localized: "Start preparation", table: "Automation"), value: nil)
-      HStack(spacing: 12) {
+  private var readinessSection: some View {
+    VStack(alignment: .leading, spacing: 8) {
+      HStack {
         Label(
-          String(localized: "Open target application", table: "Automation"),
+          String(localized: "Start preparation", table: "Automation"),
           systemImage: "macwindow.badge.plus"
         )
+        .font(.subheadline.weight(.semibold))
         .foregroundStyle(.secondary)
+        Spacer()
+      }
 
-        Picker(
-          String(localized: "Wait after window appears", table: "Automation"),
-          selection: $draft.targetApplicationReadyDelay
-        ) {
-          Text("No wait", tableName: "Automation").tag(TimeInterval(0))
-          Text("2s").tag(TimeInterval(2))
-          Text("5s").tag(TimeInterval(5))
-          Text("10s").tag(TimeInterval(10))
-          Text("20s").tag(TimeInterval(20))
+      HStack(spacing: 16) {
+        HStack(spacing: 8) {
+          Text(String(localized: "Wait after window appears", table: "Automation"))
+            .font(.callout)
+            .foregroundStyle(.secondary)
+
+          Picker("", selection: $draft.targetApplicationReadyDelay) {
+            Text(String(localized: "No wait", table: "Automation")).tag(TimeInterval(0))
+            Text("2s").tag(TimeInterval(2))
+            Text("5s").tag(TimeInterval(5))
+            Text("10s").tag(TimeInterval(10))
+            Text("20s").tag(TimeInterval(20))
+          }
+          .labelsHidden()
+          .frame(width: 100)
         }
-        .frame(width: 250)
 
-        Spacer(minLength: 8)
+        Spacer(minLength: 12)
 
         Menu {
           ForEach(availableMacros) { macro in
@@ -582,180 +585,355 @@ struct AutomationSequentialBuilderSheet: View {
             String(localized: "Add login or navigation macro", table: "Automation"),
             systemImage: "person.badge.key"
           )
+          .font(.callout)
         }
         .menuStyle(.borderlessButton)
       }
-      .padding(.horizontal, 16)
-      .padding(.vertical, 12)
+      .padding(.horizontal, 14)
+      .padding(.vertical, 10)
+      .background(
+        RoundedRectangle(cornerRadius: 8, style: .continuous)
+          .fill(Color(nsColor: .controlBackgroundColor))
+      )
+      .overlay(
+        RoundedRectangle(cornerRadius: 8, style: .continuous)
+          .strokeBorder(Color.primary.opacity(0.06), lineWidth: 1)
+      )
+    }
+  }
+
+  private var sequenceSection: some View {
+    VStack(alignment: .leading, spacing: 8) {
+      HStack {
+        Label(
+          String(localized: "Steps", table: "Automation"),
+          systemImage: "square.stack.3d.up"
+        )
+        .font(.subheadline.weight(.semibold))
+        .foregroundStyle(.secondary)
+
+        Text("\(draft.steps.count)")
+          .font(.caption2.weight(.bold).monospacedDigit())
+          .padding(.horizontal, 6)
+          .padding(.vertical, 1.5)
+          .background(Capsule().fill(Brand.libraryBlue.opacity(0.12)))
+          .foregroundStyle(Brand.libraryBlue)
+
+        Spacer()
+
+        Menu {
+          ForEach(availableMacros) { macro in
+            Button(macro.name) {
+              draft.add(macro)
+            }
+          }
+        } label: {
+          Label(String(localized: "Add macro", table: "Automation"), systemImage: "plus.circle.fill")
+            .font(.callout.weight(.medium))
+            .foregroundStyle(Brand.libraryBlue)
+        }
+        .menuStyle(.borderlessButton)
+      }
+
+      VStack(spacing: 0) {
+        ForEach(Array(draft.steps.enumerated()), id: \.element.id) { index, step in
+          stepCard(step: step, index: index)
+
+          if index < draft.steps.count - 1 {
+            stepConnector(index: index)
+          }
+        }
+      }
+    }
+  }
+
+  private func stepCard(step: AutomationLinearSequenceStep, index: Int) -> some View {
+    let isLast = index == draft.steps.count - 1
+    return HStack(spacing: 12) {
+      Text("\(index + 1)")
+        .font(.system(size: 11, weight: .bold, design: .rounded))
+        .foregroundStyle(Brand.libraryBlue)
+        .frame(width: 22, height: 22)
+        .background(Circle().fill(Brand.libraryBlue.opacity(0.12)))
+
+      Image(systemName: "play.rectangle.fill")
+        .font(.system(size: 14))
+        .foregroundStyle(Brand.libraryBlue)
+
+      VStack(alignment: .leading, spacing: 2) {
+        Text(step.macroName)
+          .font(.system(size: 13, weight: .semibold))
+          .lineLimit(1)
+        Text(durationText(step.duration))
+          .font(.caption.monospacedDigit())
+          .foregroundStyle(.secondary)
+      }
+
+      Spacer(minLength: 16)
+
+      HStack(spacing: 2) {
+        stepButton(
+          "arrow.up", help: String(localized: "Move earlier", table: "Automation"),
+          disabled: index == 0
+        ) {
+          draft.moveStep(id: step.id, direction: .earlier)
+        }
+        stepButton(
+          "arrow.down", help: String(localized: "Move later", table: "Automation"),
+          disabled: isLast
+        ) {
+          draft.moveStep(id: step.id, direction: .later)
+        }
+        stepButton(
+          "trash", help: String(localized: "Remove step", table: "Automation"),
+          role: .destructive
+        ) {
+          draft.removeStep(id: step.id)
+        }
+      }
+    }
+    .padding(.horizontal, 14)
+    .padding(.vertical, 10)
+    .background(
+      RoundedRectangle(cornerRadius: 8, style: .continuous)
+        .fill(Color(nsColor: .controlBackgroundColor))
+    )
+    .overlay(
+      RoundedRectangle(cornerRadius: 8, style: .continuous)
+        .strokeBorder(Color.primary.opacity(0.08), lineWidth: 1)
+    )
+    .shadow(color: Color.black.opacity(0.02), radius: 2, y: 1)
+  }
+
+  private func stepConnector(index: Int) -> some View {
+    let step = draft.steps[index]
+    return VStack(spacing: 2) {
+      Rectangle()
+        .fill(Color.primary.opacity(0.12))
+        .frame(width: 1.5, height: 7)
+
+      HStack(spacing: 6) {
+        Menu {
+          ForEach(AutomationLinearContinuation.allCases) { continuation in
+            Button(continuation.title) {
+              draft.steps[index].continuation = continuation
+            }
+          }
+        } label: {
+          HStack(spacing: 4) {
+            Image(systemName: connectorIcon(for: step.continuation))
+              .font(.system(size: 9.5, weight: .semibold))
+            Text(connectorSummary(for: step))
+              .font(.system(size: 11, weight: .medium))
+            Image(systemName: "chevron.up.chevron.down")
+              .font(.system(size: 8))
+              .foregroundStyle(.secondary)
+          }
+          .padding(.horizontal, 9)
+          .padding(.vertical, 3.5)
+          .background(Capsule().fill(Color(nsColor: .controlBackgroundColor)))
+          .overlay(Capsule().strokeBorder(Color.primary.opacity(0.12), lineWidth: 1))
+        }
+        .menuStyle(.borderlessButton)
+        .fixedSize()
+      }
+
+      if step.continuation == .delay {
+        HStack(spacing: 6) {
+          Text(String(localized: "Wait", table: "Automation") + ":")
+            .font(.caption2)
+            .foregroundStyle(.secondary)
+          TextField(
+            "", value: $draft.steps[index].delaySeconds,
+            format: .number.precision(.fractionLength(0...1))
+          )
+          .textFieldStyle(.roundedBorder)
+          .frame(width: 58)
+          .controlSize(.small)
+          Text(String(localized: "seconds", table: "Common"))
+            .font(.caption2)
+            .foregroundStyle(.secondary)
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 4)
+        .background(
+          RoundedRectangle(cornerRadius: 6, style: .continuous)
+            .fill(Color(nsColor: .controlBackgroundColor))
+        )
+        .overlay(
+          RoundedRectangle(cornerRadius: 6, style: .continuous)
+            .strokeBorder(Color.accentColor.opacity(0.25), lineWidth: 1)
+        )
+      } else if step.continuation == .screenText {
+        ocrInlineConfig(index: index)
+      }
+
+      VStack(spacing: -3) {
+        Rectangle()
+          .fill(Color.primary.opacity(0.12))
+          .frame(width: 1.5, height: 7)
+        Image(systemName: "chevron.down")
+          .font(.system(size: 8, weight: .bold))
+          .foregroundStyle(Color.primary.opacity(0.28))
+      }
+    }
+    .padding(.vertical, 1)
+  }
+
+  private func connectorIcon(for continuation: AutomationLinearContinuation) -> String {
+    switch continuation {
+    case .immediate: return "arrow.down"
+    case .delay: return "timer"
+    case .screenText: return "text.viewfinder"
+    }
+  }
+
+  private func connectorSummary(for step: AutomationLinearSequenceStep) -> String {
+    switch step.continuation {
+    case .immediate:
+      return String(localized: "Continue immediately", table: "Automation")
+    case .delay:
+      return String(
+        format: String(localized: "Wait %.1fs", table: "Automation"),
+        step.delaySeconds
+      )
+    case .screenText:
+      let trimmed = step.screenText.trimmingCharacters(in: .whitespacesAndNewlines)
+      return trimmed.isEmpty
+        ? String(localized: "Wait for screen text", table: "Automation")
+        : String(format: String(localized: "Wait for “%@”", table: "Automation"), trimmed)
     }
   }
 
   @ViewBuilder
-  private func stepRow(stepID: UUID) -> some View {
-    if let index = draft.steps.firstIndex(where: { $0.id == stepID }) {
-      let isLast = index == draft.steps.count - 1
-      VStack(alignment: .leading, spacing: 9) {
-        HStack(spacing: 10) {
-          Text("\(index + 1)")
-            .font(.system(size: 11, weight: .bold, design: .monospaced))
-            .foregroundStyle(.secondary)
-            .frame(width: 24, height: 24)
-            .background(Circle().fill(Color.primary.opacity(0.07)))
-          VStack(alignment: .leading, spacing: 2) {
-            Text(draft.steps[index].macroName)
-              .font(.subheadline.weight(.semibold))
-              .lineLimit(1)
-            Text(durationText(draft.steps[index].duration))
-              .font(.caption.monospacedDigit())
-              .foregroundStyle(.secondary)
-          }
-          Spacer(minLength: 0)
-          stepButton(
-            "arrow.up", help: String(localized: "Move earlier", table: "Automation"),
-            disabled: index == 0
-          ) {
-            draft.moveStep(id: stepID, direction: .earlier)
-          }
-          stepButton(
-            "arrow.down", help: String(localized: "Move later", table: "Automation"),
-            disabled: isLast
-          ) {
-            draft.moveStep(id: stepID, direction: .later)
-          }
-          stepButton(
-            "trash", help: String(localized: "Remove step", table: "Automation"), role: .destructive
-          ) {
-            draft.removeStep(id: stepID)
-          }
+  private func ocrInlineConfig(index: Int) -> some View {
+    let stepID = draft.steps[index].id
+    VStack(spacing: 6) {
+      HStack(spacing: 8) {
+        TextField(
+          String(localized: "Text to find", table: "Automation"),
+          text: $draft.steps[index].screenText
+        )
+        .textFieldStyle(.roundedBorder)
+        .controlSize(.small)
+
+        Button {
+          pickOCRText(stepID: stepID)
+        } label: {
+          Label(
+            String(localized: "Pick from screen", table: "Automation"),
+            systemImage: "text.viewfinder"
+          )
+          .font(.caption2)
         }
+        .controlSize(.small)
 
-        if !isLast {
-          Divider().opacity(0.55)
-          LabeledContent(String(localized: "Then", table: "Automation")) {
-            Picker("", selection: $draft.steps[index].continuation) {
-              ForEach(AutomationLinearContinuation.allCases) { continuation in
-                Text(continuation.title).tag(continuation)
-              }
-            }
-            .labelsHidden()
-            .frame(width: 220)
-          }
-
-          switch draft.steps[index].continuation {
-          case .immediate:
-            EmptyView()
-          case .delay:
-            LabeledContent(String(localized: "Wait", table: "Automation")) {
-              HStack(spacing: 6) {
-                TextField(
-                  "", value: $draft.steps[index].delaySeconds,
-                  format: .number.precision(.fractionLength(0...1))
-                )
-                .textFieldStyle(.roundedBorder)
-                .frame(width: 72)
-                Text("seconds", tableName: "Common")
-                  .foregroundStyle(.secondary)
-              }
-            }
-          case .screenText:
-            HStack(spacing: 8) {
-              TextField(
-                String(localized: "Text to find", table: "Automation"),
-                text: $draft.steps[index].screenText
-              )
-              Button {
-                pickOCRText(stepID: stepID)
-              } label: {
-                Label(
-                  String(localized: "Pick from screen", table: "Automation"),
-                  systemImage: "text.viewfinder"
-                )
-              }
-              Button {
-                drawOCRRegion(stepID: stepID)
-              } label: {
-                Label(
-                  String(localized: "Draw area", table: "Automation"),
-                  systemImage: "viewfinder.rectangular"
-                )
-              }
-            }
-            HStack(spacing: 10) {
-              Picker(
-                String(localized: "Match", table: "Automation"),
-                selection: $draft.steps[index].ocrMatchMode
-              ) {
-                Text("Contains", tableName: "Common").tag(TextMatchMode.contains)
-                Text("Exact", tableName: "Common").tag(TextMatchMode.exact)
-              }
-              .pickerStyle(.segmented)
-              .frame(width: 190)
-
-              if draft.steps[index].ocrSearchRegion != nil {
-                Label(
-                  draft.steps[index].ocrSearchRegionSpace.titleForVisualCondition,
-                  systemImage: "rectangle.dashed"
-                )
-                .font(.caption)
-                .foregroundStyle(Brand.libraryGreen)
-                Button {
-                  clearOCRRegion(stepID: stepID)
-                } label: {
-                  Image(systemName: "xmark.circle.fill")
-                }
-                .buttonStyle(.plain)
-                .help(String(localized: "Clear OCR area", table: "Automation"))
-              } else {
-                Label(
-                  String(localized: "Entire target screen", table: "Automation"),
-                  systemImage: "display"
-                )
-                .font(.caption)
-                .foregroundStyle(.secondary)
-              }
-
-              Spacer(minLength: 8)
-              Text("Timeout", tableName: "Common")
-                .foregroundStyle(.secondary)
-              Picker("", selection: $draft.steps[index].conditionTimeout) {
-                Text("10s").tag(TimeInterval(10))
-                Text("30s").tag(TimeInterval(30))
-                Text("60s").tag(TimeInterval(60))
-                Text("120s").tag(TimeInterval(120))
-              }
-              .labelsHidden()
-              .frame(width: 100)
-            }
-          }
+        Button {
+          drawOCRRegion(stepID: stepID)
+        } label: {
+          Label(
+            String(localized: "Draw area", table: "Automation"),
+            systemImage: "viewfinder.rectangular"
+          )
+          .font(.caption2)
         }
+        .controlSize(.small)
       }
-      .padding(12)
-      .background(
-        RoundedRectangle(cornerRadius: 7, style: .continuous)
-          .fill(Color(nsColor: .controlBackgroundColor))
-      )
-      .overlay(
-        RoundedRectangle(cornerRadius: 7, style: .continuous)
-          .strokeBorder(Color.primary.opacity(0.09), lineWidth: 1)
-      )
+
+      HStack(spacing: 10) {
+        Picker(
+          "",
+          selection: $draft.steps[index].ocrMatchMode
+        ) {
+          Text(String(localized: "Contains", table: "Common")).tag(TextMatchMode.contains)
+          Text(String(localized: "Exact", table: "Common")).tag(TextMatchMode.exact)
+        }
+        .labelsHidden()
+        .pickerStyle(.segmented)
+        .frame(width: 130)
+        .controlSize(.small)
+
+        if draft.steps[index].ocrSearchRegion != nil {
+          Label(
+            draft.steps[index].ocrSearchRegionSpace.titleForVisualCondition,
+            systemImage: "rectangle.dashed"
+          )
+          .font(.caption2)
+          .foregroundStyle(Brand.libraryGreen)
+
+          Button {
+            clearOCRRegion(stepID: stepID)
+          } label: {
+            Image(systemName: "xmark.circle.fill")
+              .font(.caption2)
+          }
+          .buttonStyle(.plain)
+          .help(String(localized: "Clear OCR area", table: "Automation"))
+        } else {
+          Label(
+            String(localized: "Entire target screen", table: "Automation"),
+            systemImage: "display"
+          )
+          .font(.caption2)
+          .foregroundStyle(.secondary)
+        }
+
+        Spacer(minLength: 6)
+
+        Text(String(localized: "Timeout", table: "Common") + ":")
+          .font(.caption2)
+          .foregroundStyle(.secondary)
+
+        Picker("", selection: $draft.steps[index].conditionTimeout) {
+          Text("10s").tag(TimeInterval(10))
+          Text("30s").tag(TimeInterval(30))
+          Text("60s").tag(TimeInterval(60))
+          Text("120s").tag(TimeInterval(120))
+        }
+        .labelsHidden()
+        .frame(width: 75)
+        .controlSize(.small)
+      }
     }
+    .padding(.horizontal, 10)
+    .padding(.vertical, 7)
+    .background(
+      RoundedRectangle(cornerRadius: 6, style: .continuous)
+        .fill(Color(nsColor: .controlBackgroundColor))
+    )
+    .overlay(
+      RoundedRectangle(cornerRadius: 6, style: .continuous)
+        .strokeBorder(Color.accentColor.opacity(0.25), lineWidth: 1)
+    )
   }
 
-  private var scheduleEditor: some View {
-    VStack(alignment: .leading, spacing: 0) {
-      sectionHeader(title: String(localized: "Timing", table: "Automation"), value: nil)
-      VStack(spacing: 11) {
+  private var scheduleSection: some View {
+    VStack(alignment: .leading, spacing: 8) {
+      Label(
+        String(localized: "Timing", table: "Automation"),
+        systemImage: "calendar.badge.clock"
+      )
+      .font(.subheadline.weight(.semibold))
+      .foregroundStyle(.secondary)
+
+      VStack(spacing: 10) {
         HStack(spacing: 12) {
-          Picker(String(localized: "Run", table: "Common"), selection: $draft.scheduleMode) {
+          Text(String(localized: "Run", table: "Common"))
+            .font(.callout)
+            .foregroundStyle(.secondary)
+
+          Picker("", selection: $draft.scheduleMode) {
             ForEach(AutomationLinearScheduleMode.allCases) { mode in
               Text(mode.title).tag(mode)
             }
           }
-          .frame(width: 180)
+          .labelsHidden()
+          .frame(width: 140)
 
           switch draft.scheduleMode {
           case .manual:
-            Text("Manual", tableName: "Common")
+            Text(String(localized: "Manual only", table: "Automation"))
+              .font(.callout)
               .foregroundStyle(.secondary)
           case .daily:
             DatePicker(
@@ -769,7 +947,7 @@ struct AutomationSequentialBuilderSheet: View {
                 Text(weekdayTitle(weekday)).tag(weekday)
               }
             }
-            .frame(width: 180)
+            .frame(width: 120)
             DatePicker(
               String(localized: "At", table: "Common"),
               selection: $draft.startAt,
@@ -788,54 +966,71 @@ struct AutomationSequentialBuilderSheet: View {
               displayedComponents: [.date, .hourAndMinute]
             )
             HStack(spacing: 6) {
-              Text("Every", tableName: "Common")
+              Text(String(localized: "Every", table: "Common"))
               TextField("", value: $draft.repeatEvery, format: .number)
                 .textFieldStyle(.roundedBorder)
-                .frame(width: 52)
+                .frame(width: 48)
               Picker("", selection: $draft.repeatUnit) {
                 ForEach(AutomationTimelineRepeatUnit.allCases) { unit in
                   Text(unit.title).tag(unit)
                 }
               }
               .labelsHidden()
-              .frame(width: 100)
+              .frame(width: 90)
             }
           }
           Spacer(minLength: 0)
         }
 
-        HStack(spacing: 10) {
-          Label(
-            String(localized: "Next run", table: "Automation"),
-            systemImage: "calendar.badge.clock"
-          )
-          .foregroundStyle(.secondary)
-          if let nextRun = draft.nextRun() {
-            Text(nextRun, format: .dateTime.month(.abbreviated).day().weekday().hour().minute())
-              .monospacedDigit()
-          } else {
-            Text("Manual", tableName: "Common")
+        Divider().opacity(0.35)
+
+        HStack(spacing: 12) {
+          HStack(spacing: 6) {
+            Image(systemName: "calendar")
+              .foregroundStyle(.secondary)
+            Text(String(localized: "Next run", table: "Automation") + ":")
+              .foregroundStyle(.secondary)
+            if let nextRun = draft.nextRun() {
+              Text(nextRun, format: .dateTime.month(.abbreviated).day().weekday().hour().minute())
+                .monospacedDigit()
+                .fontWeight(.medium)
+            } else {
+              Text(String(localized: "Manual only", table: "Automation"))
+            }
           }
+          .font(.caption)
+
           Spacer(minLength: 16)
+
           Label(
             String(localized: "Each macro once", table: "Automation"),
             systemImage: "play.square.stack"
           )
+          .font(.caption)
           .foregroundStyle(.secondary)
         }
       }
-      .padding(.horizontal, 16)
-      .padding(.vertical, 12)
+      .padding(.horizontal, 14)
+      .padding(.vertical, 11)
+      .background(
+        RoundedRectangle(cornerRadius: 8, style: .continuous)
+          .fill(Color(nsColor: .controlBackgroundColor))
+      )
+      .overlay(
+        RoundedRectangle(cornerRadius: 8, style: .continuous)
+          .strokeBorder(Color.primary.opacity(0.06), lineWidth: 1)
+      )
     }
   }
 
-  private var summary: some View {
-    HStack(spacing: 10) {
+  private var summarySection: some View {
+    HStack(spacing: 8) {
       Image(
         systemName: validationMessage == nil
           ? "checkmark.circle.fill" : "exclamationmark.triangle.fill"
       )
       .foregroundStyle(validationMessage == nil ? Brand.libraryGreen : Color.red)
+
       if let validationMessage {
         Text(validationMessage)
           .foregroundStyle(.red)
@@ -848,21 +1043,23 @@ struct AutomationSequentialBuilderSheet: View {
             estimatedDurationText
           )
         )
+        .fontWeight(.medium)
         .foregroundStyle(.secondary)
+
         Spacer(minLength: 0)
+
         Text("Applications remain open after the sequence", tableName: "Automation")
           .font(.caption)
-          .foregroundStyle(.secondary)
+          .foregroundStyle(.tertiary)
           .lineLimit(1)
       }
     }
     .font(.caption)
-    .padding(.horizontal, 18)
-    .frame(height: 42)
+    .padding(.horizontal, 2)
   }
 
   private var footer: some View {
-    HStack(spacing: 10) {
+    HStack(spacing: 12) {
       Button(String(localized: "Cancel", table: "Common")) { dismiss() }
         .keyboardShortcut(.cancelAction)
         .disabled(isSaving)
@@ -880,12 +1077,18 @@ struct AutomationSequentialBuilderSheet: View {
       Button(String(localized: "Advanced edit…", table: "Automation")) {
         create(intent: .advancedEdit)
       }
+      .buttonStyle(.plain)
+      .foregroundStyle(.secondary)
+      .font(.callout)
       .disabled(validationMessage != nil || isPreviewActive || isSaving)
+
       AutomationLinearSequencePreviewButton(
         isDisabled: validationMessage != nil || isSaving,
         onActivityChange: { isPreviewActive = $0 },
         onRun: { create(intent: .saveAndTest) }
       )
+      .buttonStyle(.bordered)
+
       Button {
         create(intent: .save)
       } label: {
@@ -899,8 +1102,6 @@ struct AutomationSequentialBuilderSheet: View {
       .buttonStyle(.borderedProminent)
       .disabled(validationMessage != nil || isPreviewActive || isSaving)
     }
-    .padding(.horizontal, 18)
-    .padding(.vertical, 12)
   }
 
   private var validationMessage: String? {

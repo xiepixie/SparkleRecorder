@@ -641,6 +641,193 @@
         }
       }
     },
+    "Adjust Target": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Adjust Target"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "调整目标位置"
+          }
+        }
+      }
+    },
+    "Adjust Fallback": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Adjust Fallback"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "调整备用位置"
+          }
+        }
+      }
+    },
+    "Adjust Search Area": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Adjust Search Area"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "调整搜索范围"
+          }
+        }
+      }
+    },
+    "Fallback not set": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fallback not set"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "备用位置未设置"
+          }
+        }
+      }
+    },
+    "Move search area": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Move search area"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "移动搜索范围"
+          }
+        }
+      }
+    },
+    "No target window": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No target window"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "尚未绑定目标窗口"
+          }
+        }
+      }
+    },
+    "Resize search area": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Resize search area"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "调整搜索范围大小"
+          }
+        }
+      }
+    },
+    "Showing the recorded window layout": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Showing the recorded window layout"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在按录制时的窗口布局预览"
+          }
+        }
+      }
+    },
+    "Target window unavailable": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Target window unavailable"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "目标窗口当前不可用"
+          }
+        }
+      }
+    },
+    "The recorded position is off-screen; showing it in the center": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The recorded position is off-screen; showing it in the center"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "上次记录的位置已不在当前屏幕中，已居中显示"
+          }
+        }
+      }
+    },
+    "Using the last recorded position": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Using the last recorded position"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在使用上次记录的位置"
+          }
+        }
+      }
+    },
     "After Action #": {
       "extractionState": "manual",
       "localizations": {
@@ -4757,19 +4944,36 @@
         }
       }
     },
-    "Show paths for all actions instead of only the selection": {
+    "Show all action targets and gesture paths as an overview": {
       "extractionState": "manual",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Show paths for all actions instead of only the selection"
+            "value": "Show all action targets and gesture paths as an overview"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "显示全部动作轨迹，不只显示所选动作"
+            "value": "概览整个宏的动作位置与手势轨迹"
+          }
+        }
+      }
+    },
+    "Show the selected action's detailed on-screen preview": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Show the selected action's detailed on-screen preview"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "显示所选动作的详细屏幕预览与编辑控件"
           }
         }
       }

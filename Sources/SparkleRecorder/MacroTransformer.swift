@@ -97,6 +97,19 @@ extension Array where Element == RecordedEvent {
         event.contentLocalY = cLocalY
         event.contentNormalizedX = contentFrame.width > 0 ? cLocalX / contentFrame.width : 0
         event.contentNormalizedY = contentFrame.height > 0 ? cLocalY / contentFrame.height : 0
+
+        // Locator-backed input stores the coordinate fallback in both the event fields
+        // and the TextAnchor. Keep those representations in lockstep when the editor
+        // moves the fallback; otherwise preview and playback can silently diverge.
+        if var anchor = event.textAnchor,
+           anchor.coordinateFallback != nil || anchor.coordinateFallbackContentNormalized != nil {
+            anchor.coordinateFallback = PointValue(x: event.x, y: event.y)
+            anchor.coordinateFallbackContentNormalized = PointValue(
+                x: event.contentNormalizedX ?? 0,
+                y: event.contentNormalizedY ?? 0
+            )
+            event.textAnchor = anchor
+        }
     }
     
     private mutating func resolveContentFrames(for indices: [Int], surfaces: [String: PlaybackSurface]) -> [String: CGRect] {
@@ -256,6 +269,47 @@ extension Array where Element == RecordedEvent {
         self = newEvents
     }
     
+    /// Updates the editable OCR search scope while keeping absolute compatibility
+    /// geometry and content-normalized geometry in sync across every event in the action.
+    public mutating func updateTextAnchorSearchRegion(
+        at indices: [Int],
+        absolute: RectValue,
+        normalized: RectValue?
+    ) {
+        var newEvents = self
+        for idx in indices where newEvents.indices.contains(idx) {
+            guard var anchor = newEvents[idx].textAnchor else { continue }
+            anchor.searchRegion = absolute
+            anchor.searchContentNormalizedRegion = normalized
+            newEvents[idx].textAnchor = anchor
+        }
+        self = newEvents
+    }
+
+    /// Updates the explicit locator fallback. Locator playback stores this point
+    /// in both RecordedEvent coordinates and TextAnchor geometry, so the editor
+    /// must change both representations atomically.
+    public mutating func updateTextAnchorCoordinateFallback(
+        at indices: [Int],
+        absolute: PointValue,
+        normalized: PointValue?
+    ) {
+        var newEvents = self
+        for idx in indices where newEvents.indices.contains(idx) {
+            guard var anchor = newEvents[idx].textAnchor else { continue }
+            anchor.coordinateFallback = absolute
+            anchor.coordinateFallbackContentNormalized = normalized
+            newEvents[idx].textAnchor = anchor
+            if newEvents[idx].coordinateStrategy == .locatorOnly {
+                newEvents[idx].x = absolute.x
+                newEvents[idx].y = absolute.y
+                newEvents[idx].contentNormalizedX = normalized?.x
+                newEvents[idx].contentNormalizedY = normalized?.y
+            }
+        }
+        self = newEvents
+    }
+
     /// Update surface ID of events at indices.
     public mutating func updateSurfaceId(at indices: [Int], surfaceId: String) {
         var newEvents = self

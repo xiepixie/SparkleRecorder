@@ -90,46 +90,65 @@ struct LibraryHeader: View {
             }
         }
         .padding(.horizontal, 16)
-        .padding(.vertical, 16)
+        .padding(.vertical, 10)
     }
 
     @ViewBuilder
     private var recordingEvidenceStatus: some View {
         let mode = state.recordingPermissionReadiness.evidenceMode
-        HStack(alignment: .center, spacing: 8) {
-            Image(systemName: evidenceIcon(for: mode))
-                .font(.system(size: 11, weight: .semibold))
-                .foregroundStyle(evidenceTint(for: mode))
-                .frame(width: 16)
+        if mode == .visualEvidenceBlocked {
+            HStack(alignment: .center, spacing: 8) {
+                Image(systemName: evidenceIcon(for: mode))
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(evidenceTint(for: mode))
+                    .frame(width: 16)
 
-            VStack(alignment: .leading, spacing: 2) {
-                Text(evidenceTitle(for: mode))
-                    .font(.system(size: 10.5, weight: .semibold))
-                    .foregroundStyle(.primary)
-                Text(evidenceDetail(for: mode))
-                    .font(.system(size: 9.5))
-                    .foregroundStyle(.secondary)
-                    .lineLimit(2)
-            }
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(evidenceTitle(for: mode))
+                        .font(.system(size: 10.5, weight: .semibold))
+                        .foregroundStyle(.primary)
+                    Text(evidenceDetail(for: mode))
+                        .font(.system(size: 9.5))
+                        .foregroundStyle(.secondary)
+                        .lineLimit(2)
+                }
 
-            Spacer(minLength: 8)
+                Spacer(minLength: 8)
 
-            if mode == .visualEvidenceBlocked {
                 Button(String(localized: "Grant…", table: "Settings")) {
                     controller.openScreenCapturePrefs()
                 }
                 .buttonStyle(.bordered)
                 .controlSize(.mini)
             }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 7)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(evidenceTint(for: mode).opacity(0.08), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .strokeBorder(evidenceTint(for: mode).opacity(0.2), lineWidth: 0.5)
+            )
+        } else {
+            HStack(spacing: 6) {
+                Image(systemName: evidenceIcon(for: mode))
+                    .font(.system(size: 9.5))
+                    .foregroundStyle(evidenceTint(for: mode))
+                Text(evidenceTitle(for: mode))
+                    .font(.system(size: 10, weight: .medium))
+                    .foregroundStyle(.secondary)
+                Text("·")
+                    .font(.system(size: 9.5))
+                    .foregroundStyle(.tertiary)
+                Text(evidenceDetail(for: mode))
+                    .font(.system(size: 9.5))
+                    .foregroundStyle(.tertiary)
+                    .lineLimit(1)
+                Spacer()
+            }
+            .padding(.horizontal, 4)
+            .padding(.vertical, 2)
         }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 7)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(evidenceTint(for: mode).opacity(0.06), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: 8, style: .continuous)
-                .strokeBorder(evidenceTint(for: mode).opacity(0.16), lineWidth: 0.5)
-        )
     }
 
     private func evidenceTitle(for mode: RecordingEvidenceMode) -> String {

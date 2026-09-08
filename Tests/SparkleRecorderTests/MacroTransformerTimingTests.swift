@@ -76,6 +76,83 @@ struct MacroTransformerTimingTests {
         #expect(events[0].textAnchor?.coordinateFallbackContentNormalized == PointValue(x: 0.2, y: 0.3))
     }
 
+    @Test("Moving locator-backed input keeps TextAnchor fallback geometry in sync")
+    func movingLocatorBackedInputKeepsFallbackGeometryInSync() {
+        let surface = TestFixtures.surface(
+            recordedFrame: RectValue(x: 100, y: 100, width: 200, height: 200),
+            recordedContentFrame: RectValue(x: 100, y: 120, width: 200, height: 180)
+        )
+        var event = RecordedEvent.make(.leftMouseDown, time: 0, x: 150, y: 170, mouseButton: 0)
+        event.surfaceId = TestFixtures.surfaceId
+        event.coordinateStrategy = .locatorOnly
+        event.textAnchor = TextAnchor(
+            text: "Continue",
+            observedFrame: RectValue(x: 140, y: 160, width: 80, height: 24),
+            coordinateFallback: PointValue(x: 150, y: 170),
+            coordinateFallbackContentNormalized: PointValue(x: 0.25, y: 50.0 / 180.0)
+        )
+        var events = [event]
+
+        events.translateEvents(
+            at: [0],
+            dx: 20,
+            dy: 10,
+            surfaces: [TestFixtures.surfaceId: surface]
+        )
+
+        #expect(events[0].x == 170)
+        #expect(events[0].y == 180)
+        #expect(events[0].textAnchor?.coordinateFallback == PointValue(x: 170, y: 180))
+        #expect(abs((events[0].textAnchor?.coordinateFallbackContentNormalized?.x ?? -1) - 0.35) < 0.000_001)
+        #expect(abs((events[0].textAnchor?.coordinateFallbackContentNormalized?.y ?? -1) - (60.0 / 180.0)) < 0.000_001)
+    }
+
+    @Test("Text target geometry edits keep shared locator events aligned")
+    func textTargetGeometryEditsKeepSharedLocatorEventsAligned() {
+        let anchor = TextAnchor(
+            text: "Continue",
+            observedFrame: RectValue(x: 100, y: 120, width: 80, height: 24),
+            searchRegion: RectValue(x: 80, y: 90, width: 160, height: 100),
+            coordinateFallback: PointValue(x: 140, y: 132),
+            searchContentNormalizedRegion: RectValue(x: 0.1, y: 0.1, width: 0.4, height: 0.25),
+            coordinateFallbackContentNormalized: PointValue(x: 0.25, y: 0.2)
+        )
+        var down = RecordedEvent.make(.leftMouseDown, time: 0, x: 140, y: 132, mouseButton: 0)
+        var up = RecordedEvent.make(.leftMouseUp, time: 0.08, x: 140, y: 132, mouseButton: 0)
+        for index in [0, 1] {
+            if index == 0 {
+                down.coordinateStrategy = .locatorOnly
+                down.textAnchor = anchor
+            } else {
+                up.coordinateStrategy = .locatorOnly
+                up.textAnchor = anchor
+            }
+        }
+        var events = [down, up]
+        let newSearch = RectValue(x: 120, y: 130, width: 220, height: 140)
+        let newSearchNormalized = RectValue(x: 0.15, y: 0.18, width: 0.45, height: 0.30)
+        let newFallback = PointValue(x: 210, y: 188)
+        let newFallbackNormalized = PointValue(x: 0.32, y: 0.28)
+
+        events.updateTextAnchorSearchRegion(
+            at: [0, 1],
+            absolute: newSearch,
+            normalized: newSearchNormalized
+        )
+        events.updateTextAnchorCoordinateFallback(
+            at: [0, 1],
+            absolute: newFallback,
+            normalized: newFallbackNormalized
+        )
+
+        #expect(events.allSatisfy { $0.textAnchor?.searchRegion == newSearch })
+        #expect(events.allSatisfy { $0.textAnchor?.searchContentNormalizedRegion == newSearchNormalized })
+        #expect(events.allSatisfy { $0.textAnchor?.coordinateFallback == newFallback })
+        #expect(events.allSatisfy { $0.textAnchor?.coordinateFallbackContentNormalized == newFallbackNormalized })
+        #expect(events.allSatisfy { $0.x == 210 && $0.y == 188 })
+        #expect(events.allSatisfy { $0.contentNormalizedX == 0.32 && $0.contentNormalizedY == 0.28 })
+    }
+
     @Test("Live duration stretch preserves trailing wait beyond last event")
     func liveDurationStretchPreservesTrailingWaitBeyondLastEvent() {
         let events = [

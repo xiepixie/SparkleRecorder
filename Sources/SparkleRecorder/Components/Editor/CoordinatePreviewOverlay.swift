@@ -160,8 +160,21 @@ func swiftuiToScreen(_ pt: CGPoint, window: NSWindow, primaryScreenHeight: CGFlo
 }
 
 @MainActor
+func swiftuiToScreen(_ rect: CGRect, window: NSWindow, primaryScreenHeight: CGFloat) -> CGRect {
+    let topLeft = swiftuiToScreen(CGPoint(x: rect.minX, y: rect.minY), window: window, primaryScreenHeight: primaryScreenHeight)
+    let bottomRight = swiftuiToScreen(CGPoint(x: rect.maxX, y: rect.maxY), window: window, primaryScreenHeight: primaryScreenHeight)
+    return CGRect(
+        x: min(topLeft.x, bottomRight.x),
+        y: min(topLeft.y, bottomRight.y),
+        width: abs(bottomRight.x - topLeft.x),
+        height: abs(bottomRight.y - topLeft.y)
+    )
+}
+
+@MainActor
 final class OverlayState: ObservableObject {
     @Published var actions: [RelativePreviewAction] = []
+    @Published var detailActionIDs: Set<UUID> = []
     @Published var selectedActionID: UUID? = nil
     weak var window: NSWindow?
     var primaryScreenHeight: CGFloat = 0
@@ -179,6 +192,8 @@ final class CoordinatePreviewOverlay {
     var onDragEndPointEnded: ((UUID, CGFloat, CGFloat) -> Void)?
     var onDragPathEnded: ((UUID, CGFloat, CGFloat) -> Void)?
     var onDragPathPointEnded: ((UUID, Int, CGFloat, CGFloat) -> Void)?
+    var onLocatorFallbackEnded: ((UUID, CGPoint) -> Void)?
+    var onSearchRegionEnded: ((UUID, CGRect) -> Void)?
     
     func clearCallbacks() {
         onDragStarted = nil
@@ -186,9 +201,15 @@ final class CoordinatePreviewOverlay {
         onDragEndPointEnded = nil
         onDragPathEnded = nil
         onDragPathPointEnded = nil
+        onLocatorFallbackEnded = nil
+        onSearchRegionEnded = nil
     }
     
-    func show(actions: [PreviewAction], selectedActionID: UUID? = nil) {
+    func show(
+        actions: [PreviewAction],
+        detailActionIDs: Set<UUID> = [],
+        selectedActionID: UUID? = nil
+    ) {
         guard let primaryScreen = NSScreen.screens.first else { return }
         let primaryScreenHeight = primaryScreen.frame.height
         
@@ -225,11 +246,50 @@ final class CoordinatePreviewOverlay {
                 let sy = viewH - localPt.y
                 
                 for action in actions {
-                    if let pt = action.selectedPoint {
+                    guard self.state.selectedActionID == action.id else { continue }
+                    if action.affordance.hasInteractiveAnchor,
+                       let pt = action.selectedPoint {
                         let dx = sx - pt.x, dy = sy - pt.y
-                        if dx * dx + dy * dy <= 784 { return true } // 28^2
+                        let radius = PreviewInteractionMetrics.pointHitRadius
+                        if dx * dx + dy * dy <= radius * radius { return true }
                     }
-                    if action.kind.canPreviewPath,
+                    let actionIsFocused = self.state.selectedActionID == action.id
+                        || (self.state.selectedActionID == nil && actions.count == 1)
+                    if action.affordance.showsLocatorFallbackPoint,
+                       action.usesCoordinateFallback,
+                       actionIsFocused,
+                       action.allowsGeometryEditing,
+                       let fallback = action.fallbackPoint {
+                        let dx = sx - fallback.x, dy = sy - fallback.y
+                        let radius = PreviewInteractionMetrics.fallbackHitRadius
+                        if dx * dx + dy * dy <= radius * radius { return true }
+                    }
+                    if action.searchRegionIsExplicit,
+                       action.allowsGeometryEditing,
+                       actionIsFocused,
+                       let region = action.searchRegion {
+                        let cornerRadius = PreviewInteractionMetrics.searchCornerHitDiameter / 2
+                        let corners = [
+                            CGPoint(x: region.minX, y: region.minY),
+                            CGPoint(x: region.maxX, y: region.minY),
+                            CGPoint(x: region.minX, y: region.maxY),
+                            CGPoint(x: region.maxX, y: region.maxY)
+                        ]
+                        if corners.contains(where: { handle in
+                            let dx = sx - handle.x, dy = sy - handle.y
+                            return dx * dx + dy * dy <= cornerRadius * cornerRadius
+                        }) {
+                            return true
+                        }
+
+                        let moveSize = PreviewInteractionMetrics.searchMoveHitSize
+                        let moveCenter = CGPoint(x: region.midX, y: region.minY)
+                        if abs(sx - moveCenter.x) <= moveSize.width / 2,
+                           abs(sy - moveCenter.y) <= moveSize.height / 2 {
+                            return true
+                        }
+                    }
+                    if action.affordance.showsPath,
                        !action.dragPath.isEmpty {
                         if action.kind.previewsPointSequence {
                             for point in action.dragPath {
@@ -241,7 +301,7 @@ final class CoordinatePreviewOverlay {
                             if dx * dx + dy * dy <= 784 { return true }
                         }
                         if action.dragPath.count > 1,
-                           distanceFromPoint(CGPoint(x: sx, y: sy), toPolyline: action.dragPath) <= 10 {
+                           distanceFromPoint(CGPoint(x: sx, y: sy), toPolyline: action.dragPath) <= PreviewInteractionMetrics.pathHitTolerance {
                             return true
                         }
                     }
@@ -265,24 +325,16 @@ final class CoordinatePreviewOverlay {
         self.state.window = win
         self.state.primaryScreenHeight = primaryScreenHeight
         
-        let relativeActions = actions.map { action -> RelativePreviewAction in
-            let mappedStart = action.selectedPoint.map { screenToSwiftUI($0, window: win, primaryScreenHeight: primaryScreenHeight) }
-            let mappedPath = action.dragPath.map { screenToSwiftUI($0, window: win, primaryScreenHeight: primaryScreenHeight) }
-            return RelativePreviewAction(
-                id: action.id,
-                kind: action.kind,
-                affordance: action.affordance,
-                selectedPoint: mappedStart,
-                dragPath: mappedPath,
-                observedFrame: action.observedFrame.map { screenToSwiftUI($0, window: win, primaryScreenHeight: primaryScreenHeight) },
-                searchRegion: action.searchRegion.map { screenToSwiftUI($0, window: win, primaryScreenHeight: primaryScreenHeight) },
-                fallbackPoint: action.fallbackPoint.map { screenToSwiftUI($0, window: win, primaryScreenHeight: primaryScreenHeight) },
-                themeColor: action.themeColor,
-                order: action.order
+        let relativeActions = actions.map {
+            RelativePreviewAction(
+                screenAction: $0,
+                window: win,
+                primaryScreenHeight: primaryScreenHeight
             )
         }
         
         self.state.actions = relativeActions
+        self.state.detailActionIDs = detailActionIDs
         self.state.selectedActionID = selectedActionID
         
         if let win = window, !win.isVisible {
@@ -294,6 +346,11 @@ final class CoordinatePreviewOverlay {
         (window as? ClickThroughPanel)?.stopTracking()
         window?.orderOut(nil)
         window = nil
+        state.actions = []
+        state.detailActionIDs = []
+        state.selectedActionID = nil
+        state.window = nil
+        clearCallbacks()
     }
     
     func setIgnoresMouseEvents(_ ignore: Bool) {

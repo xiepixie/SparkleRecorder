@@ -94,7 +94,7 @@ struct EditorView: View {
     @State private var activeDragSession: DragEditSession? = nil
     @State private var hoveredRow: UUID? = nil
     @State private var smartMergeGestures = true
-    @AppStorage("showOverlayPreview") var showOverlayPreview = true
+    @AppStorage("showOverlayPreview") var showSelectedPreview = true
 
     @State private var cachedRows: [ActionRow] = []
     @State private var cachedTimelineSamples: [TimelineSampledEvent] = []
@@ -170,7 +170,7 @@ struct EditorView: View {
                     health: macroEditorHealthSummary(for: rows.map(\.group), events: recorder.events),
                     hideMouseMoves: $hideMouseMoves,
                     showAllPaths: $showAllPaths,
-                    showOverlayPreview: $showOverlayPreview,
+                    showSelectedPreview: $showSelectedPreview,
                     smartMergeGestures: $smartMergeGestures,
                     onExport: isEditingCandidate ? nil : { controller.exportAsScript() }
                 )
@@ -286,7 +286,7 @@ struct EditorView: View {
         .onChange(of: smartMergeGestures) {
             updateCachedRows()
         }
-        .onChange(of: showOverlayPreview) {
+        .onChange(of: showSelectedPreview) {
             updatePreview()
         }
         // The active macro changed under us (new recording saved, card clicked,
@@ -480,127 +480,38 @@ struct EditorView: View {
     }
 
     func updatePreview() {
-        guard showOverlayPreview else {
+        guard showSelectedPreview || showAllPaths else {
             CoordinatePreviewOverlay.shared.hide()
             return
         }
-        
-        let groupsToScan: [(id: UUID, grp: ActionGroup)]
-        if showAllPaths {
-            groupsToScan = rows.map { ($0.id, $0.group) }
-        } else {
-            groupsToScan = rows.compactMap { row in
-                guard selection.contains(row.id) else { return nil }
-                return (row.id, row.group)
-            }
+
+        let displayPlan = MacroEditorPreviewDisplayPlan.make(
+            rows: rows,
+            selection: selection,
+            showsSelectedPreview: showSelectedPreview,
+            showsAllPaths: showAllPaths
+        )
+        guard !displayPlan.items.isEmpty else {
+            CoordinatePreviewOverlay.shared.hide()
+            return
         }
-        
+
         let currentMacro = editingMacro
         let events = recorder.events
-        
-        var actionsToPreview: [PreviewAction] = []
-        
-        // Build a temporary PlaybackContext to resolve coordinates
-        var context = PlaybackContext()
-        if let macro = currentMacro {
-            context.surfaces = macro.surfaces
-            context.coordinateMode = macro.followWindowOffset ? .boundWindowOffset : .screenAbsolute
-            
-            let tracker = WindowTracker()
-            context.currentSurfaceFrames = tracker.resolveCurrentFrames(for: macro.surfaces)
-            for (surfaceId, frame) in context.currentSurfaceFrames {
-                if let surface = macro.surfaces[surfaceId] {
-                    let contentFrame = estimatedContentFrame(for: surface, currentFrame: frame)
-                    context.currentContentFrames[surfaceId] = contentFrame
-                    context.currentTitleBarHeights[surfaceId] = max(0, contentFrame.y - frame.y)
-                }
-            }
-        }
-        
-        let resolver = PointResolver()
-        
-        for (orderIdx, item) in groupsToScan.enumerated() {
-            let grp = item.grp
-            
-            // Resolve startPoint
-            var startPt: CGPoint? = nil
-            var observedFrame: CGRect? = nil
-            var searchRegion: CGRect? = nil
-            var fallbackPoint: CGPoint? = nil
-            var usesTextLocator = grp.textAnchor != nil
-            if let firstIdx = grp.eventIndices.first, events.indices.contains(firstIdx) {
-                let ev = events[firstIdx]
-                usesTextLocator = usesTextLocator || ev.coordinateStrategy == .locatorOnly || ev.textAnchor != nil
-                startPt = try? resolver.resolve(ev, context: context).get()
-                if let anchor = ev.textAnchor {
-                    let surfaceId = (try? MacroPlaybackSurfaceEditing.effectiveSurfaceID(
-                        in: events,
-                        eventIndices: grp.eventIndices,
-                        surfaces: currentMacro?.surfaces ?? [:]
-                    )) ?? nil
-                    let contentFrame = surfaceId.flatMap { context.currentContentFrames[$0] }
-                    let currentWindowFrame = surfaceId.flatMap { context.currentSurfaceFrames[$0] }
-                    let recordedWindowFrame = surfaceId.flatMap { currentMacro?.surfaces[$0]?.recordedFrame }
-                    let geometry: ResolvedTextAnchorGeometry
-                    if let recordedWindowFrame, let currentWindowFrame {
-                        geometry = TextAnchorGeometryProjection.resolve(
-                            anchor,
-                            contentFrame: contentFrame,
-                            recordedWindowFrame: recordedWindowFrame,
-                            currentWindowFrame: currentWindowFrame
-                        )
-                    } else {
-                        geometry = TextAnchorGeometryProjection.resolve(anchor, contentFrame: contentFrame)
-                    }
-                    observedFrame = geometry.observedFrame.map {
-                        CGRect(x: $0.x, y: $0.y, width: $0.width, height: $0.height)
-                    }
-                    searchRegion = geometry.searchRegion.map {
-                        CGRect(x: $0.x, y: $0.y, width: $0.width, height: $0.height)
-                    }
-                    fallbackPoint = geometry.coordinateFallback.map { CGPoint(x: $0.x, y: $0.y) }
-                    startPt = startPt ?? fallbackPoint ?? observedFrame.map { CGPoint(x: $0.midX, y: $0.midY) }
-                }
-            }
-            
-            // Resolve path
-            var resolvedPath: [CGPoint] = []
-            for idx in grp.eventIndices {
-                if events.indices.contains(idx) {
-                    let ev = events[idx]
-                    if grp.kind.previewsPointSequence && ev.kind != .leftMouseDown && ev.kind != .rightMouseDown && ev.kind != .otherMouseDown {
-                        continue
-                    }
-                    if let pt = try? resolver.resolve(ev, context: context).get() {
-                        resolvedPath.append(pt)
-                    }
-                }
-            }
-
-            if grp.kind.editsSemanticTextTarget {
-                searchRegion = searchRegion ?? observedFrame
-                observedFrame = nil
-                fallbackPoint = nil
-                startPt = nil
-            }
-            
-            if grp.kind.isPassiveWait || (grp.kind == .mouseMove && hideMouseMoves) {
-                continue
-            }
-            
-            actionsToPreview.append(PreviewAction(
-                id: item.id,
-                kind: grp.kind,
-                affordance: ActionGroupProjection.previewAffordance(for: grp.kind, usesTextLocator: usesTextLocator),
-                selectedPoint: startPt,
-                dragPath: resolvedPath,
-                observedFrame: observedFrame,
-                searchRegion: searchRegion,
-                fallbackPoint: fallbackPoint,
-                themeColor: actionKindColor(grp.kind),
-                order: orderIdx + 1
-            ))
-        }
+        let previewItems = displayPlan.items
+        let liveContext = currentMacro.map { LivePlaybackSurfaceGeometry.playbackContext(for: $0) }
+            ?? PlaybackContext()
+        let previewProjection = MacroEditorPreviewProjector.project(
+            items: previewItems,
+            events: events,
+            liveContext: liveContext,
+            previewCanvas: previewCanvasScreenFrame(),
+            activeScreenUnion: activeScreenUnionFrame(),
+            hideMouseMoves: hideMouseMoves
+        )
+        let actionsToPreview = previewProjection.actions
+        let textGeometryEditContexts = previewProjection.textEditContexts
+        let coordinateGeometryEditContexts = previewProjection.coordinateEditContexts
         
         if !actionsToPreview.isEmpty {
             CoordinatePreviewOverlay.shared.onDragStarted = { [weak recorder] groupID in
@@ -619,16 +530,28 @@ struct EditorView: View {
                 guard let session = self.activeDragSession, session.groupID == groupID, let rec = recorder else { return }
                 rec.loadEvents(session.snapshot, duration: session.liveDuration)
                 self.activeDragSession = nil
-                self.withUndo(String(localized: "Adjust Drag Start", table: "EditorUX")) {
-                    if let start = session.group.startPoint,
+                let recordedDelta = coordinateGeometryEditContexts[groupID]?.recordedDelta(dx: dx, dy: dy) ?? (dx, dy)
+                let undoName = session.group.kind.editsPathTarget
+                    ? String(localized: "Adjust Drag Start", table: "EditorUX")
+                    : String(localized: "Adjust Target", table: "EditorUX")
+                self.withUndo(undoName) {
+                    if session.group.kind.editsPathTarget,
+                       let start = session.group.startPoint,
                        let end = session.group.endPoint {
-                        let newStart = CGPoint(x: start.x + dx, y: start.y + dy)
+                        let newStart = CGPoint(x: start.x + recordedDelta.0, y: start.y + recordedDelta.1)
                         rec.events.conformPath(
                             at: session.eventIndices,
                             oldStartPoint: start,
                             oldEndPoint: end,
                             newStartPoint: newStart,
                             newEndPoint: end,
+                            surfaces: currentMacro?.surfaces ?? [:]
+                        )
+                    } else {
+                        rec.events.translateEvents(
+                            at: session.eventIndices,
+                            dx: recordedDelta.0,
+                            dy: recordedDelta.1,
                             surfaces: currentMacro?.surfaces ?? [:]
                         )
                     }
@@ -640,10 +563,11 @@ struct EditorView: View {
                 guard let session = self.activeDragSession, session.groupID == groupID, let rec = recorder else { return }
                 rec.loadEvents(session.snapshot, duration: session.liveDuration)
                 self.activeDragSession = nil
+                let recordedDelta = coordinateGeometryEditContexts[groupID]?.recordedDelta(dx: dx, dy: dy) ?? (dx, dy)
                 self.withUndo(String(localized: "Adjust Swipe Destination", table: "Common")) {
                     if let start = session.group.startPoint,
                        let end = session.group.endPoint {
-                        let newEnd = CGPoint(x: end.x + dx, y: end.y + dy)
+                        let newEnd = CGPoint(x: end.x + recordedDelta.0, y: end.y + recordedDelta.1)
                         rec.events.conformPath(at: session.eventIndices, startPoint: start, oldEndPoint: end, newEndPoint: newEnd, surfaces: currentMacro?.surfaces ?? [:])
                     }
                 }
@@ -654,11 +578,17 @@ struct EditorView: View {
                 guard let session = self.activeDragSession, session.groupID == groupID, let rec = recorder else { return }
                 rec.loadEvents(session.snapshot, duration: session.liveDuration)
                 self.activeDragSession = nil
+                let recordedDelta = coordinateGeometryEditContexts[groupID]?.recordedDelta(dx: dx, dy: dy) ?? (dx, dy)
                 let undoName = session.group.kind.previewsPointSequence
                     ? String(localized: "Move Click Points", table: "EditorUX")
                     : String(localized: "Move Drag Path", table: "EditorUX")
                 self.withUndo(undoName) {
-                    rec.events.translateEvents(at: session.eventIndices, dx: dx, dy: dy, surfaces: currentMacro?.surfaces ?? [:])
+                    rec.events.translateEvents(
+                        at: session.eventIndices,
+                        dx: recordedDelta.0,
+                        dy: recordedDelta.1,
+                        surfaces: currentMacro?.surfaces ?? [:]
+                    )
                 }
                 self.updateCachedRows()
                 self.loadInspector()
@@ -667,47 +597,95 @@ struct EditorView: View {
                 guard let session = self.activeDragSession, session.groupID == groupID, let rec = recorder else { return }
                 rec.loadEvents(session.snapshot, duration: session.liveDuration)
                 self.activeDragSession = nil
+                let recordedDelta = coordinateGeometryEditContexts[groupID]?.recordedDelta(dx: dx, dy: dy) ?? (dx, dy)
                 self.withUndo(String(localized: "Move Click Point", table: "EditorUX")) {
                     rec.events.translateMultiPointClickPoint(
                         at: session.eventIndices,
                         pointIndex: pointIndex,
-                        dx: dx,
-                        dy: dy,
+                        dx: recordedDelta.0,
+                        dy: recordedDelta.1,
                         surfaces: currentMacro?.surfaces ?? [:]
                     )
                 }
                 self.updateCachedRows()
                 self.loadInspector()
             }
-            CoordinatePreviewOverlay.shared.show(actions: actionsToPreview, selectedActionID: selection.count == 1 ? selection.first : nil)
+            CoordinatePreviewOverlay.shared.onLocatorFallbackEnded = { [weak recorder] groupID, screenPoint in
+                guard let rec = recorder,
+                      let editContext = textGeometryEditContexts[groupID] else { return }
+                let mapped = PreviewSurfaceGeometryProjection.recordedPoint(
+                    from: PointValue(x: screenPoint.x, y: screenPoint.y),
+                    previewContentFrame: editContext.previewContentFrame,
+                    recordedContentFrame: editContext.recordedContentFrame
+                )
+                self.withUndo(String(localized: "Adjust Fallback", table: "EditorUX")) {
+                    rec.events.updateTextAnchorCoordinateFallback(
+                        at: editContext.eventIndices,
+                        absolute: mapped.absolute,
+                        normalized: editContext.storesNormalizedGeometry ? mapped.normalized : nil
+                    )
+                }
+                self.updateCachedRows()
+                self.loadInspector()
+            }
+            CoordinatePreviewOverlay.shared.onSearchRegionEnded = { [weak recorder] groupID, screenRect in
+                guard let rec = recorder,
+                      let editContext = textGeometryEditContexts[groupID] else { return }
+                let mapped = PreviewSurfaceGeometryProjection.recordedRect(
+                    from: RectValue(screenRect),
+                    previewContentFrame: editContext.previewContentFrame,
+                    recordedContentFrame: editContext.recordedContentFrame
+                )
+                self.withUndo(String(localized: "Adjust Search Area", table: "EditorUX")) {
+                    rec.events.updateTextAnchorSearchRegion(
+                        at: editContext.eventIndices,
+                        absolute: mapped.absolute,
+                        normalized: editContext.storesNormalizedGeometry ? mapped.normalized : nil
+                    )
+                }
+                self.updateCachedRows()
+                self.loadInspector()
+            }
+            CoordinatePreviewOverlay.shared.show(
+                actions: actionsToPreview,
+                detailActionIDs: displayPlan.detailActionIDs,
+                selectedActionID: displayPlan.focusedActionID
+            )
         } else {
             CoordinatePreviewOverlay.shared.hide()
         }
     }
     
-    func estimatedContentFrame(for surface: PlaybackSurface, currentFrame: RectValue) -> RectValue {
-        guard let recordedContent = surface.recordedContentFrame else {
-            let fallbackTop: CGFloat = surface.contentFrameSource == CoordinateMapper.ResolvedContentFrame.Source.fallbackOuterFrame.rawValue ? 0 : 28
-            return RectValue(
-                x: currentFrame.x,
-                y: currentFrame.y + fallbackTop,
-                width: currentFrame.width,
-                height: max(1, currentFrame.height - fallbackTop)
+    func previewCanvasScreenFrame() -> RectValue {
+        guard let primary = NSScreen.screens.first else {
+            return RectValue(x: 0, y: 0, width: 1440, height: 900)
+        }
+        let screen = NSApp.keyWindow?.screen
+            ?? NSApp.mainWindow?.screen
+            ?? NSScreen.main
+            ?? primary
+        return RectValue(
+            x: screen.frame.minX,
+            y: primary.frame.height - screen.frame.maxY,
+            width: screen.frame.width,
+            height: screen.frame.height
+        )
+    }
+
+    func activeScreenUnionFrame() -> CGRect {
+        guard let primary = NSScreen.screens.first else {
+            return CGRect(x: 0, y: 0, width: 1440, height: 900)
+        }
+        return NSScreen.screens.reduce(CGRect.null) { partial, screen in
+            partial.union(
+                CGRect(
+                    x: screen.frame.minX,
+                    y: primary.frame.height - screen.frame.maxY,
+                    width: screen.frame.width,
+                    height: screen.frame.height
+                )
             )
         }
-
-        let recordedFrame = surface.recordedFrame
-        let leftInset = recordedContent.x - recordedFrame.x
-        let topInset = recordedContent.y - recordedFrame.y
-        let rightInset = (recordedFrame.x + recordedFrame.width) - (recordedContent.x + recordedContent.width)
-        let bottomInset = (recordedFrame.y + recordedFrame.height) - (recordedContent.y + recordedContent.height)
-
-        return RectValue(
-            x: currentFrame.x + leftInset,
-            y: currentFrame.y + topInset,
-            width: max(1, currentFrame.width - leftInset - rightInset),
-            height: max(1, currentFrame.height - topInset - bottomInset)
-        )
     }
 
     func withUndo(_ name: String, _ mutate: () -> Void) {

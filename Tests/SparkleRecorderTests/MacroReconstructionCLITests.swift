@@ -51,6 +51,38 @@ struct MacroReconstructionCLITests {
         #expect(try await repo.loadMacro(for: source.id) == source)
     }
 
+    @Test("Package import tolerates modifiedAt drift when executable source revision is unchanged")
+    func packageImportToleratesModifiedAtDrift() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let repo = MacroRepository(appSupportURL: root)
+        let source = macro()
+        try await repo.saveMetadata(source)
+        try await repo.saveEvents(source.events, for: source.id)
+
+        let output = root.appendingPathComponent("package")
+        _ = try await MacroReconstructionCLI.execute(
+            ["export", "--macro-id", source.id.uuidString, "--output", output.path],
+            appSupportURL: root
+        )
+        try Data(contentsOf: output.appendingPathComponent("candidate-template.json"))
+            .write(to: output.appendingPathComponent("candidate.json"))
+
+        var metadataOnlyUpdate = try await repo.loadMacro(for: source.id)
+        let originalRevision = try MacroCandidateIdentity.revision(of: metadataOnlyUpdate)
+        metadataOnlyUpdate.modifiedAt = metadataOnlyUpdate.modifiedAt.addingTimeInterval(120)
+        try await repo.saveMetadata(metadataOnlyUpdate)
+        let reloaded = try await repo.loadMacro(for: source.id)
+        #expect(try MacroCandidateIdentity.revision(of: reloaded) == originalRevision)
+        #expect(reloaded.modifiedAt != source.modifiedAt)
+
+        let imported = try await MacroReconstructionCLI.execute(
+            ["import", "--macro-id", source.id.uuidString, "--candidate", output.path],
+            appSupportURL: root
+        )
+        #expect(imported.candidateID != nil)
+    }
+
     @Test("Package import retains machine-readable authoring provenance")
     func packageImportRetainsProvenance() async throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
@@ -103,6 +135,18 @@ struct MacroReconstructionCLITests {
         #expect(input.importProvenance.actionContextVersion == "macro-reconstruction-action-context/v2")
         let normalized = try MacroCandidateValidator.normalize(input.document, source: source)
         #expect(normalized.events == source.events)
+    }
+
+    @Test("Legacy v3 package with v4 candidate capability still imports")
+    func legacyV3PackageWithV4CapabilityStillImports() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let source = SavedMacro(name: "Legacy v3/v4", events: TestFixtures.clickPair())
+        try writeLegacyV3Package(source: source, to: root)
+        try rewriteLegacyV3Capability(at: root, version: "macro-candidate/v4", includeRequiredEventMetadata: false)
+
+        let input = try MacroReconstructionCandidateInputResolver.decodeInput(at: root, source: source)
+        #expect(input.importProvenance.capabilityVersion == "macro-candidate/v4")
     }
 
     @Test("Source-aware package import rejects edits to source-context even when package revision is unchanged")
@@ -277,6 +321,34 @@ struct MacroReconstructionCLITests {
         #expect(throws: MacroReconstructionCandidateInputError.unsupportedCapabilityVersion("macro-candidate/v2")) {
             try MacroReconstructionCandidateInputResolver.decodeInput(at: root)
         }
+    }
+
+    @Test("V4 package imports the pre-required-event-fields v4 capability profile")
+    func v4PackageImportsLegacyV4Capability() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let source = macro()
+        _ = try MacroReconstructionPackage.export(source: source, to: root)
+        try Data(contentsOf: root.appendingPathComponent("candidate-template.json"))
+            .write(to: root.appendingPathComponent("candidate.json"))
+        try rewriteV4Capability(at: root, version: "macro-candidate/v4", includeRequiredEventMetadata: false)
+
+        let input = try MacroReconstructionCandidateInputResolver.decodeInput(at: root, source: source)
+        #expect(input.importProvenance.capabilityVersion == "macro-candidate/v4")
+    }
+
+    @Test("V4 package imports the transitional v4 capability profile")
+    func v4PackageImportsTransitionalV4Capability() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let source = macro()
+        _ = try MacroReconstructionPackage.export(source: source, to: root)
+        try Data(contentsOf: root.appendingPathComponent("candidate-template.json"))
+            .write(to: root.appendingPathComponent("candidate.json"))
+        try rewriteV4Capability(at: root, version: "macro-candidate/v4", includeRequiredEventMetadata: true)
+
+        let input = try MacroReconstructionCandidateInputResolver.decodeInput(at: root, source: source)
+        #expect(input.importProvenance.capabilityVersion == "macro-candidate/v4")
     }
 
     @Test func legacyAppOwnedCandidateFieldExplainsReExport() async throws {
@@ -467,6 +539,58 @@ struct MacroReconstructionCLITests {
             .write(to: root.appendingPathComponent("candidate-template.json"), options: .atomic)
         try MacroCandidateAuthoringProjection.encode(template)
             .write(to: root.appendingPathComponent("candidate.json"), options: .atomic)
+    }
+
+    private func rewriteV4Capability(
+        at root: URL,
+        version: String,
+        includeRequiredEventMetadata: Bool
+    ) throws {
+        let harnessURL = root.appendingPathComponent("harness.json")
+        var harness = try #require(
+            JSONSerialization.jsonObject(with: Data(contentsOf: harnessURL)) as? [String: Any]
+        )
+        var contracts = try #require(harness["contracts"] as? [String: Any])
+        contracts["candidateCapabilityVersion"] = version
+        harness["contracts"] = contracts
+        try JSONSerialization.data(withJSONObject: harness).write(to: harnessURL)
+
+        let authoringURL = root.appendingPathComponent("authoring-contract.json")
+        var authoring = try #require(
+            JSONSerialization.jsonObject(with: Data(contentsOf: authoringURL)) as? [String: Any]
+        )
+        var capabilities = try #require(authoring["capabilities"] as? [String: Any])
+        capabilities["version"] = version
+        if !includeRequiredEventMetadata {
+            capabilities.removeValue(forKey: "requiredEventFields")
+            let rules = try #require(authoring["rules"] as? [[String: Any]])
+            authoring["rules"] = rules.filter { ($0["id"] as? String) != "schema.requiredEventFields" }
+        }
+        authoring["capabilities"] = capabilities
+        try JSONSerialization.data(withJSONObject: authoring).write(to: authoringURL)
+    }
+
+    private func rewriteLegacyV3Capability(
+        at root: URL,
+        version: String,
+        includeRequiredEventMetadata: Bool
+    ) throws {
+        let contractURL = root.appendingPathComponent("contract.json")
+        var contract = try #require(
+            JSONSerialization.jsonObject(with: Data(contentsOf: contractURL)) as? [String: Any]
+        )
+        contract["candidateCapabilityVersion"] = version
+        try JSONSerialization.data(withJSONObject: contract).write(to: contractURL)
+
+        let capabilitiesURL = root.appendingPathComponent("capabilities.json")
+        var capabilities = try #require(
+            JSONSerialization.jsonObject(with: Data(contentsOf: capabilitiesURL)) as? [String: Any]
+        )
+        capabilities["version"] = version
+        if !includeRequiredEventMetadata {
+            capabilities.removeValue(forKey: "requiredEventFields")
+        }
+        try JSONSerialization.data(withJSONObject: capabilities).write(to: capabilitiesURL)
     }
 
     private func macro() -> SavedMacro {

@@ -172,10 +172,6 @@ extension ActionGroupKind {
         }
     }
 
-    var canPreviewPath: Bool {
-        self == .drag || self == .scroll || self == .multiPointClick
-    }
-
     var previewsPointSequence: Bool {
         self == .multiPointClick
     }
